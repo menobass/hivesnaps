@@ -27,3 +27,6 @@ Hive Snaps is a React Native app built with Expo and TypeScript for Android and 
 
 ## License
 MIT
+
+# hivesnaps
+Quick Snap short form content on Hive
