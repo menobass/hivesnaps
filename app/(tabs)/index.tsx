@@ -1,7 +1,9 @@
-import { StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, TextInput, Image, TouchableOpacity, useColorScheme, Dimensions, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import { StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, TextInput, Image, TouchableOpacity, useColorScheme, Dimensions, TouchableWithoutFeedback, Keyboard, ActivityIndicator } from 'react-native';
 import { useState } from 'react';
 import { Text, View } from '@/components/Themed';
 import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
+import { Client, PrivateKey } from '@hiveio/dhive';
 
 const twitterColors = {
   light: {
@@ -29,16 +31,43 @@ const twitterColors = {
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const FIELD_WIDTH = SCREEN_WIDTH * 0.8;
 
+const HIVE_NODES = [
+  'https://api.hive.blog',
+  'https://api.deathwing.me',
+  'https://api.openhive.network',
+];
+const client = new Client(HIVE_NODES);
+
 export default function LoginScreen() {
   const [username, setUsername] = useState('');
   const [postingKey, setPostingKey] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const colorScheme = useColorScheme() || 'light';
   const colors = twitterColors[colorScheme];
   const router = useRouter();
 
-  const handleLogin = () => {
-    // Dummy login, just navigate to FeedScreen
-    router.push('/FeedScreen');
+  const handleLogin = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      // Validate posting key
+      const postingWif = postingKey.trim();
+      const privKey = PrivateKey.from(postingWif);
+      const account = await client.database.getAccounts([username.trim()]);
+      if (!account || !account[0]) throw new Error('Account not found');
+      const pubPosting = privKey.createPublic().toString();
+      const postingAuths = account[0].posting.key_auths.map(([key]) => key);
+      if (!postingAuths.includes(pubPosting)) throw new Error('Invalid posting key');
+      // Store key securely
+      await SecureStore.setItemAsync('hive_username', username.trim());
+      await SecureStore.setItemAsync('hive_posting_key', postingWif);
+      setLoading(false);
+      router.push('/FeedScreen');
+    } catch (e) {
+      setLoading(false);
+      setError('Invalid username or posting key. Please try again.');
+    }
   };
 
   return (
@@ -62,6 +91,7 @@ export default function LoginScreen() {
                 onChangeText={setUsername}
                 autoCapitalize="none"
                 autoCorrect={false}
+                editable={!loading}
               />
               <TextInput
                 style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text, width: FIELD_WIDTH }]}
@@ -72,9 +102,11 @@ export default function LoginScreen() {
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
+                editable={!loading}
               />
-              <TouchableOpacity style={[styles.button, { backgroundColor: colors.button, width: FIELD_WIDTH }]} onPress={handleLogin}>
-                <Text style={[styles.buttonText, { color: colors.buttonText }]}>Login</Text>
+              {error ? <Text style={{ color: 'red', marginBottom: 8 }}>{error}</Text> : null}
+              <TouchableOpacity style={[styles.button, { backgroundColor: colors.button, width: FIELD_WIDTH, opacity: loading ? 0.7 : 1 }]} onPress={handleLogin} disabled={loading}>
+                {loading ? <ActivityIndicator color={colors.buttonText} /> : <Text style={[styles.buttonText, { color: colors.buttonText }]}>Login</Text>}
               </TouchableOpacity>
               <Text style={[styles.info, { color: colors.text, width: FIELD_WIDTH }]}>Your keys are locally stored and encrypted. Only your posting key is required</Text>
               {/* Add space and move the phrase up here */}
