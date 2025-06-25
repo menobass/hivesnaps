@@ -1,6 +1,7 @@
 import { StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, TextInput, Image, TouchableOpacity, useColorScheme, Dimensions } from 'react-native';
 import { useState } from 'react';
 import { Text, View } from '@/components/Themed';
+import { useRouter } from 'expo-router';
 
 const twitterColors = {
   light: {
@@ -33,6 +34,12 @@ export default function LoginScreen() {
   const [postingKey, setPostingKey] = useState('');
   const colorScheme = useColorScheme() || 'light';
   const colors = twitterColors[colorScheme];
+  const router = useRouter();
+
+  const handleLogin = () => {
+    // Dummy login, just navigate to FeedScreen
+    router.push('/FeedScreen');
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}> 
@@ -41,6 +48,7 @@ export default function LoginScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={{ flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' }}>
+          {/* App logo at the top */}
           <Image source={require('../../assets/images/logo.jpg')} style={styles.logo} resizeMode="contain" />
           <Text style={[styles.title, { color: colors.text }]}>Hive Snaps Login</Text>
           <TextInput
@@ -62,7 +70,7 @@ export default function LoginScreen() {
             autoCapitalize="none"
             autoCorrect={false}
           />
-          <TouchableOpacity style={[styles.button, { backgroundColor: colors.button, width: FIELD_WIDTH }]} onPress={() => {}}>
+          <TouchableOpacity style={[styles.button, { backgroundColor: colors.button, width: FIELD_WIDTH }]} onPress={handleLogin}>
             <Text style={[styles.buttonText, { color: colors.buttonText }]}>Login</Text>
           </TouchableOpacity>
           <Text style={[styles.info, { color: colors.text, width: FIELD_WIDTH }]}>Your keys are locally stored and encrypted. Only your posting key is required</Text>
