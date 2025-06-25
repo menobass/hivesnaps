@@ -1,6 +1,8 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Image, useColorScheme, Dimensions } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import SnapMock from './components/SnapMock';
 
 const twitterColors = {
   light: {
@@ -24,13 +26,13 @@ const twitterColors = {
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BUTTON_WIDTH = (SCREEN_WIDTH - 48) / 4; // 12px margin on each side, 8px between buttons
 
-export default function FeedScreen() {
+const FeedScreen = () => {
   const colorScheme = useColorScheme() || 'light';
   const colors = twitterColors[colorScheme];
   const username = 'meno'; // placeholder
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}> 
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["bottom", "right"]}>
       {/* Top bar */}
       <View style={styles.topBar}>
         {/* User avatar instead of logo */}
@@ -63,12 +65,29 @@ export default function FeedScreen() {
         </TouchableOpacity>
       </View>
       {/* Placeholder for feed */}
-      <View style={styles.feedPlaceholder}>
-        <Text style={{ color: colors.text, opacity: 0.5 }}>Feed goes here...</Text>
+      <View style={styles.feedContainer}>
+        {/* BEGIN MOCKUP: Remove this SnapMock when real data is implemented */}
+        <SnapMock />
+        {/* END MOCKUP */}
       </View>
-    </View>
+      {/* Floating Action Button for New Snap */}
+      <TouchableOpacity
+        style={[
+          styles.fab,
+          {
+            backgroundColor: colors.button,
+            shadowColor: colorScheme === 'dark' ? '#000' : '#1DA1F2',
+          },
+        ]}
+        activeOpacity={0.8}
+        onPress={() => {/* TODO: Implement new snap action */}}
+        accessibilityLabel="Create new snap"
+      >
+        <Text style={styles.fabIcon}>+</Text>
+      </TouchableOpacity>
+    </SafeAreaView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -132,9 +151,32 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-  feedPlaceholder: {
+  feedContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  fab: {
+    position: 'absolute',
+    right: 24,
+    bottom: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 100,
+    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  fabIcon: {
+    color: '#fff',
+    fontSize: 36,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
 });
+
+export default FeedScreen;

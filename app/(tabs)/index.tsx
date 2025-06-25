@@ -1,4 +1,4 @@
-import { StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, TextInput, Image, TouchableOpacity, useColorScheme, Dimensions } from 'react-native';
+import { StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, TextInput, Image, TouchableOpacity, useColorScheme, Dimensions, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { useState } from 'react';
 import { Text, View } from '@/components/Themed';
 import { useRouter } from 'expo-router';
@@ -42,53 +42,67 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}> 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View style={{ flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' }}>
-          {/* App logo at the top */}
-          <Image source={require('../../assets/images/logo.jpg')} style={styles.logo} resizeMode="contain" />
-          <Text style={[styles.title, { color: colors.text }]}>Hive Snaps Login</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text, width: FIELD_WIDTH }]}
-            placeholder="username do not use @"
-            placeholderTextColor={colorScheme === 'dark' ? '#8899A6' : '#536471'}
-            value={username}
-            onChangeText={setUsername}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text, width: FIELD_WIDTH }]}
-            placeholder="Posting key only"
-            placeholderTextColor={colorScheme === 'dark' ? '#8899A6' : '#536471'}
-            value={postingKey}
-            onChangeText={setPostingKey}
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <TouchableOpacity style={[styles.button, { backgroundColor: colors.button, width: FIELD_WIDTH }]} onPress={handleLogin}>
-            <Text style={[styles.buttonText, { color: colors.buttonText }]}>Login</Text>
-          </TouchableOpacity>
-          <Text style={[styles.info, { color: colors.text, width: FIELD_WIDTH }]}>Your keys are locally stored and encrypted. Only your posting key is required</Text>
-        </View>
-        <View style={styles.footerContainer}>
-          <Text style={styles.footerText}>Hivesnaps, made with love by @meno</Text>
-        </View>
-      </KeyboardAvoidingView>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}> 
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+        >
+          <View style={styles.flexContainer}>
+            <View style={styles.innerContainer}>
+              {/* App logo at the top */}
+              <Image source={require('../../assets/images/logo.jpg')} style={styles.logo} resizeMode="contain" />
+              <Text style={[styles.title, { color: colors.text }]}>Hive Snaps Login</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text, width: FIELD_WIDTH }]}
+                placeholder="username do not use @"
+                placeholderTextColor={colorScheme === 'dark' ? '#8899A6' : '#536471'}
+                value={username}
+                onChangeText={setUsername}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TextInput
+                style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text, width: FIELD_WIDTH }]}
+                placeholder="Posting key only"
+                placeholderTextColor={colorScheme === 'dark' ? '#8899A6' : '#536471'}
+                value={postingKey}
+                onChangeText={setPostingKey}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity style={[styles.button, { backgroundColor: colors.button, width: FIELD_WIDTH }]} onPress={handleLogin}>
+                <Text style={[styles.buttonText, { color: colors.buttonText }]}>Login</Text>
+              </TouchableOpacity>
+              <Text style={[styles.info, { color: colors.text, width: FIELD_WIDTH }]}>Your keys are locally stored and encrypted. Only your posting key is required</Text>
+              {/* Add space and move the phrase up here */}
+              <View style={{ height: 32 }} />
+              <Text style={styles.footerText}>Hivesnaps, made with love by @meno</Text>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
+    backgroundColor: 'transparent',
+  },
+  flexContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
+    backgroundColor: 'transparent',
+  },
+  innerContainer: {
+    flex: 1,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
   },
   logo: {
     width: 120,
@@ -126,16 +140,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     alignSelf: 'center',
-  },
-  footerContainer: {
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingBottom: 16,
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
   },
   footerText: {
     fontSize: 13,
