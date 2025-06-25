@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Image, useColorScheme, Dimensions, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Image, useColorScheme, Dimensions, ActivityIndicator, FlatList } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import SnapMock from './components/SnapMock';
 import * as SecureStore from 'expo-secure-store';
 import { Client } from '@hiveio/dhive';
+import Snap from './components/Snap';
 
 const twitterColors = {
   light: {
@@ -35,12 +35,27 @@ const HIVE_NODES = [
 ];
 const client = new Client(HIVE_NODES);
 
+// Define a Snap type for Hive posts/comments
+interface Snap {
+  author: string;
+  permlink: string;
+  parent_author: string;
+  parent_permlink: string;
+  body: string;
+  created: string;
+  json_metadata?: string;
+  posting_json_metadata?: string;
+  [key: string]: any;
+}
+
 const FeedScreen = () => {
   console.log('FeedScreen mounted'); // Debug log
 
   const [username, setUsername] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [loading, setLoading] = useState(true);
+  const [snaps, setSnaps] = useState<Snap[]>([]);
+  const [activeFilter, setActiveFilter] = useState<'following' | 'newest' | 'trending' | 'my'>('newest');
   const colorScheme = useColorScheme() || 'light';
   const colors = twitterColors[colorScheme];
   const insets = useSafeAreaInsets();
@@ -102,6 +117,109 @@ const FeedScreen = () => {
     fetchUser();
   }, []);
 
+  // Enhance snaps with avatarUrl for Snap component
+  const enhanceSnapsWithAvatar = async (snaps: Snap[]) => {
+    // Get unique authors
+    const authors = Array.from(new Set(snaps.map(s => s.author)));
+    // Fetch accounts in batch
+    let accounts: any[] = [];
+    try {
+      accounts = await client.database.getAccounts(authors);
+    } catch (e) {
+      console.log('Error fetching accounts for avatars:', e);
+    }
+    // Map author to avatarUrl
+    const avatarMap: Record<string, string> = {};
+    for (const acc of accounts) {
+      let meta = null;
+      if (acc.json_metadata) {
+        try {
+          meta = JSON.parse(acc.json_metadata);
+        } catch {}
+      }
+      if ((!meta || !meta.profile || !meta.profile.profile_image) && acc.posting_json_metadata) {
+        try {
+          meta = JSON.parse(acc.posting_json_metadata);
+        } catch {}
+      }
+      let url = meta && meta.profile && meta.profile.profile_image ? meta.profile.profile_image.replace(/[\\/]+$/, '') : '';
+      avatarMap[acc.name] = url;
+    }
+    // Attach avatarUrl to each snap
+    return snaps.map(snap => ({ ...snap, avatarUrl: avatarMap[snap.author] || '' }));
+  };
+
+  // Fetch Snaps (replies to @peak.snaps)
+  const fetchSnaps = async () => {
+    try {
+      // Get latest posts by @peak.snaps
+      const discussions = await client.database.call('get_discussions_by_blog', [{
+        tag: 'peak.snaps',
+        limit: 10
+      }]);
+      // For each post, get replies (snaps)
+      let allSnaps: Snap[] = [];
+      for (const post of discussions) {
+        const replies: Snap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
+        allSnaps = allSnaps.concat(replies);
+      }
+      // Optionally, sort by created date descending
+      allSnaps.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
+      const enhanced = await enhanceSnapsWithAvatar(allSnaps);
+      setSnaps(enhanced);
+      console.log('Fetched snaps:', enhanced.length);
+    } catch (err) {
+      console.log('Error fetching snaps:', err);
+    }
+  };
+
+  // Fetch Following Feed (snaps from users the current user follows)
+  const fetchFollowingSnaps = async () => {
+    if (!username) return;
+    try {
+      // 1. Get the list of accounts the user is following
+      const followingResult = await client.call('condenser_api', 'get_following', [username, '', 'blog', 100]);
+      const following = Array.isArray(followingResult)
+        ? followingResult.map((f: any) => f.following)
+        : (followingResult && followingResult.following) ? followingResult.following : [];
+      console.log('Following:', following);
+      // 2. Get latest posts by @peak.snaps (the container account)
+      const containerPosts = await client.database.call('get_discussions_by_blog', [{ tag: 'peak.snaps', limit: 10 }]);
+      let allSnaps: Snap[] = [];
+      for (const post of containerPosts) {
+        // 3. Get all replies to this post
+        const replies: Snap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
+        // 4. Filter replies to only those by followed users
+        const filtered = replies.filter((reply) => following.includes(reply.author));
+        allSnaps = allSnaps.concat(filtered);
+      }
+      // 5. Sort by created date descending
+      allSnaps.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
+      const enhanced = await enhanceSnapsWithAvatar(allSnaps);
+      setSnaps(enhanced);
+      console.log('Fetched following snaps:', enhanced.length);
+    } catch (err) {
+      console.log('Error fetching following snaps:', err);
+    }
+  };
+
+  // Refetch snaps when activeFilter or username changes
+  useEffect(() => {
+    if (activeFilter === 'newest') {
+      fetchSnaps();
+    } else if (activeFilter === 'following' && username) {
+      fetchFollowingSnaps();
+    } else {
+      setSnaps([]); // Placeholder for other filters
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFilter, username]);
+
+  // Handler for filter button presses
+  const handleFilterPress = (filter: 'following' | 'newest' | 'trending' | 'my') => {
+    setActiveFilter(filter);
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Top bar inside SafeAreaView for status bar/notch safety */}
@@ -130,25 +248,57 @@ const FeedScreen = () => {
         </View>
         {/* Filter buttons */}
         <View style={styles.filterRow}>
-          <TouchableOpacity style={[styles.filterBtn, { backgroundColor: colors.button }]}>
-            <Text style={[styles.filterText, { color: colors.buttonText }]}>Following</Text>
+          <TouchableOpacity
+            style={[styles.filterBtn, { backgroundColor: activeFilter === 'following' ? colors.button : colors.buttonInactive }]}
+            onPress={() => handleFilterPress('following')}
+          >
+            <Text style={[styles.filterText, { color: activeFilter === 'following' ? colors.buttonText : colors.text }]}>Following</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.filterBtn, { backgroundColor: colors.buttonInactive }]}> 
-            <Text style={[styles.filterText, { color: colors.text }]}>Newest</Text>
+          <TouchableOpacity
+            style={[styles.filterBtn, { backgroundColor: activeFilter === 'newest' ? colors.button : colors.buttonInactive }]}
+            onPress={() => handleFilterPress('newest')}
+          >
+            <Text style={[styles.filterText, { color: activeFilter === 'newest' ? colors.buttonText : colors.text }]}>Newest</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.filterBtn, { backgroundColor: colors.buttonInactive }]}> 
-            <Text style={[styles.filterText, { color: colors.text }]}>Trending</Text>
+          <TouchableOpacity
+            style={[styles.filterBtn, { backgroundColor: activeFilter === 'trending' ? colors.button : colors.buttonInactive }]}
+            onPress={() => handleFilterPress('trending')}
+          >
+            <Text style={[styles.filterText, { color: activeFilter === 'trending' ? colors.buttonText : colors.text }]}>Trending</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.filterBtn, { backgroundColor: colors.buttonInactive }]}> 
-            <Text style={[styles.filterText, { color: colors.text }]}>My Snaps</Text>
+          <TouchableOpacity
+            style={[styles.filterBtn, { backgroundColor: activeFilter === 'my' ? colors.button : colors.buttonInactive }]}
+            onPress={() => handleFilterPress('my')}
+          >
+            <Text style={[styles.filterText, { color: activeFilter === 'my' ? colors.buttonText : colors.text }]}>My Snaps</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
-      {/* Placeholder for feed */}
+      {/* Feed list */}
       <View style={styles.feedContainer}>
         {/* BEGIN MOCKUP: Remove this SnapMock when real data is implemented */}
-        <SnapMock />
+        {/* <SnapMock /> */}
         {/* END MOCKUP */}
+        {snaps.length === 0 ? (
+          <Text style={{ color: colors.text, marginTop: 24 }}>No snaps to display.</Text>
+        ) : (
+          <FlatList
+            data={snaps}
+            keyExtractor={(item) => item.author + '-' + item.permlink}
+            renderItem={({ item }) => (
+              <Snap
+                author={item.author}
+                avatarUrl={item.avatarUrl}
+                body={item.body}
+                created={item.created}
+                voteCount={item.net_votes || 0}
+                replyCount={item.children || 0}
+                payout={parseFloat(item.pending_payout_value ? item.pending_payout_value.replace(' HBD', '') : '0')}
+              />
+            )}
+            contentContainerStyle={{ alignItems: 'center', paddingBottom: 80 }}
+          />
+        )}
       </View>
       {/* Floating Action Button for New Snap, using safe area insets */}
       <TouchableOpacity
