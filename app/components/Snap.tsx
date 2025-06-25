@@ -3,6 +3,8 @@ import { View, Text, Image, StyleSheet, useColorScheme } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { extractImageUrls } from '../utils/extractImageUrls';
 import { stripImageTags } from '../utils/stripImageTags';
+import { extractYouTubeId } from '../utils/extractYouTubeId';
+import { WebView } from 'react-native-webview';
 
 const twitterColors = {
   light: {
@@ -33,11 +35,21 @@ interface SnapProps {
   payout?: number;
 }
 
+const removeYouTubeUrl = (text: string): string => {
+  // Remove all YouTube links (youtube.com/watch?v=, youtu.be/, youtube.com/shorts/, etc.)
+  return text.replace(/(?:https?:\/\/(?:www\.)?)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)[\w-]{11}(\S*)?/gi, '').replace(/\s{2,}/g, ' ').trim();
+};
+
 const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount = 0, replyCount = 0, payout = 0 }) => {
   const colorScheme = useColorScheme() || 'light';
   const colors = twitterColors[colorScheme];
   const imageUrls = extractImageUrls(body);
-  const textBody = stripImageTags(body);
+  const youtubeId = extractYouTubeId(body);
+  // Remove YouTube URL from text body if video is embedded
+  let textBody = stripImageTags(body);
+  if (youtubeId) {
+    textBody = removeYouTubeUrl(textBody);
+  }
 
   return (
     <View style={[styles.bubble, { backgroundColor: colors.bubble, borderColor: colors.border }]}> 
@@ -47,6 +59,18 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
         <Text style={[styles.username, { color: colors.text }]}>{author}</Text>
         <Text style={[styles.timestamp, { color: colors.text }]}>{new Date(created).toLocaleString()}</Text>    
       </View>
+      {/* YouTube Video */}
+      {youtubeId && (
+        <View style={{ width: '100%', aspectRatio: 16/9, marginBottom: 8, borderRadius: 12, overflow: 'hidden' }}>
+          <WebView
+            source={{ uri: `https://www.youtube.com/embed/${youtubeId}` }}
+            style={{ flex: 1, backgroundColor: '#000' }}
+            allowsFullscreenVideo
+            javaScriptEnabled
+            domStorageEnabled
+          />
+        </View>
+      )}
       {/* Images */}
       {imageUrls.length > 0 && (
         <View style={{ marginBottom: 8 }}>
