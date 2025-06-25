@@ -208,12 +208,50 @@ const FeedScreen = () => {
     setFeedLoading(false);
   };
 
+  // Fetch Trending Feed (snaps under latest @peak.snaps container, sorted by payout)
+  const fetchTrendingSnaps = async () => {
+    setFeedLoading(true);
+    try {
+      // Get the most recent post by @peak.snaps (container account)
+      const discussions = await client.database.call('get_discussions_by_blog', [{
+        tag: 'peak.snaps',
+        limit: 1
+      }]);
+      let allSnaps: Snap[] = [];
+      if (discussions && discussions.length > 0) {
+        const post = discussions[0];
+        // Get all replies (snaps) to the latest container post
+        allSnaps = await client.database.call('get_content_replies', [post.author, post.permlink]);
+        // Sort by payout (pending + total + curator) descending
+        allSnaps.sort((a, b) => {
+          const payoutA =
+            parseFloat(a.pending_payout_value ? a.pending_payout_value.replace(' HBD', '') : '0') +
+            parseFloat(a.total_payout_value ? a.total_payout_value.replace(' HBD', '') : '0') +
+            parseFloat(a.curator_payout_value ? a.curator_payout_value.replace(' HBD', '') : '0');
+          const payoutB =
+            parseFloat(b.pending_payout_value ? b.pending_payout_value.replace(' HBD', '') : '0') +
+            parseFloat(b.total_payout_value ? b.total_payout_value.replace(' HBD', '') : '0') +
+            parseFloat(b.curator_payout_value ? b.curator_payout_value.replace(' HBD', '') : '0');
+          return payoutB - payoutA;
+        });
+      }
+      const enhanced = await enhanceSnapsWithAvatar(allSnaps);
+      setSnaps(enhanced);
+      console.log('Fetched trending snaps:', enhanced.length);
+    } catch (err) {
+      console.log('Error fetching trending snaps:', err);
+    }
+    setFeedLoading(false);
+  };
+
   // Refetch snaps when activeFilter or username changes
   useEffect(() => {
     if (activeFilter === 'newest') {
       fetchSnaps();
     } else if (activeFilter === 'following' && username) {
       fetchFollowingSnaps();
+    } else if (activeFilter === 'trending') {
+      fetchTrendingSnaps();
     } else {
       setSnaps([]); // Placeholder for other filters
     }
