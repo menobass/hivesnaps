@@ -371,7 +371,8 @@ const FeedScreen = () => {
                 payout={parseFloat(item.pending_payout_value ? item.pending_payout_value.replace(' HBD', '') : '0')}
               />
             )}
-            contentContainerStyle={{ alignItems: 'center', paddingBottom: 80 }}
+            contentContainerStyle={{ paddingBottom: 80 }}
+            style={{ width: '100%' }}
           />
         )}
       </View>

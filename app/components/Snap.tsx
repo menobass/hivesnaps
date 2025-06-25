@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet, useColorScheme } from 'react-native';
+import { View, Text, Image, StyleSheet, useColorScheme, Linking, Pressable } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { extractImageUrls } from '../utils/extractImageUrls';
 import { stripImageTags } from '../utils/stripImageTags';
 import { extractYouTubeId } from '../utils/extractYouTubeId';
 import { WebView } from 'react-native-webview';
+import { extractExternalLinks } from '../utils/extractExternalLinks';
 
 const twitterColors = {
   light: {
@@ -71,9 +72,11 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
   if (rawImageUrls.length > 0) {
     textBody = removeRawImageUrls(textBody);
   }
+  // Extract external (non-image, non-YouTube) links from all forms
+  const { links: externalLinks, text: cleanTextBody } = extractExternalLinks(textBody);
 
   return (
-    <View style={[styles.bubble, { backgroundColor: colors.bubble, borderColor: colors.border }]}> 
+    <View style={[styles.bubble, { backgroundColor: colors.bubble, borderColor: colors.border, width: '100%', alignSelf: 'stretch' }]}> 
       {/* Top row: avatar, username, timestamp */}
       <View style={styles.topRow}>
         <Image source={avatarUrl ? { uri: avatarUrl } : require('../../assets/images/logo.jpg')} style={styles.avatar} />       
@@ -119,8 +122,42 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
         </View>
       )}
       {/* Body */}
-      {textBody.length > 0 && (
-        <Text style={[styles.body, { color: colors.text }]}>{textBody}</Text>
+      {cleanTextBody.length > 0 && (
+        <Text style={[styles.body, { color: colors.text }]}>{cleanTextBody}</Text>
+      )}
+      {/* External Links */}
+      {externalLinks.length > 0 && (
+        <View style={{ marginTop: 4, marginBottom: 6 }}>
+          {externalLinks.map((link, idx) => {
+            let display = link.label || link.url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+            // Show only domain if no label
+            if (!link.label) {
+              try {
+                const urlObj = new URL(link.url);
+                display = urlObj.hostname.replace(/^www\./, '');
+              } catch {
+                display = link.url;
+              }
+            }
+            return (
+              <Pressable
+                key={link.url + idx}
+                onPress={() => Linking.openURL(link.url)}
+                style={({ pressed }) => [{
+                  opacity: pressed ? 0.6 : 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 2,
+                }]}
+                accessibilityRole="link"
+                accessibilityLabel={`External link to ${display}`}
+              >
+                <FontAwesome name="external-link" size={15} color={colors.icon} style={{ marginRight: 6 }} />
+                <Text style={{ color: colors.icon, textDecorationLine: 'underline', fontSize: 15 }}>{display}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
       )}
       {/* VoteReplyBar */}
       <View style={styles.voteBar}>
@@ -141,11 +178,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 14,
     marginVertical: 10,
-    marginHorizontal: 8,
     shadowColor: '#000',
     shadowOpacity: 0.04,
     shadowRadius: 4,
     elevation: 1,
+    width: '100%', // Ensure full width
+    alignSelf: 'stretch',
   },
   topRow: {
     flexDirection: 'row',
