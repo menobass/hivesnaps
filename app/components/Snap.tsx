@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, useColorScheme } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
+import { extractImageUrls } from '../utils/extractImageUrls';
+import { stripImageTags } from '../utils/stripImageTags';
 
 const twitterColors = {
   light: {
@@ -34,6 +36,8 @@ interface SnapProps {
 const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount = 0, replyCount = 0, payout = 0 }) => {
   const colorScheme = useColorScheme() || 'light';
   const colors = twitterColors[colorScheme];
+  const imageUrls = extractImageUrls(body);
+  const textBody = stripImageTags(body);
 
   return (
     <View style={[styles.bubble, { backgroundColor: colors.bubble, borderColor: colors.border }]}> 
@@ -43,8 +47,23 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
         <Text style={[styles.username, { color: colors.text }]}>{author}</Text>
         <Text style={[styles.timestamp, { color: colors.text }]}>{new Date(created).toLocaleString()}</Text>    
       </View>
+      {/* Images */}
+      {imageUrls.length > 0 && (
+        <View style={{ marginBottom: 8 }}>
+          {imageUrls.map((url, idx) => (
+            <Image
+              key={url + idx}
+              source={{ uri: url }}
+              style={{ width: '100%', height: 200, borderRadius: 12, marginBottom: 6, backgroundColor: '#eee' }}
+              resizeMode="cover"
+            />
+          ))}
+        </View>
+      )}
       {/* Body */}
-      <Text style={[styles.body, { color: colors.text }]}>{body}</Text>
+      {textBody.length > 0 && (
+        <Text style={[styles.body, { color: colors.text }]}>{textBody}</Text>
+      )}
       {/* VoteReplyBar */}
       <View style={styles.voteBar}>
         <FontAwesome name="arrow-up" size={18} color={colors.icon} style={styles.icon} />
