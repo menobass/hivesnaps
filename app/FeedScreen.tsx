@@ -56,6 +56,7 @@ const FeedScreen = () => {
   const [loading, setLoading] = useState(true);
   const [snaps, setSnaps] = useState<Snap[]>([]);
   const [activeFilter, setActiveFilter] = useState<'following' | 'newest' | 'trending' | 'my'>('newest');
+  const [feedLoading, setFeedLoading] = useState(false);
   const colorScheme = useColorScheme() || 'light';
   const colors = twitterColors[colorScheme];
   const insets = useSafeAreaInsets();
@@ -151,6 +152,7 @@ const FeedScreen = () => {
 
   // Fetch Snaps (replies to @peak.snaps)
   const fetchSnaps = async () => {
+    setFeedLoading(true);
     try {
       // Get latest posts by @peak.snaps
       const discussions = await client.database.call('get_discussions_by_blog', [{
@@ -171,10 +173,12 @@ const FeedScreen = () => {
     } catch (err) {
       console.log('Error fetching snaps:', err);
     }
+    setFeedLoading(false);
   };
 
   // Fetch Following Feed (snaps from users the current user follows)
   const fetchFollowingSnaps = async () => {
+    setFeedLoading(true);
     if (!username) return;
     try {
       // 1. Get the list of accounts the user is following
@@ -201,6 +205,7 @@ const FeedScreen = () => {
     } catch (err) {
       console.log('Error fetching following snaps:', err);
     }
+    setFeedLoading(false);
   };
 
   // Refetch snaps when activeFilter or username changes
@@ -276,10 +281,12 @@ const FeedScreen = () => {
       </SafeAreaView>
       {/* Feed list */}
       <View style={styles.feedContainer}>
-        {/* BEGIN MOCKUP: Remove this SnapMock when real data is implemented */}
-        {/* <SnapMock /> */}
-        {/* END MOCKUP */}
-        {snaps.length === 0 ? (
+        {feedLoading ? (
+          <View style={{ alignItems: 'center', marginTop: 40 }}>
+            <FontAwesome name="hourglass-half" size={48} color={colors.icon} style={{ marginBottom: 12, transform: [{ rotate: `${(Date.now() % 3600) / 10}deg` }] }} />
+            <Text style={{ color: colors.text, fontSize: 16 }}>Loading snaps...</Text>
+          </View>
+        ) : snaps.length === 0 ? (
           <Text style={{ color: colors.text, marginTop: 24 }}>No snaps to display.</Text>
         ) : (
           <FlatList
