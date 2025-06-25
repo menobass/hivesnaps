@@ -244,6 +244,34 @@ const FeedScreen = () => {
     setFeedLoading(false);
   };
 
+  // Fetch My Snaps Feed (user's own snaps under latest @peak.snaps container)
+  const fetchMySnaps = async () => {
+    setFeedLoading(true);
+    try {
+      // Get the most recent post by @peak.snaps (container account)
+      const discussions = await client.database.call('get_discussions_by_blog', [{
+        tag: 'peak.snaps',
+        limit: 1
+      }]);
+      let mySnaps: Snap[] = [];
+      if (discussions && discussions.length > 0 && username) {
+        const post = discussions[0];
+        // Get all replies (snaps) to the latest container post
+        const replies: Snap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
+        // Filter to only those by the logged-in user
+        mySnaps = replies.filter((reply) => reply.author === username);
+        // Sort by created date descending
+        mySnaps.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
+      }
+      const enhanced = await enhanceSnapsWithAvatar(mySnaps);
+      setSnaps(enhanced);
+      console.log('Fetched my snaps:', enhanced.length);
+    } catch (err) {
+      console.log('Error fetching my snaps:', err);
+    }
+    setFeedLoading(false);
+  };
+
   // Refetch snaps when activeFilter or username changes
   useEffect(() => {
     if (activeFilter === 'newest') {
@@ -252,6 +280,8 @@ const FeedScreen = () => {
       fetchFollowingSnaps();
     } else if (activeFilter === 'trending') {
       fetchTrendingSnaps();
+    } else if (activeFilter === 'my' && username) {
+      fetchMySnaps();
     } else {
       setSnaps([]); // Placeholder for other filters
     }
