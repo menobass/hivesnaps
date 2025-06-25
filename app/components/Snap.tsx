@@ -35,6 +35,23 @@ interface SnapProps {
   payout?: number;
 }
 
+// Utility to extract raw image URLs from text (not in markdown or html)
+function extractRawImageUrls(text: string): string[] {
+  // Match URLs ending with image extensions, not inside markdown or html tags
+  const regex = /(?:^|\s)(https?:\/\/(?:[\w.-]+)\/(?:[\w\-./%]+)\.(?:jpg|jpeg|png|gif|webp|bmp|svg))(?:\s|$)/gi;
+  const matches = [];
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    matches.push(match[1]);
+  }
+  return matches;
+}
+
+// Utility to remove raw image URLs from text
+function removeRawImageUrls(text: string): string {
+  return text.replace(/(?:^|\s)(https?:\/\/(?:[\w.-]+)\/(?:[\w\-./%]+)\.(?:jpg|jpeg|png|gif|webp|bmp|svg))(?:\s|$)/gi, ' ').replace(/\s{2,}/g, ' ').trim();
+}
+
 const removeYouTubeUrl = (text: string): string => {
   // Remove all YouTube links (youtube.com/watch?v=, youtu.be/, youtube.com/shorts/, etc.)
   return text.replace(/(?:https?:\/\/(?:www\.)?)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)[\w-]{11}(\S*)?/gi, '').replace(/\s{2,}/g, ' ').trim();
@@ -44,11 +61,15 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
   const colorScheme = useColorScheme() || 'light';
   const colors = twitterColors[colorScheme];
   const imageUrls = extractImageUrls(body);
+  const rawImageUrls = extractRawImageUrls(body);
   const youtubeId = extractYouTubeId(body);
-  // Remove YouTube URL from text body if video is embedded
+  // Remove YouTube URL and raw image URLs from text body if present
   let textBody = stripImageTags(body);
   if (youtubeId) {
     textBody = removeYouTubeUrl(textBody);
+  }
+  if (rawImageUrls.length > 0) {
+    textBody = removeRawImageUrls(textBody);
   }
 
   return (
@@ -71,10 +92,23 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
           />
         </View>
       )}
-      {/* Images */}
+      {/* Images from markdown/html */}
       {imageUrls.length > 0 && (
         <View style={{ marginBottom: 8 }}>
           {imageUrls.map((url, idx) => (
+            <Image
+              key={url + idx}
+              source={{ uri: url }}
+              style={{ width: '100%', height: 200, borderRadius: 12, marginBottom: 6, backgroundColor: '#eee' }}
+              resizeMode="cover"
+            />
+          ))}
+        </View>
+      )}
+      {/* Images from raw URLs */}
+      {rawImageUrls.length > 0 && (
+        <View style={{ marginBottom: 8 }}>
+          {rawImageUrls.map((url, idx) => (
             <Image
               key={url + idx}
               source={{ uri: url }}
