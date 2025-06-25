@@ -1,8 +1,10 @@
-import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Image, useColorScheme, Dimensions } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, Image, useColorScheme, Dimensions, ActivityIndicator } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import SnapMock from './components/SnapMock';
+import * as SecureStore from 'expo-secure-store';
+import { Client } from '@hiveio/dhive';
 
 const twitterColors = {
   light: {
@@ -26,11 +28,79 @@ const twitterColors = {
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BUTTON_WIDTH = (SCREEN_WIDTH - 48) / 4; // 12px margin on each side, 8px between buttons
 
+const HIVE_NODES = [
+  'https://api.hive.blog',
+  'https://api.deathwing.me',
+  'https://api.openhive.network',
+];
+const client = new Client(HIVE_NODES);
+
 const FeedScreen = () => {
+  console.log('FeedScreen mounted'); // Debug log
+
+  const [username, setUsername] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [loading, setLoading] = useState(true);
   const colorScheme = useColorScheme() || 'light';
   const colors = twitterColors[colorScheme];
-  const username = 'meno'; // placeholder
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    console.log('useEffect running'); // Debug log
+    const fetchUser = async () => {
+      setLoading(true);
+      try {
+        const storedUsername = await SecureStore.getItemAsync('hive_username');
+        console.log('Stored username:', storedUsername);
+        setUsername(storedUsername || '');
+        if (storedUsername) {
+          const accounts = await client.database.getAccounts([storedUsername]);
+          console.log('Hive account object:', accounts && accounts[0]);
+          let profileImg = '';
+          // Try to get profile image from json_metadata first, then posting_json_metadata
+          if (accounts && accounts[0]) {
+            let meta = null;
+            // Try json_metadata
+            if (accounts[0].json_metadata) {
+              try {
+                meta = JSON.parse(accounts[0].json_metadata);
+                console.log('json_metadata:', accounts[0].json_metadata);
+              } catch (err) {
+                console.log('Error parsing json_metadata:', err);
+              }
+            }
+            // If no profile image in json_metadata, try posting_json_metadata
+            if (!meta || !meta.profile || !meta.profile.profile_image) {
+              if (accounts[0].posting_json_metadata) {
+                try {
+                  const postingMeta = JSON.parse(accounts[0].posting_json_metadata);
+                  meta = postingMeta;
+                  console.log('posting_json_metadata:', accounts[0].posting_json_metadata);
+                } catch (err) {
+                  console.log('Error parsing posting_json_metadata:', err);
+                }
+              }
+            }
+            if (meta && meta.profile && meta.profile.profile_image) {
+              profileImg = meta.profile.profile_image;
+              // Sanitize avatar URL to remove trailing slashes or backslashes
+              profileImg = profileImg.replace(/[\\/]+$/, '');
+              console.log('Parsed profile_image:', profileImg);
+            } else {
+              console.log('No profile_image found in metadata.');
+            }
+            setAvatarUrl(profileImg);
+            console.log('Avatar URL set to:', profileImg);
+          }
+        }
+      } catch (err) {
+        setAvatarUrl('');
+        console.log('Error fetching Hive user:', err);
+      }
+      setLoading(false);
+    };
+    fetchUser();
+  }, []);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -38,7 +108,14 @@ const FeedScreen = () => {
       <SafeAreaView style={{ backgroundColor: colors.background, paddingTop: insets.top }} edges={['top']}>
         <View style={styles.topBar}>
           {/* User avatar instead of logo */}
-          <Image source={require('../assets/images/avatar-placeholder.png')} style={styles.avatar} />
+          {loading ? (
+            <ActivityIndicator size="small" color={colors.text} style={styles.avatar} />
+          ) : (
+            <Image
+              source={avatarUrl ? { uri: avatarUrl } : require('../assets/images/logo.jpg')}
+              style={styles.avatar}
+            />
+          )}
           <Text style={[styles.username, { color: colors.text }]}>{username}</Text>
           <TouchableOpacity style={styles.logoutBtn}>
             <FontAwesome name="sign-out" size={24} color={colors.icon} />
