@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Image, useColorScheme, Dimensions } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import SnapMock from './components/SnapMock';
 
 const twitterColors = {
@@ -30,53 +30,58 @@ const FeedScreen = () => {
   const colorScheme = useColorScheme() || 'light';
   const colors = twitterColors[colorScheme];
   const username = 'meno'; // placeholder
+  const insets = useSafeAreaInsets();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["bottom", "right"]}>
-      {/* Top bar */}
-      <View style={styles.topBar}>
-        {/* User avatar instead of logo */}
-        <Image source={require('../assets/images/avatar-placeholder.png')} style={styles.avatar} />
-        <Text style={[styles.username, { color: colors.text }]}>{username}</Text>
-        <TouchableOpacity style={styles.logoutBtn}>
-          <FontAwesome name="sign-out" size={24} color={colors.icon} />
-        </TouchableOpacity>
-      </View>
-      {/* Slogan row */}
-      <View style={styles.sloganRow}>
-        <Text style={[styles.slogan, { color: colors.text }]}>What's snappening today?</Text>
-        <TouchableOpacity style={styles.bellBtn}>
-          <FontAwesome name="bell" size={22} color={colors.icon} />
-        </TouchableOpacity>
-      </View>
-      {/* Filter buttons */}
-      <View style={styles.filterRow}>
-        <TouchableOpacity style={[styles.filterBtn, { backgroundColor: colors.button }]}>
-          <Text style={[styles.filterText, { color: colors.buttonText }]}>Following</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.filterBtn, { backgroundColor: colors.buttonInactive }]}> 
-          <Text style={[styles.filterText, { color: colors.text }]}>Newest</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.filterBtn, { backgroundColor: colors.buttonInactive }]}> 
-          <Text style={[styles.filterText, { color: colors.text }]}>Trending</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.filterBtn, { backgroundColor: colors.buttonInactive }]}> 
-          <Text style={[styles.filterText, { color: colors.text }]}>My Snaps</Text>
-        </TouchableOpacity>
-      </View>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* Top bar inside SafeAreaView for status bar/notch safety */}
+      <SafeAreaView style={{ backgroundColor: colors.background, paddingTop: insets.top }} edges={['top']}>
+        <View style={styles.topBar}>
+          {/* User avatar instead of logo */}
+          <Image source={require('../assets/images/avatar-placeholder.png')} style={styles.avatar} />
+          <Text style={[styles.username, { color: colors.text }]}>{username}</Text>
+          <TouchableOpacity style={styles.logoutBtn}>
+            <FontAwesome name="sign-out" size={24} color={colors.icon} />
+          </TouchableOpacity>
+        </View>
+        {/* Slogan row */}
+        <View style={styles.sloganRow}>
+          <Text style={[styles.slogan, { color: colors.text }]}>What's snappening today?</Text>
+          <TouchableOpacity style={styles.bellBtn}>
+            <FontAwesome name="bell" size={22} color={colors.icon} />
+          </TouchableOpacity>
+        </View>
+        {/* Filter buttons */}
+        <View style={styles.filterRow}>
+          <TouchableOpacity style={[styles.filterBtn, { backgroundColor: colors.button }]}>
+            <Text style={[styles.filterText, { color: colors.buttonText }]}>Following</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.filterBtn, { backgroundColor: colors.buttonInactive }]}> 
+            <Text style={[styles.filterText, { color: colors.text }]}>Newest</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.filterBtn, { backgroundColor: colors.buttonInactive }]}> 
+            <Text style={[styles.filterText, { color: colors.text }]}>Trending</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.filterBtn, { backgroundColor: colors.buttonInactive }]}> 
+            <Text style={[styles.filterText, { color: colors.text }]}>My Snaps</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
       {/* Placeholder for feed */}
       <View style={styles.feedContainer}>
         {/* BEGIN MOCKUP: Remove this SnapMock when real data is implemented */}
         <SnapMock />
         {/* END MOCKUP */}
       </View>
-      {/* Floating Action Button for New Snap */}
+      {/* Floating Action Button for New Snap, using safe area insets */}
       <TouchableOpacity
         style={[
           styles.fab,
           {
             backgroundColor: colors.button,
             shadowColor: colorScheme === 'dark' ? '#000' : '#1DA1F2',
+            bottom: insets.bottom + 24,
+            right: insets.right + 24,
           },
         ]}
         activeOpacity={0.8}
@@ -85,7 +90,7 @@ const FeedScreen = () => {
       >
         <Text style={styles.fabIcon}>+</Text>
       </TouchableOpacity>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -158,8 +163,6 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    right: 24,
-    bottom: 24,
     width: 60,
     height: 60,
     borderRadius: 30,
