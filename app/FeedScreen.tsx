@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Image, useColorScheme, Dimensions, ActivityIndicator, FlatList, Modal, Pressable, Platform } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -66,6 +66,18 @@ const FeedScreen = () => {
   const colorScheme = useColorScheme() || 'light';
   const colors = twitterColors[colorScheme];
   const insets = useSafeAreaInsets();
+  const flatListRef = useRef<FlatList<any>>(null); // FlatList ref for scroll control
+  const [pendingScrollToKey, setPendingScrollToKey] = useState<string | null>(null); // Key to scroll to after refresh
+  const [viewableSnaps, setViewableSnaps] = useState<string[]>([]); // Track visible snap keys
+  const [viewableItems, setViewableItems] = useState<any[]>([]); // Track visible items
+
+  // Viewability config for FlatList
+  const viewabilityConfig = {
+    itemVisiblePercentThreshold: 60, // Consider item visible if 60% is shown
+  };
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
+    setViewableItems(viewableItems);
+  }).current;
 
   useEffect(() => {
     console.log('useEffect running'); // Debug log
@@ -304,6 +316,7 @@ const FeedScreen = () => {
     setUpvoteTarget({ author, permlink });
     setVoteWeight(100);
     setUpvoteModalVisible(true);
+    setPendingScrollToKey(author + '-' + permlink); // Remember which snap to scroll to
   };
 
   const handleUpvoteCancel = () => {
@@ -351,7 +364,7 @@ const FeedScreen = () => {
         else if (activeFilter === 'following') await fetchFollowingSnaps();
         else if (activeFilter === 'trending') await fetchTrendingSnaps();
         else if (activeFilter === 'my') await fetchMySnaps();
-        // TODO: Scroll to upvoted snap (requires FlatList ref)
+        // Scrolling will be handled in useEffect below
       }, 2000);
     } catch (err) {
       setUpvoteLoading(false);
@@ -360,6 +373,34 @@ const FeedScreen = () => {
       alert('Upvote failed: ' + errorMsg);
     }
   };
+
+  // ---
+  // WISHLIST / WORK IN PROGRESS:
+  // The following scroll-to-upvoted Snap logic is intended to bring the upvoted Snap into view after voting.
+  // However, with variable-height FlatList items, this does not reliably center or scroll to the correct Snap.
+  // As of now, this feature is NOT working as intended. If you have experience with FlatList and dynamic item heights,
+  // please help improve or fix this logic! See related discussion in commit and/or GitHub issue.
+  // ---
+  // Scroll to upvoted snap after snaps update if needed
+  useEffect(() => {
+    if (pendingScrollToKey && snaps.length > 0 && flatListRef.current) {
+      const idx = snaps.findIndex(s => (s.author + '-' + s.permlink) === pendingScrollToKey);
+      console.log('[ScrollDebug] pendingScrollToKey:', pendingScrollToKey);
+      console.log('[ScrollDebug] snaps.length:', snaps.length);
+      console.log('[ScrollDebug] found index:', idx);
+      // Always scroll to the Snap if found, regardless of isVisible
+      if (idx >= 0) {
+        setTimeout(() => {
+          console.log('[ScrollDebug] Forcing scroll to index:', idx);
+          flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 }); // Center it if possible
+          setPendingScrollToKey(null);
+        }, 600); // Wait for FlatList to render
+      } else {
+        console.log('[ScrollDebug] Snap not found in refreshed snaps.');
+        setPendingScrollToKey(null);
+      }
+    }
+  }, [snaps, pendingScrollToKey]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -479,6 +520,7 @@ const FeedScreen = () => {
           <Text style={{ color: colors.text, marginTop: 24 }}>No snaps to display.</Text>
         ) : (
           <FlatList
+            ref={flatListRef}
             data={snaps}
             keyExtractor={(item) => item.author + '-' + item.permlink}
             renderItem={({ item }) => (
@@ -504,6 +546,12 @@ const FeedScreen = () => {
               else if (activeFilter === 'trending') await fetchTrendingSnaps();
               else if (activeFilter === 'my') await fetchMySnaps();
             }}
+            onScrollToIndexFailed={({ index }) => {
+              // Fallback: scroll to closest possible
+              flatListRef.current?.scrollToOffset({ offset: Math.max(0, index - 2) * 220, animated: true });
+            }}
+            viewabilityConfig={viewabilityConfig}
+            onViewableItemsChanged={onViewableItemsChanged}
           />
         )}
       </View>
