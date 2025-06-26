@@ -1,11 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Image, useColorScheme, Dimensions, ActivityIndicator, FlatList, Modal, Pressable, Platform } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Image, useColorScheme, Dimensions, ActivityIndicator, FlatList, Modal, Pressable, Platform, TextInput, KeyboardAvoidingView } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { Client, PrivateKey } from '@hiveio/dhive';
 import Snap from './components/Snap';
 import Slider from '@react-native-community/slider';
+import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
+import { useRouter } from 'expo-router';
 
 const twitterColors = {
   light: {
@@ -63,6 +66,12 @@ const FeedScreen = () => {
   const [voteWeight, setVoteWeight] = useState(100);
   const [upvoteLoading, setUpvoteLoading] = useState(false);
   const [upvoteSuccess, setUpvoteSuccess] = useState(false);
+  // --- New Snap Modal State ---
+  const [newSnapModalVisible, setNewSnapModalVisible] = useState(false);
+  const [newSnapText, setNewSnapText] = useState('');
+  const [newSnapImage, setNewSnapImage] = useState<string | null>(null);
+  const [newSnapLoading, setNewSnapLoading] = useState(false);
+  const [newSnapSuccess, setNewSnapSuccess] = useState(false);
   const colorScheme = useColorScheme() || 'light';
   const colors = twitterColors[colorScheme];
   const insets = useSafeAreaInsets();
@@ -70,6 +79,7 @@ const FeedScreen = () => {
   const [pendingScrollToKey, setPendingScrollToKey] = useState<string | null>(null); // Key to scroll to after refresh
   const [viewableSnaps, setViewableSnaps] = useState<string[]>([]); // Track visible snap keys
   const [viewableItems, setViewableItems] = useState<any[]>([]); // Track visible items
+  const router = useRouter();
 
   // Viewability config for FlatList
   const viewabilityConfig = {
@@ -402,6 +412,113 @@ const FeedScreen = () => {
     }
   }, [snaps, pendingScrollToKey]);
 
+  // --- New Snap Modal Handlers ---
+  const openNewSnapModal = () => {
+    setNewSnapText('');
+    setNewSnapImage(null);
+    setNewSnapSuccess(false);
+    setNewSnapModalVisible(true);
+  };
+  const closeNewSnapModal = () => {
+    setNewSnapModalVisible(false);
+    setNewSnapText('');
+    setNewSnapImage(null);
+    setNewSnapSuccess(false);
+  };
+  const handleAddImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Permission to access media library is required!');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setNewSnapImage(result.assets[0].uri);
+      }
+    } catch (err) {
+      alert('Failed to pick image: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
+    }
+  };
+  const handleSubmitNewSnap = async () => {
+    if (!username) {
+      alert('You must be logged in to post a Snap.');
+      return;
+    }
+    if (!newSnapText.trim()) {
+      alert('Snap text cannot be empty.');
+      return;
+    }
+    setNewSnapLoading(true);
+    setNewSnapSuccess(false);
+    try {
+      // Get posting key
+      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
+      if (!postingKeyStr) throw new Error('No posting key found. Please log in again.');
+      const postingKey = PrivateKey.fromString(postingKeyStr);
+      // Get latest @peak.snaps post (container)
+      const discussions = await client.database.call('get_discussions_by_blog', [{ tag: 'peak.snaps', limit: 1 }]);
+      if (!discussions || discussions.length === 0) throw new Error('No container post found.');
+      const container = discussions[0];
+      // Generate permlink
+      const permlink = `snap-${Date.now()}`;
+      // Compose body (append image if present)
+      let body = newSnapText.trim();
+      if (newSnapImage) {
+        body += `\n![image](${newSnapImage})`;
+      }
+      // Compose metadata
+      const json_metadata = JSON.stringify({ app: 'hivesnaps/1.0', image: newSnapImage ? [newSnapImage] : [] });
+      // Broadcast comment (reply)
+      await client.broadcast.comment({
+        parent_author: container.author,
+        parent_permlink: container.permlink,
+        author: username,
+        permlink,
+        title: '',
+        body,
+        json_metadata,
+      }, postingKey);
+      setNewSnapLoading(false);
+      setNewSnapSuccess(true);
+      setTimeout(async () => {
+        setNewSnapModalVisible(false);
+        setNewSnapText('');
+        setNewSnapImage(null);
+        setNewSnapSuccess(false);
+        // Switch to 'newest' and refresh feed
+        setActiveFilter('newest');
+        await fetchSnaps();
+        // Scroll to top
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      }, 1800);
+    } catch (err) {
+      setNewSnapLoading(false);
+      setNewSnapSuccess(false);
+      alert('Failed to post Snap: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
+    }
+  };
+
+  // --- Logout Handler ---
+  const handleLogout = async () => {
+    try {
+      await SecureStore.deleteItemAsync('hive_username');
+      await SecureStore.deleteItemAsync('hive_posting_key');
+      setUsername('');
+      setAvatarUrl('');
+      // Optionally clear snaps and state
+      setSnaps([]);
+      // Navigate to login screen (root)
+      router.replace('/');
+    } catch (err) {
+      alert('Logout failed: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
+    }
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Upvote Modal */}
@@ -470,7 +587,7 @@ const FeedScreen = () => {
             />
           )}
           <Text style={[styles.username, { color: colors.text }]}>{username}</Text>
-          <TouchableOpacity style={styles.logoutBtn}>
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
             <FontAwesome name="sign-out" size={24} color={colors.icon} />
           </TouchableOpacity>
         </View>
@@ -567,11 +684,81 @@ const FeedScreen = () => {
           },
         ]}
         activeOpacity={0.8}
-        onPress={() => {/* TODO: Implement new snap action */}}
+        onPress={() => setNewSnapModalVisible(true)}
         accessibilityLabel="Create new snap"
       >
         <Text style={styles.fabIcon}>+</Text>
       </TouchableOpacity>
+      {/* New Snap Modal */}
+      <Modal
+        visible={newSnapModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setNewSnapModalVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: colors.background, borderRadius: 16, padding: 24, width: '90%', alignItems: 'center' }}>
+            <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>New Snap</Text>
+            <View style={{ width: '100%', marginBottom: 12 }}>
+              <Text style={{ color: colors.text, fontSize: 15, marginBottom: 6 }}>What's snappening?</Text>
+              <View style={{ borderWidth: 1, borderColor: colors.buttonInactive, borderRadius: 8, backgroundColor: colorScheme === 'dark' ? '#22303C' : '#F5F8FA', padding: 8 }}>
+                <TextInput
+                  style={{ color: colors.text, fontSize: 16, minHeight: 60, maxHeight: 120, textAlignVertical: 'top' }}
+                  placeholder="Write your Snap..."
+                  placeholderTextColor={colors.buttonInactive}
+                  multiline
+                  value={newSnapText}
+                  onChangeText={setNewSnapText}
+                  editable={!newSnapLoading && !newSnapSuccess}
+                />
+              </View>
+            </View>
+            {/* Add Image Button & Preview */}
+            <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <Pressable
+                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.buttonInactive, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 14, marginRight: 10 }}
+                onPress={handleAddImage}
+                disabled={newSnapLoading || newSnapSuccess}
+              >
+                <FontAwesome name="image" size={20} color={colors.icon} style={{ marginRight: 6 }} />
+                <Text style={{ color: colors.text, fontWeight: '600' }}>Add Image</Text>
+              </Pressable>
+              {newSnapImage && (
+                <Image source={{ uri: newSnapImage }} style={{ width: 48, height: 48, borderRadius: 8, borderWidth: 1, borderColor: colors.buttonInactive }} />
+              )}
+            </View>
+            {/* Action Buttons or Loading/Success */}
+            {newSnapLoading ? (
+              <View style={{ marginTop: 18, alignItems: 'center' }}>
+                <FontAwesome name="hourglass-half" size={32} color={colors.icon} />
+                <Text style={{ color: colors.text, marginTop: 8 }}>Posting snap...</Text>
+              </View>
+            ) : newSnapSuccess ? (
+              <View style={{ marginTop: 18, alignItems: 'center' }}>
+                <FontAwesome name="check-circle" size={32} color={colors.button} />
+                <Text style={{ color: colors.text, marginTop: 8 }}>Snap posted!</Text>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', marginTop: 18 }}>
+                <Pressable
+                  style={{ flex: 1, marginRight: 8, backgroundColor: colors.buttonInactive, borderRadius: 8, padding: 12, alignItems: 'center' }}
+                  onPress={() => setNewSnapModalVisible(false)}
+                  disabled={newSnapLoading}
+                >
+                  <Text style={{ color: colors.text, fontWeight: '600' }}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={{ flex: 1, marginLeft: 8, backgroundColor: colors.button, borderRadius: 8, padding: 12, alignItems: 'center' }}
+                  onPress={handleSubmitNewSnap}
+                  disabled={newSnapLoading}
+                >
+                  <Text style={{ color: colors.buttonText, fontWeight: '600' }}>Submit</Text>
+                </Pressable>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
