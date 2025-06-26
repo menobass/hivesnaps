@@ -36,7 +36,8 @@ interface SnapProps {
   payout?: number;
   onUpvotePress?: (snap: { author: string; permlink: string }) => void;
   permlink?: string;
-  hasUpvoted?: boolean; // NEW: indicates if current user has upvoted
+  hasUpvoted?: boolean;
+  onSpeechBubblePress?: () => void; // NEW: handler for speech bubble
 }
 
 // Utility to extract raw image URLs from text (not in markdown or html)
@@ -61,7 +62,7 @@ const removeYouTubeUrl = (text: string): string => {
   return text.replace(/(?:https?:\/\/(?:www\.)?)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)[\w-]{11}(\S*)?/gi, '').replace(/\s{2,}/g, ' ').trim();
 };
 
-const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount = 0, replyCount = 0, payout = 0, onUpvotePress, permlink, hasUpvoted = false }) => {
+const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount = 0, replyCount = 0, payout = 0, onUpvotePress, permlink, hasUpvoted = false, onSpeechBubblePress }) => {
   const colorScheme = useColorScheme() || 'light';
   const colors = twitterColors[colorScheme];
   const upvoteColor = hasUpvoted ? '#8e44ad' : colors.icon; // purple if upvoted
@@ -204,7 +205,18 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
           <FontAwesome name="arrow-up" size={18} color={upvoteColor} style={styles.icon} />
         )}
         <Text style={[styles.voteCount, { color: colors.text }]}>{voteCount}</Text>
-        <FontAwesome name="comment-o" size={18} color={colors.icon} style={styles.icon} />
+        {onSpeechBubblePress ? (
+          <Pressable
+            onPress={onSpeechBubblePress}
+            style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+            accessibilityRole="button"
+            accessibilityLabel="View conversation"
+          >
+            <FontAwesome name="comment-o" size={18} color={colors.icon} style={styles.icon} />
+          </Pressable>
+        ) : (
+          <FontAwesome name="comment-o" size={18} color={colors.icon} style={styles.icon} />
+        )}
         <Text style={[styles.replyCount, { color: colors.text }]}>{replyCount}</Text>
         <View style={{ flex: 1 }} />
         <Text style={[styles.payout, { color: colors.payout }]}>${payout.toFixed(2)}</Text>
