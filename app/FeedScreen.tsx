@@ -496,6 +496,13 @@ const FeedScreen = () => {
             )}
             contentContainerStyle={{ paddingBottom: 80 }}
             style={{ width: '100%' }}
+            refreshing={feedLoading}
+            onRefresh={async () => {
+              if (activeFilter === 'newest') await fetchSnaps();
+              else if (activeFilter === 'following') await fetchFollowingSnaps();
+              else if (activeFilter === 'trending') await fetchTrendingSnaps();
+              else if (activeFilter === 'my') await fetchMySnaps();
+            }}
           />
         )}
       </View>
