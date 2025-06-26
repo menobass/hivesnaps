@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, FlatList, useColorScheme, Image } from 'react-native';
+import { SafeAreaView as SafeAreaViewRN } from 'react-native';
+import { SafeAreaView as SafeAreaViewSA, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, FlatList, useColorScheme, Image } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImageToCloudinaryFixed } from './utils/cloudinaryImageUploadFixed';
@@ -35,7 +37,7 @@ const ConversationScreen = () => {
   const colorScheme = useColorScheme() || 'light';
   const isDark = colorScheme === 'dark';
   const router = useRouter();
-  const [replyText, setReplyText] = useState('');
+  const insets = useSafeAreaInsets();
 
   // Use Expo Router's useLocalSearchParams to get navigation params
   const params = useLocalSearchParams();
@@ -45,11 +47,11 @@ const ConversationScreen = () => {
   if (!author || !permlink) {
     console.error('Missing navigation parameters: author and permlink');
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: isDark ? '#15202B' : '#fff' }]}> 
+      <SafeAreaViewRN style={[styles.safeArea, { backgroundColor: isDark ? '#15202B' : '#fff' }]}> 
         <View style={{ alignItems: 'center', marginTop: 40 }}>
           <Text style={{ color: isDark ? '#D7DBDC' : '#0F1419', fontSize: 16 }}>Error: Missing conversation parameters.</Text>
         </View>
-      </SafeAreaView>
+      </SafeAreaViewRN>
     );
   }
 
@@ -85,9 +87,30 @@ const ConversationScreen = () => {
       try {
         // Fetch the main post
         const post = await client.database.call('get_content', [author, permlink]);
+        // Fetch avatar robustly from account profile
+        let avatarUrl: string | undefined = undefined;
+        try {
+          const accounts = await client.database.call('get_accounts', [[post.author]]);
+          if (accounts && accounts[0]) {
+            const meta = accounts[0].posting_json_metadata || accounts[0].json_metadata;
+            if (meta) {
+              let profile;
+              try {
+                profile = JSON.parse(meta).profile;
+              } catch (e) {
+                profile = undefined;
+              }
+              if (profile && profile.profile_image) {
+                avatarUrl = profile.profile_image;
+              }
+            }
+          }
+        } catch (e) {
+          // Avatar fetch fail fallback
+        }
         setSnap({
           author: post.author,
-          avatarUrl: undefined, // TODO: fetch avatar if needed
+          avatarUrl,
           body: post.body,
           created: post.created,
           voteCount: post.net_votes,
@@ -121,11 +144,6 @@ const ConversationScreen = () => {
     // TODO: Refresh replies from API
   };
 
-  const handleCancel = () => {
-    setReplyText('');
-    setReplyImage(null);
-  };
-
   const handleAddImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -152,26 +170,65 @@ const ConversationScreen = () => {
 
   const handleSubmit = () => {
     // TODO: Submit reply logic
-    setReplyText('');
     setReplyImage(null);
   };
 
   // Render a single reply (flat, not threaded yet)
-  const renderReply = ({ item }: { item: ReplyData }) => (
-    <View style={[styles.replyBubble, { backgroundColor: colors.bubble }]}> 
-      <Text style={[styles.replyAuthor, { color: colors.text }]}>{item.author}</Text>
-      <Text style={[styles.replyBody, { color: colors.text }]}>{item.body}</Text>
-      <View style={styles.replyMeta}>
-        <FontAwesome name="arrow-up" size={16} color={colors.icon} />
-        <Text style={[styles.replyMetaText, { color: colors.text }]}>{item.voteCount || 0}</Text>
-        <FontAwesome name="comment-o" size={16} color={colors.icon} style={{ marginLeft: 12 }} />
-        <Text style={[styles.replyMetaText, { color: colors.payout }]}>{item.payout ? `$${item.payout.toFixed(2)}` : ''}</Text>
+  const renderReply = ({ item }: { item: ReplyData }) => {
+    console.log('Reply payout:', item.payout, 'for', item.author, item.permlink);
+    return (
+      <View style={[styles.replyBubble, { backgroundColor: colors.bubble }]}> 
+        <Text style={[styles.replyAuthor, { color: colors.text }]}>{item.author}</Text>
+        <Text style={[styles.replyBody, { color: colors.text }]}>{item.body}</Text>
+        <View style={styles.replyMeta}>
+          <FontAwesome name="arrow-up" size={16} color={colors.icon} />
+          <Text style={[styles.replyMetaText, { color: colors.text }]}>{item.voteCount || 0}</Text>
+          <FontAwesome name="comment-o" size={16} color={colors.icon} style={{ marginLeft: 12 }} />
+          <Text style={[styles.replyMetaText, { color: colors.payout, marginLeft: 12 }]}>{item.payout !== undefined ? `$${item.payout.toFixed(2)}` : ''}</Text>
+        </View>
       </View>
-    </View>
+    );
+  };
+
+  // Add log for snap payout
+  if (snap) {
+    console.log('Snap payout:', snap.payout, 'for', snap.author, snap.permlink);
+  }
+
+  // Render the snap as a header for the replies list
+  const renderSnapHeader = () => (
+    snap ? (
+      <View style={[styles.snapPost, { borderColor: colors.border, backgroundColor: colors.background }]}> 
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+          {snap.avatarUrl ? (
+            <Image source={{ uri: snap.avatarUrl }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: isDark ? '#22303C' : '#eee', justifyContent: 'center', alignItems: 'center' }]}> 
+              <FontAwesome name="user" size={22} color={isDark ? '#8899A6' : '#bbb'} />
+            </View>
+          )}
+          <Text style={[styles.snapAuthor, { color: colors.text, marginLeft: 10 }]}>{snap.author}</Text>
+          <Text style={[styles.snapTimestamp, { color: colors.text }]}>{snap.created ? new Date(snap.created).toLocaleString() : ''}</Text>
+        </View>
+        <Text style={[styles.snapBody, { color: colors.text }]}>{snap.body}</Text>
+        <View style={[styles.snapMeta, { alignItems: 'center' }]}> 
+          <FontAwesome name="arrow-up" size={18} color={colors.icon} />
+          <Text style={[styles.snapMetaText, { color: colors.text }]}>{snap.voteCount || 0}</Text>
+          <FontAwesome name="comment-o" size={18} color={colors.icon} style={{ marginLeft: 12 }} />
+          <Text style={[styles.snapMetaText, { color: colors.text }]}>{snap.replyCount || 0}</Text>
+          <Text style={[styles.snapMetaText, { color: colors.payout, marginLeft: 12 }]}>{snap.payout ? `$${snap.payout.toFixed(2)}` : ''}</Text>
+          <View style={{ flex: 1 }} />
+          <TouchableOpacity style={styles.replyButton} onPress={() => {/* TODO: open reply modal */}}>
+            <FontAwesome name="reply" size={18} color={colors.icon} />
+            <Text style={[styles.replyButtonText, { color: colors.icon }]}>Reply</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    ) : null
   );
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: isDark ? '#15202B' : '#fff' }]}> 
+    <SafeAreaViewRN style={[styles.safeArea, { backgroundColor: isDark ? '#15202B' : '#fff' }]}> 
       {/* Top bar */}
       <View style={[styles.topBar, { borderColor: colors.border, backgroundColor: colors.background }]}> 
         <TouchableOpacity onPress={() => router.back()} style={styles.topBarButton}>
@@ -182,63 +239,25 @@ const ConversationScreen = () => {
           <FontAwesome name="refresh" size={24} color="#1DA1F2" />
         </TouchableOpacity>
       </View>
-      {/* Snap as post */}
+      {/* Conversation list (snap as header, replies as data) */}
       {loading ? (
         <View style={{ alignItems: 'center', marginTop: 40 }}>
           <FontAwesome name="hourglass-half" size={48} color={colors.icon} style={{ marginBottom: 12 }} />
           <Text style={{ color: colors.text, fontSize: 16 }}>Loading conversation...</Text>
         </View>
-      ) : snap ? (
-        <View style={[styles.snapPost, { borderColor: colors.border, backgroundColor: colors.background }]}> 
-          <Text style={[styles.snapAuthor, { color: colors.text }]}>{snap.author}</Text>
-          <Text style={[styles.snapBody, { color: colors.text }]}>{snap.body}</Text>
-          <View style={styles.snapMeta}>
-            <FontAwesome name="arrow-up" size={18} color={colors.icon} />
-            <Text style={[styles.snapMetaText, { color: colors.text }]}>{snap.voteCount || 0}</Text>
-            <FontAwesome name="comment-o" size={18} color={colors.icon} style={{ marginLeft: 12 }} />
-            <Text style={[styles.snapMetaText, { color: colors.text }]}>{snap.replyCount || 0}</Text>
-            <Text style={[styles.snapMetaText, { color: colors.payout }]}>{snap.payout ? `$${snap.payout.toFixed(2)}` : ''}</Text>
-          </View>
-        </View>
-      ) : null}
-      {/* Reply input */}
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={[styles.replyInputBox, { backgroundColor: colors.bubble, borderColor: colors.border }]}> 
-          <TextInput
-            style={[styles.replyInput, { backgroundColor: isDark ? '#15202B' : '#fff', color: isDark ? '#D7DBDC' : '#0F1419', borderColor: isDark ? '#38444D' : '#ddd' }]}
-            value={replyText}
-            onChangeText={setReplyText}
-            placeholder="Write a reply..."
-            placeholderTextColor={isDark ? '#8899A6' : '#888'}
-            multiline
-          />
-          {replyImage && (
-            <Image source={{ uri: replyImage }} style={{ width: 80, height: 80, borderRadius: 8, marginTop: 8 }} />
-          )}
-          <View style={styles.replyInputButtonsRow}>
-            <TouchableOpacity onPress={handleAddImage} style={styles.addImageButton} disabled={uploading}>
-              <FontAwesome name="image" size={22} color={uploading ? '#ccc' : '#1DA1F2'} />
-            </TouchableOpacity>
-            <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-end' }}>
-              <TouchableOpacity onPress={handleCancel} style={styles.cancelButton}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleSubmit} style={styles.submitButton}>
-                <Text style={styles.submitButtonText}>Submit</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-      {/* Replies */}
-      <FlatList
-        data={replies}
-        renderItem={renderReply}
-        keyExtractor={(_, idx) => idx.toString()}
-        contentContainerStyle={styles.repliesList}
-        style={{ flex: 1 }}
-      />
-    </SafeAreaView>
+      ) : (
+        <FlatList
+          data={replies}
+          renderItem={renderReply}
+          keyExtractor={(_, idx) => idx.toString()}
+          contentContainerStyle={styles.repliesList}
+          ListHeaderComponent={renderSnapHeader}
+          style={{ flex: 1 }}
+          keyboardShouldPersistTaps="handled"
+        />
+      )}
+      {/* Reply input removed; will use modal/composer */}
+    </SafeAreaViewRN>
   );
 };
 
@@ -251,22 +270,31 @@ const styles = StyleSheet.create({
   snapPost: { padding: 16, borderBottomWidth: 1 },
   snapAuthor: { fontWeight: 'bold', fontSize: 16, marginBottom: 4 },
   snapBody: { fontSize: 15, marginBottom: 8 },
-  snapMeta: { flexDirection: 'row', alignItems: 'center' },
+  snapMeta: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
   snapMetaText: { marginLeft: 4, fontSize: 14 },
-  replyInputBox: { padding: 12, borderBottomWidth: 1 },
-  replyInput: { minHeight: 40, fontSize: 15, borderRadius: 8, padding: 8, borderWidth: 1 },
-  replyInputButtonsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
-  addImageButton: { marginRight: 12, padding: 4 },
-  cancelButton: { marginRight: 12 },
-  cancelButtonText: { color: '#888' },
-  submitButton: { backgroundColor: '#1DA1F2', borderRadius: 6, paddingHorizontal: 16, paddingVertical: 6 },
-  submitButtonText: { color: '#fff', fontWeight: 'bold' },
+  replyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'auto',
+    marginLeft: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: 'transparent',
+  },
+  replyButtonText: {
+    marginLeft: 6,
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
   repliesList: { padding: 12 },
   replyBubble: { borderRadius: 12, padding: 10, marginBottom: 10 },
   replyAuthor: { fontWeight: 'bold', fontSize: 14, marginBottom: 2 },
   replyBody: { fontSize: 14, marginBottom: 4 },
   replyMeta: { flexDirection: 'row', alignItems: 'center' },
   replyMetaText: { marginLeft: 4, fontSize: 13 },
+  avatar: { width: 40, height: 40, borderRadius: 20, marginRight: 10 },
+  snapTimestamp: { fontSize: 12, color: '#8899A6', marginLeft: 8 },
 });
 
 export default ConversationScreen;
