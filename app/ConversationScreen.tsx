@@ -7,6 +7,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { uploadImageToCloudinaryFixed } from './utils/cloudinaryImageUploadFixed';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Client } from '@hiveio/dhive';
+import Modal from 'react-native-modal';
+
+// TODO: Replace these with your app's real auth/user context
+const currentUsername = 'your_hive_username'; // e.g. from context or props
+const postingKey = 'your_posting_key'; // e.g. from secure storage or wallet connect
 
 // Placeholder Snap data type
 interface SnapData {
@@ -60,9 +65,17 @@ const ConversationScreen = () => {
   const [loading, setLoading] = useState(true);
   const [replyImage, setReplyImage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [replyModalVisible, setReplyModalVisible] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [posting, setPosting] = useState(false);
+  const [postError, setPostError] = useState<string | null>(null);
+  // Track which reply (by author/permlink) is being replied to
+  const [replyTarget, setReplyTarget] = useState<{author: string, permlink: string} | null>(null);
 
-  async function fetchRepliesTree(author: string, permlink: string, depth = 0, maxDepth = 3): Promise<any[]> {
+  // Recursively fetch replies, ensuring each reply has full content (including payout info)
+  async function fetchRepliesTreeWithContent(author: string, permlink: string, depth = 0, maxDepth = 3): Promise<any[]> {
     if (depth > maxDepth) return [];
+    // Fetch shallow replies
     const res = await fetch('https://api.hive.blog', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -74,11 +87,35 @@ const ConversationScreen = () => {
       }),
     });
     const data = await res.json();
-    const replies = data.result || [];
-    for (const reply of replies) {
-      reply.childrenReplies = await fetchRepliesTree(reply.author, reply.permlink, depth + 1, maxDepth);
+    const shallowReplies = data.result || [];
+    // For each reply, fetch full content and recurse
+    const fullReplies: ReplyData[] = [];
+    for (const reply of shallowReplies) {
+      // Fetch full content for this reply
+      let fullReply;
+      try {
+        fullReply = await client.database.call('get_content', [reply.author, reply.permlink]);
+      } catch (e) {
+        fullReply = reply; // fallback
+      }
+      // Parse payout
+      const payout = parseFloat(fullReply.pending_payout_value ? fullReply.pending_payout_value.replace(' HBD', '') : '0');
+      // Recursively fetch children
+      const childrenReplies = await fetchRepliesTreeWithContent(reply.author, reply.permlink, depth + 1, maxDepth);
+      // Build reply object
+      fullReplies.push({
+        author: fullReply.author,
+        body: fullReply.body,
+        created: fullReply.created,
+        voteCount: fullReply.net_votes,
+        replyCount: fullReply.children,
+        payout,
+        permlink: fullReply.permlink,
+        hasUpvoted: false, // TODO: check if user has upvoted
+        replies: childrenReplies,
+      });
     }
-    return replies;
+    return fullReplies;
   }
 
   React.useEffect(() => {
@@ -119,8 +156,8 @@ const ConversationScreen = () => {
           permlink: post.permlink,
           hasUpvoted: false, // TODO: check if user has upvoted
         });
-        // Fetch replies tree
-        const tree = await fetchRepliesTree(author, permlink);
+        // Fetch replies tree with full content (including payout info)
+        const tree = await fetchRepliesTreeWithContent(author, permlink);
         setReplies(tree);
       } catch (e) {
         console.error('Error fetching snap and replies:', e);
@@ -168,9 +205,59 @@ const ConversationScreen = () => {
     }
   };
 
-  const handleSubmit = () => {
-    // TODO: Submit reply logic
+  const handleOpenReplyModal = (author: string, permlink: string) => {
+    setReplyTarget({ author, permlink });
+    setReplyModalVisible(true);
+  };
+  const handleCloseReplyModal = () => {
+    setReplyModalVisible(false);
+    setReplyText('');
     setReplyImage(null);
+    setReplyTarget(null);
+  };
+
+  const handleSubmitReply = async () => {
+    if (!replyTarget || !replyText.trim()) return;
+    setPosting(true);
+    setPostError(null);
+    try {
+      let body = replyText.trim();
+      if (replyImage) {
+        body += `\n![image](${replyImage})`;
+      }
+      const parent_author = replyTarget.author;
+      const parent_permlink = replyTarget.permlink;
+      const author = currentUsername;
+      const permlink = `re-${parent_author}-${parent_permlink}-${Date.now()}`;
+      const json_metadata: any = {
+        app: 'hivesnaps/1.0',
+        format: 'markdown',
+        tags: ['hivesnaps', 'reply'],
+      };
+      if (replyImage) {
+        json_metadata.image = [replyImage];
+      }
+      // Uncomment below to enable real posting (make sure postingKey is correct and secure!)
+      // await client.broadcast.comment({
+      //   parent_author,
+      //   parent_permlink,
+      //   author,
+      //   permlink,
+      //   title: '',
+      //   body,
+      //   json_metadata: JSON.stringify(json_metadata),
+      // }, postingKey);
+      await new Promise(res => setTimeout(res, 1200)); // Simulate delay
+      setReplyModalVisible(false);
+      setReplyText('');
+      setReplyImage(null);
+      setPosting(false);
+      setReplyTarget(null);
+      handleRefresh();
+    } catch (e: any) {
+      setPostError(e.message || 'Failed to post reply.');
+      setPosting(false);
+    }
   };
 
   // Render a single reply (flat, not threaded yet)
@@ -195,6 +282,29 @@ const ConversationScreen = () => {
     console.log('Snap payout:', snap.payout, 'for', snap.author, snap.permlink);
   }
 
+  // Recursive threaded reply renderer
+  const renderReplyTree = (reply: ReplyData, level = 0) => (
+    <View key={reply.author + reply.permlink} style={{ marginLeft: level * 18, marginBottom: 10 }}>
+      <View style={[styles.replyBubble, { backgroundColor: colors.bubble }]}> 
+        <Text style={[styles.replyAuthor, { color: colors.text }]}>{reply.author}</Text>
+        <Text style={[styles.replyBody, { color: colors.text }]}>{reply.body}</Text>
+        <View style={styles.replyMeta}>
+          <FontAwesome name="arrow-up" size={16} color={colors.icon} />
+          <Text style={[styles.replyMetaText, { color: colors.text }]}>{reply.voteCount || 0}</Text>
+          <FontAwesome name="comment-o" size={16} color={colors.icon} style={{ marginLeft: 12 }} />
+          <Text style={[styles.replyMetaText, { color: colors.payout, marginLeft: 12 }]}>{reply.payout !== undefined ? `$${reply.payout.toFixed(2)}` : ''}</Text>
+          <View style={{ flex: 1 }} />
+          <TouchableOpacity style={styles.replyButton} onPress={() => handleOpenReplyModal(reply.author, reply.permlink!)}>
+            <FontAwesome name="reply" size={16} color={colors.icon} />
+            <Text style={[styles.replyButtonText, { color: colors.icon }]}>Reply</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+      {/* Render children recursively */}
+      {reply.replies && reply.replies.length > 0 && reply.replies.map(child => renderReplyTree(child, level + 1))}
+    </View>
+  );
+
   // Render the snap as a header for the replies list
   const renderSnapHeader = () => (
     snap ? (
@@ -218,7 +328,7 @@ const ConversationScreen = () => {
           <Text style={[styles.snapMetaText, { color: colors.text }]}>{snap.replyCount || 0}</Text>
           <Text style={[styles.snapMetaText, { color: colors.payout, marginLeft: 12 }]}>{snap.payout ? `$${snap.payout.toFixed(2)}` : ''}</Text>
           <View style={{ flex: 1 }} />
-          <TouchableOpacity style={styles.replyButton} onPress={() => {/* TODO: open reply modal */}}>
+          <TouchableOpacity style={styles.replyButton} onPress={() => handleOpenReplyModal(snap.author, snap.permlink!)}>
             <FontAwesome name="reply" size={18} color={colors.icon} />
             <Text style={[styles.replyButtonText, { color: colors.icon }]}>Reply</Text>
           </TouchableOpacity>
@@ -247,16 +357,87 @@ const ConversationScreen = () => {
         </View>
       ) : (
         <FlatList
-          data={replies}
-          renderItem={renderReply}
-          keyExtractor={(_, idx) => idx.toString()}
-          contentContainerStyle={styles.repliesList}
-          ListHeaderComponent={renderSnapHeader}
+          data={[]}
+          renderItem={null}
+          ListHeaderComponent={
+            <>
+              {renderSnapHeader()}
+              <View style={styles.repliesList}>
+                {replies.map(reply => renderReplyTree(reply))}
+              </View>
+            </>
+          }
           style={{ flex: 1 }}
           keyboardShouldPersistTaps="handled"
         />
       )}
-      {/* Reply input removed; will use modal/composer */}
+      {/* Reply modal composer */}
+      <Modal
+        isVisible={replyModalVisible}
+        onBackdropPress={posting ? undefined : handleCloseReplyModal}
+        onBackButtonPress={posting ? undefined : handleCloseReplyModal}
+        style={{ justifyContent: 'flex-end', margin: 0 }}
+        useNativeDriver
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ backgroundColor: colors.background, padding: 16, borderTopLeftRadius: 18, borderTopRightRadius: 18 }}
+        >
+          <Text style={{ color: colors.text, fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>
+            Reply to {replyTarget?.author}
+          </Text>
+          <TextInput
+            style={{
+              minHeight: 60,
+              color: colors.text,
+              backgroundColor: colors.bubble,
+              borderRadius: 10,
+              padding: 10,
+              fontSize: 15,
+              marginBottom: 10,
+            }}
+            placeholder="Write your reply..."
+            placeholderTextColor={isDark ? '#8899A6' : '#888'}
+            multiline
+            value={replyText}
+            onChangeText={setReplyText}
+            editable={!uploading && !posting}
+          />
+          {replyImage ? (
+            <View style={{ marginBottom: 10 }}>
+              <Image source={{ uri: replyImage }} style={{ width: 120, height: 120, borderRadius: 10 }} />
+              <TouchableOpacity onPress={() => setReplyImage(null)} style={{ position: 'absolute', top: 4, right: 4 }} disabled={posting}>
+                <FontAwesome name="close" size={20} color={colors.icon} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          {postError ? (
+            <Text style={{ color: 'red', marginBottom: 8 }}>{postError}</Text>
+          ) : null}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+            <TouchableOpacity onPress={handleAddImage} disabled={uploading || posting} style={{ marginRight: 16 }}>
+              <FontAwesome name="image" size={22} color={colors.icon} />
+            </TouchableOpacity>
+            <View style={{ flex: 1 }} />
+            <TouchableOpacity
+              onPress={handleSubmitReply}
+              disabled={uploading || posting || !replyText.trim()}
+              style={{
+                backgroundColor: colors.icon,
+                borderRadius: 20,
+                paddingHorizontal: 18,
+                paddingVertical: 8,
+                opacity: uploading || posting || !replyText.trim() ? 0.6 : 1,
+              }}
+            >
+              {posting ? (
+                <FontAwesome name="spinner" size={16} color="#fff" style={{ marginRight: 8 }} />
+              ) : null}
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{posting ? 'Posting...' : 'Send'}</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaViewRN>
   );
 };
