@@ -36,6 +36,7 @@ interface SnapProps {
   payout?: number;
   onUpvotePress?: (snap: { author: string; permlink: string }) => void;
   permlink?: string;
+  hasUpvoted?: boolean; // NEW: indicates if current user has upvoted
 }
 
 // Utility to extract raw image URLs from text (not in markdown or html)
@@ -60,9 +61,10 @@ const removeYouTubeUrl = (text: string): string => {
   return text.replace(/(?:https?:\/\/(?:www\.)?)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)[\w-]{11}(\S*)?/gi, '').replace(/\s{2,}/g, ' ').trim();
 };
 
-const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount = 0, replyCount = 0, payout = 0, onUpvotePress, permlink }) => {
+const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount = 0, replyCount = 0, payout = 0, onUpvotePress, permlink, hasUpvoted = false }) => {
   const colorScheme = useColorScheme() || 'light';
   const colors = twitterColors[colorScheme];
+  const upvoteColor = hasUpvoted ? '#8e44ad' : colors.icon; // purple if upvoted
   const imageUrls = extractImageUrls(body);
   const rawImageUrls = extractRawImageUrls(body);
   const youtubeId = extractYouTubeId(body);
@@ -170,10 +172,10 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
             accessibilityRole="button"
             accessibilityLabel="Upvote this snap"
           >
-            <FontAwesome name="arrow-up" size={18} color={colors.icon} style={styles.icon} />
+            <FontAwesome name="arrow-up" size={18} color={upvoteColor} style={styles.icon} />
           </Pressable>
         ) : (
-          <FontAwesome name="arrow-up" size={18} color={colors.icon} style={styles.icon} />
+          <FontAwesome name="arrow-up" size={18} color={upvoteColor} style={styles.icon} />
         )}
         <Text style={[styles.voteCount, { color: colors.text }]}>{voteCount}</Text>
         <FontAwesome name="comment-o" size={18} color={colors.icon} style={styles.icon} />

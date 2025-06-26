@@ -492,6 +492,7 @@ const FeedScreen = () => {
                 payout={parseFloat(item.pending_payout_value ? item.pending_payout_value.replace(' HBD', '') : '0')}
                 permlink={item.permlink}
                 onUpvotePress={() => handleUpvotePress({ author: item.author, permlink: item.permlink })}
+                hasUpvoted={Array.isArray(item.active_votes) && item.active_votes.some((v: any) => v.voter === username && v.percent > 0)}
               />
             )}
             contentContainerStyle={{ paddingBottom: 80 }}
