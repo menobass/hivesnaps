@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, Image, StyleSheet, useColorScheme, Linking, Pressable } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Image, StyleSheet, useColorScheme, Linking, Pressable, Modal, TouchableOpacity, Dimensions } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { extractImageUrls } from '../utils/extractImageUrls';
 import { stripImageTags } from '../utils/stripImageTags';
@@ -78,9 +78,33 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
   }
   // Extract external (non-image, non-YouTube) links from all forms
   const { links: externalLinks, text: cleanTextBody } = extractExternalLinks(textBody);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalImageUrl, setModalImageUrl] = useState<string | null>(null);
 
   return (
     <View style={[styles.bubble, { backgroundColor: colors.bubble, borderColor: colors.border, width: '100%', alignSelf: 'stretch' }]}> 
+      {/* Image Modal */}
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
+              <FontAwesome name="close" size={28} color="#fff" />
+            </TouchableOpacity>
+            {modalImageUrl && (
+              <Image
+                source={{ uri: modalImageUrl }}
+                style={styles.fullImage}
+                resizeMode="contain"
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
       {/* Top row: avatar, username, timestamp */}
       <View style={styles.topRow}>
         <Image source={avatarUrl ? { uri: avatarUrl } : require('../../assets/images/logo.jpg')} style={styles.avatar} />       
@@ -103,12 +127,13 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
       {imageUrls.length > 0 && (
         <View style={{ marginBottom: 8 }}>
           {imageUrls.map((url, idx) => (
-            <Image
-              key={url + idx}
-              source={{ uri: url }}
-              style={{ width: '100%', height: 200, borderRadius: 12, marginBottom: 6, backgroundColor: '#eee' }}
-              resizeMode="cover"
-            />
+            <Pressable key={url + idx} onPress={() => { setModalImageUrl(url); setModalVisible(true); }}>
+              <Image
+                source={{ uri: url }}
+                style={{ width: '100%', height: 200, borderRadius: 12, marginBottom: 6, backgroundColor: '#eee' }}
+                resizeMode="cover"
+              />
+            </Pressable>
           ))}
         </View>
       )}
@@ -116,12 +141,13 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
       {rawImageUrls.length > 0 && (
         <View style={{ marginBottom: 8 }}>
           {rawImageUrls.map((url, idx) => (
-            <Image
-              key={url + idx}
-              source={{ uri: url }}
-              style={{ width: '100%', height: 200, borderRadius: 12, marginBottom: 6, backgroundColor: '#eee' }}
-              resizeMode="cover"
-            />
+            <Pressable key={url + idx} onPress={() => { setModalImageUrl(url); setModalVisible(true); }}>
+              <Image
+                source={{ uri: url }}
+                style={{ width: '100%', height: 200, borderRadius: 12, marginBottom: 6, backgroundColor: '#eee' }}
+                resizeMode="cover"
+              />
+            </Pressable>
           ))}
         </View>
       )}
@@ -187,6 +213,7 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
   );
 };
 
+const { width, height } = Dimensions.get('window');
 const styles = StyleSheet.create({
   bubble: {
     borderRadius: 18,
@@ -246,6 +273,33 @@ const styles = StyleSheet.create({
   payout: {
     fontWeight: 'bold',
     fontSize: 15,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: width * 0.95,
+    height: height * 0.85,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 18,
+    right: 18,
+    zIndex: 2,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 20,
+    padding: 4,
+  },
+  fullImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
   },
 });
 
