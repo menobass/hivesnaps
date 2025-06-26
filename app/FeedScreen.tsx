@@ -9,6 +9,7 @@ import Slider from '@react-native-community/slider';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import { useRouter } from 'expo-router';
+import { uploadImageToCloudinaryFixed } from './utils/cloudinaryImageUploadFixed';
 
 const twitterColors = {
   light: {
@@ -72,6 +73,7 @@ const FeedScreen = () => {
   const [newSnapImage, setNewSnapImage] = useState<string | null>(null);
   const [newSnapLoading, setNewSnapLoading] = useState(false);
   const [newSnapSuccess, setNewSnapSuccess] = useState(false);
+  const [newSnapUploading, setNewSnapUploading] = useState(false);
   const colorScheme = useColorScheme() || 'light';
   const colors = twitterColors[colorScheme];
   const insets = useSafeAreaInsets();
@@ -427,23 +429,89 @@ const FeedScreen = () => {
   };
   const handleAddImage = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        alert('Permission to access media library is required!');
-        return;
+      // Ask user: Take Photo or Choose from Gallery
+      const options = [
+        { text: 'Take Photo', value: 'camera' },
+        { text: 'Choose from Gallery', value: 'gallery' },
+        { text: 'Cancel', value: 'cancel', style: 'cancel' },
+      ];
+      let pickType: 'camera' | 'gallery' | 'cancel' = 'cancel';
+      if (Platform.OS === 'ios') {
+        const { ActionSheetIOS } = await import('react-native');
+        await new Promise<void>(resolve => {
+          ActionSheetIOS.showActionSheetWithOptions(
+            {
+              options: options.map(o => o.text),
+              cancelButtonIndex: 2,
+            },
+            async (buttonIndex) => {
+              if (buttonIndex === 0) pickType = 'camera';
+              else if (buttonIndex === 1) pickType = 'gallery';
+              resolve();
+            }
+          );
+        });
+      } else {
+        pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(resolve => {
+          import('react-native').then(({ Alert }) => {
+            Alert.alert(
+              'Add Image',
+              'Choose an option',
+              [
+                { text: 'Take Photo', onPress: () => resolve('camera') },
+                { text: 'Choose from Gallery', onPress: () => resolve('gallery') },
+                { text: 'Cancel', style: 'cancel', onPress: () => resolve('cancel') },
+              ],
+              { cancelable: true }
+            );
+          });
+        });
       }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        quality: 0.8,
-      });
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setNewSnapImage(result.assets[0].uri);
+      if (pickType === 'cancel') return;
+      // Pick image
+      let result;
+      if (pickType === 'camera') {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          alert('Permission to access camera is required!');
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          allowsEditing: true,
+          quality: 0.8,
+        });
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          alert('Permission to access media library is required!');
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          quality: 0.8,
+        });
       }
+      if (!result || result.canceled || !result.assets || !result.assets[0]) return;
+      const asset = result.assets[0];
+      setNewSnapUploading(true);
+      try {
+        const fileToUpload = {
+          uri: asset.uri,
+          name: `snap-${Date.now()}.jpg`,
+          type: 'image/jpeg',
+        };
+        const cloudinaryUrl = await uploadImageToCloudinaryFixed(fileToUpload);
+        setNewSnapImage(cloudinaryUrl);
+      } catch (err) {
+        alert('Image upload failed: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
+      }
+      setNewSnapUploading(false);
     } catch (err) {
       alert('Failed to pick image: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
     }
   };
+
   const handleSubmitNewSnap = async () => {
     if (!username) {
       alert('You must be logged in to post a Snap.');
@@ -718,12 +786,15 @@ const FeedScreen = () => {
               <Pressable
                 style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.buttonInactive, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 14, marginRight: 10 }}
                 onPress={handleAddImage}
-                disabled={newSnapLoading || newSnapSuccess}
+                disabled={newSnapLoading || newSnapSuccess || newSnapUploading}
               >
                 <FontAwesome name="image" size={20} color={colors.icon} style={{ marginRight: 6 }} />
                 <Text style={{ color: colors.text, fontWeight: '600' }}>Add Image</Text>
               </Pressable>
-              {newSnapImage && (
+              {newSnapUploading && (
+                <ActivityIndicator size="small" color={colors.button} style={{ marginLeft: 8 }} />
+              )}
+              {newSnapImage && !newSnapUploading && (
                 <Image source={{ uri: newSnapImage }} style={{ width: 48, height: 48, borderRadius: 8, borderWidth: 1, borderColor: colors.buttonInactive }} />
               )}
             </View>
