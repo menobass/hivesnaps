@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Image, useColorScheme, Dimensions, ActivityIndicator, FlatList } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Image, useColorScheme, Dimensions, ActivityIndicator, FlatList, Modal, Pressable, Platform } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
-import { Client } from '@hiveio/dhive';
+import { Client, PrivateKey } from '@hiveio/dhive';
 import Snap from './components/Snap';
+import Slider from '@react-native-community/slider';
 
 const twitterColors = {
   light: {
@@ -57,6 +58,11 @@ const FeedScreen = () => {
   const [snaps, setSnaps] = useState<Snap[]>([]);
   const [activeFilter, setActiveFilter] = useState<'following' | 'newest' | 'trending' | 'my'>('newest');
   const [feedLoading, setFeedLoading] = useState(false);
+  const [upvoteModalVisible, setUpvoteModalVisible] = useState(false);
+  const [upvoteTarget, setUpvoteTarget] = useState<{ author: string; permlink: string } | null>(null);
+  const [voteWeight, setVoteWeight] = useState(100);
+  const [upvoteLoading, setUpvoteLoading] = useState(false);
+  const [upvoteSuccess, setUpvoteSuccess] = useState(false);
   const colorScheme = useColorScheme() || 'light';
   const colors = twitterColors[colorScheme];
   const insets = useSafeAreaInsets();
@@ -293,8 +299,123 @@ const FeedScreen = () => {
     setActiveFilter(filter);
   };
 
+  // Corrected: Accepts { author, permlink } object
+  const handleUpvotePress = ({ author, permlink }: { author: string; permlink: string }) => {
+    setUpvoteTarget({ author, permlink });
+    setVoteWeight(100);
+    setUpvoteModalVisible(true);
+  };
+
+  const handleUpvoteCancel = () => {
+    setUpvoteModalVisible(false);
+    setUpvoteTarget(null);
+    setVoteWeight(100);
+  };
+
+  const handleUpvoteConfirm = async () => {
+    if (!upvoteTarget) return;
+    setUpvoteLoading(true);
+    setUpvoteSuccess(false);
+    try {
+      // Retrieve posting key from secure store
+      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
+      if (!postingKeyStr) throw new Error('No posting key found. Please log in again.');
+      const postingKey = PrivateKey.fromString(postingKeyStr);
+
+      // Ecency-style weight: 1-100% slider maps to -10000 to 10000 (positive for upvote)
+      // Ecency rounds to nearest 100 (1%)
+      let weight = Math.round(voteWeight * 100);
+      if (weight > 10000) weight = 10000;
+      if (weight < 1) weight = 1;
+
+      // Use dhive to broadcast vote
+      await client.broadcast.vote(
+        {
+          voter: username,
+          author: upvoteTarget.author,
+          permlink: upvoteTarget.permlink,
+          weight,
+        },
+        postingKey
+      );
+
+      setUpvoteLoading(false);
+      setUpvoteSuccess(true);
+      // Refresh feed and scroll to upvoted snap after short delay
+      setTimeout(async () => {
+        setUpvoteModalVisible(false);
+        setUpvoteSuccess(false);
+        setUpvoteTarget(null);
+        // Refresh feed
+        if (activeFilter === 'newest') await fetchSnaps();
+        else if (activeFilter === 'following') await fetchFollowingSnaps();
+        else if (activeFilter === 'trending') await fetchTrendingSnaps();
+        else if (activeFilter === 'my') await fetchMySnaps();
+        // TODO: Scroll to upvoted snap (requires FlatList ref)
+      }, 2000);
+    } catch (err) {
+      setUpvoteLoading(false);
+      setUpvoteSuccess(false);
+      const errorMsg = err instanceof Error ? err.message : JSON.stringify(err);
+      alert('Upvote failed: ' + errorMsg);
+    }
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* Upvote Modal */}
+      <Modal
+        visible={upvoteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={handleUpvoteCancel}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: colors.background, borderRadius: 16, padding: 24, width: '85%', alignItems: 'center' }}>
+            <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>Upvote Snap</Text>
+            <Text style={{ color: colors.text, fontSize: 15, marginBottom: 16 }}>Vote Weight: {voteWeight}%</Text>
+            <Slider
+              style={{ width: '100%', height: 40 }}
+              minimumValue={1}
+              maximumValue={100}
+              step={1}
+              value={voteWeight}
+              onValueChange={setVoteWeight}
+              minimumTrackTintColor={colors.button}
+              maximumTrackTintColor={colors.buttonInactive}
+              thumbTintColor={colors.button}
+            />
+            {upvoteLoading ? (
+              <View style={{ marginTop: 24, alignItems: 'center' }}>
+                <FontAwesome name="hourglass-half" size={32} color={colors.icon} />
+                <Text style={{ color: colors.text, marginTop: 8 }}>Submitting vote...</Text>
+              </View>
+            ) : upvoteSuccess ? (
+              <View style={{ marginTop: 24, alignItems: 'center' }}>
+                <FontAwesome name="check-circle" size={32} color={colors.button} />
+                <Text style={{ color: colors.text, marginTop: 8 }}>Upvote successful!</Text>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', marginTop: 24 }}>
+                <Pressable
+                  style={{ flex: 1, marginRight: 8, backgroundColor: colors.buttonInactive, borderRadius: 8, padding: 12, alignItems: 'center' }}
+                  onPress={handleUpvoteCancel}
+                  disabled={upvoteLoading}
+                >
+                  <Text style={{ color: colors.text, fontWeight: '600' }}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={{ flex: 1, marginLeft: 8, backgroundColor: colors.button, borderRadius: 8, padding: 12, alignItems: 'center' }}
+                  onPress={handleUpvoteConfirm}
+                  disabled={upvoteLoading}
+                >
+                  <Text style={{ color: colors.buttonText, fontWeight: '600' }}>Confirm</Text>
+                </Pressable>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
       {/* Top bar inside SafeAreaView for status bar/notch safety */}
       <SafeAreaView style={{ backgroundColor: colors.background, paddingTop: insets.top }} edges={['top']}>
         <View style={styles.topBar}>
@@ -369,6 +490,8 @@ const FeedScreen = () => {
                 voteCount={item.net_votes || 0}
                 replyCount={item.children || 0}
                 payout={parseFloat(item.pending_payout_value ? item.pending_payout_value.replace(' HBD', '') : '0')}
+                permlink={item.permlink}
+                onUpvotePress={() => handleUpvotePress({ author: item.author, permlink: item.permlink })}
               />
             )}
             contentContainerStyle={{ paddingBottom: 80 }}
