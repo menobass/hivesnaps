@@ -10,6 +10,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import { useRouter } from 'expo-router';
 import { uploadImageToCloudinaryFixed } from './utils/cloudinaryImageUploadFixed';
+import ConversationScreen from './ConversationScreen';
 
 const twitterColors = {
   light: {
@@ -720,6 +721,10 @@ const FeedScreen = () => {
                 permlink={item.permlink}
                 onUpvotePress={() => handleUpvotePress({ author: item.author, permlink: item.permlink })}
                 hasUpvoted={Array.isArray(item.active_votes) && item.active_votes.some((v: any) => v.voter === username && v.percent > 0)}
+                onSpeechBubblePress={() => {
+                  console.log('Navigating to ConversationScreen with:', item);
+                  router.push({ pathname: '/ConversationScreen', params: { author: item.author, permlink: item.permlink } });
+                }}
               />
             )}
             contentContainerStyle={{ paddingBottom: 80 }}
