@@ -1,0 +1,2 @@
+# For rendering markdown in React Native
+react-native-markdown-display

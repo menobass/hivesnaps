@@ -8,6 +8,7 @@ import { uploadImageToCloudinaryFixed } from './utils/cloudinaryImageUploadFixed
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Client } from '@hiveio/dhive';
 import Modal from 'react-native-modal';
+import Markdown from 'react-native-markdown-display';
 
 // TODO: Replace these with your app's real auth/user context
 const currentUsername = 'your_hive_username'; // e.g. from context or props
@@ -266,7 +267,14 @@ const ConversationScreen = () => {
     return (
       <View style={[styles.replyBubble, { backgroundColor: colors.bubble }]}> 
         <Text style={[styles.replyAuthor, { color: colors.text }]}>{item.author}</Text>
-        <Text style={[styles.replyBody, { color: colors.text }]}>{item.body}</Text>
+        <Markdown
+          style={{
+            body: { color: colors.text, fontSize: 14, marginBottom: 4 },
+            link: { color: colors.icon },
+          }}
+        >
+          {item.body}
+        </Markdown>
         <View style={styles.replyMeta}>
           <FontAwesome name="arrow-up" size={16} color={colors.icon} />
           <Text style={[styles.replyMetaText, { color: colors.text }]}>{item.voteCount || 0}</Text>
@@ -277,6 +285,28 @@ const ConversationScreen = () => {
     );
   };
 
+  // Custom markdown rules with 'any' types to silence TS warnings
+  const markdownRules = {
+    image: (
+      node: any,
+      children: any,
+      parent: any,
+      styles: any
+    ) => {
+      const { src, alt } = node.attributes;
+      return (
+        <Image
+          key={src || alt}
+          source={{ uri: src }}
+          style={{ width: 220, height: 220, borderRadius: 10, marginVertical: 8, alignSelf: 'center' }}
+          resizeMode="contain"
+          accessible
+          accessibilityLabel={alt || 'image'}
+        />
+      );
+    },
+  };
+
   // Add log for snap payout
   if (snap) {
     console.log('Snap payout:', snap.payout, 'for', snap.author, snap.permlink);
@@ -284,10 +314,18 @@ const ConversationScreen = () => {
 
   // Recursive threaded reply renderer
   const renderReplyTree = (reply: ReplyData, level = 0) => (
-    <View key={reply.author + reply.permlink} style={{ marginLeft: level * 18, marginBottom: 10 }}>
+    <View key={reply.author + reply.permlink + '-' + level} style={{ marginLeft: level * 18, marginBottom: 10 }}>
       <View style={[styles.replyBubble, { backgroundColor: colors.bubble }]}> 
         <Text style={[styles.replyAuthor, { color: colors.text }]}>{reply.author}</Text>
-        <Text style={[styles.replyBody, { color: colors.text }]}>{reply.body}</Text>
+        <Markdown
+          style={{
+            body: { color: colors.text, fontSize: 14, marginBottom: 4 },
+            link: { color: colors.icon },
+          }}
+          rules={markdownRules}
+        >
+          {reply.body}
+        </Markdown>
         <View style={styles.replyMeta}>
           <FontAwesome name="arrow-up" size={16} color={colors.icon} />
           <Text style={[styles.replyMetaText, { color: colors.text }]}>{reply.voteCount || 0}</Text>
@@ -301,7 +339,7 @@ const ConversationScreen = () => {
         </View>
       </View>
       {/* Render children recursively */}
-      {reply.replies && reply.replies.length > 0 && reply.replies.map(child => renderReplyTree(child, level + 1))}
+      {reply.replies && reply.replies.length > 0 && reply.replies.map((child, idx) => renderReplyTree(child, level + 1))}
     </View>
   );
 
@@ -320,7 +358,15 @@ const ConversationScreen = () => {
           <Text style={[styles.snapAuthor, { color: colors.text, marginLeft: 10 }]}>{snap.author}</Text>
           <Text style={[styles.snapTimestamp, { color: colors.text }]}>{snap.created ? new Date(snap.created).toLocaleString() : ''}</Text>
         </View>
-        <Text style={[styles.snapBody, { color: colors.text }]}>{snap.body}</Text>
+        <Markdown
+          style={{
+            body: { color: colors.text, fontSize: 15, marginBottom: 8 },
+            link: { color: colors.icon },
+          }}
+          rules={markdownRules}
+        >
+          {snap.body}
+        </Markdown>
         <View style={[styles.snapMeta, { alignItems: 'center' }]}> 
           <FontAwesome name="arrow-up" size={18} color={colors.icon} />
           <Text style={[styles.snapMetaText, { color: colors.text }]}>{snap.voteCount || 0}</Text>
