@@ -504,17 +504,7 @@ const ConversationScreen = () => {
   };
 
   return (
-    <SafeAreaViewRN style={[styles.safeArea, { backgroundColor: isDark ? '#15202B' : '#fff' }]}> 
-      {/* Top bar */}
-      <View style={[styles.topBar, { borderColor: colors.border, backgroundColor: colors.background }]}> 
-        <TouchableOpacity onPress={() => router.back()} style={styles.topBarButton}>
-          <FontAwesome name="arrow-left" size={24} color="#1DA1F2" />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }} />
-        <TouchableOpacity onPress={handleRefresh} style={styles.topBarButton}>
-          <FontAwesome name="refresh" size={24} color="#1DA1F2" />
-        </TouchableOpacity>
-      </View>
+    <SafeAreaViewSA style={[styles.safeArea, { backgroundColor: isDark ? '#15202B' : '#fff' }]}> 
       {/* Conversation list (snap as header, replies as data) */}
       {loading ? (
         <View style={{ alignItems: 'center', marginTop: 40 }}>
@@ -535,6 +525,8 @@ const ConversationScreen = () => {
           }
           style={{ flex: 1 }}
           keyboardShouldPersistTaps="handled"
+          refreshing={loading}
+          onRefresh={handleRefresh}
         />
       )}
       {/* Reply modal composer */}
@@ -604,7 +596,7 @@ const ConversationScreen = () => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </SafeAreaViewRN>
+    </SafeAreaViewSA>
   );
 };
 
