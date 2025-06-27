@@ -12,6 +12,7 @@ import Markdown from 'react-native-markdown-display';
 import { WebView } from 'react-native-webview';
 import { extractYouTubeId } from './utils/extractYouTubeId';
 import * as SecureStore from 'expo-secure-store';
+import Slider from '@react-native-community/slider';
 
 // Placeholder Snap data type
 interface SnapData {
@@ -24,11 +25,13 @@ interface SnapData {
   payout?: number;
   permlink?: string;
   hasUpvoted?: boolean;
+  active_votes?: any[]; // Add active_votes to store raw voting data
 }
 
 // Placeholder reply type
 interface ReplyData extends SnapData {
   replies?: ReplyData[];
+  active_votes?: any[]; // Add active_votes to store raw voting data
 }
 
 const HIVE_NODES = [
@@ -74,6 +77,13 @@ const ConversationScreen = () => {
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [modalImageUrl, setModalImageUrl] = useState<string | null>(null);
+
+  // Upvote modal state
+  const [upvoteModalVisible, setUpvoteModalVisible] = useState(false);
+  const [upvoteTarget, setUpvoteTarget] = useState<{ author: string; permlink: string } | null>(null);
+  const [voteWeight, setVoteWeight] = useState(100);
+  const [upvoteLoading, setUpvoteLoading] = useState(false);
+  const [upvoteSuccess, setUpvoteSuccess] = useState(false);
 
   // Load user credentials on mount
   React.useEffect(() => {
@@ -149,7 +159,7 @@ const ConversationScreen = () => {
         replyCount: fullReply.children,
         payout,
         permlink: fullReply.permlink,
-        hasUpvoted: false, // TODO: check if user has upvoted
+        active_votes: fullReply.active_votes, // Keep the raw active_votes data
         replies: childrenReplies,
       });
     }
@@ -192,7 +202,7 @@ const ConversationScreen = () => {
         replyCount: post.children,
         payout: parseFloat(post.pending_payout_value ? post.pending_payout_value.replace(' HBD', '') : '0'),
         permlink: post.permlink,
-        hasUpvoted: false, // TODO: check if user has upvoted
+        active_votes: post.active_votes, // Keep the raw active_votes data
       });
       // Fetch replies tree with full content (including payout info)
       const tree = await fetchRepliesTreeWithContent(author, permlink);
@@ -205,8 +215,10 @@ const ConversationScreen = () => {
   };
 
   React.useEffect(() => {
-    fetchSnapAndReplies();
-  }, [author, permlink]);
+    if (currentUsername) {
+      fetchSnapAndReplies();
+    }
+  }, [author, permlink, currentUsername]);
 
   const colors = {
     background: isDark ? '#15202B' : '#fff',
@@ -215,6 +227,8 @@ const ConversationScreen = () => {
     border: isDark ? '#38444D' : '#eee',
     icon: '#1DA1F2',
     payout: '#17BF63',
+    button: '#1DA1F2',
+    buttonInactive: isDark ? '#22303C' : '#E1E8ED',
   };
 
   const handleRefresh = () => {
@@ -374,6 +388,89 @@ const ConversationScreen = () => {
     }
   };
 
+  // --- Upvote handlers ---
+  const handleUpvotePress = ({ author, permlink }: { author: string; permlink: string }) => {
+    setUpvoteTarget({ author, permlink });
+    setVoteWeight(100);
+    setUpvoteModalVisible(true);
+  };
+
+  const handleUpvoteCancel = () => {
+    setUpvoteModalVisible(false);
+    setUpvoteTarget(null);
+    setVoteWeight(100);
+  };
+
+  const handleUpvoteConfirm = async () => {
+    if (!upvoteTarget || !currentUsername) return;
+    setUpvoteLoading(true);
+    setUpvoteSuccess(false);
+    try {
+      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
+      if (!postingKeyStr) throw new Error('No posting key found. Please log in again.');
+      const postingKey = PrivateKey.fromString(postingKeyStr);
+      let weight = Math.round(voteWeight * 100);
+      if (weight > 10000) weight = 10000;
+      if (weight < 1) weight = 1;
+      await client.broadcast.vote(
+        {
+          voter: currentUsername,
+          author: upvoteTarget.author,
+          permlink: upvoteTarget.permlink,
+          weight,
+        },
+        postingKey
+      );
+      // Optimistically update UI
+      setSnap((prev) =>
+        prev && prev.author === upvoteTarget.author && prev.permlink === upvoteTarget.permlink
+          ? { 
+              ...prev, 
+              voteCount: (prev.voteCount || 0) + 1,
+              active_votes: [
+                ...(prev.active_votes || []),
+                { voter: currentUsername, percent: weight }
+              ]
+            }
+          : prev
+      );
+      setReplies((prevReplies) =>
+        prevReplies.map((reply) =>
+          updateReplyUpvoteOptimistic(reply, upvoteTarget, currentUsername, weight)
+        )
+      );
+      setUpvoteLoading(false);
+      setUpvoteSuccess(true);
+      setTimeout(() => {
+        setUpvoteModalVisible(false);
+        setUpvoteSuccess(false);
+        setUpvoteTarget(null);
+        handleRefresh();
+      }, 2000);
+    } catch (err) {
+      setUpvoteLoading(false);
+      setUpvoteSuccess(false);
+      const errorMsg = err instanceof Error ? err.message : JSON.stringify(err);
+      alert('Upvote failed: ' + errorMsg);
+    }
+  };
+
+  // Helper to optimistically update hasUpvoted for replies (recursive)
+  function updateReplyUpvoteOptimistic(reply: ReplyData, target: { author: string; permlink: string }, username: string, weight: number): ReplyData {
+    let updated = { ...reply };
+    if (reply.author === target.author && reply.permlink === target.permlink) {
+      updated.voteCount = (reply.voteCount || 0) + 1;
+      updated.active_votes = [
+        ...(reply.active_votes || []),
+        { voter: username, percent: weight }
+      ];
+    }
+    if (reply.replies && reply.replies.length > 0) {
+      updated.replies = reply.replies.map((r) => updateReplyUpvoteOptimistic(r, target, username, weight));
+    }
+    return updated;
+  }
+
   // Render a single reply (flat, not threaded yet)
   const renderReply = ({ item }: { item: ReplyData }) => {
     console.log('Reply payout:', item.payout, 'for', item.author, item.permlink);
@@ -530,11 +627,16 @@ const ConversationScreen = () => {
             {textBody}
           </Markdown>
           <View style={styles.replyMeta}>
-            <FontAwesome name="arrow-up" size={16} color={colors.icon} />
+            <TouchableOpacity
+              style={[styles.replyButton, { backgroundColor: 'transparent' }]}
+              onPress={() => handleUpvotePress({ author: reply.author, permlink: reply.permlink! })}
+              disabled={Array.isArray(reply.active_votes) && reply.active_votes.some((v: any) => v.voter === currentUsername && v.percent > 0)}
+            >
+              <FontAwesome name="arrow-up" size={16} color={Array.isArray(reply.active_votes) && reply.active_votes.some((v: any) => v.voter === currentUsername && v.percent > 0) ? '#8e44ad' : colors.icon} />
+            </TouchableOpacity>
             <Text style={[styles.replyMetaText, { color: colors.text }]}>{reply.voteCount || 0}</Text>
             <FontAwesome name="comment-o" size={16} color={colors.icon} style={{ marginLeft: 12 }} />
             <Text style={[styles.replyMetaText, { color: colors.payout, marginLeft: 12 }]}>{reply.payout !== undefined ? `$${reply.payout.toFixed(2)}` : ''}</Text>
-            <View style={{ flex: 1 }} />
             <TouchableOpacity style={styles.replyButton} onPress={() => handleOpenReplyModal(reply.author, reply.permlink!)}>
               <FontAwesome name="reply" size={16} color={colors.icon} />
               <Text style={[styles.replyButtonText, { color: colors.icon }]}>Reply</Text>
@@ -590,7 +692,13 @@ const ConversationScreen = () => {
           {textBody}
         </Markdown>
         <View style={[styles.snapMeta, { alignItems: 'center' }]}> 
-          <FontAwesome name="arrow-up" size={18} color={colors.icon} />
+          <TouchableOpacity
+            style={[styles.replyButton, { backgroundColor: 'transparent' }]}
+            onPress={() => handleUpvotePress({ author: snap.author, permlink: snap.permlink! })}
+            disabled={Array.isArray(snap.active_votes) && snap.active_votes.some((v: any) => v.voter === currentUsername && v.percent > 0)}
+          >
+            <FontAwesome name="arrow-up" size={18} color={Array.isArray(snap.active_votes) && snap.active_votes.some((v: any) => v.voter === currentUsername && v.percent > 0) ? '#8e44ad' : colors.icon} />
+          </TouchableOpacity>
           <Text style={[styles.snapMetaText, { color: colors.text }]}>{snap.voteCount || 0}</Text>
           <FontAwesome name="comment-o" size={18} color={colors.icon} style={{ marginLeft: 12 }} />
           <Text style={[styles.snapMetaText, { color: colors.text }]}>{snap.replyCount || 0}</Text>
@@ -732,9 +840,63 @@ const ConversationScreen = () => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      {/* Upvote Modal */}
+      <Modal
+        isVisible={upvoteModalVisible}
+        onBackdropPress={handleUpvoteCancel}
+        onBackButtonPress={handleUpvoteCancel}
+        style={{ justifyContent: 'center', alignItems: 'center', margin: 0 }}
+        useNativeDriver
+      >
+        <View style={{ backgroundColor: colors.background, borderRadius: 16, padding: 24, width: '85%', alignItems: 'center' }}>
+          <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>Upvote</Text>
+          <Text style={{ color: colors.text, fontSize: 15, marginBottom: 16 }}>Vote Weight: {voteWeight}%</Text>
+          <Slider
+            style={{ width: '100%', height: 40 }}
+            minimumValue={1}
+            maximumValue={100}
+            step={1}
+            value={voteWeight}
+            onValueChange={setVoteWeight}
+            minimumTrackTintColor={colors.icon}
+            maximumTrackTintColor={colors.border}
+            thumbTintColor={colors.icon}
+          />
+          {upvoteLoading ? (
+            <View style={{ marginTop: 24, alignItems: 'center' }}>
+              <FontAwesome name="hourglass-half" size={32} color={colors.icon} />
+              <Text style={{ color: colors.text, marginTop: 8 }}>Submitting vote...</Text>
+            </View>
+          ) : upvoteSuccess ? (
+            <View style={{ marginTop: 24, alignItems: 'center' }}>
+              <FontAwesome name="check-circle" size={32} color={colors.icon} />
+              <Text style={{ color: colors.text, marginTop: 8 }}>Upvote successful!</Text>
+            </View>
+          ) : (
+            <View style={{ flexDirection: 'row', marginTop: 24 }}>
+              <Pressable
+                style={{ flex: 1, marginRight: 8, backgroundColor: colors.border, borderRadius: 8, padding: 12, alignItems: 'center' }}
+                onPress={handleUpvoteCancel}
+                disabled={upvoteLoading}
+              >
+                <Text style={{ color: colors.text, fontWeight: '600' }}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={{ flex: 1, marginLeft: 8, backgroundColor: colors.icon, borderRadius: 8, padding: 12, alignItems: 'center' }}
+                onPress={handleUpvoteConfirm}
+                disabled={upvoteLoading}
+              >
+                <Text style={{ color: '#fff', fontWeight: '600' }}>Confirm</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+      </Modal>
     </SafeAreaViewSA>
   );
 };
+
+export default ConversationScreen;
 
 export const options = { headerShown: false };
 
@@ -771,5 +933,3 @@ const styles = StyleSheet.create({
   avatar: { width: 40, height: 40, borderRadius: 20, marginRight: 10 },
   snapTimestamp: { fontSize: 12, color: '#8899A6', marginLeft: 8 },
 });
-
-export default ConversationScreen;
