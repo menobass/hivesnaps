@@ -143,53 +143,55 @@ const ConversationScreen = () => {
     return fullReplies;
   }
 
-  React.useEffect(() => {
-    const fetchSnapAndReplies = async () => {
-      setLoading(true);
+  // Fetch snap and replies (extracted for refresh)
+  const fetchSnapAndReplies = async () => {
+    setLoading(true);
+    try {
+      // Fetch the main post
+      const post = await client.database.call('get_content', [author, permlink]);
+      // Fetch avatar robustly from account profile
+      let avatarUrl: string | undefined = undefined;
       try {
-        // Fetch the main post
-        const post = await client.database.call('get_content', [author, permlink]);
-        // Fetch avatar robustly from account profile
-        let avatarUrl: string | undefined = undefined;
-        try {
-          const accounts = await client.database.call('get_accounts', [[post.author]]);
-          if (accounts && accounts[0]) {
-            const meta = accounts[0].posting_json_metadata || accounts[0].json_metadata;
-            if (meta) {
-              let profile;
-              try {
-                profile = JSON.parse(meta).profile;
-              } catch (e) {
-                profile = undefined;
-              }
-              if (profile && profile.profile_image) {
-                avatarUrl = profile.profile_image;
-              }
+        const accounts = await client.database.call('get_accounts', [[post.author]]);
+        if (accounts && accounts[0]) {
+          const meta = accounts[0].posting_json_metadata || accounts[0].json_metadata;
+          if (meta) {
+            let profile;
+            try {
+              profile = JSON.parse(meta).profile;
+            } catch (e) {
+              profile = undefined;
+            }
+            if (profile && profile.profile_image) {
+              avatarUrl = profile.profile_image;
             }
           }
-        } catch (e) {
-          // Avatar fetch fail fallback
         }
-        setSnap({
-          author: post.author,
-          avatarUrl,
-          body: post.body,
-          created: post.created,
-          voteCount: post.net_votes,
-          replyCount: post.children,
-          payout: parseFloat(post.pending_payout_value ? post.pending_payout_value.replace(' HBD', '') : '0'),
-          permlink: post.permlink,
-          hasUpvoted: false, // TODO: check if user has upvoted
-        });
-        // Fetch replies tree with full content (including payout info)
-        const tree = await fetchRepliesTreeWithContent(author, permlink);
-        setReplies(tree);
       } catch (e) {
-        console.error('Error fetching snap and replies:', e);
-      } finally {
-        setLoading(false);
+        // Avatar fetch fail fallback
       }
-    };
+      setSnap({
+        author: post.author,
+        avatarUrl,
+        body: post.body,
+        created: post.created,
+        voteCount: post.net_votes,
+        replyCount: post.children,
+        payout: parseFloat(post.pending_payout_value ? post.pending_payout_value.replace(' HBD', '') : '0'),
+        permlink: post.permlink,
+        hasUpvoted: false, // TODO: check if user has upvoted
+      });
+      // Fetch replies tree with full content (including payout info)
+      const tree = await fetchRepliesTreeWithContent(author, permlink);
+      setReplies(tree);
+    } catch (e) {
+      console.error('Error fetching snap and replies:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
     fetchSnapAndReplies();
   }, [author, permlink]);
 
@@ -203,7 +205,7 @@ const ConversationScreen = () => {
   };
 
   const handleRefresh = () => {
-    // TODO: Refresh replies from API
+    fetchSnapAndReplies();
   };
 
   const handleAddImage = async () => {
