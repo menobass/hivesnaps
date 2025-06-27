@@ -9,6 +9,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Client } from '@hiveio/dhive';
 import Modal from 'react-native-modal';
 import Markdown from 'react-native-markdown-display';
+import { WebView } from 'react-native-webview';
+import { extractYouTubeId } from './utils/extractYouTubeId';
 
 // TODO: Replace these with your app's real auth/user context
 const currentUsername = 'your_hive_username'; // e.g. from context or props
@@ -285,6 +287,11 @@ const ConversationScreen = () => {
     );
   };
 
+  // Utility to remove all YouTube URLs from text (copied from Snap)
+  function removeYouTubeUrl(text: string): string {
+    return text.replace(/(?:https?:\/\/(?:www\.)?)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)\w{11}(\S*)?/gi, '').replace(/\s{2,}/g, ' ').trim();
+  }
+
   // Custom markdown rules with 'any' types to silence TS warnings
   const markdownRules = {
     image: (
@@ -305,6 +312,47 @@ const ConversationScreen = () => {
         />
       );
     },
+    link: (
+      node: any,
+      children: any,
+      parent: any,
+      styles: any
+    ) => {
+      const { href } = node.attributes;
+      // YouTube link detection (supports youtu.be and youtube.com)
+      const youtubeMatch =
+        href &&
+        (href.match(
+          /(?:https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu.be\/))([\w-]{11})/
+        ) || []);
+      const videoId = youtubeMatch[1];
+      if (videoId) {
+        return (
+          <View key={href} style={{ width: '100%', aspectRatio: 16 / 9, marginVertical: 10, borderRadius: 10, overflow: 'hidden', backgroundColor: isDark ? '#222' : '#eee' }}>
+            <WebView
+              source={{ uri: `https://www.youtube.com/embed/${videoId}` }}
+              style={{ flex: 1 }}
+              allowsFullscreenVideo
+              javaScriptEnabled
+              domStorageEnabled
+              originWhitelist={['*']}
+            />
+          </View>
+        );
+      }
+      // Default link rendering
+      return (
+        <Text key={href} style={[{ color: colors.icon, textDecorationLine: 'underline' }]} onPress={() => {
+          // Open link in browser
+          if (href) {
+            // Use Expo's Linking API
+            import('expo-linking').then(Linking => Linking.openURL(href));
+          }
+        }}>
+          {children}
+        </Text>
+      );
+    },
   };
 
   // Add log for snap payout
@@ -313,39 +361,64 @@ const ConversationScreen = () => {
   }
 
   // Recursive threaded reply renderer
-  const renderReplyTree = (reply: ReplyData, level = 0) => (
-    <View key={reply.author + reply.permlink + '-' + level} style={{ marginLeft: level * 18, marginBottom: 10 }}>
-      <View style={[styles.replyBubble, { backgroundColor: colors.bubble }]}> 
-        <Text style={[styles.replyAuthor, { color: colors.text }]}>{reply.author}</Text>
-        <Markdown
-          style={{
-            body: { color: colors.text, fontSize: 14, marginBottom: 4 },
-            link: { color: colors.icon },
-          }}
-          rules={markdownRules}
-        >
-          {reply.body}
-        </Markdown>
-        <View style={styles.replyMeta}>
-          <FontAwesome name="arrow-up" size={16} color={colors.icon} />
-          <Text style={[styles.replyMetaText, { color: colors.text }]}>{reply.voteCount || 0}</Text>
-          <FontAwesome name="comment-o" size={16} color={colors.icon} style={{ marginLeft: 12 }} />
-          <Text style={[styles.replyMetaText, { color: colors.payout, marginLeft: 12 }]}>{reply.payout !== undefined ? `$${reply.payout.toFixed(2)}` : ''}</Text>
-          <View style={{ flex: 1 }} />
-          <TouchableOpacity style={styles.replyButton} onPress={() => handleOpenReplyModal(reply.author, reply.permlink!)}>
-            <FontAwesome name="reply" size={16} color={colors.icon} />
-            <Text style={[styles.replyButtonText, { color: colors.icon }]}>Reply</Text>
-          </TouchableOpacity>
+  const renderReplyTree = (reply: ReplyData, level = 0) => {
+    const youtubeId = extractYouTubeId(reply.body);
+    let textBody = reply.body;
+    if (youtubeId) {
+      textBody = removeYouTubeUrl(textBody);
+    }
+    return (
+      <View key={reply.author + reply.permlink + '-' + level} style={{ marginLeft: level * 18, marginBottom: 10 }}>
+        <View style={[styles.replyBubble, { backgroundColor: colors.bubble }]}> 
+          <Text style={[styles.replyAuthor, { color: colors.text }]}>{reply.author}</Text>
+          {/* YouTube Video */}
+          {youtubeId && (
+            <View style={{ width: '100%', aspectRatio: 16/9, marginBottom: 8, borderRadius: 12, overflow: 'hidden' }}>
+              <WebView
+                source={{ uri: `https://www.youtube.com/embed/${youtubeId}` }}
+                style={{ flex: 1, backgroundColor: '#000' }}
+                allowsFullscreenVideo
+                javaScriptEnabled
+                domStorageEnabled
+              />
+            </View>
+          )}
+          <Markdown
+            style={{
+              body: { color: colors.text, fontSize: 14, marginBottom: 4 },
+              link: { color: colors.icon },
+            }}
+            rules={markdownRules}
+          >
+            {textBody}
+          </Markdown>
+          <View style={styles.replyMeta}>
+            <FontAwesome name="arrow-up" size={16} color={colors.icon} />
+            <Text style={[styles.replyMetaText, { color: colors.text }]}>{reply.voteCount || 0}</Text>
+            <FontAwesome name="comment-o" size={16} color={colors.icon} style={{ marginLeft: 12 }} />
+            <Text style={[styles.replyMetaText, { color: colors.payout, marginLeft: 12 }]}>{reply.payout !== undefined ? `$${reply.payout.toFixed(2)}` : ''}</Text>
+            <View style={{ flex: 1 }} />
+            <TouchableOpacity style={styles.replyButton} onPress={() => handleOpenReplyModal(reply.author, reply.permlink!)}>
+              <FontAwesome name="reply" size={16} color={colors.icon} />
+              <Text style={[styles.replyButtonText, { color: colors.icon }]}>Reply</Text>
+            </TouchableOpacity>
+          </View>
         </View>
+        {/* Render children recursively */}
+        {reply.replies && reply.replies.length > 0 && reply.replies.map((child, idx) => renderReplyTree(child, level + 1))}
       </View>
-      {/* Render children recursively */}
-      {reply.replies && reply.replies.length > 0 && reply.replies.map((child, idx) => renderReplyTree(child, level + 1))}
-    </View>
-  );
+    );
+  };
 
   // Render the snap as a header for the replies list
-  const renderSnapHeader = () => (
-    snap ? (
+  const renderSnapHeader = () => {
+    if (!snap) return null;
+    const youtubeId = extractYouTubeId(snap.body);
+    let textBody = snap.body;
+    if (youtubeId) {
+      textBody = removeYouTubeUrl(textBody);
+    }
+    return (
       <View style={[styles.snapPost, { borderColor: colors.border, backgroundColor: colors.background }]}> 
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
           {snap.avatarUrl ? (
@@ -358,6 +431,18 @@ const ConversationScreen = () => {
           <Text style={[styles.snapAuthor, { color: colors.text, marginLeft: 10 }]}>{snap.author}</Text>
           <Text style={[styles.snapTimestamp, { color: colors.text }]}>{snap.created ? new Date(snap.created).toLocaleString() : ''}</Text>
         </View>
+        {/* YouTube Video */}
+        {youtubeId && (
+          <View style={{ width: '100%', aspectRatio: 16/9, marginBottom: 8, borderRadius: 12, overflow: 'hidden' }}>
+            <WebView
+              source={{ uri: `https://www.youtube.com/embed/${youtubeId}` }}
+              style={{ flex: 1, backgroundColor: '#000' }}
+              allowsFullscreenVideo
+              javaScriptEnabled
+              domStorageEnabled
+            />
+          </View>
+        )}
         <Markdown
           style={{
             body: { color: colors.text, fontSize: 15, marginBottom: 8 },
@@ -365,7 +450,7 @@ const ConversationScreen = () => {
           }}
           rules={markdownRules}
         >
-          {snap.body}
+          {textBody}
         </Markdown>
         <View style={[styles.snapMeta, { alignItems: 'center' }]}> 
           <FontAwesome name="arrow-up" size={18} color={colors.icon} />
@@ -380,8 +465,8 @@ const ConversationScreen = () => {
           </TouchableOpacity>
         </View>
       </View>
-    ) : null
-  );
+    );
+  };
 
   return (
     <SafeAreaViewRN style={[styles.safeArea, { backgroundColor: isDark ? '#15202B' : '#fff' }]}> 
