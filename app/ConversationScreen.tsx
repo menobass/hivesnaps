@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { SafeAreaView as SafeAreaViewRN } from 'react-native';
 import { SafeAreaView as SafeAreaViewSA, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, FlatList, useColorScheme, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, FlatList, useColorScheme, Image, Pressable } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImageToCloudinaryFixed } from './utils/cloudinaryImageUploadFixed';
@@ -72,6 +72,8 @@ const ConversationScreen = () => {
   // Track which reply (by author/permlink) is being replied to
   const [replyTarget, setReplyTarget] = useState<{author: string, permlink: string} | null>(null);
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
+  const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [modalImageUrl, setModalImageUrl] = useState<string | null>(null);
 
   // Load user credentials on mount
   React.useEffect(() => {
@@ -411,14 +413,21 @@ const ConversationScreen = () => {
     ) => {
       const { src, alt } = node.attributes;
       return (
-        <Image
+        <Pressable
           key={src || alt}
-          source={{ uri: src }}
-          style={{ width: 220, height: 220, borderRadius: 10, marginVertical: 8, alignSelf: 'center' }}
-          resizeMode="contain"
-          accessible
-          accessibilityLabel={alt || 'image'}
-        />
+          onPress={() => {
+            setModalImageUrl(src);
+            setImageModalVisible(true);
+          }}
+        >
+          <Image
+            source={{ uri: src }}
+            style={{ width: 220, height: 220, borderRadius: 10, marginVertical: 8, alignSelf: 'center' }}
+            resizeMode="contain"
+            accessible
+            accessibilityLabel={alt || 'image'}
+          />
+        </Pressable>
       );
     },
     link: (
@@ -590,6 +599,40 @@ const ConversationScreen = () => {
 
   return (
     <SafeAreaViewSA style={[styles.safeArea, { backgroundColor: isDark ? '#15202B' : '#fff' }]}> 
+      {/* Fullscreen Image Modal */}
+      <Modal
+        isVisible={imageModalVisible}
+        onBackdropPress={() => setImageModalVisible(false)}
+        onBackButtonPress={() => setImageModalVisible(false)}
+        style={{ margin: 0, justifyContent: 'center', alignItems: 'center' }}
+      >
+        {/* Debug: log modalImageUrl in useEffect instead of inline */}
+        <View style={{ backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100%' }}>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 40, right: 20, zIndex: 2 }}
+            onPress={() => setImageModalVisible(false)}
+            accessibilityLabel="Close image"
+          >
+            <FontAwesome name="close" size={32} color="#fff" />
+          </TouchableOpacity>
+          {/* Try hardcoded fallback image if modalImageUrl is not valid */}
+          {modalImageUrl ? (
+            <Image
+              key={modalImageUrl}
+              source={{ uri: modalImageUrl }}
+              style={{ width: '96%', height: '80%', borderRadius: 16, backgroundColor: '#222' }}
+              resizeMode="contain"
+              onError={e => console.log('Image load error:', e.nativeEvent)}
+            />
+          ) : (
+            <Image
+              source={{ uri: 'https://placekitten.com/800/800' }}
+              style={{ width: '96%', height: '80%', borderRadius: 16, backgroundColor: '#222' }}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
       {/* Conversation list (snap as header, replies as data) */}
       {loading ? (
         <View style={{ alignItems: 'center', marginTop: 40 }}>
