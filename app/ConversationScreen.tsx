@@ -422,8 +422,16 @@ const ConversationScreen = () => {
         >
           <Image
             source={{ uri: src }}
-            style={{ width: 220, height: 220, borderRadius: 10, marginVertical: 8, alignSelf: 'center' }}
-            resizeMode="contain"
+            style={{
+              width: '100%',
+              aspectRatio: 1.2, // or 1.5 for landscape, adjust as needed
+              maxHeight: 340,
+              borderRadius: 14,
+              marginVertical: 10,
+              alignSelf: 'center',
+              backgroundColor: isDark ? '#222' : '#eee',
+            }}
+            resizeMode="cover"
             accessible
             accessibilityLabel={alt || 'image'}
           />
