@@ -6,15 +6,12 @@ import { FontAwesome } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImageToCloudinaryFixed } from './utils/cloudinaryImageUploadFixed';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Client } from '@hiveio/dhive';
+import { Client, PrivateKey } from '@hiveio/dhive';
 import Modal from 'react-native-modal';
 import Markdown from 'react-native-markdown-display';
 import { WebView } from 'react-native-webview';
 import { extractYouTubeId } from './utils/extractYouTubeId';
-
-// TODO: Replace these with your app's real auth/user context
-const currentUsername = 'your_hive_username'; // e.g. from context or props
-const postingKey = 'your_posting_key'; // e.g. from secure storage or wallet connect
+import * as SecureStore from 'expo-secure-store';
 
 // Placeholder Snap data type
 interface SnapData {
@@ -74,6 +71,20 @@ const ConversationScreen = () => {
   const [postError, setPostError] = useState<string | null>(null);
   // Track which reply (by author/permlink) is being replied to
   const [replyTarget, setReplyTarget] = useState<{author: string, permlink: string} | null>(null);
+  const [currentUsername, setCurrentUsername] = useState<string | null>(null);
+
+  // Load user credentials on mount
+  React.useEffect(() => {
+    const loadCredentials = async () => {
+      try {
+        const storedUsername = await SecureStore.getItemAsync('hive_username');
+        setCurrentUsername(storedUsername);
+      } catch (e) {
+        console.error('Error loading credentials:', e);
+      }
+    };
+    loadCredentials();
+  }, []);
 
   // Recursively fetch replies, ensuring each reply has full content (including payout info and avatar)
   async function fetchRepliesTreeWithContent(author: string, permlink: string, depth = 0, maxDepth = 3): Promise<any[]> {
@@ -210,24 +221,88 @@ const ConversationScreen = () => {
 
   const handleAddImage = async () => {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        quality: 0.8,
-      });
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setUploading(true);
-        const asset = result.assets[0];
-        const url = await uploadImageToCloudinaryFixed({
-          uri: asset.uri,
-          name: asset.fileName || 'reply.jpg',
-          type: asset.type || 'image/jpeg',
+      // Show action sheet to choose between camera and gallery
+      let pickType: 'camera' | 'gallery' | 'cancel';
+      
+      if (Platform.OS === 'ios') {
+        pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(resolve => {
+          import('react-native').then(({ ActionSheetIOS }) => {
+            ActionSheetIOS.showActionSheetWithOptions(
+              {
+                options: ['Cancel', 'Take Photo', 'Choose from Gallery'],
+                cancelButtonIndex: 0,
+              },
+              buttonIndex => {
+                if (buttonIndex === 0) pickType = 'cancel';
+                else if (buttonIndex === 1) pickType = 'camera';
+                else if (buttonIndex === 2) pickType = 'gallery';
+                resolve(pickType);
+              }
+            );
+          });
         });
-        setReplyImage(url);
+      } else {
+        pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(resolve => {
+          import('react-native').then(({ Alert }) => {
+            Alert.alert(
+              'Add Image',
+              'Choose an option',
+              [
+                { text: 'Take Photo', onPress: () => resolve('camera') },
+                { text: 'Choose from Gallery', onPress: () => resolve('gallery') },
+                { text: 'Cancel', style: 'cancel', onPress: () => resolve('cancel') },
+              ],
+              { cancelable: true }
+            );
+          });
+        });
       }
-    } catch (e) {
-      // Optionally show error
-    } finally {
+      
+      if (pickType === 'cancel') return;
+      
+      // Pick image
+      let result;
+      if (pickType === 'camera') {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          alert('Permission to access camera is required!');
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          allowsEditing: true,
+          quality: 0.8,
+        });
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          alert('Permission to access media library is required!');
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'], // Fixed deprecation warning - use array of strings
+          allowsEditing: true,
+          quality: 0.8,
+        });
+      }
+      
+      if (!result || result.canceled || !result.assets || !result.assets[0]) return;
+      const asset = result.assets[0];
+      
+      setUploading(true);
+      try {
+        const fileToUpload = {
+          uri: asset.uri,
+          name: `reply-${Date.now()}.jpg`,
+          type: 'image/jpeg',
+        };
+        const cloudinaryUrl = await uploadImageToCloudinaryFixed(fileToUpload);
+        setReplyImage(cloudinaryUrl);
+      } catch (err) {
+        alert('Image upload failed: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
+      }
+      setUploading(false);
+    } catch (err) {
+      alert('Failed to pick image: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
       setUploading(false);
     }
   };
@@ -244,10 +319,17 @@ const ConversationScreen = () => {
   };
 
   const handleSubmitReply = async () => {
-    if (!replyTarget || !replyText.trim()) return;
+    if (!replyTarget || !replyText.trim() || !currentUsername) return;
     setPosting(true);
     setPostError(null);
     try {
+      // Get posting key from secure storage
+      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
+      if (!postingKeyStr) {
+        throw new Error('No posting key found. Please log in again.');
+      }
+      const postingKey = PrivateKey.fromString(postingKeyStr);
+
       let body = replyText.trim();
       if (replyImage) {
         body += `\n![image](${replyImage})`;
@@ -264,23 +346,26 @@ const ConversationScreen = () => {
       if (replyImage) {
         json_metadata.image = [replyImage];
       }
-      // Uncomment below to enable real posting (make sure postingKey is correct and secure!)
-      // await client.broadcast.comment({
-      //   parent_author,
-      //   parent_permlink,
-      //   author,
-      //   permlink,
-      //   title: '',
-      //   body,
-      //   json_metadata: JSON.stringify(json_metadata),
-      // }, postingKey);
-      await new Promise(res => setTimeout(res, 1200)); // Simulate delay
+      // Real posting to Hive blockchain
+      await client.broadcast.comment({
+        parent_author,
+        parent_permlink,
+        author,
+        permlink,
+        title: '',
+        body,
+        json_metadata: JSON.stringify(json_metadata),
+      }, postingKey);
+      
       setReplyModalVisible(false);
       setReplyText('');
       setReplyImage(null);
       setPosting(false);
       setReplyTarget(null);
-      handleRefresh();
+      // Refresh after a delay to allow blockchain confirmation
+      setTimeout(() => {
+        handleRefresh();
+      }, 3000);
     } catch (e: any) {
       setPostError(e.message || 'Failed to post reply.');
       setPosting(false);
@@ -579,13 +664,13 @@ const ConversationScreen = () => {
             <View style={{ flex: 1 }} />
             <TouchableOpacity
               onPress={handleSubmitReply}
-              disabled={uploading || posting || !replyText.trim()}
+              disabled={uploading || posting || !replyText.trim() || !currentUsername}
               style={{
                 backgroundColor: colors.icon,
                 borderRadius: 20,
                 paddingHorizontal: 18,
                 paddingVertical: 8,
-                opacity: uploading || posting || !replyText.trim() ? 0.6 : 1,
+                opacity: uploading || posting || !replyText.trim() || !currentUsername ? 0.6 : 1,
               }}
             >
               {posting ? (
