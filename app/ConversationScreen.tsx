@@ -75,7 +75,7 @@ const ConversationScreen = () => {
   // Track which reply (by author/permlink) is being replied to
   const [replyTarget, setReplyTarget] = useState<{author: string, permlink: string} | null>(null);
 
-  // Recursively fetch replies, ensuring each reply has full content (including payout info)
+  // Recursively fetch replies, ensuring each reply has full content (including payout info and avatar)
   async function fetchRepliesTreeWithContent(author: string, permlink: string, depth = 0, maxDepth = 3): Promise<any[]> {
     if (depth > maxDepth) return [];
     // Fetch shallow replies
@@ -101,6 +101,27 @@ const ConversationScreen = () => {
       } catch (e) {
         fullReply = reply; // fallback
       }
+      // Fetch avatar for reply author
+      let avatarUrl: string | undefined = undefined;
+      try {
+        const accounts = await client.database.call('get_accounts', [[fullReply.author]]);
+        if (accounts && accounts[0]) {
+          const meta = accounts[0].posting_json_metadata || accounts[0].json_metadata;
+          if (meta) {
+            let profile;
+            try {
+              profile = JSON.parse(meta).profile;
+            } catch (e) {
+              profile = undefined;
+            }
+            if (profile && profile.profile_image) {
+              avatarUrl = profile.profile_image;
+            }
+          }
+        }
+      } catch (e) {
+        // Avatar fetch fail fallback
+      }
       // Parse payout
       const payout = parseFloat(fullReply.pending_payout_value ? fullReply.pending_payout_value.replace(' HBD', '') : '0');
       // Recursively fetch children
@@ -108,6 +129,7 @@ const ConversationScreen = () => {
       // Build reply object
       fullReplies.push({
         author: fullReply.author,
+        avatarUrl,
         body: fullReply.body,
         created: fullReply.created,
         voteCount: fullReply.net_votes,
@@ -370,7 +392,18 @@ const ConversationScreen = () => {
     return (
       <View key={reply.author + reply.permlink + '-' + level} style={{ marginLeft: level * 18, marginBottom: 10 }}>
         <View style={[styles.replyBubble, { backgroundColor: colors.bubble }]}> 
-          <Text style={[styles.replyAuthor, { color: colors.text }]}>{reply.author}</Text>
+          {/* Avatar, author, timestamp row */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+            {reply.avatarUrl ? (
+              <Image source={{ uri: reply.avatarUrl }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: isDark ? '#22303C' : '#eee', justifyContent: 'center', alignItems: 'center' }]}> 
+                <FontAwesome name="user" size={22} color={isDark ? '#8899A6' : '#bbb'} />
+              </View>
+            )}
+            <Text style={[styles.replyAuthor, { color: colors.text, marginLeft: 10 }]}>{reply.author}</Text>
+            <Text style={[styles.snapTimestamp, { color: colors.text }]}>{reply.created ? new Date(reply.created).toLocaleString() : ''}</Text>
+          </View>
           {/* YouTube Video */}
           {youtubeId && (
             <View style={{ width: '100%', aspectRatio: 16/9, marginBottom: 8, borderRadius: 12, overflow: 'hidden' }}>
