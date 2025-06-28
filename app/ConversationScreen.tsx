@@ -10,9 +10,10 @@ import { Client, PrivateKey } from '@hiveio/dhive';
 import Modal from 'react-native-modal';
 import Markdown from 'react-native-markdown-display';
 import { WebView } from 'react-native-webview';
-import { extractYouTubeId } from './utils/extractYouTubeId';
+import { extractVideoInfo, removeVideoUrls, extractYouTubeId } from './utils/extractVideoInfo';
 import * as SecureStore from 'expo-secure-store';
 import Slider from '@react-native-community/slider';
+import IPFSVideoPlayer from './components/IPFSVideoPlayer';
 
 // Placeholder Snap data type
 interface SnapData {
@@ -495,9 +496,9 @@ const ConversationScreen = () => {
     );
   };
 
-  // Utility to remove all YouTube URLs from text (copied from Snap)
-  function removeYouTubeUrl(text: string): string {
-    return text.replace(/(?:https?:\/\/(?:www\.)?)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)\w{11}(\S*)?/gi, '').replace(/\s{2,}/g, ' ').trim();
+  // Utility to remove all video URLs from text (updated for multiple platforms)
+  function removeAllVideoUrls(text: string): string {
+    return removeVideoUrls(text);
   }
 
   // Custom markdown rules with 'any' types to silence TS warnings
@@ -535,6 +536,28 @@ const ConversationScreen = () => {
         </Pressable>
       );
     },
+    html: (
+      node: any,
+      children: any,
+      parent: any,
+      styles: any
+    ) => {
+      // Handle iframe tags for IPFS videos and other embedded content
+      const htmlContent = node.content || '';
+      const iframeMatch = htmlContent.match(/<iframe[^>]+src=["']([^"']*ipfs[^"']*\/ipfs\/([A-Za-z0-9]+))[^"']*["'][^>]*>/i);
+      
+      if (iframeMatch) {
+        const ipfsUrl = iframeMatch[1];
+        return (
+          <View key={ipfsUrl} style={{ marginVertical: 10 }}>
+            <IPFSVideoPlayer ipfsUrl={ipfsUrl} isDark={isDark} />
+          </View>
+        );
+      }
+      
+      // Default HTML rendering (let markdown handle it)
+      return null;
+    },
     link: (
       node: any,
       children: any,
@@ -542,24 +565,74 @@ const ConversationScreen = () => {
       styles: any
     ) => {
       const { href } = node.attributes;
-      // YouTube link detection (supports youtu.be and youtube.com)
-      const youtubeMatch =
-        href &&
-        (href.match(
-          /(?:https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu.be\/))([\w-]{11})/
-        ) || []);
-      const videoId = youtubeMatch[1];
-      if (videoId) {
+      // Enhanced video link detection (supports YouTube, 3speak, IPFS)
+      const youtubeMatch = href && href.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+      const threeSpeakMatch = href && href.match(/https:\/\/3speak\.tv\/watch\?v=([^\/\s]+)\/([a-zA-Z0-9_-]+)/);
+      const ipfsMatch = href && href.match(/ipfs\/([A-Za-z0-9]+)/);
+      
+      if (youtubeMatch) {
+        const videoId = youtubeMatch[1];
         return (
-          <View key={href} style={{ width: '100%', aspectRatio: 16 / 9, marginVertical: 10, borderRadius: 10, overflow: 'hidden', backgroundColor: isDark ? '#222' : '#eee' }}>
+          <View key={href} style={{ width: '100%', aspectRatio: 16 / 9, marginVertical: 10, borderRadius: 10, overflow: 'hidden', backgroundColor: isDark ? '#222' : '#eee', position: 'relative' }}>
             <WebView
-              source={{ uri: `https://www.youtube.com/embed/${videoId}` }}
+              source={{ uri: `https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0&modestbranding=1` }}
               style={{ flex: 1 }}
               allowsFullscreenVideo
               javaScriptEnabled
               domStorageEnabled
+              mediaPlaybackRequiresUserAction={true}
+              allowsInlineMediaPlayback={true}
               originWhitelist={['*']}
             />
+            <View style={{ 
+              position: 'absolute', 
+              top: 8, 
+              right: 8, 
+              backgroundColor: 'rgba(0,0,0,0.7)', 
+              paddingHorizontal: 6, 
+              paddingVertical: 2, 
+              borderRadius: 4 
+            }}>
+              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>YOUTUBE</Text>
+            </View>
+          </View>
+        );
+      }
+      
+      if (threeSpeakMatch) {
+        const username = threeSpeakMatch[1];
+        const videoId = threeSpeakMatch[2];
+        return (
+          <View key={href} style={{ width: '100%', aspectRatio: 16 / 9, marginVertical: 10, borderRadius: 10, overflow: 'hidden', backgroundColor: isDark ? '#222' : '#eee', position: 'relative' }}>
+            <WebView
+              source={{ uri: `https://3speak.tv/embed?v=${username}/${videoId}&autoplay=0` }}
+              style={{ flex: 1 }}
+              allowsFullscreenVideo
+              javaScriptEnabled
+              domStorageEnabled
+              mediaPlaybackRequiresUserAction={true}
+              allowsInlineMediaPlayback={true}
+              originWhitelist={['*']}
+            />
+            <View style={{ 
+              position: 'absolute', 
+              top: 8, 
+              right: 8, 
+              backgroundColor: 'rgba(0,0,0,0.7)', 
+              paddingHorizontal: 6, 
+              paddingVertical: 2, 
+              borderRadius: 4 
+            }}>
+              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>3SPEAK</Text>
+            </View>
+          </View>
+        );
+      }
+      
+      if (ipfsMatch) {
+        return (
+          <View key={href} style={{ marginVertical: 10 }}>
+            <IPFSVideoPlayer ipfsUrl={href} isDark={isDark} />
           </View>
         );
       }
@@ -585,10 +658,10 @@ const ConversationScreen = () => {
 
   // Recursive threaded reply renderer
   const renderReplyTree = (reply: ReplyData, level = 0) => {
-    const youtubeId = extractYouTubeId(reply.body);
+    const videoInfo = extractVideoInfo(reply.body);
     let textBody = reply.body;
-    if (youtubeId) {
-      textBody = removeYouTubeUrl(textBody);
+    if (videoInfo) {
+      textBody = removeAllVideoUrls(textBody);
     }
     return (
       <View key={reply.author + reply.permlink + '-' + level} style={{ marginLeft: level * 18, marginBottom: 10 }}>
@@ -605,16 +678,42 @@ const ConversationScreen = () => {
             <Text style={[styles.replyAuthor, { color: colors.text, marginLeft: 10 }]}>{reply.author}</Text>
             <Text style={[styles.snapTimestamp, { color: colors.text }]}>{reply.created ? new Date(reply.created).toLocaleString() : ''}</Text>
           </View>
-          {/* YouTube Video */}
-          {youtubeId && (
-            <View style={{ width: '100%', aspectRatio: 16/9, marginBottom: 8, borderRadius: 12, overflow: 'hidden' }}>
-              <WebView
-                source={{ uri: `https://www.youtube.com/embed/${youtubeId}` }}
-                style={{ flex: 1, backgroundColor: '#000' }}
-                allowsFullscreenVideo
-                javaScriptEnabled
-                domStorageEnabled
-              />
+          {/* Video Player (YouTube, 3speak, IPFS) - Click to play */}
+          {videoInfo && (
+            <View style={{ marginBottom: 8 }}>
+              {videoInfo.type === 'ipfs' ? (
+                <IPFSVideoPlayer ipfsUrl={videoInfo.embedUrl} isDark={isDark} />
+              ) : (
+                <View style={{ width: '100%', aspectRatio: 16/9, borderRadius: 12, overflow: 'hidden', position: 'relative' }}>
+                  <WebView
+                    source={{ 
+                      uri: videoInfo.type === 'youtube' 
+                        ? `${videoInfo.embedUrl}?autoplay=0&rel=0&modestbranding=1`
+                        : `${videoInfo.embedUrl}&autoplay=0`
+                    }}
+                    style={{ flex: 1, backgroundColor: '#000' }}
+                    allowsFullscreenVideo
+                    javaScriptEnabled
+                    domStorageEnabled
+                    mediaPlaybackRequiresUserAction={true}
+                    allowsInlineMediaPlayback={true}
+                  />
+                  {/* Video type indicator */}
+                  <View style={{ 
+                    position: 'absolute', 
+                    top: 8, 
+                    right: 8, 
+                    backgroundColor: 'rgba(0,0,0,0.7)', 
+                    paddingHorizontal: 6, 
+                    paddingVertical: 2, 
+                    borderRadius: 4 
+                  }}>
+                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+                      {videoInfo.type.toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+              )}
             </View>
           )}
           <Markdown
@@ -652,10 +751,10 @@ const ConversationScreen = () => {
   // Render the snap as a header for the replies list
   const renderSnapHeader = () => {
     if (!snap) return null;
-    const youtubeId = extractYouTubeId(snap.body);
+    const videoInfo = extractVideoInfo(snap.body);
     let textBody = snap.body;
-    if (youtubeId) {
-      textBody = removeYouTubeUrl(textBody);
+    if (videoInfo) {
+      textBody = removeAllVideoUrls(textBody);
     }
     return (
       <View style={[styles.snapPost, { borderColor: colors.border, backgroundColor: colors.background }]}> 
@@ -670,16 +769,42 @@ const ConversationScreen = () => {
           <Text style={[styles.snapAuthor, { color: colors.text, marginLeft: 10 }]}>{snap.author}</Text>
           <Text style={[styles.snapTimestamp, { color: colors.text }]}>{snap.created ? new Date(snap.created).toLocaleString() : ''}</Text>
         </View>
-        {/* YouTube Video */}
-        {youtubeId && (
-          <View style={{ width: '100%', aspectRatio: 16/9, marginBottom: 8, borderRadius: 12, overflow: 'hidden' }}>
-            <WebView
-              source={{ uri: `https://www.youtube.com/embed/${youtubeId}` }}
-              style={{ flex: 1, backgroundColor: '#000' }}
-              allowsFullscreenVideo
-              javaScriptEnabled
-              domStorageEnabled
-            />
+        {/* Video Player (YouTube, 3speak, IPFS) - Click to play */}
+        {videoInfo && (
+          <View style={{ marginBottom: 8 }}>
+            {videoInfo.type === 'ipfs' ? (
+              <IPFSVideoPlayer ipfsUrl={videoInfo.embedUrl} isDark={isDark} />
+            ) : (
+              <View style={{ width: '100%', aspectRatio: 16/9, borderRadius: 12, overflow: 'hidden', position: 'relative' }}>
+                <WebView
+                  source={{ 
+                    uri: videoInfo.type === 'youtube' 
+                      ? `${videoInfo.embedUrl}?autoplay=0&rel=0&modestbranding=1`
+                      : `${videoInfo.embedUrl}&autoplay=0`
+                  }}
+                  style={{ flex: 1, backgroundColor: '#000' }}
+                  allowsFullscreenVideo
+                  javaScriptEnabled
+                  domStorageEnabled
+                  mediaPlaybackRequiresUserAction={true}
+                  allowsInlineMediaPlayback={true}
+                />
+                {/* Video type indicator */}
+                <View style={{ 
+                  position: 'absolute', 
+                  top: 8, 
+                  right: 8, 
+                  backgroundColor: 'rgba(0,0,0,0.7)', 
+                  paddingHorizontal: 6, 
+                  paddingVertical: 2, 
+                  borderRadius: 4 
+                }}>
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+                    {videoInfo.type.toUpperCase()}
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
         )}
         <Markdown
