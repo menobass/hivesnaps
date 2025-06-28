@@ -5,11 +5,13 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as SecureStore from 'expo-secure-store';
 import { Client, PrivateKey } from '@hiveio/dhive';
 import Snap from './components/Snap';
+import NotificationBadge from './components/NotificationBadge';
 import Slider from '@react-native-community/slider';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import { useRouter } from 'expo-router';
 import { uploadImageToCloudinaryFixed } from './utils/cloudinaryImageUploadFixed';
+import { useNotifications } from './hooks/useNotifications';
 import ConversationScreen from './ConversationScreen';
 
 const twitterColors = {
@@ -83,6 +85,9 @@ const FeedScreen = () => {
   const [viewableSnaps, setViewableSnaps] = useState<string[]>([]); // Track visible snap keys
   const [viewableItems, setViewableItems] = useState<any[]>([]); // Track visible items
   const router = useRouter();
+
+  // Notifications
+  const { unreadCount } = useNotifications(username || null);
 
   // Viewability config for FlatList
   const viewabilityConfig = {
@@ -663,8 +668,19 @@ const FeedScreen = () => {
         {/* Slogan row */}
         <View style={styles.sloganRow}>
           <Text style={[styles.slogan, { color: colors.text }]}>What's snappening today?</Text>
-          <TouchableOpacity style={styles.bellBtn}>
-            <FontAwesome name="bell" size={22} color={colors.icon} />
+          <TouchableOpacity 
+            style={styles.bellBtn}
+            onPress={() => router.push('/NotificationsScreen')}
+          >
+            <View style={{ position: 'relative' }}>
+              <FontAwesome name="bell" size={22} color={colors.icon} />
+              <NotificationBadge 
+                count={unreadCount}
+                size="small"
+                color="#FF3B30"
+                visible={unreadCount > 0}
+              />
+            </View>
           </TouchableOpacity>
         </View>
         {/* Filter buttons */}
