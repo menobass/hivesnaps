@@ -3,7 +3,8 @@ import { View, Text, Image, StyleSheet, useColorScheme, Linking, Pressable, Moda
 import { FontAwesome } from '@expo/vector-icons';
 import { extractImageUrls } from '../utils/extractImageUrls';
 import { stripImageTags } from '../utils/stripImageTags';
-import { extractYouTubeId } from '../utils/extractYouTubeId';
+import { extractVideoInfo, removeVideoUrls, extractYouTubeId } from '../utils/extractVideoInfo';
+import IPFSVideoPlayer from './IPFSVideoPlayer';
 import { WebView } from 'react-native-webview';
 import { extractExternalLinks } from '../utils/extractExternalLinks';
 
@@ -64,15 +65,16 @@ const removeYouTubeUrl = (text: string): string => {
 
 const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount = 0, replyCount = 0, payout = 0, onUpvotePress, permlink, hasUpvoted = false, onSpeechBubblePress }) => {
   const colorScheme = useColorScheme() || 'light';
+  const isDark = colorScheme === 'dark';
   const colors = twitterColors[colorScheme];
   const upvoteColor = hasUpvoted ? '#8e44ad' : colors.icon; // purple if upvoted
   const imageUrls = extractImageUrls(body);
   const rawImageUrls = extractRawImageUrls(body);
-  const youtubeId = extractYouTubeId(body);
-  // Remove YouTube URL and raw image URLs from text body if present
+  const videoInfo = extractVideoInfo(body);
+  // Remove video URLs and raw image URLs from text body if present
   let textBody = stripImageTags(body);
-  if (youtubeId) {
-    textBody = removeYouTubeUrl(textBody);
+  if (videoInfo) {
+    textBody = removeVideoUrls(textBody);
   }
   if (rawImageUrls.length > 0) {
     textBody = removeRawImageUrls(textBody);
@@ -112,16 +114,42 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
         <Text style={[styles.username, { color: colors.text }]}>{author}</Text>
         <Text style={[styles.timestamp, { color: colors.text }]}>{new Date(created).toLocaleString()}</Text>    
       </View>
-      {/* YouTube Video */}
-      {youtubeId && (
-        <View style={{ width: '100%', aspectRatio: 16/9, marginBottom: 8, borderRadius: 12, overflow: 'hidden' }}>
-          <WebView
-            source={{ uri: `https://www.youtube.com/embed/${youtubeId}` }}
-            style={{ flex: 1, backgroundColor: '#000' }}
-            allowsFullscreenVideo
-            javaScriptEnabled
-            domStorageEnabled
-          />
+      {/* Video Player (YouTube, 3speak, IPFS) - Click to play */}
+      {videoInfo && (
+        <View style={{ marginBottom: 8 }}>
+          {videoInfo.type === 'ipfs' ? (
+            <IPFSVideoPlayer ipfsUrl={videoInfo.embedUrl} isDark={isDark} />
+          ) : (
+            <View style={{ width: '100%', aspectRatio: 16/9, borderRadius: 12, overflow: 'hidden', position: 'relative' }}>
+              <WebView
+                source={{ 
+                  uri: videoInfo.type === 'youtube' 
+                    ? `${videoInfo.embedUrl}?autoplay=0&rel=0&modestbranding=1`
+                    : `${videoInfo.embedUrl}&autoplay=0`
+                }}
+                style={{ flex: 1, backgroundColor: '#000' }}
+                allowsFullscreenVideo
+                javaScriptEnabled
+                domStorageEnabled
+                mediaPlaybackRequiresUserAction={true}
+                allowsInlineMediaPlayback={true}
+              />
+              {/* Video type indicator */}
+              <View style={{ 
+                position: 'absolute', 
+                top: 8, 
+                right: 8, 
+                backgroundColor: 'rgba(0,0,0,0.7)', 
+                paddingHorizontal: 6, 
+                paddingVertical: 2, 
+                borderRadius: 4 
+              }}>
+                <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+                  {videoInfo.type.toUpperCase()}
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
       )}
       {/* Images from markdown/html */}
