@@ -131,7 +131,10 @@ const ConversationScreen = () => {
       try {
         const accounts = await client.database.call('get_accounts', [[fullReply.author]]);
         if (accounts && accounts[0]) {
-          const meta = accounts[0].posting_json_metadata || accounts[0].json_metadata;
+          let meta = accounts[0].posting_json_metadata;
+          if (!meta || meta === '{}') {
+            meta = accounts[0].json_metadata;
+          }
           if (meta) {
             let profile;
             try {
@@ -177,9 +180,13 @@ const ConversationScreen = () => {
       // Fetch avatar robustly from account profile
       let avatarUrl: string | undefined = undefined;
       try {
+        let meta;
         const accounts = await client.database.call('get_accounts', [[post.author]]);
         if (accounts && accounts[0]) {
-          const meta = accounts[0].posting_json_metadata || accounts[0].json_metadata;
+          meta = accounts[0].posting_json_metadata;
+          if (!meta || meta === '{}') {
+            meta = accounts[0].json_metadata;
+          }
           if (meta) {
             let profile;
             try {
