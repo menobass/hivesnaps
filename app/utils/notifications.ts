@@ -296,10 +296,22 @@ export function getNotificationPriority(notification: ParsedNotification): numbe
 }
 
 /**
- * Sort notifications by priority and date
+ * Sort notifications by priority and date, or chronologically
+ * @param notifications - Array of notifications to sort
+ * @param sortBy - Sorting method: 'chronological' for strict time order (newest first), 
+ *                 'priority' for grouped by type with priority ordering
  */
-export function sortNotifications(notifications: ParsedNotification[]): ParsedNotification[] {
+export function sortNotifications(
+  notifications: ParsedNotification[], 
+  sortBy: 'priority' | 'chronological' = 'chronological'
+): ParsedNotification[] {
   return notifications.sort((a, b) => {
+    if (sortBy === 'chronological') {
+      // Pure chronological sorting: newest first, ignoring priority and read status
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    }
+    
+    // Legacy priority-based sorting (groups notifications by type)
     // First sort by read status (unread first)
     if (a.read !== b.read) {
       return a.read ? 1 : -1;
@@ -314,6 +326,13 @@ export function sortNotifications(notifications: ParsedNotification[]): ParsedNo
     // Finally by date (newest first)
     return new Date(b.date).getTime() - new Date(a.date).getTime();
   });
+}
+
+/**
+ * Sort notifications chronologically (convenience wrapper)
+ */
+export function sortNotificationsChronologically(notifications: ParsedNotification[]): ParsedNotification[] {
+  return sortNotifications(notifications, 'chronological');
 }
 
 /**

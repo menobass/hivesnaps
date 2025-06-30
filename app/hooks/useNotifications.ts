@@ -113,9 +113,9 @@ export const useNotifications = (username: string | null): UseNotificationsResul
         read: readNotifications.includes(notification.id),
       }));
 
-      // Filter by settings and sort
+      // Filter by settings and sort chronologically
       const filtered = filterNotificationsBySettings(withReadStatus, settings);
-      return sortNotifications(filtered);
+      return sortNotifications(filtered, 'chronological');
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Failed to fetch notifications');
     }
@@ -222,9 +222,9 @@ export const useNotifications = (username: string | null): UseNotificationsResul
   // Refresh when settings change
   useEffect(() => {
     if (username && notifications.length > 0) {
-      // Re-filter existing notifications with new settings
+      // Re-filter existing notifications with new settings and sort chronologically
       const filtered = filterNotificationsBySettings(notifications, settings);
-      const sorted = sortNotifications(filtered);
+      const sorted = sortNotifications(filtered, 'chronological');
       setNotifications(sorted);
     }
   }, [settings]);

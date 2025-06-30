@@ -165,9 +165,9 @@ const NotificationsScreen = () => {
         read: readNotifications.includes(notification.id),
       }));
 
-      // Filter by settings and sort
+      // Filter by settings and sort chronologically
       const filtered = filterNotificationsBySettings(withReadStatus, settings);
-      const sorted = sortNotifications(filtered);
+      const sorted = sortNotifications(filtered, 'chronological');
 
       setNotifications(sorted);
     } catch (error) {
