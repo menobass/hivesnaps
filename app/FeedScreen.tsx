@@ -652,15 +652,25 @@ const FeedScreen = () => {
       <SafeAreaView style={{ backgroundColor: colors.background, paddingTop: insets.top }} edges={['top']}>
         <View style={styles.topBar}>
           {/* User avatar instead of logo */}
-          {loading ? (
-            <ActivityIndicator size="small" color={colors.text} style={styles.avatar} />
-          ) : (
-            <Image
-              source={avatarUrl ? { uri: avatarUrl } : require('../assets/images/logo.jpg')}
-              style={styles.avatar}
-            />
-          )}
-          <Text style={[styles.username, { color: colors.text }]}>{username}</Text>
+          <Pressable
+            onPress={() => {
+              console.log('Navigating to ProfileScreen for:', username);
+              router.push(`/ProfileScreen?username=${username}` as any);
+            }}
+            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, flexDirection: 'row', alignItems: 'center' }]}
+            accessibilityRole="button"
+            accessibilityLabel={`View your profile`}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color={colors.text} style={styles.avatar} />
+            ) : (
+              <Image
+                source={avatarUrl ? { uri: avatarUrl } : require('../assets/images/logo.jpg')}
+                style={styles.avatar}
+              />
+            )}
+            <Text style={[styles.username, { color: colors.text }]}>{username}</Text>
+          </Pressable>
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
             <FontAwesome name="sign-out" size={24} color={colors.icon} />
           </TouchableOpacity>
@@ -740,6 +750,10 @@ const FeedScreen = () => {
                 onSpeechBubblePress={() => {
                   console.log('Navigating to ConversationScreen with:', item);
                   router.push({ pathname: '/ConversationScreen', params: { author: item.author, permlink: item.permlink } });
+                }}
+                onUserPress={(username) => {
+                  console.log('Navigating to ProfileScreen for:', username);
+                  router.push(`/ProfileScreen?username=${username}` as any);
                 }}
               />
             )}

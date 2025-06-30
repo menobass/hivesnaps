@@ -39,6 +39,7 @@ interface SnapProps {
   permlink?: string;
   hasUpvoted?: boolean;
   onSpeechBubblePress?: () => void; // NEW: handler for speech bubble
+  onUserPress?: (username: string) => void; // NEW: handler for username/avatar press
 }
 
 // Utility to extract raw image URLs from text (not in markdown or html)
@@ -63,7 +64,7 @@ const removeYouTubeUrl = (text: string): string => {
   return text.replace(/(?:https?:\/\/(?:www\.)?)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)[\w-]{11}(\S*)?/gi, '').replace(/\s{2,}/g, ' ').trim();
 };
 
-const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount = 0, replyCount = 0, payout = 0, onUpvotePress, permlink, hasUpvoted = false, onSpeechBubblePress }) => {
+const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount = 0, replyCount = 0, payout = 0, onUpvotePress, permlink, hasUpvoted = false, onSpeechBubblePress, onUserPress }) => {
   const colorScheme = useColorScheme() || 'light';
   const isDark = colorScheme === 'dark';
   const colors = twitterColors[colorScheme];
@@ -110,8 +111,16 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
       </Modal>
       {/* Top row: avatar, username, timestamp */}
       <View style={styles.topRow}>
-        <Image source={avatarUrl ? { uri: avatarUrl } : require('../../assets/images/logo.jpg')} style={styles.avatar} />       
-        <Text style={[styles.username, { color: colors.text }]}>{author}</Text>
+        <Pressable
+          onPress={() => onUserPress && onUserPress(author)}
+          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, flexDirection: 'row', alignItems: 'center' }]}
+          disabled={!onUserPress}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${author}'s profile`}
+        >
+          <Image source={avatarUrl ? { uri: avatarUrl } : require('../../assets/images/logo.jpg')} style={styles.avatar} />       
+          <Text style={[styles.username, { color: colors.text }]}>{author}</Text>
+        </Pressable>
         <Text style={[styles.timestamp, { color: colors.text }]}>{new Date(created).toLocaleString()}</Text>    
       </View>
       {/* Video Player (YouTube, 3speak, IPFS) - Click to play */}

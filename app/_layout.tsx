@@ -54,6 +54,8 @@ function RootLayoutNav() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="FeedScreen" />
         <Stack.Screen name="NotificationsScreen" />
+        <Stack.Screen name="ConversationScreen" />
+        <Stack.Screen name="ProfileScreen" />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>
