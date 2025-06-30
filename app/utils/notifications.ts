@@ -122,7 +122,7 @@ export function parseNotification(notification: HiveNotification): ParsedNotific
       break;
 
     case 'mention':
-      parsed.icon = 'at-sign';
+      parsed.icon = 'at';
       parsed.color = '#F4900C';
       parsed.actionText = 'Mentioned you';
       
