@@ -8,6 +8,9 @@ import { extractVideoInfo, removeVideoUrls, extractYouTubeId } from '../../utils
 import { extractExternalLinks } from '../../utils/extractExternalLinks';
 import IPFSVideoPlayer from './IPFSVideoPlayer';
 import { WebView } from 'react-native-webview';
+import Markdown from 'react-native-markdown-display';
+import RenderHtml from 'react-native-render-html';
+import { Video, ResizeMode } from 'expo-av';
 
 const twitterColors = {
   light: {
@@ -64,6 +67,59 @@ function removeRawImageUrls(text: string): string {
 const removeYouTubeUrl = (text: string): string => {
   // Remove all YouTube links (youtube.com/watch?v=, youtu.be/, youtube.com/shorts/, etc.)
   return text.replace(/(?:https?:\/\/(?:www\.)?)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)[\w-]{11}(\S*)?/gi, '').replace(/\s{2,}/g, ' ').trim();
+};
+
+// Utility to check if a string contains HTML tags
+function containsHtml(str: string): boolean {
+  return /<([a-z][\s\S]*?)>/i.test(str);
+}
+
+// Helper: Render mp4 video using expo-av Video
+const renderMp4Video = (uri: string, key?: string | number) => (
+  <View key={key || uri} style={{ width: '100%', aspectRatio: 16 / 9, marginVertical: 10, borderRadius: 12, overflow: 'hidden', backgroundColor: '#eee' }}>
+    <Video
+      source={{ uri }}
+      useNativeControls
+      resizeMode={ResizeMode.CONTAIN}
+      style={{ width: '100%', height: '100%' }}
+      shouldPlay={false}
+      isLooping={false}
+    />
+  </View>
+);
+
+// Custom markdown rules for mp4 and video support
+const markdownRules = {
+  // ...existing code...
+  link: (
+    node: any,
+    children: any,
+    parent: any,
+    styles: any
+  ) => {
+    const { href } = node.attributes;
+    const mp4Match = href && href.match(/\.mp4($|\?)/i);
+    if (mp4Match) {
+      return renderMp4Video(href, href);
+    }
+    // ...existing code...
+  },
+  html: (
+    node: any,
+    children: any,
+    parent: any,
+    styles: any
+  ) => {
+    const htmlContent = node.content || '';
+    const videoTagMatch = htmlContent.match(/<video[^>]*src=["']([^"']+\.mp4)["'][^>]*>(.*?)<\/video>/i);
+    if (videoTagMatch) {
+      const mp4Url = videoTagMatch[1];
+      return renderMp4Video(mp4Url, mp4Url);
+    }
+    // ...existing code...
+    return null;
+  },
+  // ...existing code...
 };
 
 const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount = 0, replyCount = 0, payout = 0, onUpvotePress, permlink, hasUpvoted = false, onSpeechBubblePress, onUserPress, onContentPress }) => {
@@ -192,20 +248,80 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
         </View>
       )}
       {/* Body */}
-      {cleanTextBody.length > 0 && (
-        onContentPress ? (
-          <Pressable
-            onPress={onContentPress}
-            style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
-            accessibilityRole="button"
-            accessibilityLabel="View conversation"
-          >
-            <Text style={[styles.body, { color: colors.text }]}>{cleanTextBody}</Text>
-          </Pressable>
-        ) : (
-          <Text style={[styles.body, { color: colors.text }]}>{cleanTextBody}</Text>
-        )
-      )}
+      {cleanTextBody.length > 0 && (() => {
+        const windowWidth = Dimensions.get('window').width;
+        const isHtml = containsHtml(cleanTextBody);
+        if (onContentPress) {
+          return (
+            <Pressable
+              onPress={onContentPress}
+              style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+              accessibilityRole="button"
+              accessibilityLabel="View conversation"
+            >
+              {isHtml ? (
+                <RenderHtml
+                  contentWidth={windowWidth - 32}
+                  source={{ html: cleanTextBody }}
+                  baseStyle={{ color: colors.text, fontSize: 15, marginBottom: 8 }}
+                  enableExperimentalMarginCollapsing
+                  tagsStyles={{ a: { color: colors.icon } }}
+                  renderers={{
+                    video: (props: any) => {
+                      const src = props?.tnode?.attributes?.src;
+                      const TDefaultRenderer = props?.TDefaultRenderer;
+                      if (src && src.endsWith('.mp4')) {
+                        return renderMp4Video(src);
+                      }
+                      return TDefaultRenderer ? <TDefaultRenderer {...props} /> : null;
+                    },
+                  }}
+                />
+              ) : (
+                <Markdown
+                  style={{
+                    body: { color: colors.text, fontSize: 15, marginBottom: 8 },
+                    link: { color: colors.icon },
+                  }}
+                  rules={markdownRules}
+                >
+                  {cleanTextBody}
+                </Markdown>
+              )}
+            </Pressable>
+          );
+        } else {
+          return isHtml ? (
+            <RenderHtml
+              contentWidth={windowWidth - 32}
+              source={{ html: cleanTextBody }}
+              baseStyle={{ color: colors.text, fontSize: 15, marginBottom: 8 }}
+              enableExperimentalMarginCollapsing
+              tagsStyles={{ a: { color: colors.icon } }}
+              renderers={{
+                video: (props: any) => {
+                  const src = props?.tnode?.attributes?.src;
+                  const TDefaultRenderer = props?.TDefaultRenderer;
+                  if (src && src.endsWith('.mp4')) {
+                    return renderMp4Video(src);
+                  }
+                  return TDefaultRenderer ? <TDefaultRenderer {...props} /> : null;
+                },
+              }}
+            />
+          ) : (
+            <Markdown
+              style={{
+                body: { color: colors.text, fontSize: 15, marginBottom: 8 },
+                link: { color: colors.icon },
+              }}
+              rules={markdownRules}
+            >
+              {cleanTextBody}
+            </Markdown>
+          );
+        }
+      })()}
       {/* External Links */}
       {externalLinks.length > 0 && (
         <View style={{ marginTop: 4, marginBottom: 6 }}>
