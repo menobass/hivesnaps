@@ -17,6 +17,7 @@ import IPFSVideoPlayer from './components/IPFSVideoPlayer';
 import { Image as ExpoImage } from 'expo-image';
 import RenderHtml from 'react-native-render-html';
 import { Dimensions } from 'react-native';
+import { Video, ResizeMode } from 'expo-av';
 
 // Placeholder Snap data type
 interface SnapData {
@@ -506,6 +507,20 @@ const ConversationScreen = () => {
     );
   };
 
+  // Helper: Render mp4 video using expo-av Video
+  const renderMp4Video = (uri: string, key?: string | number) => (
+    <View key={key || uri} style={{ width: '100%', aspectRatio: 16 / 9, marginVertical: 10, borderRadius: 12, overflow: 'hidden', backgroundColor: isDark ? '#222' : '#eee' }}>
+      <Video
+        source={{ uri }}
+        useNativeControls
+        resizeMode={ResizeMode.CONTAIN}
+        style={{ width: '100%', height: '100%' }}
+        shouldPlay={false}
+        isLooping={false}
+      />
+    </View>
+  );
+
   // Utility to remove all video URLs from text (updated for multiple platforms)
   function removeAllVideoUrls(text: string): string {
     return removeVideoUrls(text);
@@ -545,15 +560,39 @@ const ConversationScreen = () => {
         </Pressable>
       );
     },
+    video: (
+      node: any,
+      children: any,
+      parent: any,
+      styles: any
+    ) => {
+      // Handle <video src="...mp4"> or <video><source src="...mp4"></video>
+      let src = node.attributes?.src;
+      if (!src && node.children && node.children.length > 0) {
+        const sourceNode = node.children.find((c: any) => c.name === 'source');
+        if (sourceNode) src = sourceNode.attributes?.src;
+      }
+      if (src && src.endsWith('.mp4')) {
+        return renderMp4Video(src);
+      }
+      return null;
+    },
     html: (
       node: any,
       children: any,
       parent: any,
       styles: any
     ) => {
-      // Handle iframe tags for IPFS videos and other embedded content
+      // Handle <video> tags for mp4
       const htmlContent = node.content || '';
-      const iframeMatch = htmlContent.match(/<iframe[^>]+src=["']([^"']*ipfs[^"']*\/ipfs\/([A-Za-z0-9]+))[^"']*["'][^>]*>/i);
+      const videoTagMatch = htmlContent.match(/<video[^>]*src=["']([^"']+\.mp4)["'][^>]*>(.*?)<\/video>/i);
+      if (videoTagMatch) {
+        const mp4Url = videoTagMatch[1];
+        return renderMp4Video(mp4Url);
+      }
+      // Handle iframe tags for IPFS videos and other embedded content
+      const htmlContent2 = node.content || '';
+      const iframeMatch = htmlContent2.match(/<iframe[^>]+src=["']([^"']*ipfs[^"']*\/ipfs\/([A-Za-z0-9]+))[^"']*["'][^>]*>/i);
       
       if (iframeMatch) {
         const ipfsUrl = iframeMatch[1];
@@ -574,11 +613,12 @@ const ConversationScreen = () => {
       styles: any
     ) => {
       const { href } = node.attributes;
-      // Enhanced video link detection (supports YouTube, 3speak, IPFS)
+      // Enhanced video link detection (supports YouTube, 3speak, IPFS, mp4)
       const youtubeMatch = href && href.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
       const threeSpeakMatch = href && href.match(/https:\/\/3speak\.tv\/watch\?v=([^\/\s]+)\/([a-zA-Z0-9_-]+)/);
       const ipfsMatch = href && href.match(/ipfs\/([A-Za-z0-9]+)/);
-      
+      const mp4Match = href && href.match(/\.mp4($|\?)/i);
+
       if (youtubeMatch) {
         const videoId = youtubeMatch[1];
         return (
@@ -644,6 +684,9 @@ const ConversationScreen = () => {
             <IPFSVideoPlayer ipfsUrl={href} isDark={isDark} />
           </View>
         );
+      }
+      if (mp4Match) {
+        return renderMp4Video(href, href);
       }
       // Default link rendering
       return (
@@ -862,6 +905,15 @@ const ConversationScreen = () => {
             baseStyle={{ color: colors.text, fontSize: 15, marginBottom: 8 }}
             enableExperimentalMarginCollapsing
             tagsStyles={{ a: { color: colors.icon } }}
+            renderers={{
+              video: ({ tnode }: any) => {
+                const src = tnode?.attributes?.src;
+                if (src && src.endsWith('.mp4')) {
+                  return renderMp4Video(src);
+                }
+                return null;
+              },
+            }}
           />
         ) : (
           <Markdown
