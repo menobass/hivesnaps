@@ -668,14 +668,24 @@ const ConversationScreen = () => {
         <View style={[styles.replyBubble, { backgroundColor: colors.bubble }]}> 
           {/* Avatar, author, timestamp row */}
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-            {reply.avatarUrl ? (
-              <Image source={{ uri: reply.avatarUrl }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, { backgroundColor: isDark ? '#22303C' : '#eee', justifyContent: 'center', alignItems: 'center' }]}> 
-                <FontAwesome name="user" size={22} color={isDark ? '#8899A6' : '#bbb'} />
-              </View>
-            )}
-            <Text style={[styles.replyAuthor, { color: colors.text, marginLeft: 10 }]}>{reply.author}</Text>
+            <Pressable
+              onPress={() => {
+                console.log('Navigating to ProfileScreen for:', reply.author);
+                router.push(`/ProfileScreen?username=${reply.author}` as any);
+              }}
+              style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, flexDirection: 'row', alignItems: 'center' }]}
+              accessibilityRole="button"
+              accessibilityLabel={`View ${reply.author}'s profile`}
+            >
+              {reply.avatarUrl ? (
+                <Image source={{ uri: reply.avatarUrl }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatar, { backgroundColor: isDark ? '#22303C' : '#eee', justifyContent: 'center', alignItems: 'center' }]}> 
+                  <FontAwesome name="user" size={22} color={isDark ? '#8899A6' : '#bbb'} />
+                </View>
+              )}
+              <Text style={[styles.replyAuthor, { color: colors.text, marginLeft: 10 }]}>{reply.author}</Text>
+            </Pressable>
             <Text style={[styles.snapTimestamp, { color: colors.text }]}>{reply.created ? new Date(reply.created).toLocaleString() : ''}</Text>
           </View>
           {/* Video Player (YouTube, 3speak, IPFS) - Click to play */}
@@ -759,14 +769,24 @@ const ConversationScreen = () => {
     return (
       <View style={[styles.snapPost, { borderColor: colors.border, backgroundColor: colors.background }]}> 
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-          {snap.avatarUrl ? (
-            <Image source={{ uri: snap.avatarUrl }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatar, { backgroundColor: isDark ? '#22303C' : '#eee', justifyContent: 'center', alignItems: 'center' }]}> 
-              <FontAwesome name="user" size={22} color={isDark ? '#8899A6' : '#bbb'} />
-            </View>
-          )}
-          <Text style={[styles.snapAuthor, { color: colors.text, marginLeft: 10 }]}>{snap.author}</Text>
+          <Pressable
+            onPress={() => {
+              console.log('Navigating to ProfileScreen for:', snap.author);
+              router.push(`/ProfileScreen?username=${snap.author}` as any);
+            }}
+            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, flexDirection: 'row', alignItems: 'center' }]}
+            accessibilityRole="button"
+            accessibilityLabel={`View ${snap.author}'s profile`}
+          >
+            {snap.avatarUrl ? (
+              <Image source={{ uri: snap.avatarUrl }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: isDark ? '#22303C' : '#eee', justifyContent: 'center', alignItems: 'center' }]}> 
+                <FontAwesome name="user" size={22} color={isDark ? '#8899A6' : '#bbb'} />
+              </View>
+            )}
+            <Text style={[styles.snapAuthor, { color: colors.text, marginLeft: 10 }]}>{snap.author}</Text>
+          </Pressable>
           <Text style={[styles.snapTimestamp, { color: colors.text }]}>{snap.created ? new Date(snap.created).toLocaleString() : ''}</Text>
         </View>
         {/* Video Player (YouTube, 3speak, IPFS) - Click to play */}
