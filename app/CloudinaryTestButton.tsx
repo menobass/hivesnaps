@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Button, Alert } from 'react-native';
-import { uploadImageToCloudinaryFixed } from './utils/cloudinaryImageUploadFixed';
+import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
 
 // TestButton component for debugging Cloudinary upload
 export const CloudinaryTestButton = () => {

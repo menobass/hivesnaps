@@ -30,7 +30,7 @@ import {
   getDefaultNotificationSettings,
   filterNotificationsBySettings,
   type ParsedNotification,
-} from './utils/notifications';
+} from '../utils/notifications';
 
 interface NotificationItemProps {
   notification: ParsedNotification;

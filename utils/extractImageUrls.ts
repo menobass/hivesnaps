@@ -1,3 +1,5 @@
+// moved from app/utils/extractImageUrls.ts
+
 // Utility to extract image URLs from markdown and html in a string
 export function extractImageUrls(text: string): string[] {
   const urls: string[] = [];

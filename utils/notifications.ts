@@ -198,109 +198,6 @@ export function getUnreadCount(notifications: ParsedNotification[]): number {
   return notifications.filter(n => !n.read).length;
 }
 
-/**
- * Mark notification as read
- */
-export function markAsRead(notifications: ParsedNotification[], notificationId: number): ParsedNotification[] {
-  return notifications.map(n => 
-    n.id === notificationId ? { ...n, read: true } : n
-  );
-}
-
-/**
- * Mark all notifications as read
- */
-export function markAllAsRead(notifications: ParsedNotification[]): ParsedNotification[] {
-  return notifications.map(n => ({ ...n, read: true }));
-}
-
-/**
- * Filter notifications by type
- */
-export function filterNotificationsByType(
-  notifications: ParsedNotification[], 
-  types: string[]
-): ParsedNotification[] {
-  return notifications.filter(n => types.includes(n.type));
-}
-
-/**
- * Get recent notifications (last 24 hours)
- */
-export function getRecentNotifications(notifications: ParsedNotification[]): ParsedNotification[] {
-  const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
-  return notifications.filter(n => (n.timestamp || 0) > oneDayAgo);
-}
-
-/**
- * Group notifications by type
- */
-export function groupNotificationsByType(notifications: ParsedNotification[]): Record<string, ParsedNotification[]> {
-  return notifications.reduce((groups, notification) => {
-    const type = notification.type;
-    if (!groups[type]) {
-      groups[type] = [];
-    }
-    groups[type].push(notification);
-    return groups;
-  }, {} as Record<string, ParsedNotification[]>);
-}
-
-/**
- * Format notification timestamp for display
- */
-export function formatNotificationTime(date: string): string {
-  const notificationDate = new Date(date);
-  const now = new Date();
-  const diffInMinutes = Math.floor((now.getTime() - notificationDate.getTime()) / (1000 * 60));
-  
-  if (diffInMinutes < 1) {
-    return 'Just now';
-  } else if (diffInMinutes < 60) {
-    return `${diffInMinutes}m ago`;
-  } else if (diffInMinutes < 1440) { // 24 hours
-    const hours = Math.floor(diffInMinutes / 60);
-    return `${hours}h ago`;
-  } else if (diffInMinutes < 10080) { // 7 days
-    const days = Math.floor(diffInMinutes / 1440);
-    return `${days}d ago`;
-  } else {
-    return notificationDate.toLocaleDateString();
-  }
-}
-
-/**
- * Check if notification is actionable (can navigate to content)
- */
-export function isActionableNotification(notification: ParsedNotification): boolean {
-  return !!(notification.url && notification.targetContent);
-}
-
-/**
- * Get notification priority (for sorting)
- */
-export function getNotificationPriority(notification: ParsedNotification): number {
-  const priorities: Record<string, number> = {
-    'mention': 10,
-    'reply': 9,
-    'vote': 8,
-    'follow': 7,
-    'reblog': 6,
-    'set_role': 5,
-    'set_label': 4,
-    'subscribe': 3,
-    'new_community': 2,
-  };
-  
-  return priorities[notification.type] || 1;
-}
-
-/**
- * Sort notifications by priority and date, or chronologically
- * @param notifications - Array of notifications to sort
- * @param sortBy - Sorting method: 'chronological' for strict time order (newest first), 
- *                 'priority' for grouped by type with priority ordering
- */
 export function sortNotifications(
   notifications: ParsedNotification[], 
   sortBy: 'priority' | 'chronological' = 'chronological'
@@ -310,34 +207,21 @@ export function sortNotifications(
       // Pure chronological sorting: newest first, ignoring priority and read status
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     }
-    
     // Legacy priority-based sorting (groups notifications by type)
     // First sort by read status (unread first)
     if (a.read !== b.read) {
       return a.read ? 1 : -1;
     }
-    
     // Then by priority
     const priorityDiff = getNotificationPriority(b) - getNotificationPriority(a);
     if (priorityDiff !== 0) {
       return priorityDiff;
     }
-    
     // Finally by date (newest first)
     return new Date(b.date).getTime() - new Date(a.date).getTime();
   });
 }
 
-/**
- * Sort notifications chronologically (convenience wrapper)
- */
-export function sortNotificationsChronologically(notifications: ParsedNotification[]): ParsedNotification[] {
-  return sortNotifications(notifications, 'chronological');
-}
-
-/**
- * Get notification settings with defaults
- */
 export function getDefaultNotificationSettings() {
   return {
     votes: true,
@@ -351,9 +235,6 @@ export function getDefaultNotificationSettings() {
   };
 }
 
-/**
- * Filter notifications based on user settings
- */
 export function filterNotificationsBySettings(
   notifications: ParsedNotification[],
   settings: ReturnType<typeof getDefaultNotificationSettings>
@@ -379,4 +260,52 @@ export function filterNotificationsBySettings(
         return true;
     }
   });
+}
+
+export function getNotificationPriority(notification: ParsedNotification): number {
+  const priorities: Record<string, number> = {
+    'mention': 10,
+    'reply': 9,
+    'vote': 8,
+    'follow': 7,
+    'reblog': 6,
+    'set_role': 5,
+    'set_label': 4,
+    'subscribe': 3,
+    'new_community': 2,
+  };
+  return priorities[notification.type] || 1;
+}
+
+export function markAsRead(notifications: ParsedNotification[], notificationId: number): ParsedNotification[] {
+  return notifications.map(n => 
+    n.id === notificationId ? { ...n, read: true } : n
+  );
+}
+
+export function markAllAsRead(notifications: ParsedNotification[]): ParsedNotification[] {
+  return notifications.map(n => ({ ...n, read: true }));
+}
+
+export function formatNotificationTime(date: string): string {
+  const notificationDate = new Date(date);
+  const now = new Date();
+  const diffInMinutes = Math.floor((now.getTime() - notificationDate.getTime()) / (1000 * 60));
+  if (diffInMinutes < 1) {
+    return 'Just now';
+  } else if (diffInMinutes < 60) {
+    return `${diffInMinutes}m ago`;
+  } else if (diffInMinutes < 1440) { // 24 hours
+    const hours = Math.floor(diffInMinutes / 60);
+    return `${hours}h ago`;
+  } else if (diffInMinutes < 10080) { // 7 days
+    const days = Math.floor(diffInMinutes / 1440);
+    return `${days}d ago`;
+  } else {
+    return notificationDate.toLocaleDateString();
+  }
+}
+
+export function isActionableNotification(notification: ParsedNotification): boolean {
+  return !!(notification.url && notification.targetContent);
 }

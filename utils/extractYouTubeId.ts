@@ -1,3 +1,5 @@
+// moved from app/utils/extractYouTubeId.ts
+
 // Utility to extract YouTube video ID from a string
 export function extractYouTubeId(text: string): string | null {
   // Regex for YouTube URLs (youtu.be or youtube.com)
