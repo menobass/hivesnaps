@@ -15,6 +15,8 @@ import * as SecureStore from 'expo-secure-store';
 import Slider from '@react-native-community/slider';
 import IPFSVideoPlayer from './components/IPFSVideoPlayer';
 import { Image as ExpoImage } from 'expo-image';
+import RenderHtml from 'react-native-render-html';
+import { Dimensions } from 'react-native';
 
 // Placeholder Snap data type
 interface SnapData {
@@ -663,6 +665,11 @@ const ConversationScreen = () => {
     console.log('Snap payout:', snap.payout, 'for', snap.author, snap.permlink);
   }
 
+  // Utility to check if a string contains HTML tags
+  function containsHtml(str: string): boolean {
+    return /<([a-z][\s\S]*?)>/i.test(str);
+  }
+
   // Recursive threaded reply renderer
   const renderReplyTree = (reply: ReplyData, level = 0) => {
     const videoInfo = extractVideoInfo(reply.body);
@@ -670,6 +677,8 @@ const ConversationScreen = () => {
     if (videoInfo) {
       textBody = removeAllVideoUrls(textBody);
     }
+    const windowWidth = Dimensions.get('window').width;
+    const isHtml = containsHtml(textBody);
     return (
       <View key={reply.author + reply.permlink + '-' + level} style={{ marginLeft: level * 18, marginBottom: 10 }}>
         <View style={[styles.replyBubble, { backgroundColor: colors.bubble }]}> 
@@ -733,15 +742,25 @@ const ConversationScreen = () => {
               )}
             </View>
           )}
-          <Markdown
-            style={{
-              body: { color: colors.text, fontSize: 14, marginBottom: 4 },
-              link: { color: colors.icon },
-            }}
-            rules={markdownRules}
-          >
-            {textBody}
-          </Markdown>
+          {isHtml ? (
+            <RenderHtml
+              contentWidth={windowWidth - (level * 18) - 32}
+              source={{ html: textBody }}
+              baseStyle={{ color: colors.text, fontSize: 14, marginBottom: 4 }}
+              enableExperimentalMarginCollapsing
+              tagsStyles={{ a: { color: colors.icon } }}
+            />
+          ) : (
+            <Markdown
+              style={{
+                body: { color: colors.text, fontSize: 14, marginBottom: 4 },
+                link: { color: colors.icon },
+              }}
+              rules={markdownRules}
+            >
+              {textBody}
+            </Markdown>
+          )}
           <View style={styles.replyMeta}>
             <TouchableOpacity
               style={[styles.replyButton, { backgroundColor: 'transparent' }]}
@@ -773,6 +792,8 @@ const ConversationScreen = () => {
     if (videoInfo) {
       textBody = removeAllVideoUrls(textBody);
     }
+    const windowWidth = Dimensions.get('window').width;
+    const isHtml = containsHtml(textBody);
     return (
       <View style={[styles.snapPost, { borderColor: colors.border, backgroundColor: colors.background }]}> 
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
@@ -834,15 +855,25 @@ const ConversationScreen = () => {
             )}
           </View>
         )}
-        <Markdown
-          style={{
-            body: { color: colors.text, fontSize: 15, marginBottom: 8 },
-            link: { color: colors.icon },
-          }}
-          rules={markdownRules}
-        >
-          {textBody}
-        </Markdown>
+        {isHtml ? (
+          <RenderHtml
+            contentWidth={windowWidth - 32}
+            source={{ html: textBody }}
+            baseStyle={{ color: colors.text, fontSize: 15, marginBottom: 8 }}
+            enableExperimentalMarginCollapsing
+            tagsStyles={{ a: { color: colors.icon } }}
+          />
+        ) : (
+          <Markdown
+            style={{
+              body: { color: colors.text, fontSize: 15, marginBottom: 8 },
+              link: { color: colors.icon },
+            }}
+            rules={markdownRules}
+          >
+            {textBody}
+          </Markdown>
+        )}
         <View style={[styles.snapMeta, { alignItems: 'center' }]}> 
           <TouchableOpacity
             style={[styles.replyButton, { backgroundColor: 'transparent' }]}
