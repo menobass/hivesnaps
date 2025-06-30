@@ -117,32 +117,25 @@ const ProfileScreen = () => {
       
       const account = accounts[0];
       
-      // Method 2: Fetch reputation using dedicated reputation API
-      let reputationValue = 0;
+      // Method 2: Fetch reputation using techcoderx.com API (much more reliable!)
+      let reputation = 25; // fallback
       try {
-        const reputationResponse = await fetch('https://api.hive.blog', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            method: 'reputation_api.get_account_reputations',
-            params: {
-              account_lower_bound: username,
-              limit: 1
-            },
-            id: 1,
-          }),
-        });
-        const reputationData = await reputationResponse.json();
-        if (reputationData.result && reputationData.result.reputations && reputationData.result.reputations[0]) {
-          const reputationEntry = reputationData.result.reputations[0];
-          if (reputationEntry.account === username) {
-            reputationValue = parseInt(reputationEntry.reputation);
-            console.log('Reputation API returned:', reputationEntry.reputation, 'for', username);
+        console.log('Fetching reputation from techcoderx.com API for:', username);
+        const reputationResponse = await fetch(`https://techcoderx.com/reputation-api/accounts/${username}/reputation`);
+        if (reputationResponse.ok) {
+          const reputationText = await reputationResponse.text();
+          const reputationNumber = parseInt(reputationText.trim(), 10);
+          if (!isNaN(reputationNumber)) {
+            reputation = reputationNumber;
+            console.log('Successfully fetched reputation from API:', reputation);
+          } else {
+            console.log('Invalid reputation response from API:', reputationText);
           }
+        } else {
+          console.log('Failed to fetch reputation from API, status:', reputationResponse.status);
         }
-      } catch (e) {
-        console.log('Reputation API failed:', e);
+      } catch (reputationError) {
+        console.log('Error fetching reputation from API:', reputationError);
       }
       
       // 🔍 DEBUG: Log the raw account data
@@ -183,49 +176,6 @@ const ProfileScreen = () => {
       } catch (e) {
         console.log('Error parsing profile metadata:', e);
       }
-
-      // Calculate reputation using Ecency's exact method
-      const parseReputation = (input: string | number): number => {
-        const isHumanReadable = (input: number): boolean => {
-          return Math.abs(input) > 0 && Math.abs(input) <= 100;
-        };
-        
-        if (typeof input === 'number' && isHumanReadable(input)) {
-          return Math.floor(input);
-        }
-
-        if (typeof input === 'string') {
-          input = Number(input);
-          if (isHumanReadable(input)) {
-            return Math.floor(input);
-          }
-        }
-
-        if (input === 0) {
-          return 25;
-        }
-
-        let neg = false;
-        if (input < 0) neg = true;
-
-        let reputationLevel = Math.log10(Math.abs(input));
-        reputationLevel = Math.max(reputationLevel - 9, 0);
-
-        if (reputationLevel < 0) reputationLevel = 0;
-        if (neg) reputationLevel *= -1;
-
-        reputationLevel = reputationLevel * 9 + 25;
-
-        return Math.floor(reputationLevel);
-      };
-
-      // Use the better reputation source (reputation API if available, otherwise dhive)
-      const reputationSource = reputationValue !== 0 ? reputationValue : account.reputation;
-      console.log('Using reputation from:', reputationValue !== 0 ? 'reputation API' : 'dhive API');
-      console.log('Reputation source value:', reputationSource);
-      
-      const reputation = parseReputation(reputationSource);
-      console.log('Calculated reputation using Ecency method:', reputation);
       
       // Parse balances
       const hiveBalance = parseFloat(account.balance.replace(' HIVE', ''));
@@ -262,7 +212,7 @@ const ProfileScreen = () => {
       setProfile({
         username: account.name,
         avatarUrl: profileMeta.profile_image,
-        reputation: Math.round(reputation * 10) / 10,
+        reputation: reputation, // Direct from API - no need for rounding!
         hivePower: Math.round(hivePower * 100) / 100,
         hbd: Math.round(hbdBalance * 100) / 100,
         displayName: profileMeta.name,
@@ -277,7 +227,7 @@ const ProfileScreen = () => {
       });
       
       console.log('=== FINAL CALCULATED VALUES ===');
-      console.log('Final reputation:', Math.round(reputation * 10) / 10);
+      console.log('Final reputation:', reputation);
       console.log('Final Hive Power:', Math.round(hivePower * 100) / 100);
       console.log('Final HBD:', Math.round(hbdBalance * 100) / 100);
       console.log('===============================\n');
