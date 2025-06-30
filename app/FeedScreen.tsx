@@ -773,6 +773,10 @@ const FeedScreen = () => {
                   console.log('Navigating to ConversationScreen with:', item);
                   router.push({ pathname: '/ConversationScreen', params: { author: item.author, permlink: item.permlink } });
                 }}
+                onContentPress={() => {
+                  console.log('Navigating to ConversationScreen via content press with:', item);
+                  router.push({ pathname: '/ConversationScreen', params: { author: item.author, permlink: item.permlink } });
+                }}
                 onUserPress={(username) => {
                   console.log('Navigating to ProfileScreen for:', username);
                   router.push(`/ProfileScreen?username=${username}` as any);
