@@ -15,7 +15,7 @@ import * as SecureStore from 'expo-secure-store';
 import Slider from '@react-native-community/slider';
 import IPFSVideoPlayer from './components/IPFSVideoPlayer';
 import { Image as ExpoImage } from 'expo-image';
-import RenderHtml from 'react-native-render-html';
+import RenderHtml, { defaultHTMLElementModels, HTMLContentModel } from 'react-native-render-html';
 import { Dimensions } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 
@@ -526,6 +526,16 @@ const ConversationScreen = () => {
     return removeVideoUrls(text);
   }
 
+  // Utility: Preprocess @username mentions to clickable profile links
+  function linkifyMentions(text: string): string {
+    // Hive usernames: 3-16 chars, a-z, 0-9, dash, dot (no @ in username)
+    // Avoid emails and already-linked mentions
+    return text.replace(/(^|\s|[\(\[>])@([a-z0-9\-\.]{3,16})(?![a-z0-9\-\.])/gi, (match, pre, username) => {
+      // Don't double-link if already inside a link
+      return `${pre}[**@${username}**](profile://${username})`;
+    });
+  }
+
   // Custom markdown rules with 'any' types to silence TS warnings
   const markdownRules = {
     image: (
@@ -613,6 +623,21 @@ const ConversationScreen = () => {
       styles: any
     ) => {
       const { href } = node.attributes;
+      // Handle profile:// links for mentions
+      if (href && href.startsWith('profile://')) {
+        const username = href.replace('profile://', '');
+        return (
+          <Text
+            key={href}
+            style={{ color: colors.icon, fontWeight: 'bold', textDecorationLine: 'underline' }}
+            onPress={() => router.push(`/ProfileScreen?username=${username}` as any)}
+            accessibilityRole="link"
+            accessibilityLabel={`View @${username}'s profile`}
+          >
+            {children}
+          </Text>
+        );
+      }
       // Enhanced video link detection (supports YouTube, 3speak, IPFS, mp4)
       const youtubeMatch = href && href.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
       const threeSpeakMatch = href && href.match(/https:\/\/3speak\.tv\/watch\?v=([^\/\s]+)\/([a-zA-Z0-9_-]+)/);
@@ -720,6 +745,8 @@ const ConversationScreen = () => {
     if (videoInfo) {
       textBody = removeAllVideoUrls(textBody);
     }
+    // Preprocess @mentions to links
+    textBody = linkifyMentions(textBody);
     const windowWidth = Dimensions.get('window').width;
     const isHtml = containsHtml(textBody);
     return (
@@ -835,6 +862,8 @@ const ConversationScreen = () => {
     if (videoInfo) {
       textBody = removeAllVideoUrls(textBody);
     }
+    // Preprocess @mentions to links
+    textBody = linkifyMentions(textBody);
     const windowWidth = Dimensions.get('window').width;
     const isHtml = containsHtml(textBody);
     return (
@@ -905,6 +934,11 @@ const ConversationScreen = () => {
             baseStyle={{ color: colors.text, fontSize: 15, marginBottom: 8 }}
             enableExperimentalMarginCollapsing
             tagsStyles={{ a: { color: colors.icon } }}
+            customHTMLElementModels={{
+              video: defaultHTMLElementModels.video.extend({
+                contentModel: HTMLContentModel.mixed,
+              }),
+            }}
             renderers={{
               video: ({ tnode }: any) => {
                 const src = tnode?.attributes?.src;
