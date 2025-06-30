@@ -65,6 +65,7 @@ const FeedScreen = () => {
   const [snaps, setSnaps] = useState<Snap[]>([]);
   const [activeFilter, setActiveFilter] = useState<'following' | 'newest' | 'trending' | 'my'>('newest');
   const [feedLoading, setFeedLoading] = useState(false);
+  const [hasUnclaimedRewards, setHasUnclaimedRewards] = useState(false);
   const [upvoteModalVisible, setUpvoteModalVisible] = useState(false);
   const [upvoteTarget, setUpvoteTarget] = useState<{ author: string; permlink: string } | null>(null);
   const [voteWeight, setVoteWeight] = useState(100);
@@ -143,6 +144,29 @@ const FeedScreen = () => {
             }
             setAvatarUrl(profileImg);
             console.log('Avatar URL set to:', profileImg);
+            
+            // Check for unclaimed rewards
+            // Handle both Asset objects and string formats
+            const parseRewardBalance = (balance: any, symbol: string) => {
+              if (!balance) return 0;
+              if (typeof balance === 'object' && balance.amount !== undefined) {
+                // Asset object format
+                return parseFloat(balance.amount) || 0;
+              } else if (typeof balance === 'string') {
+                // String format like "0.000 HIVE"
+                return parseFloat(balance.replace(` ${symbol}`, '')) || 0;
+              } else {
+                // Try converting to string and parsing
+                return parseFloat(balance.toString().replace(` ${symbol}`, '')) || 0;
+              }
+            };
+            
+            const unclaimedHive = parseRewardBalance(accounts[0].reward_hive_balance, 'HIVE');
+            const unclaimedHbd = parseRewardBalance(accounts[0].reward_hbd_balance, 'HBD');
+            const unclaimedVests = parseRewardBalance(accounts[0].reward_vesting_balance, 'VESTS');
+            
+            const hasRewards = unclaimedHive > 0 || unclaimedHbd > 0 || unclaimedVests > 0;
+            setHasUnclaimedRewards(hasRewards);
           }
         }
       } catch (err) {
@@ -577,22 +601,6 @@ const FeedScreen = () => {
     }
   };
 
-  // --- Logout Handler ---
-  const handleLogout = async () => {
-    try {
-      await SecureStore.deleteItemAsync('hive_username');
-      await SecureStore.deleteItemAsync('hive_posting_key');
-      setUsername('');
-      setAvatarUrl('');
-      // Optionally clear snaps and state
-      setSnaps([]);
-      // Navigate to login screen (root)
-      router.replace('/');
-    } catch (err) {
-      alert('Logout failed: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
-    }
-  };
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Upvote Modal */}
@@ -657,41 +665,55 @@ const FeedScreen = () => {
               console.log('Navigating to ProfileScreen for:', username);
               router.push(`/ProfileScreen?username=${username}` as any);
             }}
-            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, flexDirection: 'row', alignItems: 'center' }]}
+            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, flexDirection: 'row', alignItems: 'center', position: 'relative' }]}
             accessibilityRole="button"
             accessibilityLabel={`View your profile`}
           >
             {loading ? (
               <ActivityIndicator size="small" color={colors.text} style={styles.avatar} />
             ) : (
-              <Image
-                source={avatarUrl ? { uri: avatarUrl } : require('../assets/images/logo.jpg')}
-                style={styles.avatar}
-              />
+              <View style={{ position: 'relative' }}>
+                <Image
+                  source={avatarUrl ? { uri: avatarUrl } : require('../assets/images/logo.jpg')}
+                  style={styles.avatar}
+                />
+                {/* Subtle reward indicator as avatar overlay */}
+                {hasUnclaimedRewards && (
+                  <View style={[styles.rewardIndicator, { 
+                    position: 'absolute', 
+                    top: -2, 
+                    right: -2, 
+                    backgroundColor: '#FFD700',
+                    borderWidth: 1,
+                    borderColor: colors.background
+                  }]}>
+                    <FontAwesome name="dollar" size={8} color="#FFF" />
+                  </View>
+                )}
+              </View>
             )}
             <Text style={[styles.username, { color: colors.text }]}>{username}</Text>
           </Pressable>
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-            <FontAwesome name="sign-out" size={24} color={colors.icon} />
-          </TouchableOpacity>
         </View>
         {/* Slogan row */}
         <View style={styles.sloganRow}>
           <Text style={[styles.slogan, { color: colors.text }]}>What's snappening today?</Text>
-          <TouchableOpacity 
-            style={styles.bellBtn}
-            onPress={() => router.push('/NotificationsScreen')}
-          >
-            <View style={{ position: 'relative' }}>
-              <FontAwesome name="bell" size={22} color={colors.icon} />
-              <NotificationBadge 
-                count={unreadCount}
-                size="small"
-                color="#FF3B30"
-                visible={unreadCount > 0}
-              />
-            </View>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity 
+              style={styles.bellBtn}
+              onPress={() => router.push('/NotificationsScreen')}
+            >
+              <View style={{ position: 'relative' }}>
+                <FontAwesome name="bell" size={22} color={colors.icon} />
+                <NotificationBadge 
+                  count={unreadCount}
+                  size="small"
+                  color="#FF3B30"
+                  visible={unreadCount > 0}
+                />
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
         {/* Filter buttons */}
         <View style={styles.filterRow}>
@@ -894,9 +916,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 4,
   },
-  logoutBtn: {
-    padding: 4,
-    marginLeft: 8,
+  rewardIndicator: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 1,
+    elevation: 2,
   },
   sloganRow: {
     flexDirection: 'row',
