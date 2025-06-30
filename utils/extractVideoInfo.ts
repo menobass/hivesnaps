@@ -98,5 +98,5 @@ export function removeVideoUrls(text: string): string {
  */
 export function extractYouTubeId(text: string): string | null {
   const videoInfo = extractVideoInfo(text);
-  return videoInfo?.type === 'youtube' ? videoInfo.id! : null;
+  return videoInfo && videoInfo.type === 'youtube' ? videoInfo.id || null : null;
 }

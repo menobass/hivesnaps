@@ -1,3 +1,5 @@
+// moved from app/utils/stripImageTags.ts
+
 // Utility to strip markdown and html image tags from a string
 export function stripImageTags(text: string): string {
   // Remove markdown image tags: ![alt](url)

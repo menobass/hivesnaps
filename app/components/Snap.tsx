@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, useColorScheme, Linking, Pressable, Modal, TouchableOpacity, Dimensions } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
-import { extractImageUrls } from '../utils/extractImageUrls';
-import { stripImageTags } from '../utils/stripImageTags';
-import { extractVideoInfo, removeVideoUrls, extractYouTubeId } from '../utils/extractVideoInfo';
+import { extractImageUrls } from '../../utils/extractImageUrls';
+import { uploadImageToCloudinaryFixed } from '../../utils/cloudinaryImageUploadFixed';
+import { stripImageTags } from '../../utils/stripImageTags';
+import { extractVideoInfo, removeVideoUrls, extractYouTubeId } from '../../utils/extractVideoInfo';
+import { extractExternalLinks } from '../../utils/extractExternalLinks';
 import IPFSVideoPlayer from './IPFSVideoPlayer';
 import { WebView } from 'react-native-webview';
-import { extractExternalLinks } from '../utils/extractExternalLinks';
 
 const twitterColors = {
   light: {

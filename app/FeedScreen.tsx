@@ -10,8 +10,8 @@ import Slider from '@react-native-community/slider';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import { useRouter } from 'expo-router';
-import { uploadImageToCloudinaryFixed } from './utils/cloudinaryImageUploadFixed';
-import { useNotifications } from './hooks/useNotifications';
+import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
+import { useNotifications } from '../hooks/useNotifications';
 import ConversationScreen from './ConversationScreen';
 
 const twitterColors = {

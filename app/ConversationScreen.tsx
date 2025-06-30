@@ -4,16 +4,17 @@ import { SafeAreaView as SafeAreaViewSA, useSafeAreaInsets } from 'react-native-
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, FlatList, useColorScheme, Image, Pressable } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { uploadImageToCloudinaryFixed } from './utils/cloudinaryImageUploadFixed';
+import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Client, PrivateKey } from '@hiveio/dhive';
 import Modal from 'react-native-modal';
 import Markdown from 'react-native-markdown-display';
 import { WebView } from 'react-native-webview';
-import { extractVideoInfo, removeVideoUrls, extractYouTubeId } from './utils/extractVideoInfo';
+import { extractVideoInfo, removeVideoUrls, extractYouTubeId } from '../utils/extractVideoInfo';
 import * as SecureStore from 'expo-secure-store';
 import Slider from '@react-native-community/slider';
 import IPFSVideoPlayer from './components/IPFSVideoPlayer';
+import { Image as ExpoImage } from 'expo-image';
 
 // Placeholder Snap data type
 interface SnapData {
@@ -518,7 +519,7 @@ const ConversationScreen = () => {
             setImageModalVisible(true);
           }}
         >
-          <Image
+          <ExpoImage
             source={{ uri: src }}
             style={{
               width: '100%',
@@ -529,8 +530,7 @@ const ConversationScreen = () => {
               alignSelf: 'center',
               backgroundColor: isDark ? '#222' : '#eee',
             }}
-            resizeMode="cover"
-            accessible
+            contentFit="cover"
             accessibilityLabel={alt || 'image'}
           />
         </Pressable>
@@ -678,7 +678,7 @@ const ConversationScreen = () => {
               accessibilityLabel={`View ${reply.author}'s profile`}
             >
               {reply.avatarUrl ? (
-                <Image source={{ uri: reply.avatarUrl }} style={styles.avatar} />
+                <ExpoImage source={{ uri: reply.avatarUrl }} style={styles.avatar} contentFit="cover" />
               ) : (
                 <View style={[styles.avatar, { backgroundColor: isDark ? '#22303C' : '#eee', justifyContent: 'center', alignItems: 'center' }]}> 
                   <FontAwesome name="user" size={22} color={isDark ? '#8899A6' : '#bbb'} />
@@ -779,7 +779,7 @@ const ConversationScreen = () => {
             accessibilityLabel={`View ${snap.author}'s profile`}
           >
             {snap.avatarUrl ? (
-              <Image source={{ uri: snap.avatarUrl }} style={styles.avatar} />
+              <ExpoImage source={{ uri: snap.avatarUrl }} style={styles.avatar} contentFit="cover" />
             ) : (
               <View style={[styles.avatar, { backgroundColor: isDark ? '#22303C' : '#eee', justifyContent: 'center', alignItems: 'center' }]}> 
                 <FontAwesome name="user" size={22} color={isDark ? '#8899A6' : '#bbb'} />
@@ -878,18 +878,17 @@ const ConversationScreen = () => {
           </TouchableOpacity>
           {/* Try hardcoded fallback image if modalImageUrl is not valid */}
           {modalImageUrl ? (
-            <Image
+            <ExpoImage
               key={modalImageUrl}
               source={{ uri: modalImageUrl }}
               style={{ width: '96%', height: '80%', borderRadius: 16, backgroundColor: '#222' }}
-              resizeMode="contain"
-              onError={e => console.log('Image load error:', e.nativeEvent)}
+              contentFit="contain"
             />
           ) : (
-            <Image
+            <ExpoImage
               source={{ uri: 'https://placekitten.com/800/800' }}
               style={{ width: '96%', height: '80%', borderRadius: 16, backgroundColor: '#222' }}
-              resizeMode="contain"
+              contentFit="contain"
             />
           )}
         </View>
@@ -952,7 +951,7 @@ const ConversationScreen = () => {
           />
           {replyImage ? (
             <View style={{ marginBottom: 10 }}>
-              <Image source={{ uri: replyImage }} style={{ width: 120, height: 120, borderRadius: 10 }} />
+              <ExpoImage source={{ uri: replyImage }} style={{ width: 120, height: 120, borderRadius: 10 }} contentFit="cover" />
               <TouchableOpacity onPress={() => setReplyImage(null)} style={{ position: 'absolute', top: 4, right: 4 }} disabled={posting}>
                 <FontAwesome name="close" size={20} color={colors.icon} />
               </TouchableOpacity>
