@@ -24,8 +24,8 @@ export interface VideoInfo {
  * @returns VideoInfo object if video found, null otherwise
  */
 export function extractVideoInfo(text: string): VideoInfo | null {
-  // YouTube detection (existing logic)
-  const youtubeMatch = text.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+  // YouTube detection (now supports Shorts, embed, v, and watch URLs)
+  const youtubeMatch = text.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
   if (youtubeMatch) {
     return {
       type: 'youtube',
