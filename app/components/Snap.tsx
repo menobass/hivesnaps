@@ -40,6 +40,7 @@ interface SnapProps {
   hasUpvoted?: boolean;
   onSpeechBubblePress?: () => void; // NEW: handler for speech bubble
   onUserPress?: (username: string) => void; // NEW: handler for username/avatar press
+  onContentPress?: () => void; // NEW: handler for content/text press
 }
 
 // Utility to extract raw image URLs from text (not in markdown or html)
@@ -64,7 +65,7 @@ const removeYouTubeUrl = (text: string): string => {
   return text.replace(/(?:https?:\/\/(?:www\.)?)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)[\w-]{11}(\S*)?/gi, '').replace(/\s{2,}/g, ' ').trim();
 };
 
-const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount = 0, replyCount = 0, payout = 0, onUpvotePress, permlink, hasUpvoted = false, onSpeechBubblePress, onUserPress }) => {
+const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount = 0, replyCount = 0, payout = 0, onUpvotePress, permlink, hasUpvoted = false, onSpeechBubblePress, onUserPress, onContentPress }) => {
   const colorScheme = useColorScheme() || 'light';
   const isDark = colorScheme === 'dark';
   const colors = twitterColors[colorScheme];
@@ -191,7 +192,18 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
       )}
       {/* Body */}
       {cleanTextBody.length > 0 && (
-        <Text style={[styles.body, { color: colors.text }]}>{cleanTextBody}</Text>
+        onContentPress ? (
+          <Pressable
+            onPress={onContentPress}
+            style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+            accessibilityRole="button"
+            accessibilityLabel="View conversation"
+          >
+            <Text style={[styles.body, { color: colors.text }]}>{cleanTextBody}</Text>
+          </Pressable>
+        ) : (
+          <Text style={[styles.body, { color: colors.text }]}>{cleanTextBody}</Text>
+        )
       )}
       {/* External Links */}
       {externalLinks.length > 0 && (
