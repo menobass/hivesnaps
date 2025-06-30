@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { SafeAreaView as SafeAreaViewRN } from 'react-native';
 import { SafeAreaView as SafeAreaViewSA, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, FlatList, useColorScheme, Image, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, FlatList, useColorScheme, Image, Pressable, ScrollView } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
@@ -18,6 +18,16 @@ import { Image as ExpoImage } from 'expo-image';
 import RenderHtml, { defaultHTMLElementModels, HTMLContentModel } from 'react-native-render-html';
 import { Dimensions } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
+import { extractImageUrls } from '../utils/extractImageUrls';
+
+// Utility to remove image markdown/html from text
+function stripImageTags(text: string): string {
+  // Remove markdown images
+  let out = text.replace(/!\[[^\]]*\]\([^\)]+\)/g, '');
+  // Remove html <img ...>
+  out = out.replace(/<img[^>]+src=["'][^"'>]+["'][^>]*>/g, '');
+  return out;
+}
 
 // Placeholder Snap data type
 interface SnapData {
@@ -526,6 +536,19 @@ const ConversationScreen = () => {
     return removeVideoUrls(text);
   }
 
+  // Utility: Preprocess raw URLs to clickable markdown links (if not already linked)
+  function linkifyUrls(text: string): string {
+    // Regex for URLs (http/https)
+    return text.replace(/(https?:\/\/[\w.-]+(?:\/[\w\-./?%&=+#]*)?)/gi, (url) => {
+      // If already inside a markdown or html link, skip
+      if (/\]\([^)]+\)$/.test(url) || /href=/.test(url)) return url;
+      // Shorten display for long URLs
+      let display = url.replace(/^https?:\/\//, '');
+      if (display.length > 32) display = display.slice(0, 29) + '...';
+      return `[${display}](${url})`;
+    });
+  }
+
   // Utility: Preprocess @username mentions to clickable profile links
   function linkifyMentions(text: string): string {
     // Hive usernames: 3-16 chars, a-z, 0-9, dash, dot (no @ in username)
@@ -553,7 +576,7 @@ const ConversationScreen = () => {
             setImageModalVisible(true);
           }}
         >
-          <ExpoImage
+          <Image
             source={{ uri: src }}
             style={{
               width: '100%',
@@ -564,7 +587,7 @@ const ConversationScreen = () => {
               alignSelf: 'center',
               backgroundColor: isDark ? '#222' : '#eee',
             }}
-            contentFit="cover"
+            resizeMode="cover"
             accessibilityLabel={alt || 'image'}
           />
         </Pressable>
@@ -741,12 +764,17 @@ const ConversationScreen = () => {
   // Recursive threaded reply renderer
   const renderReplyTree = (reply: ReplyData, level = 0) => {
     const videoInfo = extractVideoInfo(reply.body);
+    const imageUrls = extractImageUrls(reply.body);
     let textBody = reply.body;
     if (videoInfo) {
       textBody = removeAllVideoUrls(textBody);
     }
+    // Remove image tags from text body
+    textBody = stripImageTags(textBody);
     // Preprocess @mentions to links
     textBody = linkifyMentions(textBody);
+    // Add: linkify URLs
+    textBody = linkifyUrls(textBody);
     const windowWidth = Dimensions.get('window').width;
     const isHtml = containsHtml(textBody);
     return (
@@ -812,6 +840,20 @@ const ConversationScreen = () => {
               )}
             </View>
           )}
+          {/* Images from markdown/html */}
+          {imageUrls.length > 0 && (
+            <View style={{ marginBottom: 8 }}>
+              {imageUrls.map((url, idx) => (
+                <Pressable key={url + idx} onPress={() => { setModalImageUrl(url); setImageModalVisible(true); }}>
+                  <ExpoImage
+                    source={{ uri: url }}
+                    style={{ width: '100%', height: 200, borderRadius: 12, marginBottom: 6, backgroundColor: '#eee' }}
+                    contentFit="cover"
+                  />
+                </Pressable>
+              ))}
+            </View>
+          )}
           {isHtml ? (
             <RenderHtml
               contentWidth={windowWidth - (level * 18) - 32}
@@ -858,12 +900,17 @@ const ConversationScreen = () => {
   const renderSnapHeader = () => {
     if (!snap) return null;
     const videoInfo = extractVideoInfo(snap.body);
+    const imageUrls = extractImageUrls(snap.body);
     let textBody = snap.body;
     if (videoInfo) {
       textBody = removeAllVideoUrls(textBody);
     }
+    // Remove image tags from text body
+    textBody = stripImageTags(textBody);
     // Preprocess @mentions to links
     textBody = linkifyMentions(textBody);
+    // Add: linkify URLs
+    textBody = linkifyUrls(textBody);
     const windowWidth = Dimensions.get('window').width;
     const isHtml = containsHtml(textBody);
     return (
@@ -925,6 +972,20 @@ const ConversationScreen = () => {
                 </View>
               </View>
             )}
+          </View>
+        )}
+        {/* Images from markdown/html */}
+        {imageUrls.length > 0 && (
+          <View style={{ marginBottom: 8 }}>
+            {imageUrls.map((url, idx) => (
+              <Pressable key={url + idx} onPress={() => { setModalImageUrl(url); setImageModalVisible(true); }}>
+                <ExpoImage
+                  source={{ uri: url }}
+                  style={{ width: '100%', height: 200, borderRadius: 12, marginBottom: 6, backgroundColor: '#eee' }}
+                  contentFit="cover"
+                />
+              </Pressable>
+            ))}
           </View>
         )}
         {isHtml ? (
@@ -1024,24 +1085,14 @@ const ConversationScreen = () => {
           <Text style={{ color: colors.text, fontSize: 16 }}>Loading conversation...</Text>
         </View>
       ) : (
-        <FlatList
-          data={[]}
-          renderItem={null}
-          ListHeaderComponent={
-            <>
-              {renderSnapHeader()}
-              <View style={styles.repliesList}>
-                {replies.map(reply => renderReplyTree(reply))}
-              </View>
-            </>
-          }
-          style={{ flex: 1 }}
-          keyboardShouldPersistTaps="handled"
-          refreshing={loading}
-          onRefresh={handleRefresh}
-        />
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 32 }}>
+          {renderSnapHeader()}
+          <View style={styles.repliesList}>
+            {replies.map(reply => renderReplyTree(reply))}
+          </View>
+        </ScrollView>
       )}
-      {/* Reply modal composer */}
+      {/* Reply modal composer and upvote modal remain unchanged */}
       <Modal
         isVisible={replyModalVisible}
         onBackdropPress={posting ? undefined : handleCloseReplyModal}
@@ -1049,66 +1100,86 @@ const ConversationScreen = () => {
         style={{ justifyContent: 'flex-end', margin: 0 }}
         useNativeDriver
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{ backgroundColor: colors.background, padding: 16, borderTopLeftRadius: 18, borderTopRightRadius: 18 }}
-        >
+        <View style={{ 
+          backgroundColor: colors.background, 
+          padding: 16, 
+          borderTopLeftRadius: 18, 
+          borderTopRightRadius: 18 
+        }}>
           <Text style={{ color: colors.text, fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>
             Reply to {replyTarget?.author}
           </Text>
-          <TextInput
-            style={{
-              minHeight: 60,
-              color: colors.text,
-              backgroundColor: colors.bubble,
-              borderRadius: 10,
-              padding: 10,
-              fontSize: 15,
-              marginBottom: 10,
-            }}
-            placeholder="Write your reply..."
-            placeholderTextColor={isDark ? '#8899A6' : '#888'}
-            multiline
-            value={replyText}
-            onChangeText={setReplyText}
-            editable={!uploading && !posting}
-          />
-          {replyImage ? (
-            <View style={{ marginBottom: 10 }}>
-              <ExpoImage source={{ uri: replyImage }} style={{ width: 120, height: 120, borderRadius: 10 }} contentFit="cover" />
-              <TouchableOpacity onPress={() => setReplyImage(null)} style={{ position: 'absolute', top: 4, right: 4 }} disabled={posting}>
-                <FontAwesome name="close" size={20} color={colors.icon} />
-              </TouchableOpacity>
-            </View>
-          ) : null}
-          {postError ? (
-            <Text style={{ color: 'red', marginBottom: 8 }}>{postError}</Text>
-          ) : null}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-            <TouchableOpacity onPress={handleAddImage} disabled={uploading || posting} style={{ marginRight: 16 }}>
-              <FontAwesome name="image" size={22} color={colors.icon} />
-            </TouchableOpacity>
-            <View style={{ flex: 1 }} />
-            <TouchableOpacity
-              onPress={handleSubmitReply}
-              disabled={uploading || posting || !replyText.trim() || !currentUsername}
+          {/* Reply modal composer */}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ backgroundColor: colors.background, padding: 16, borderTopLeftRadius: 18, borderTopRightRadius: 18 }}
+          >
+            <TextInput
+              value={replyText}
+              onChangeText={setReplyText}
               style={{
-                backgroundColor: colors.icon,
-                borderRadius: 20,
-                paddingHorizontal: 18,
-                paddingVertical: 8,
-                opacity: uploading || posting || !replyText.trim() || !currentUsername ? 0.6 : 1,
+                minHeight: 60,
+                color: colors.text,
+                backgroundColor: colors.bubble,
+                borderRadius: 10,
+                padding: 10,
+                marginBottom: 10,
               }}
-            >
-              {posting ? (
+              placeholder="Write your reply..."
+              placeholderTextColor={isDark ? '#8899A6' : '#888'}
+              multiline
+            />
+            {replyImage ? (
+              <View style={{ marginBottom: 10 }}>
+                <ExpoImage source={{ uri: replyImage }} style={{ width: 120, height: 120, borderRadius: 10 }} contentFit="cover" />
+                <TouchableOpacity onPress={() => setReplyImage(null)} style={{ position: 'absolute', top: 4, right: 4 }} disabled={posting}>
+                  <FontAwesome name="close" size={20} color={colors.icon} />
+                </TouchableOpacity>
+              </View>
+            ) : null}
+            {postError ? (
+              <Text style={{ color: 'red', marginBottom: 8 }}>{postError}</Text>
+            ) : null}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              <TouchableOpacity onPress={handleAddImage} disabled={uploading || posting} style={{ marginRight: 16 }}>
+                <FontAwesome name="image" size={22} color={colors.icon} />
+              </TouchableOpacity>
+              <TextInput
+                value={replyText}
+                onChangeText={setReplyText}
+                style={{
+                  flex: 1,
+                  minHeight: 60,
+                  color: colors.text,
+                  backgroundColor: colors.bubble,
+                  borderRadius: 10,
+                  padding: 10,
+                  marginRight: 10,
+                }}
+                placeholder="Write your reply..."
+                placeholderTextColor={isDark ? '#8899A6' : '#888'}
+                multiline
+              />
+              {uploading ? (
                 <FontAwesome name="spinner" size={16} color="#fff" style={{ marginRight: 8 }} />
               ) : null}
-              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{posting ? 'Posting...' : 'Send'}</Text>
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
+              <TouchableOpacity
+                onPress={handleSubmitReply}
+                disabled={uploading || posting || !replyText.trim() || !currentUsername}
+                style={{
+                  backgroundColor: colors.icon,
+                  borderRadius: 20,
+                  paddingHorizontal: 18,
+                  paddingVertical: 8,
+                  opacity: uploading || posting || !replyText.trim() || !currentUsername ? 0.6 : 1,
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{posting ? 'Posting...' : 'Send'}</Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
-      {/* Upvote Modal */}
       <Modal
         isVisible={upvoteModalVisible}
         onBackdropPress={handleUpvoteCancel}

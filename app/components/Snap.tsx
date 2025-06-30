@@ -74,6 +74,29 @@ function containsHtml(str: string): boolean {
   return /<([a-z][\s\S]*?)>/i.test(str);
 }
 
+// Utility: Preprocess @username mentions to clickable profile links
+function linkifyMentions(text: string): string {
+  // Only match @username if not preceded by a '/'
+  // Negative lookbehind for '/': (?<!/)
+  // Hive usernames: 3-16 chars, a-z, 0-9, dash, dot (no @ in username)
+  // Avoid emails and already-linked mentions
+  return text.replace(/(^|[^\w/@])@([a-z0-9\-\.]{3,16})(?![a-z0-9\-\.])/gi, (match, pre, username) => {
+    // Don't double-link if already inside a link
+    return `${pre}[**@${username}**](profile://${username})`;
+  });
+}
+
+// Utility: Preprocess raw URLs to clickable markdown links (if not already linked)
+function linkifyUrls(text: string): string {
+  // Regex for URLs (http/https)
+  return text.replace(/(https?:\/\/[\w.-]+(?:\/[\w\-./?%&=+#]*)?)/gi, (url) => {
+    // If already inside a markdown or html link, skip
+    if (/\]\([^)]+\)$/.test(url) || /href=/.test(url)) return url;
+    // Do NOT shorten display for long URLs; use full URL as display
+    return `[${url}](${url})`;
+  });
+}
+
 // Helper: Render mp4 video using expo-av Video
 const renderMp4Video = (uri: string, key?: string | number) => (
   <View key={key || uri} style={{ width: '100%', aspectRatio: 16 / 9, marginVertical: 10, borderRadius: 12, overflow: 'hidden', backgroundColor: '#eee' }}>
@@ -102,7 +125,37 @@ const markdownRules = {
     if (mp4Match) {
       return renderMp4Video(href, href);
     }
-    // ...existing code...
+    // Handle profile:// links for mentions
+    if (href && href.startsWith('profile://')) {
+      const username = href.replace('profile://', '');
+      // Use global onUserPress from Snap props
+      return (
+        <Pressable
+          key={href}
+          onPress={() => {
+            const handler = (globalThis as any)._snapOnUserPress;
+            if (typeof handler === 'function') handler(username);
+          }}
+          style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+          accessibilityRole="link"
+          accessibilityLabel={`View @${username}'s profile`}
+        >
+          <Text style={{ color: twitterColors.light.icon, fontWeight: 'bold', textDecorationLine: 'underline' }}>{children}</Text>
+        </Pressable>
+      );
+    }
+    // Default: open external link
+    return (
+      <Text
+        key={href}
+        style={{ color: twitterColors.light.icon, textDecorationLine: 'underline' }}
+        onPress={() => {
+          if (href) Linking.openURL(href);
+        }}
+      >
+        {children}
+      </Text>
+    );
   },
   html: (
     node: any,
@@ -138,10 +191,16 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
   if (rawImageUrls.length > 0) {
     textBody = removeRawImageUrls(textBody);
   }
-  // Extract external (non-image, non-YouTube) links from all forms
-  const { links: externalLinks, text: cleanTextBody } = extractExternalLinks(textBody);
+  // Add: linkify mentions and URLs
+  textBody = linkifyMentions(textBody);
+  textBody = linkifyUrls(textBody);
+  // Remove extraction of external links
+  const cleanTextBody = textBody; // Just use the processed textBody
   const [modalVisible, setModalVisible] = useState(false);
   const [modalImageUrl, setModalImageUrl] = useState<string | null>(null);
+
+  // Expose onUserPress globally for markdownRules
+  (globalThis as any)._snapOnUserPress = onUserPress;
 
   return (
     <View style={[styles.bubble, { backgroundColor: colors.bubble, borderColor: colors.border, width: '100%', alignSelf: 'stretch' }]}> 
@@ -322,40 +381,6 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
           );
         }
       })()}
-      {/* External Links */}
-      {externalLinks.length > 0 && (
-        <View style={{ marginTop: 4, marginBottom: 6 }}>
-          {externalLinks.map((link, idx) => {
-            let display = link.label || link.url.replace(/^https?:\/\//, '').replace(/\/$/, '');
-            // Show only domain if no label
-            if (!link.label) {
-              try {
-                const urlObj = new URL(link.url);
-                display = urlObj.hostname.replace(/^www\./, '');
-              } catch {
-                display = link.url;
-              }
-            }
-            return (
-              <Pressable
-                key={link.url + idx}
-                onPress={() => Linking.openURL(link.url)}
-                style={({ pressed }) => [{
-                  opacity: pressed ? 0.6 : 1,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  marginBottom: 2,
-                }]}
-                accessibilityRole="link"
-                accessibilityLabel={`External link to ${display}`}
-              >
-                <FontAwesome name="external-link" size={15} color={colors.icon} style={{ marginRight: 6 }} />
-                <Text style={{ color: colors.icon, textDecorationLine: 'underline', fontSize: 15 }}>{display}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
       {/* VoteReplyBar - only upvote icon is interactive */}
       <View style={styles.voteBar}>
         {onUpvotePress && permlink ? (
