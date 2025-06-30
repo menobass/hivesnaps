@@ -3,7 +3,7 @@ import { SafeAreaView as SafeAreaViewSA } from 'react-native-safe-area-context';
 import { View, Text, StyleSheet, TouchableOpacity, useColorScheme, Image, ScrollView } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Client } from '@hiveio/dhive';
+import { Client, PrivateKey } from '@hiveio/dhive';
 import * as SecureStore from 'expo-secure-store';
 
 // Profile data interface
@@ -19,6 +19,10 @@ interface ProfileData {
   website?: string;
   followingCount?: number;
   followersCount?: number;
+  // Unclaimed rewards
+  unclaimedHive?: number;
+  unclaimedHbd?: number;
+  unclaimedVests?: number;
 }
 
 const HIVE_NODES = [
@@ -27,6 +31,29 @@ const HIVE_NODES = [
   'https://api.openhive.network',
 ];
 const client = new Client(HIVE_NODES);
+
+// Helper function to convert VESTS to Hive Power
+const vestsToHp = (vests: number, totalVestingFundHive: any, totalVestingShares: any): number => {
+  // Handle both string and Asset types from global props
+  const totalVestingFundHiveStr = typeof totalVestingFundHive === 'string' 
+    ? totalVestingFundHive 
+    : totalVestingFundHive.toString();
+  const totalVestingSharesStr = typeof totalVestingShares === 'string' 
+    ? totalVestingShares 
+    : totalVestingShares.toString();
+    
+  const totalVestingFundHiveNum = parseFloat(totalVestingFundHiveStr.replace(' HIVE', ''));
+  const totalVestingSharesNum = parseFloat(totalVestingSharesStr.replace(' VESTS', ''));
+  
+  if (totalVestingSharesNum === 0) {
+    return 0;
+  }
+  
+  const hivePerVests = totalVestingFundHiveNum / totalVestingSharesNum;
+  const hp = vests * hivePerVests;
+  
+  return hp;
+};
 
 const ProfileScreen = () => {
   const colorScheme = useColorScheme() || 'light';
@@ -42,6 +69,8 @@ const ProfileScreen = () => {
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [claimLoading, setClaimLoading] = useState(false);
+  const [globalProps, setGlobalProps] = useState<any>(null);
 
   const colors = {
     background: isDark ? '#15202B' : '#fff',
@@ -137,11 +166,12 @@ const ProfileScreen = () => {
       console.log('Follower count:', account.follower_count);
       
       // Fetch global dynamic properties for HP calculation
-      const globalProps = await client.database.getDynamicGlobalProperties();
-      console.log('Global props total_vesting_fund_hive:', globalProps.total_vesting_fund_hive);
-      console.log('Global props total_vesting_shares:', globalProps.total_vesting_shares);
-      console.log('Global props type check - total_vesting_fund_hive:', typeof globalProps.total_vesting_fund_hive);
-      console.log('Global props type check - total_vesting_shares:', typeof globalProps.total_vesting_shares);
+      const fetchedGlobalProps = await client.database.getDynamicGlobalProperties();
+      setGlobalProps(fetchedGlobalProps);
+      console.log('Global props total_vesting_fund_hive:', fetchedGlobalProps.total_vesting_fund_hive);
+      console.log('Global props total_vesting_shares:', fetchedGlobalProps.total_vesting_shares);
+      console.log('Global props type check - total_vesting_fund_hive:', typeof fetchedGlobalProps.total_vesting_fund_hive);
+      console.log('Global props type check - total_vesting_shares:', typeof fetchedGlobalProps.total_vesting_shares);
       
       // Parse profile metadata
       let profileMeta: any = {};
@@ -216,39 +246,18 @@ const ProfileScreen = () => {
       console.log('Calculated effective_vests:', effectiveVests);
       
       // Calculate Hive Power using Ecency's exact vestsToHp method
-      const vestsToHp = (vests: number, totalVestingFundHive: any, totalVestingShares: any): number => {
-        // Handle both string and Asset types from global props
-        const totalVestingFundHiveStr = typeof totalVestingFundHive === 'string' 
-          ? totalVestingFundHive 
-          : totalVestingFundHive.toString();
-        const totalVestingSharesStr = typeof totalVestingShares === 'string' 
-          ? totalVestingShares 
-          : totalVestingShares.toString();
-          
-        const totalVestingFundHiveNum = parseFloat(totalVestingFundHiveStr.replace(' HIVE', ''));
-        const totalVestingSharesNum = parseFloat(totalVestingSharesStr.replace(' VESTS', ''));
-        
-        console.log('vestsToHp calculation:');
-        console.log('  vests:', vests);
-        console.log('  totalVestingFundHive:', totalVestingFundHiveNum);
-        console.log('  totalVestingShares:', totalVestingSharesNum);
-        
-        if (totalVestingSharesNum === 0) {
-          return 0;
-        }
-        
-        const hivePerVests = totalVestingFundHiveNum / totalVestingSharesNum;
-        const hp = vests * hivePerVests;
-        
-        console.log('  hivePerVests:', hivePerVests);
-        console.log('  calculated HP:', hp);
-        
-        return hp;
-      };
-      
-      const hivePower = vestsToHp(effectiveVests, globalProps.total_vesting_fund_hive, globalProps.total_vesting_shares);
+      const hivePower = vestsToHp(effectiveVests, fetchedGlobalProps.total_vesting_fund_hive, fetchedGlobalProps.total_vesting_shares);
       
       console.log('Calculated Hive Power using Ecency method:', hivePower);
+
+      // Parse unclaimed rewards
+      const unclaimedHive = parseFloat((account.reward_hive_balance || '0.000 HIVE').replace(' HIVE', ''));
+      const unclaimedHbd = parseFloat((account.reward_hbd_balance || '0.000 HBD').replace(' HBD', ''));
+      const unclaimedVests = parseFloat((account.reward_vesting_balance || '0.000000 VESTS').replace(' VESTS', ''));
+      
+      console.log('Unclaimed HIVE:', unclaimedHive);
+      console.log('Unclaimed HBD:', unclaimedHbd);
+      console.log('Unclaimed VESTS:', unclaimedVests);
 
       setProfile({
         username: account.name,
@@ -262,6 +271,9 @@ const ProfileScreen = () => {
         website: profileMeta.website,
         followingCount: account.following_count,
         followersCount: account.follower_count,
+        unclaimedHive,
+        unclaimedHbd,
+        unclaimedVests,
       });
       
       console.log('=== FINAL CALCULATED VALUES ===');
@@ -309,6 +321,73 @@ const ProfileScreen = () => {
     // TODO: Implement unmute functionality
     console.log('Unmute user:', username);
     setIsMuted(false);
+  };
+
+  const handleClaimRewards = async () => {
+    if (!profile || !currentUsername || !isOwnProfile) return;
+    
+    const { unclaimedHive = 0, unclaimedHbd = 0, unclaimedVests = 0 } = profile;
+    
+    // Check if there are any rewards to claim
+    if (unclaimedHive === 0 && unclaimedHbd === 0 && unclaimedVests === 0) {
+      return;
+    }
+    
+    setClaimLoading(true);
+    
+    try {
+      // Get posting key from secure storage
+      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
+      if (!postingKeyStr) {
+        throw new Error('No posting key found. Please log in again.');
+      }
+      const postingKey = PrivateKey.fromString(postingKeyStr);
+
+      // Format reward balances for the claim operation
+      const rewardHiveBalance = `${unclaimedHive.toFixed(3)} HIVE`;
+      const rewardHbdBalance = `${unclaimedHbd.toFixed(3)} HBD`;
+      const rewardVestingBalance = `${unclaimedVests.toFixed(6)} VESTS`;
+
+      console.log('Claiming rewards:', {
+        rewardHiveBalance,
+        rewardHbdBalance, 
+        rewardVestingBalance
+      });
+
+      // Broadcast the claim_reward_balance operation
+      await client.broadcast.sendOperations([
+        ['claim_reward_balance', {
+          account: currentUsername,
+          reward_hive: rewardHiveBalance,
+          reward_hbd: rewardHbdBalance,
+          reward_vests: rewardVestingBalance,
+        }]
+      ], postingKey);
+
+      console.log('Rewards claimed successfully!');
+      
+      // Refresh profile data to show updated balances and clear unclaimed rewards
+      setTimeout(() => {
+        fetchProfileData();
+      }, 3000); // Wait 3 seconds for blockchain confirmation
+      
+    } catch (error) {
+      console.error('Error claiming rewards:', error);
+      alert('Failed to claim rewards: ' + (error instanceof Error ? error.message : JSON.stringify(error)));
+    } finally {
+      setClaimLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await SecureStore.deleteItemAsync('hive_username');
+      await SecureStore.deleteItemAsync('hive_posting_key');
+      // Navigate back to login screen
+      router.replace('/');
+    } catch (err) {
+      alert('Logout failed: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
+    }
   };
 
   const handleBack = () => {
@@ -446,6 +525,44 @@ const ProfileScreen = () => {
               </View>
             </View>
 
+            {/* Unclaimed Rewards Section - Only show for own profile with unclaimed rewards */}
+            {isOwnProfile && profile.unclaimedHive !== undefined && profile.unclaimedHbd !== undefined && profile.unclaimedVests !== undefined && 
+             (profile.unclaimedHive > 0 || profile.unclaimedHbd > 0 || profile.unclaimedVests > 0) && (
+              <View style={[styles.unclaimedSection, { backgroundColor: colors.bubble, borderColor: colors.border }]}>
+                <Text style={[styles.unclaimedTitle, { color: colors.text }]}>
+                  Unclaimed Rewards
+                </Text>
+                
+                <View style={styles.unclaimedRewards}>
+                  {profile.unclaimedVests > 0 && (
+                    <Text style={[styles.unclaimedText, { color: colors.payout }]}>
+                      {vestsToHp(profile.unclaimedVests, globalProps?.total_vesting_fund_hive, globalProps?.total_vesting_shares).toFixed(3)} HP
+                    </Text>
+                  )}
+                  {profile.unclaimedHbd > 0 && (
+                    <Text style={[styles.unclaimedText, { color: colors.payout }]}>
+                      {profile.unclaimedHbd.toFixed(3)} HBD
+                    </Text>
+                  )}
+                </View>
+                
+                <TouchableOpacity 
+                  style={[styles.claimButton, { backgroundColor: colors.icon }]}
+                  onPress={handleClaimRewards}
+                  disabled={claimLoading}
+                >
+                  {claimLoading ? (
+                    <FontAwesome name="hourglass-half" size={16} color="#fff" />
+                  ) : (
+                    <FontAwesome name="dollar" size={16} color="#fff" />
+                  )}
+                  <Text style={styles.claimButtonText}>
+                    {claimLoading ? 'Claiming...' : 'CLAIM NOW'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* Additional Info */}
             {(profile.location || profile.website) && (
               <View style={styles.additionalInfo}>
@@ -466,6 +583,21 @@ const ProfileScreen = () => {
                     </Text>
                   </View>
                 )}
+              </View>
+            )}
+
+            {/* Logout Button - Only show for own profile */}
+            {isOwnProfile && (
+              <View style={styles.logoutSection}>
+                <TouchableOpacity 
+                  style={[styles.logoutButton, { backgroundColor: '#E74C3C' }]}
+                  onPress={handleLogout}
+                >
+                  <FontAwesome name="sign-out" size={18} color="#fff" />
+                  <Text style={styles.logoutButtonText}>
+                    Log Out
+                  </Text>
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -610,6 +742,65 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   errorText: {
+    fontSize: 16,
+  },
+  unclaimedSection: {
+    width: '100%',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+  },
+  unclaimedTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  unclaimedRewards: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 16,
+  },
+  unclaimedText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  claimButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+    gap: 8,
+  },
+  claimButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  logoutSection: {
+    width: '100%',
+    marginTop: 20,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+    gap: 8,
+    width: '100%',
+  },
+  logoutButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
     fontSize: 16,
   },
 });
