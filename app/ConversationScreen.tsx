@@ -375,7 +375,10 @@ const ConversationScreen = () => {
       const parent_author = replyTarget.author;
       const parent_permlink = replyTarget.permlink;
       const author = currentUsername;
-      const permlink = `re-${parent_author}-${parent_permlink}-${Date.now()}`;
+      
+      // Sanitize parent_author for use in permlink - remove invalid characters like dots and convert to lowercase
+      const sanitizedParentAuthor = parent_author.toLowerCase().replace(/[^a-z0-9-]/g, '');
+      const permlink = `re-${sanitizedParentAuthor}-${parent_permlink}-${Date.now()}`;
       const json_metadata: any = {
         app: 'hivesnaps/1.0',
         format: 'markdown',
@@ -538,23 +541,34 @@ const ConversationScreen = () => {
 
   // Utility: Preprocess raw URLs to clickable markdown links (if not already linked)
   function linkifyUrls(text: string): string {
-    // Regex for URLs (http/https)
-    return text.replace(/(https?:\/\/[\w.-]+(?:\/[\w\-./?%&=+#]*)?)/gi, (url) => {
+    // Regex for URLs (http/https) - includes @ character for Hive frontend URLs
+    return text.replace(/(https?:\/\/[\w.-]+(?:\/[\w\-./?%&=+#@]*)?)/gi, (url) => {
       // If already inside a markdown or html link, skip
       if (/\]\([^)]+\)$/.test(url) || /href=/.test(url)) return url;
-      // Shorten display for long URLs
-      let display = url.replace(/^https?:\/\//, '');
-      if (display.length > 32) display = display.slice(0, 29) + '...';
-      return `[${display}](${url})`;
+      // Use full URL as display text (no shortening in conversation view)
+      return `[${url}](${url})`;
     });
   }
 
   // Utility: Preprocess @username mentions to clickable profile links
   function linkifyMentions(text: string): string {
+    // Only match @username if not preceded by a '/' or inside a markdown link
     // Hive usernames: 3-16 chars, a-z, 0-9, dash, dot (no @ in username)
     // Avoid emails and already-linked mentions
-    return text.replace(/(^|\s|[\(\[>])@([a-z0-9\-\.]{3,16})(?![a-z0-9\-\.])/gi, (match, pre, username) => {
-      // Don't double-link if already inside a link
+    return text.replace(/(^|[^\w/@])@([a-z0-9\-\.]{3,16})(?![a-z0-9\-\.])/gi, (match, pre, username, offset, string) => {
+      // Don't process if we're inside a markdown link [text](url)
+      const beforeMatch = string.substring(0, offset);
+      const afterMatch = string.substring(offset + match.length);
+      
+      // Check if we're inside a markdown link by looking for unmatched brackets
+      const openBrackets = (beforeMatch.match(/\[/g) || []).length;
+      const closeBrackets = (beforeMatch.match(/\]/g) || []).length;
+      const isInsideMarkdownLink = openBrackets > closeBrackets && afterMatch.includes('](');
+      
+      if (isInsideMarkdownLink) {
+        return match; // Don't modify if inside a markdown link
+      }
+      
       return `${pre}[**@${username}**](profile://${username})`;
     });
   }
@@ -771,10 +785,9 @@ const ConversationScreen = () => {
     }
     // Remove image tags from text body
     textBody = stripImageTags(textBody);
-    // Preprocess @mentions to links
-    textBody = linkifyMentions(textBody);
-    // Add: linkify URLs
+    // Process URLs first, then mentions (order matters!)
     textBody = linkifyUrls(textBody);
+    textBody = linkifyMentions(textBody);
     const windowWidth = Dimensions.get('window').width;
     const isHtml = containsHtml(textBody);
     return (
@@ -907,10 +920,9 @@ const ConversationScreen = () => {
     }
     // Remove image tags from text body
     textBody = stripImageTags(textBody);
-    // Preprocess @mentions to links
-    textBody = linkifyMentions(textBody);
-    // Add: linkify URLs
+    // Process URLs first, then mentions (order matters!)
     textBody = linkifyUrls(textBody);
+    textBody = linkifyMentions(textBody);
     const windowWidth = Dimensions.get('window').width;
     const isHtml = containsHtml(textBody);
     return (

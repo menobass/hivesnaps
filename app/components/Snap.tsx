@@ -76,20 +76,32 @@ function containsHtml(str: string): boolean {
 
 // Utility: Preprocess @username mentions to clickable profile links
 function linkifyMentions(text: string): string {
-  // Only match @username if not preceded by a '/'
+  // Only match @username if not preceded by a '/' or inside a markdown link
   // Negative lookbehind for '/': (?<!/)
   // Hive usernames: 3-16 chars, a-z, 0-9, dash, dot (no @ in username)
   // Avoid emails and already-linked mentions
-  return text.replace(/(^|[^\w/@])@([a-z0-9\-\.]{3,16})(?![a-z0-9\-\.])/gi, (match, pre, username) => {
-    // Don't double-link if already inside a link
+  return text.replace(/(^|[^\w/@])@([a-z0-9\-\.]{3,16})(?![a-z0-9\-\.])/gi, (match, pre, username, offset, string) => {
+    // Don't process if we're inside a markdown link [text](url)
+    const beforeMatch = string.substring(0, offset);
+    const afterMatch = string.substring(offset + match.length);
+    
+    // Check if we're inside a markdown link by looking for unmatched brackets
+    const openBrackets = (beforeMatch.match(/\[/g) || []).length;
+    const closeBrackets = (beforeMatch.match(/\]/g) || []).length;
+    const isInsideMarkdownLink = openBrackets > closeBrackets && afterMatch.includes('](');
+    
+    if (isInsideMarkdownLink) {
+      return match; // Don't modify if inside a markdown link
+    }
+    
     return `${pre}[**@${username}**](profile://${username})`;
   });
 }
 
 // Utility: Preprocess raw URLs to clickable markdown links (if not already linked)
 function linkifyUrls(text: string): string {
-  // Regex for URLs (http/https)
-  return text.replace(/(https?:\/\/[\w.-]+(?:\/[\w\-./?%&=+#]*)?)/gi, (url) => {
+  // Regex for URLs (http/https) - includes @ character for Hive frontend URLs
+  return text.replace(/(https?:\/\/[\w.-]+(?:\/[\w\-./?%&=+#@]*)?)/gi, (url) => {
     // If already inside a markdown or html link, skip
     if (/\]\([^)]+\)$/.test(url) || /href=/.test(url)) return url;
     // Do NOT shorten display for long URLs; use full URL as display
@@ -191,9 +203,9 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
   if (rawImageUrls.length > 0) {
     textBody = removeRawImageUrls(textBody);
   }
-  // Add: linkify mentions and URLs
-  textBody = linkifyMentions(textBody);
+  // Add: linkify URLs first, then mentions (order matters!)
   textBody = linkifyUrls(textBody);
+  textBody = linkifyMentions(textBody);
   // Remove extraction of external links
   const cleanTextBody = textBody; // Just use the processed textBody
   const [modalVisible, setModalVisible] = useState(false);
