@@ -69,6 +69,8 @@ const ProfileScreen = () => {
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [muteLoading, setMuteLoading] = useState(false);
   const [claimLoading, setClaimLoading] = useState(false);
   const [globalProps, setGlobalProps] = useState<any>(null);
 
@@ -232,8 +234,10 @@ const ProfileScreen = () => {
       console.log('Final HBD:', Math.round(hbdBalance * 100) / 100);
       console.log('===============================\n');
 
-      // TODO: Check if current user is following this profile
-      // TODO: Check if current user has muted this profile
+      // Check follow status after setting profile data (only for other users' profiles)
+      if (currentUsername && username !== currentUsername) {
+        await checkFollowStatus();
+      }
       
     } catch (e) {
       console.error('Error fetching profile:', e);
@@ -243,34 +247,207 @@ const ProfileScreen = () => {
   };
 
   useEffect(() => {
-    if (username && currentUsername) {
+    if (username && currentUsername && username !== currentUsername) {
+      fetchProfileData();
+    } else if (username && username === currentUsername) {
+      // For own profile, just fetch data without follow status
       fetchProfileData();
     }
   }, [username, currentUsername]);
 
+  // Check if current user is following/muting the profile user
+  const checkFollowStatus = async () => {
+    if (!currentUsername || !username || currentUsername === username) return;
+    
+    try {
+      // Check following status
+      const following = await client.call('condenser_api', 'get_following', [currentUsername, username, 'blog', 1]);
+      const isCurrentlyFollowing = Array.isArray(following) && 
+        following.some((f: any) => f.following === username && f.what?.includes('blog'));
+      setIsFollowing(isCurrentlyFollowing);
+
+      // Check mute status
+      const ignoring = await client.call('condenser_api', 'get_following', [currentUsername, username, 'ignore', 1]);
+      const isCurrentlyMuting = Array.isArray(ignoring) && 
+        ignoring.some((f: any) => f.following === username && f.what?.includes('ignore'));
+      setIsMuted(isCurrentlyMuting);
+      
+    } catch (error) {
+      console.log('Error checking follow/mute status:', error);
+    }
+  };
+
   // Action handlers
   const handleFollow = async () => {
-    // TODO: Implement follow functionality
-    console.log('Follow user:', username);
-    setIsFollowing(true);
+    if (!currentUsername || !username || followLoading) return;
+    
+    setFollowLoading(true);
+    try {
+      // Get posting key from secure storage
+      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
+      if (!postingKeyStr) {
+        throw new Error('No posting key found. Please log in again.');
+      }
+      const postingKey = PrivateKey.fromString(postingKeyStr);
+
+      // Create follow operation
+      const followOp = [
+        'follow',
+        {
+          follower: currentUsername,
+          following: username,
+          what: ['blog'] // Follow their blog posts
+        }
+      ];
+
+      // Broadcast the follow operation
+      await client.broadcast.json(
+        {
+          required_auths: [],
+          required_posting_auths: [currentUsername],
+          id: 'follow',
+          json: JSON.stringify(followOp)
+        },
+        postingKey
+      );
+
+      setIsFollowing(true);
+      console.log('Successfully followed:', username);
+    } catch (error) {
+      console.log('Error following user:', error);
+      alert('Failed to follow user: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setFollowLoading(false);
+    }
   };
 
   const handleUnfollow = async () => {
-    // TODO: Implement unfollow functionality
-    console.log('Unfollow user:', username);
-    setIsFollowing(false);
+    if (!currentUsername || !username || followLoading) return;
+    
+    setFollowLoading(true);
+    try {
+      // Get posting key from secure storage
+      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
+      if (!postingKeyStr) {
+        throw new Error('No posting key found. Please log in again.');
+      }
+      const postingKey = PrivateKey.fromString(postingKeyStr);
+
+      // Create unfollow operation
+      const unfollowOp = [
+        'follow',
+        {
+          follower: currentUsername,
+          following: username,
+          what: [] // Empty array means unfollow
+        }
+      ];
+
+      // Broadcast the unfollow operation
+      await client.broadcast.json(
+        {
+          required_auths: [],
+          required_posting_auths: [currentUsername],
+          id: 'follow',
+          json: JSON.stringify(unfollowOp)
+        },
+        postingKey
+      );
+
+      setIsFollowing(false);
+      console.log('Successfully unfollowed:', username);
+    } catch (error) {
+      console.log('Error unfollowing user:', error);
+      alert('Failed to unfollow user: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setFollowLoading(false);
+    }
   };
 
   const handleMute = async () => {
-    // TODO: Implement mute functionality
-    console.log('Mute user:', username);
-    setIsMuted(true);
+    if (!currentUsername || !username || muteLoading) return;
+    
+    setMuteLoading(true);
+    try {
+      // Get posting key from secure storage
+      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
+      if (!postingKeyStr) {
+        throw new Error('No posting key found. Please log in again.');
+      }
+      const postingKey = PrivateKey.fromString(postingKeyStr);
+
+      // Create mute operation
+      const muteOp = [
+        'follow',
+        {
+          follower: currentUsername,
+          following: username,
+          what: ['ignore'] // Mute/ignore user
+        }
+      ];
+
+      // Broadcast the mute operation
+      await client.broadcast.json(
+        {
+          required_auths: [],
+          required_posting_auths: [currentUsername],
+          id: 'follow',
+          json: JSON.stringify(muteOp)
+        },
+        postingKey
+      );
+
+      setIsMuted(true);
+      console.log('Successfully muted:', username);
+    } catch (error) {
+      console.log('Error muting user:', error);
+      alert('Failed to mute user: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setMuteLoading(false);
+    }
   };
 
   const handleUnmute = async () => {
-    // TODO: Implement unmute functionality
-    console.log('Unmute user:', username);
-    setIsMuted(false);
+    if (!currentUsername || !username || muteLoading) return;
+    
+    setMuteLoading(true);
+    try {
+      // Get posting key from secure storage
+      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
+      if (!postingKeyStr) {
+        throw new Error('No posting key found. Please log in again.');
+      }
+      const postingKey = PrivateKey.fromString(postingKeyStr);
+
+      // Create unmute operation (same as unfollow - empty array)
+      const unmuteOp = [
+        'follow',
+        {
+          follower: currentUsername,
+          following: username,
+          what: [] // Empty array removes all follow relationships including mute
+        }
+      ];
+
+      // Broadcast the unmute operation
+      await client.broadcast.json(
+        {
+          required_auths: [],
+          required_posting_auths: [currentUsername],
+          id: 'follow',
+          json: JSON.stringify(unmuteOp)
+        },
+        postingKey
+      );
+
+      setIsMuted(false);
+      console.log('Successfully unmuted:', username);
+    } catch (error) {
+      console.log('Error unmuting user:', error);
+      alert('Failed to unmute user: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setMuteLoading(false);
+    }
   };
 
   const handleClaimRewards = async () => {
@@ -406,37 +583,65 @@ const ProfileScreen = () => {
               <View style={styles.actionButtons}>
                 {isFollowing ? (
                   <TouchableOpacity 
-                    style={[styles.actionButton, { backgroundColor: colors.unfollowButton }]}
+                    style={[styles.actionButton, { backgroundColor: colors.unfollowButton, opacity: followLoading ? 0.6 : 1 }]}
                     onPress={handleUnfollow}
+                    disabled={followLoading}
                   >
-                    <FontAwesome name="user-times" size={16} color="#fff" />
-                    <Text style={styles.buttonText}>Unfollow</Text>
+                    {followLoading ? (
+                      <FontAwesome name="hourglass-half" size={16} color="#fff" />
+                    ) : (
+                      <FontAwesome name="user-times" size={16} color="#fff" />
+                    )}
+                    <Text style={styles.buttonText}>
+                      {followLoading ? 'Unfollowing...' : 'Unfollow'}
+                    </Text>
                   </TouchableOpacity>
                 ) : (
                   <TouchableOpacity 
-                    style={[styles.actionButton, { backgroundColor: colors.followButton }]}
+                    style={[styles.actionButton, { backgroundColor: colors.followButton, opacity: followLoading ? 0.6 : 1 }]}
                     onPress={handleFollow}
+                    disabled={followLoading}
                   >
-                    <FontAwesome name="user-plus" size={16} color="#fff" />
-                    <Text style={styles.buttonText}>Follow</Text>
+                    {followLoading ? (
+                      <FontAwesome name="hourglass-half" size={16} color="#fff" />
+                    ) : (
+                      <FontAwesome name="user-plus" size={16} color="#fff" />
+                    )}
+                    <Text style={styles.buttonText}>
+                      {followLoading ? 'Following...' : 'Follow'}
+                    </Text>
                   </TouchableOpacity>
                 )}
 
                 {isMuted ? (
                   <TouchableOpacity 
-                    style={[styles.actionButton, { backgroundColor: colors.buttonInactive }]}
+                    style={[styles.actionButton, { backgroundColor: colors.buttonInactive, opacity: muteLoading ? 0.6 : 1 }]}
                     onPress={handleUnmute}
+                    disabled={muteLoading}
                   >
-                    <FontAwesome name="volume-up" size={16} color={colors.text} />
-                    <Text style={[styles.buttonText, { color: colors.text }]}>Unmute</Text>
+                    {muteLoading ? (
+                      <FontAwesome name="hourglass-half" size={16} color={colors.text} />
+                    ) : (
+                      <FontAwesome name="volume-up" size={16} color={colors.text} />
+                    )}
+                    <Text style={[styles.buttonText, { color: colors.text }]}>
+                      {muteLoading ? 'Unmuting...' : 'Unmute'}
+                    </Text>
                   </TouchableOpacity>
                 ) : (
                   <TouchableOpacity 
-                    style={[styles.actionButton, { backgroundColor: colors.mutedButton }]}
+                    style={[styles.actionButton, { backgroundColor: colors.mutedButton, opacity: muteLoading ? 0.6 : 1 }]}
                     onPress={handleMute}
+                    disabled={muteLoading}
                   >
-                    <FontAwesome name="volume-off" size={16} color="#fff" />
-                    <Text style={styles.buttonText}>Mute</Text>
+                    {muteLoading ? (
+                      <FontAwesome name="hourglass-half" size={16} color="#fff" />
+                    ) : (
+                      <FontAwesome name="volume-off" size={16} color="#fff" />
+                    )}
+                    <Text style={styles.buttonText}>
+                      {muteLoading ? 'Muting...' : 'Mute'}
+                    </Text>
                   </TouchableOpacity>
                 )}
               </View>
