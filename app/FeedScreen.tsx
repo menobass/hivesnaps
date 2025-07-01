@@ -66,6 +66,10 @@ const FeedScreen = () => {
   const [activeFilter, setActiveFilter] = useState<'following' | 'newest' | 'trending' | 'my'>('newest');
   const [feedLoading, setFeedLoading] = useState(false);
   const [hasUnclaimedRewards, setHasUnclaimedRewards] = useState(false);
+  // Cache for snaps and avatars
+  const [snapsCache, setSnapsCache] = useState<Record<string, Snap[]>>({});
+  const [avatarCache, setAvatarCache] = useState<Record<string, string>>({});
+  const [lastFetchTime, setLastFetchTime] = useState<Record<string, number>>({});
   const [upvoteModalVisible, setUpvoteModalVisible] = useState(false);
   const [upvoteTarget, setUpvoteTarget] = useState<{ author: string; permlink: string } | null>(null);
   const [voteWeight, setVoteWeight] = useState(100);
@@ -178,98 +182,192 @@ const FeedScreen = () => {
     fetchUser();
   }, []);
 
-  // Enhance snaps with avatarUrl for Snap component
+  // Enhanced avatar fetching with caching
   const enhanceSnapsWithAvatar = async (snaps: Snap[]) => {
-    // Get unique authors
+    // Get unique authors not already in cache
     const authors = Array.from(new Set(snaps.map(s => s.author)));
-    // Fetch accounts in batch
-    let accounts: any[] = [];
-    try {
-      accounts = await client.database.getAccounts(authors);
-    } catch (e) {
-      console.log('Error fetching accounts for avatars:', e);
-    }
-    // Map author to avatarUrl
-    const avatarMap: Record<string, string> = {};
-    for (const acc of accounts) {
-      let meta = null;
-      if (acc.json_metadata) {
-        try {
-          meta = JSON.parse(acc.json_metadata);
-        } catch {}
+    const uncachedAuthors = authors.filter(author => !avatarCache[author]);
+    
+    // Only fetch accounts for authors not in cache
+    if (uncachedAuthors.length > 0) {
+      try {
+        const accounts = await client.database.getAccounts(uncachedAuthors);
+        const newAvatars: Record<string, string> = {};
+        
+        for (const acc of accounts) {
+          let meta = null;
+          if (acc.json_metadata) {
+            try {
+              meta = JSON.parse(acc.json_metadata);
+            } catch {}
+          }
+          if ((!meta || !meta.profile || !meta.profile.profile_image) && acc.posting_json_metadata) {
+            try {
+              meta = JSON.parse(acc.posting_json_metadata);
+            } catch {}
+          }
+          const url = meta && meta.profile && meta.profile.profile_image 
+            ? meta.profile.profile_image.replace(/[\\/]+$/, '') 
+            : '';
+          newAvatars[acc.name] = url;
+        }
+        
+        // Update avatar cache
+        setAvatarCache(prev => ({ ...prev, ...newAvatars }));
+      } catch (e) {
+        console.log('Error fetching accounts for avatars:', e);
       }
-      if ((!meta || !meta.profile || !meta.profile.profile_image) && acc.posting_json_metadata) {
-        try {
-          meta = JSON.parse(acc.posting_json_metadata);
-        } catch {}
-      }
-      let url = meta && meta.profile && meta.profile.profile_image ? meta.profile.profile_image.replace(/[\\/]+$/, '') : '';
-      avatarMap[acc.name] = url;
     }
-    // Attach avatarUrl to each snap
-    return snaps.map(snap => ({ ...snap, avatarUrl: avatarMap[snap.author] || '' }));
+    
+    // Use cached avatars
+    return snaps.map(snap => ({ 
+      ...snap, 
+      avatarUrl: avatarCache[snap.author] || '' 
+    }));
   };
 
-  // Fetch Snaps (replies to @peak.snaps)
-  const fetchSnaps = async () => {
+  // Cache management - 5 minute cache
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+  const isCacheValid = (filterKey: string) => {
+    const lastFetch = lastFetchTime[filterKey];
+    return lastFetch && (Date.now() - lastFetch) < CACHE_DURATION;
+  };
+
+  const getCachedSnaps = (filterKey: string) => {
+    if (isCacheValid(filterKey) && snapsCache[filterKey]) {
+      return snapsCache[filterKey];
+    }
+    return null;
+  };
+
+  const setCachedSnaps = (filterKey: string, snaps: Snap[]) => {
+    setSnapsCache(prev => ({ ...prev, [filterKey]: snaps }));
+    setLastFetchTime(prev => ({ ...prev, [filterKey]: Date.now() }));
+  };
+
+  // Optimized Fetch Snaps (replies to @peak.snaps) with caching
+  const fetchSnaps = async (useCache = true) => {
+    const cacheKey = 'newest';
+    
+    // Check cache first
+    if (useCache) {
+      const cachedSnaps = getCachedSnaps(cacheKey);
+      if (cachedSnaps) {
+        console.log('Using cached snaps for newest feed');
+        setSnaps(cachedSnaps);
+        return;
+      }
+    }
+    
     setFeedLoading(true);
     try {
-      // Get latest posts by @peak.snaps
+      // Optimized: Get fewer container posts initially, focus on most recent
       const discussions = await client.database.call('get_discussions_by_blog', [{
         tag: 'peak.snaps',
-        limit: 10
+        limit: 3 // Reduced from 10 to 3 for faster loading
       }]);
-      // For each post, get replies (snaps)
+      
       let allSnaps: Snap[] = [];
-      for (const post of discussions) {
-        const replies: Snap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
-        allSnaps = allSnaps.concat(replies);
-      }
-      // Optionally, sort by created date descending
+      
+      // Process container posts in parallel for better performance
+      const snapPromises = discussions.map(async (post: any) => {
+        try {
+          const replies: Snap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
+          return replies;
+        } catch (err) {
+          console.log('Error fetching replies for post:', post.permlink, err);
+          return [];
+        }
+      });
+      
+      const snapResults = await Promise.all(snapPromises);
+      allSnaps = snapResults.flat();
+      
+      // Sort by created date descending
       allSnaps.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
-      const enhanced = await enhanceSnapsWithAvatar(allSnaps);
+      
+      // Limit to most recent 50 snaps for better performance
+      const limitedSnaps = allSnaps.slice(0, 50);
+      
+      const enhanced = await enhanceSnapsWithAvatar(limitedSnaps);
       setSnaps(enhanced);
-      console.log('Fetched snaps:', enhanced.length);
+      setCachedSnaps(cacheKey, enhanced);
+      console.log('Fetched and cached snaps:', enhanced.length);
     } catch (err) {
       console.log('Error fetching snaps:', err);
     }
     setFeedLoading(false);
   };
 
-  // Fetch Following Feed (snaps from users the current user follows)
-  const fetchFollowingSnaps = async () => {
+  // Optimized Following Feed with caching
+  const fetchFollowingSnaps = async (useCache = true) => {
+    const cacheKey = 'following';
+    
+    // Check cache first
+    if (useCache) {
+      const cachedSnaps = getCachedSnaps(cacheKey);
+      if (cachedSnaps) {
+        console.log('Using cached snaps for following feed');
+        setSnaps(cachedSnaps);
+        return;
+      }
+    }
+    
     setFeedLoading(true);
     if (!username) return;
     try {
-      // 1. Get the list of accounts the user is following
+      // Get following list
       const followingResult = await client.call('condenser_api', 'get_following', [username, '', 'blog', 100]);
       const following = Array.isArray(followingResult)
         ? followingResult.map((f: any) => f.following)
         : (followingResult && followingResult.following) ? followingResult.following : [];
       console.log('Following:', following);
-      // 2. Get latest posts by @peak.snaps (the container account)
-      const containerPosts = await client.database.call('get_discussions_by_blog', [{ tag: 'peak.snaps', limit: 10 }]);
-      let allSnaps: Snap[] = [];
-      for (const post of containerPosts) {
-        // 3. Get all replies to this post
-        const replies: Snap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
-        // 4. Filter replies to only those by followed users
-        const filtered = replies.filter((reply) => following.includes(reply.author));
-        allSnaps = allSnaps.concat(filtered);
-      }
-      // 5. Sort by created date descending
+      
+      // Get fewer container posts for faster loading
+      const containerPosts = await client.database.call('get_discussions_by_blog', [{ tag: 'peak.snaps', limit: 3 }]);
+      
+      // Process in parallel
+      const snapPromises = containerPosts.map(async (post: any) => {
+        try {
+          const replies: Snap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
+          return replies.filter((reply) => following.includes(reply.author));
+        } catch (err) {
+          console.log('Error fetching replies for post:', post.permlink, err);
+          return [];
+        }
+      });
+      
+      const snapResults = await Promise.all(snapPromises);
+      let allSnaps = snapResults.flat();
+      
+      // Sort and limit
       allSnaps.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
-      const enhanced = await enhanceSnapsWithAvatar(allSnaps);
+      const limitedSnaps = allSnaps.slice(0, 50);
+      
+      const enhanced = await enhanceSnapsWithAvatar(limitedSnaps);
       setSnaps(enhanced);
-      console.log('Fetched following snaps:', enhanced.length);
+      setCachedSnaps(cacheKey, enhanced);
+      console.log('Fetched and cached following snaps:', enhanced.length);
     } catch (err) {
       console.log('Error fetching following snaps:', err);
     }
     setFeedLoading(false);
   };
 
-  // Fetch Trending Feed (snaps under latest @peak.snaps container, sorted by payout)
-  const fetchTrendingSnaps = async () => {
+  // Optimized Trending Feed with caching
+  const fetchTrendingSnaps = async (useCache = true) => {
+    const cacheKey = 'trending';
+    
+    // Check cache first
+    if (useCache) {
+      const cachedSnaps = getCachedSnaps(cacheKey);
+      if (cachedSnaps) {
+        console.log('Using cached snaps for trending feed');
+        setSnaps(cachedSnaps);
+        return;
+      }
+    }
+    
     setFeedLoading(true);
     try {
       // Get the most recent post by @peak.snaps (container account)
@@ -294,18 +392,33 @@ const FeedScreen = () => {
             parseFloat(b.curator_payout_value ? b.curator_payout_value.replace(' HBD', '') : '0');
           return payoutB - payoutA;
         });
+        // Limit for performance
+        allSnaps = allSnaps.slice(0, 50);
       }
       const enhanced = await enhanceSnapsWithAvatar(allSnaps);
       setSnaps(enhanced);
-      console.log('Fetched trending snaps:', enhanced.length);
+      setCachedSnaps(cacheKey, enhanced);
+      console.log('Fetched and cached trending snaps:', enhanced.length);
     } catch (err) {
       console.log('Error fetching trending snaps:', err);
     }
     setFeedLoading(false);
   };
 
-  // Fetch My Snaps Feed (user's own snaps under latest @peak.snaps container)
-  const fetchMySnaps = async () => {
+  // Optimized My Snaps Feed with caching
+  const fetchMySnaps = async (useCache = true) => {
+    const cacheKey = `my-${username}`;
+    
+    // Check cache first
+    if (useCache) {
+      const cachedSnaps = getCachedSnaps(cacheKey);
+      if (cachedSnaps) {
+        console.log('Using cached snaps for my snaps feed');
+        setSnaps(cachedSnaps);
+        return;
+      }
+    }
+    
     setFeedLoading(true);
     try {
       // Get the most recent post by @peak.snaps (container account)
@@ -322,10 +435,13 @@ const FeedScreen = () => {
         mySnaps = replies.filter((reply) => reply.author === username);
         // Sort by created date descending
         mySnaps.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
+        // Limit for performance
+        mySnaps = mySnaps.slice(0, 50);
       }
       const enhanced = await enhanceSnapsWithAvatar(mySnaps);
       setSnaps(enhanced);
-      console.log('Fetched my snaps:', enhanced.length);
+      setCachedSnaps(cacheKey, enhanced);
+      console.log('Fetched and cached my snaps:', enhanced.length);
     } catch (err) {
       console.log('Error fetching my snaps:', err);
     }
@@ -335,22 +451,29 @@ const FeedScreen = () => {
   // Refetch snaps when activeFilter or username changes
   useEffect(() => {
     if (activeFilter === 'newest') {
-      fetchSnaps();
+      fetchSnaps(true); // Use cache
     } else if (activeFilter === 'following' && username) {
-      fetchFollowingSnaps();
+      fetchFollowingSnaps(true); // Use cache
     } else if (activeFilter === 'trending') {
-      fetchTrendingSnaps();
+      fetchTrendingSnaps(true); // Use cache
     } else if (activeFilter === 'my' && username) {
-      fetchMySnaps();
+      fetchMySnaps(true); // Use cache
     } else {
       setSnaps([]); // Placeholder for other filters
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeFilter, username]);
 
-  // Handler for filter button presses
+  // Handler for filter button presses with immediate cache loading
   const handleFilterPress = (filter: 'following' | 'newest' | 'trending' | 'my') => {
     setActiveFilter(filter);
+    
+    // Immediately show cached content if available for instant UI response
+    const cacheKey = filter === 'my' ? `my-${username}` : filter;
+    const cachedSnaps = getCachedSnaps(cacheKey);
+    if (cachedSnaps) {
+      setSnaps(cachedSnaps);
+    }
   };
 
   // Corrected: Accepts { author, permlink } object
@@ -402,10 +525,10 @@ const FeedScreen = () => {
         setUpvoteSuccess(false);
         setUpvoteTarget(null);
         // Refresh feed
-        if (activeFilter === 'newest') await fetchSnaps();
-        else if (activeFilter === 'following') await fetchFollowingSnaps();
-        else if (activeFilter === 'trending') await fetchTrendingSnaps();
-        else if (activeFilter === 'my') await fetchMySnaps();
+        if (activeFilter === 'newest') await fetchSnaps(false); // Force refresh
+        else if (activeFilter === 'following') await fetchFollowingSnaps(false);
+        else if (activeFilter === 'trending') await fetchTrendingSnaps(false);
+        else if (activeFilter === 'my') await fetchMySnaps(false);
         // Scrolling will be handled in useEffect below
       }, 2000);
     } catch (err) {
@@ -590,7 +713,7 @@ const FeedScreen = () => {
         setNewSnapSuccess(false);
         // Switch to 'newest' and refresh feed
         setActiveFilter('newest');
-        await fetchSnaps();
+        await fetchSnaps(false); // Force refresh without cache
         // Scroll to top
         flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
       }, 1800);
@@ -787,10 +910,10 @@ const FeedScreen = () => {
             style={{ width: '100%' }}
             refreshing={feedLoading}
             onRefresh={async () => {
-              if (activeFilter === 'newest') await fetchSnaps();
-              else if (activeFilter === 'following') await fetchFollowingSnaps();
-              else if (activeFilter === 'trending') await fetchTrendingSnaps();
-              else if (activeFilter === 'my') await fetchMySnaps();
+              if (activeFilter === 'newest') await fetchSnaps(false); // Force refresh
+              else if (activeFilter === 'following') await fetchFollowingSnaps(false);
+              else if (activeFilter === 'trending') await fetchTrendingSnaps(false);
+              else if (activeFilter === 'my') await fetchMySnaps(false);
             }}
             onScrollToIndexFailed={({ index }) => {
               // Fallback: scroll to closest possible
