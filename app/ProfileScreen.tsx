@@ -5,6 +5,7 @@ import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Client, PrivateKey } from '@hiveio/dhive';
 import * as SecureStore from 'expo-secure-store';
+import * as Haptics from 'expo-haptics';
 
 // Profile data interface
 interface ProfileData {
@@ -23,6 +24,22 @@ interface ProfileData {
   unclaimedHive?: number;
   unclaimedHbd?: number;
   unclaimedVests?: number;
+}
+
+// User snap interface for profile bubbles
+interface UserSnap {
+  author: string;
+  permlink: string;
+  parent_author: string;
+  parent_permlink: string;
+  body: string;
+  created: string;
+  net_votes?: number;
+  children?: number;
+  pending_payout_value?: string;
+  total_payout_value?: string;
+  active_votes?: any[];
+  [key: string]: any;
 }
 
 const HIVE_NODES = [
@@ -73,6 +90,11 @@ const ProfileScreen = () => {
   const [muteLoading, setMuteLoading] = useState(false);
   const [claimLoading, setClaimLoading] = useState(false);
   const [globalProps, setGlobalProps] = useState<any>(null);
+  // User snaps state
+  const [userSnaps, setUserSnaps] = useState<UserSnap[]>([]);
+  const [snapsLoading, setSnapsLoading] = useState(false);
+  const [snapsError, setSnapsError] = useState<string | null>(null);
+  const [snapsLoaded, setSnapsLoaded] = useState(false);
 
   const colors = {
     background: isDark ? '#15202B' : '#fff',
@@ -82,6 +104,7 @@ const ProfileScreen = () => {
     icon: '#1DA1F2',
     payout: '#17BF63',
     button: '#1DA1F2',
+    buttonText: '#fff',
     buttonInactive: isDark ? '#22303C' : '#E1E8ED',
     mutedButton: '#E74C3C',
     followButton: '#1DA1F2',
@@ -275,6 +298,156 @@ const ProfileScreen = () => {
     } catch (error) {
       console.log('Error checking follow/mute status:', error);
     }
+  };
+
+  // Fetch user's recent snaps from Hive blockchain
+  const fetchUserSnaps = async () => {
+    if (!username) return;
+    
+    setSnapsLoading(true);
+    setSnapsError(null);
+    
+    try {
+      console.log('Fetching recent snaps for user:', username);
+      
+      // Get latest posts by @peak.snaps (container account)
+      const discussions = await client.database.call('get_discussions_by_blog', [{
+        tag: 'peak.snaps',
+        limit: 10
+      }]);
+      
+      let userSnapsFound: UserSnap[] = [];
+      
+      // Search through all container posts for user's snaps
+      for (const post of discussions) {
+        try {
+          const replies: UserSnap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
+          
+          // Filter replies to only those by the profile user
+          const userReplies = replies.filter((reply) => reply.author === username);
+          userSnapsFound = userSnapsFound.concat(userReplies);
+        } catch (replyError) {
+          console.log('Error fetching replies for post:', post.permlink, replyError);
+        }
+      }
+      
+      // Sort by created date descending (newest first)
+      userSnapsFound.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
+      
+      // Limit to 20 most recent snaps
+      const limitedSnaps = userSnapsFound.slice(0, 20);
+      
+      setUserSnaps(limitedSnaps);
+      setSnapsLoaded(true);
+      console.log(`Found ${limitedSnaps.length} recent snaps for @${username}`);
+      
+    } catch (error) {
+      console.error('Error fetching user snaps:', error);
+      setSnapsError('Failed to load recent snaps');
+    } finally {
+      setSnapsLoading(false);
+    }
+  };
+
+  // Handle upvote for profile snap bubbles
+  const handleSnapUpvote = async (snap: UserSnap) => {
+    if (!currentUsername) return;
+    
+    try {
+      // Haptic feedback for user interaction
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      
+      // Get posting key from secure storage
+      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
+      if (!postingKeyStr) {
+        throw new Error('No posting key found. Please log in again.');
+      }
+      const postingKey = PrivateKey.fromString(postingKeyStr);
+
+      // Use 100% vote weight (10000)
+      const weight = 10000;
+
+      // Broadcast vote
+      await client.broadcast.vote(
+        {
+          voter: currentUsername,
+          author: snap.author,
+          permlink: snap.permlink,
+          weight,
+        },
+        postingKey
+      );
+
+      // Update the local snap data to reflect the vote
+      setUserSnaps(prev => prev.map(s => 
+        s.permlink === snap.permlink 
+          ? { 
+              ...s, 
+              net_votes: (s.net_votes || 0) + 1,
+              active_votes: [...(s.active_votes || []), { voter: currentUsername, percent: weight }]
+            }
+          : s
+      ));
+
+      // Success haptic feedback
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+      console.log('Successfully upvoted snap:', snap.permlink);
+    } catch (error) {
+      // Error haptic feedback
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      console.error('Error upvoting snap:', error);
+      alert('Failed to upvote: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+  };
+
+  // Handle reply to profile snap bubble
+  const handleSnapReply = (snap: UserSnap) => {
+    // Navigate to conversation screen for this snap
+    router.push({ 
+      pathname: '/ConversationScreen', 
+      params: { 
+        author: snap.author, 
+        permlink: snap.permlink 
+      } 
+    });
+  };
+
+  // Handle snap bubble press (navigate to conversation)
+  const handleSnapPress = (snap: UserSnap) => {
+    router.push({ 
+      pathname: '/ConversationScreen', 
+      params: { 
+        author: snap.author, 
+        permlink: snap.permlink 
+      } 
+    });
+  };
+
+  // Extract text content from snap body (removing images and formatting)
+  const extractSnapText = (body: string): string => {
+    // Remove images
+    let text = body.replace(/!\[.*?\]\(.*?\)/g, '');
+    // Remove markdown links but keep the text
+    text = text.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+    // Remove URLs
+    text = text.replace(/https?:\/\/[^\s]+/g, '');
+    // Remove extra whitespace
+    text = text.replace(/\s+/g, ' ').trim();
+    
+    // If no text remains, return a fallback
+    if (!text) {
+      return 'Snap contains media or links';
+    }
+    
+    // Limit length
+    return text.length > 120 ? text.substring(0, 120) + '...' : text;
+  };
+
+  // Check if current user has upvoted a snap
+  const hasUserUpvoted = (snap: UserSnap): boolean => {
+    if (!currentUsername || !snap.active_votes) return false;
+    return snap.active_votes.some((vote: any) => vote.voter === currentUsername && vote.percent > 0);
   };
 
   // Action handlers
@@ -741,6 +914,143 @@ const ProfileScreen = () => {
               </View>
             )}
 
+            {/* Recent Snaps Section */}
+            <View style={styles.snapsSection}>
+              <Text style={[styles.snapsSectionTitle, { color: colors.text }]}>
+                Recent Snaps
+              </Text>
+              
+              {!snapsLoaded ? (
+                <TouchableOpacity 
+                  style={[styles.loadSnapsButton, { backgroundColor: colors.button }]}
+                  onPress={fetchUserSnaps}
+                  disabled={snapsLoading}
+                  activeOpacity={0.8}
+                >
+                  {snapsLoading ? (
+                    <>
+                      <FontAwesome name="hourglass-half" size={16} color={colors.buttonText} />
+                      <Text style={[styles.loadSnapsButtonText, { color: colors.buttonText }]}>
+                        Loading...
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <FontAwesome name="comment" size={16} color={colors.buttonText} />
+                      <Text style={[styles.loadSnapsButtonText, { color: colors.buttonText }]}>
+                        Show Recent Snaps
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              ) : (
+                <>
+                  <View style={styles.snapsSectionHeader}>
+                    <TouchableOpacity 
+                      style={styles.refreshButton}
+                      onPress={fetchUserSnaps}
+                      disabled={snapsLoading}
+                    >
+                      <FontAwesome name="refresh" size={16} color={colors.icon} />
+                    </TouchableOpacity>
+                  </View>
+                  
+                  {snapsError ? (
+                    <View style={styles.snapsErrorContainer}>
+                      <FontAwesome name="exclamation-triangle" size={24} color="#E74C3C" />
+                      <Text style={[styles.snapsErrorText, { color: colors.text }]}>
+                        {snapsError}
+                      </Text>
+                      <TouchableOpacity 
+                        style={[styles.retryButton, { backgroundColor: colors.button }]}
+                        onPress={fetchUserSnaps}
+                        disabled={snapsLoading}
+                      >
+                        <Text style={[styles.retryButtonText, { color: colors.buttonText }]}>
+                          Try Again
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : userSnaps.length === 0 ? (
+                    <View style={styles.snapsEmptyContainer}>
+                      <FontAwesome name="comment-o" size={32} color={colors.buttonInactive} />
+                      <Text style={[styles.snapsEmptyText, { color: colors.text }]}>
+                        No recent snaps found
+                      </Text>
+                    </View>
+                  ) : (
+                    <ScrollView 
+                      horizontal 
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.snapsScrollContainer}
+                      style={styles.snapsScrollView}
+                    >
+                      {userSnaps.map((snap, index) => {
+                        const snapText = extractSnapText(snap.body);
+                        const hasUpvoted = hasUserUpvoted(snap);
+                        const voteCount = snap.net_votes || 0;
+                        const replyCount = snap.children || 0;
+                        
+                        return (
+                          <TouchableOpacity
+                            key={`${snap.author}-${snap.permlink}`}
+                            style={[styles.snapBubble, { backgroundColor: colors.bubble, borderColor: colors.border }]}
+                            onPress={() => handleSnapPress(snap)}
+                            activeOpacity={0.7}
+                          >
+                            <View style={styles.snapBubbleContent}>
+                              <Text style={[styles.snapBubbleText, { color: colors.text }]} numberOfLines={4}>
+                                {snapText}
+                              </Text>
+                              
+                              <View style={styles.snapBubbleActions}>
+                                <TouchableOpacity
+                                  style={styles.snapBubbleAction}
+                                  onPress={(e) => {
+                                    e.stopPropagation();
+                                    handleSnapUpvote(snap);
+                                  }}
+                                  disabled={!currentUsername}
+                                >
+                                  <FontAwesome 
+                                    name="heart" 
+                                    size={14} 
+                                    color={hasUpvoted ? '#E74C3C' : colors.buttonInactive} 
+                                  />
+                                  <Text style={[styles.snapBubbleActionText, { 
+                                    color: hasUpvoted ? '#E74C3C' : colors.buttonInactive
+                                  }]}>
+                                    {voteCount}
+                                  </Text>
+                                </TouchableOpacity>
+                                
+                                <TouchableOpacity
+                                  style={styles.snapBubbleAction}
+                                  onPress={(e) => {
+                                    e.stopPropagation();
+                                    handleSnapReply(snap);
+                                  }}
+                                >
+                                  <FontAwesome name="reply" size={14} color={colors.buttonInactive} />
+                                  <Text style={[styles.snapBubbleActionText, { color: colors.buttonInactive }]}>
+                                    {replyCount}
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
+                              
+                              <Text style={[styles.snapBubbleDate, { color: colors.buttonInactive }]}>
+                                {new Date(snap.created).toLocaleDateString()}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  )}
+                </>
+              )}
+            </View>
+
             {/* Logout Button - Only show for own profile */}
             {isOwnProfile && (
               <View style={styles.logoutSection}>
@@ -957,5 +1267,135 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  // Snaps section styles
+  snapsSection: {
+    width: '100%',
+    marginTop: 20,
+  },
+  snapsSectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  snapsSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    position: 'relative',
+  },
+  refreshButton: {
+    position: 'absolute',
+    right: 0,
+    padding: 8,
+  },
+  snapsLoadingContainer: {
+    alignItems: 'center',
+    padding: 40,
+  },
+  snapsLoadingText: {
+    marginTop: 8,
+    fontSize: 14,
+  },
+  snapsErrorContainer: {
+    alignItems: 'center',
+    padding: 40,
+  },
+  snapsErrorText: {
+    marginTop: 8,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  snapsEmptyContainer: {
+    alignItems: 'center',
+    padding: 40,
+  },
+  snapsEmptyText: {
+    marginTop: 12,
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  snapsScrollView: {
+    marginHorizontal: -24, // Offset parent padding
+  },
+  snapsScrollContainer: {
+    paddingHorizontal: 24,
+    paddingRight: 24,
+  },
+  snapBubble: {
+    width: 180,
+    minHeight: 140,
+    maxHeight: 200,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginRight: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  snapBubbleContent: {
+    padding: 16,
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  snapBubbleText: {
+    fontSize: 14,
+    lineHeight: 18,
+    marginBottom: 12,
+    flex: 1,
+  },
+  snapBubbleActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  snapBubbleAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  snapBubbleActionText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  snapBubbleDate: {
+    fontSize: 11,
+    textAlign: 'right',
+  },
+  // Load snaps button styles
+  loadSnapsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    gap: 8,
+    marginBottom: 20,
+  },
+  loadSnapsButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginTop: 12,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
