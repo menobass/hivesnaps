@@ -114,27 +114,27 @@ const FeedScreen = () => {
           const accounts = await client.database.getAccounts([storedUsername]);
           console.log('Hive account object:', accounts && accounts[0]);
           let profileImg = '';
-          // Try to get profile image from json_metadata first, then posting_json_metadata
+          // Try to get profile image from posting_json_metadata first (most current), then fallback to json_metadata
           if (accounts && accounts[0]) {
             let meta = null;
-            // Try json_metadata
-            if (accounts[0].json_metadata) {
+            // Try posting_json_metadata first (most up-to-date)
+            if (accounts[0].posting_json_metadata) {
               try {
-                meta = JSON.parse(accounts[0].json_metadata);
-                console.log('json_metadata:', accounts[0].json_metadata);
+                meta = JSON.parse(accounts[0].posting_json_metadata);
+                console.log('posting_json_metadata:', accounts[0].posting_json_metadata);
               } catch (err) {
-                console.log('Error parsing json_metadata:', err);
+                console.log('Error parsing posting_json_metadata:', err);
               }
             }
-            // If no profile image in json_metadata, try posting_json_metadata
+            // If no profile image in posting_json_metadata, fallback to json_metadata
             if (!meta || !meta.profile || !meta.profile.profile_image) {
-              if (accounts[0].posting_json_metadata) {
+              if (accounts[0].json_metadata) {
                 try {
-                  const postingMeta = JSON.parse(accounts[0].posting_json_metadata);
-                  meta = postingMeta;
-                  console.log('posting_json_metadata:', accounts[0].posting_json_metadata);
+                  const jsonMeta = JSON.parse(accounts[0].json_metadata);
+                  meta = jsonMeta;
+                  console.log('json_metadata (fallback):', accounts[0].json_metadata);
                 } catch (err) {
-                  console.log('Error parsing posting_json_metadata:', err);
+                  console.log('Error parsing json_metadata:', err);
                 }
               }
             }
@@ -196,14 +196,16 @@ const FeedScreen = () => {
         
         for (const acc of accounts) {
           let meta = null;
-          if (acc.json_metadata) {
-            try {
-              meta = JSON.parse(acc.json_metadata);
-            } catch {}
-          }
-          if ((!meta || !meta.profile || !meta.profile.profile_image) && acc.posting_json_metadata) {
+          // Try posting_json_metadata first (most up-to-date)
+          if (acc.posting_json_metadata) {
             try {
               meta = JSON.parse(acc.posting_json_metadata);
+            } catch {}
+          }
+          // Fallback to json_metadata if posting_json_metadata doesn't have profile image
+          if ((!meta || !meta.profile || !meta.profile.profile_image) && acc.json_metadata) {
+            try {
+              meta = JSON.parse(acc.json_metadata);
             } catch {}
           }
           const url = meta && meta.profile && meta.profile.profile_image 

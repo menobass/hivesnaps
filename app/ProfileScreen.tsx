@@ -124,7 +124,7 @@ const ProfileScreen = () => {
     loadCredentials();
   }, []);
 
-  // Fetch profile data
+  // Fetch profile data (simplified approach for follow counts)
   // Updated to use Ecency's exact calculation methods for reputation and Hive Power
   const fetchProfileData = async () => {
     if (!username) return;
@@ -234,6 +234,7 @@ const ProfileScreen = () => {
       console.log('Unclaimed HBD:', unclaimedHbd);
       console.log('Unclaimed VESTS:', unclaimedVests);
 
+      // Set profile with account object counts first (non-blocking)
       setProfile({
         username: account.name,
         avatarUrl: profileMeta.profile_image,
@@ -244,11 +245,16 @@ const ProfileScreen = () => {
         about: profileMeta.about,
         location: profileMeta.location,
         website: profileMeta.website,
-        followingCount: account.following_count,
-        followersCount: account.follower_count,
+        followingCount: account.following_count || 0,
+        followersCount: account.follower_count || 0,
         unclaimedHive,
         unclaimedHbd,
         unclaimedVests,
+      });
+
+      console.log('Follow counts from account object:', { 
+        following: account.following_count || 0, 
+        followers: account.follower_count || 0 
       });
       
       console.log('=== FINAL CALCULATED VALUES ===');
@@ -751,6 +757,26 @@ const ProfileScreen = () => {
               </Text>
             )}
 
+            {/* Follower/Following Counts */}
+            <View style={styles.socialStats}>
+              <View style={styles.socialStatItem}>
+                <Text style={[styles.socialStatNumber, { color: colors.text }]}>
+                  {(profile.followersCount || 0).toLocaleString()}
+                </Text>
+                <Text style={[styles.socialStatLabel, { color: colors.text }]}>
+                  Followers
+                </Text>
+              </View>
+              <View style={styles.socialStatItem}>
+                <Text style={[styles.socialStatNumber, { color: colors.text }]}>
+                  {(profile.followingCount || 0).toLocaleString()}
+                </Text>
+                <Text style={[styles.socialStatLabel, { color: colors.text }]}>
+                  Following
+                </Text>
+              </View>
+            </View>
+
             {/* Action Buttons */}
             {!isOwnProfile && (
               <View style={styles.actionButtons}>
@@ -1133,6 +1159,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 16,
     textAlign: 'center',
+  },
+  socialStats: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 40,
+    marginBottom: 20,
+  },
+  socialStatItem: {
+    alignItems: 'center',
+  },
+  socialStatNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  socialStatLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    opacity: 0.7,
   },
   actionButtons: {
     flexDirection: 'row',
