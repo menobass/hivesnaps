@@ -265,6 +265,27 @@ const ProfileScreen = () => {
         unclaimedVests,
       });
 
+      // Fetch accurate follow counts using the proper API
+      try {
+        const followCount = await client.database.call('get_follow_count', [username]);
+        console.log('Follow count API result:', followCount);
+        
+        // Update profile with accurate follow counts
+        setProfile(prev => ({
+          ...prev!,
+          followingCount: followCount.following_count || 0,
+          followersCount: followCount.follower_count || 0,
+        }));
+        
+        console.log('Updated follow counts:', { 
+          following: followCount.following_count || 0, 
+          followers: followCount.follower_count || 0 
+        });
+      } catch (e) {
+        console.log('Error fetching follow counts:', e);
+        // Keep the counts from account object as fallback
+      }
+
       console.log('Follow counts from account object:', { 
         following: account.following_count || 0, 
         followers: account.follower_count || 0 
