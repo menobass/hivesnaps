@@ -898,14 +898,15 @@ const ProfileScreen = () => {
         },
       };
       
-      // Broadcast account update - dhive uses account_update operation directly
+      // Broadcast account update2 - required for posting_json_metadata support
       const operation = [
-        'account_update',
+        'account_update2',
         {
           account: currentUsername,
           memo_key: account.memo_key,
           json_metadata: JSON.stringify(updatedJsonMeta),
           posting_json_metadata: JSON.stringify(updatedPostingMeta),
+          extensions: [], // Required field for account_update2
         }
       ] as const;
       

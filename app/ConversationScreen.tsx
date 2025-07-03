@@ -790,8 +790,14 @@ const ConversationScreen = () => {
     textBody = linkifyMentions(textBody);
     const windowWidth = Dimensions.get('window').width;
     const isHtml = containsHtml(textBody);
+    
+    // Cap visual nesting level to prevent bubbles from going off-screen
+    // Maximum visual level is 3 (54px = 3 * 18px indentation)
+    const maxVisualLevel = 3;
+    const visualLevel = Math.min(level, maxVisualLevel);
+    
     return (
-      <View key={reply.author + reply.permlink + '-' + level} style={{ marginLeft: level * 18, marginBottom: 10 }}>
+      <View key={reply.author + reply.permlink + '-' + level} style={{ marginLeft: visualLevel * 18, marginBottom: 10 }}>
         <View style={[styles.replyBubble, { backgroundColor: colors.bubble }]}> 
           {/* Avatar, author, timestamp row */}
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
@@ -869,7 +875,7 @@ const ConversationScreen = () => {
           )}
           {isHtml ? (
             <RenderHtml
-              contentWidth={windowWidth - (level * 18) - 32}
+              contentWidth={windowWidth - (visualLevel * 18) - 32}
               source={{ html: textBody }}
               baseStyle={{ color: colors.text, fontSize: 14, marginBottom: 4 }}
               enableExperimentalMarginCollapsing
