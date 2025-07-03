@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
 import { useNotifications } from '../hooks/useNotifications';
 import ConversationScreen from './ConversationScreen';
+import ImageView from 'react-native-image-viewing';
 
 const twitterColors = {
   light: {
@@ -82,6 +83,10 @@ const FeedScreen = () => {
   const [newSnapLoading, setNewSnapLoading] = useState(false);
   const [newSnapSuccess, setNewSnapSuccess] = useState(false);
   const [newSnapUploading, setNewSnapUploading] = useState(false);
+  // Image modal state
+  const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [modalImages, setModalImages] = useState<Array<{uri: string}>>([]);
+  const [modalImageIndex, setModalImageIndex] = useState(0);
   const colorScheme = useColorScheme() || 'light';
   const colors = twitterColors[colorScheme];
   const insets = useSafeAreaInsets();
@@ -700,6 +705,13 @@ const FeedScreen = () => {
     }
   };
 
+  // Image modal handler
+  const handleImagePress = (imageUrl: string) => {
+    setModalImages([{ uri: imageUrl }]);
+    setModalImageIndex(0);
+    setImageModalVisible(true);
+  };
+
   const handleSubmitNewSnap = async () => {
     if (!username) {
       alert('You must be logged in to post a Snap.');
@@ -956,6 +968,7 @@ const FeedScreen = () => {
                   console.log('Navigating to ProfileScreen for:', username);
                   router.push(`/ProfileScreen?username=${username}` as any);
                 }}
+                onImagePress={handleImagePress}
               />
             )}
             contentContainerStyle={{ paddingBottom: 80 }}
@@ -1066,6 +1079,44 @@ const FeedScreen = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Image Modal with react-native-image-viewing */}
+      <ImageView
+        images={modalImages}
+        imageIndex={modalImageIndex}
+        visible={imageModalVisible}
+        onRequestClose={() => {
+          setImageModalVisible(false);
+          // Force status bar refresh after modal closes
+          setTimeout(() => {
+            // This helps prevent white stripe issues
+          }, 100);
+        }}
+        backgroundColor="rgba(0, 0, 0, 0.95)"
+        swipeToCloseEnabled={true}
+        doubleTapToZoomEnabled={true}
+        presentationStyle="fullScreen"
+        HeaderComponent={() => (
+          <TouchableOpacity
+            style={{
+              position: 'absolute',
+              top: 50,
+              right: 20,
+              zIndex: 1000,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              borderRadius: 20,
+              width: 40,
+              height: 40,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+            onPress={() => setImageModalVisible(false)}
+            accessibilityLabel="Close image"
+          >
+            <FontAwesome name="close" size={20} color="#fff" />
+          </TouchableOpacity>
+        )}
+      />
     </View>
   );
 };

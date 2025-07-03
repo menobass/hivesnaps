@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { SafeAreaView as SafeAreaViewRN } from 'react-native';
 import { SafeAreaView as SafeAreaViewSA, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, FlatList, useColorScheme, Image, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, FlatList, useColorScheme, Image, Pressable, ScrollView, Linking } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
@@ -19,6 +19,7 @@ import RenderHtml, { defaultHTMLElementModels, HTMLContentModel } from 'react-na
 import { Dimensions } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import { extractImageUrls } from '../utils/extractImageUrls';
+import ImageView from 'react-native-image-viewing';
 
 // Utility to remove image markdown/html from text
 function stripImageTags(text: string): string {
@@ -92,6 +93,8 @@ const ConversationScreen = () => {
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [modalImageUrl, setModalImageUrl] = useState<string | null>(null);
+  const [modalImages, setModalImages] = useState<Array<{uri: string}>>([]);
+  const [modalImageIndex, setModalImageIndex] = useState(0);
 
   // Upvote modal state
   const [upvoteModalVisible, setUpvoteModalVisible] = useState(false);
@@ -496,6 +499,13 @@ const ConversationScreen = () => {
     return updated;
   }
 
+  // Image modal handler
+  const handleImagePress = (imageUrl: string) => {
+    setModalImages([{ uri: imageUrl }]);
+    setModalImageIndex(0);
+    setImageModalVisible(true);
+  };
+
   // Render a single reply (flat, not threaded yet)
   const renderReply = ({ item }: { item: ReplyData }) => {
     console.log('Reply payout:', item.payout, 'for', item.author, item.permlink);
@@ -585,10 +595,7 @@ const ConversationScreen = () => {
       return (
         <Pressable
           key={src || alt}
-          onPress={() => {
-            setModalImageUrl(src);
-            setImageModalVisible(true);
-          }}
+          onPress={() => handleImagePress(src)}
         >
           <Image
             source={{ uri: src }}
@@ -755,8 +762,7 @@ const ConversationScreen = () => {
         <Text key={href} style={[{ color: colors.icon, textDecorationLine: 'underline' }]} onPress={() => {
           // Open link in browser
           if (href) {
-            // Use Expo's Linking API
-            import('expo-linking').then(Linking => Linking.openURL(href));
+            Linking.openURL(href);
           }
         }}>
           {children}
@@ -863,7 +869,7 @@ const ConversationScreen = () => {
           {imageUrls.length > 0 && (
             <View style={{ marginBottom: 8 }}>
               {imageUrls.map((url, idx) => (
-                <Pressable key={url + idx} onPress={() => { setModalImageUrl(url); setImageModalVisible(true); }}>
+                <Pressable key={url + idx} onPress={() => handleImagePress(url)}>
                   <ExpoImage
                     source={{ uri: url }}
                     style={{ width: '100%', height: 200, borderRadius: 12, marginBottom: 6, backgroundColor: '#eee' }}
@@ -996,7 +1002,7 @@ const ConversationScreen = () => {
         {imageUrls.length > 0 && (
           <View style={{ marginBottom: 8 }}>
             {imageUrls.map((url, idx) => (
-              <Pressable key={url + idx} onPress={() => { setModalImageUrl(url); setImageModalVisible(true); }}>
+              <Pressable key={url + idx} onPress={() => handleImagePress(url)}>
                 <ExpoImage
                   source={{ uri: url }}
                   style={{ width: '100%', height: 200, borderRadius: 12, marginBottom: 6, backgroundColor: '#eee' }}
@@ -1063,39 +1069,43 @@ const ConversationScreen = () => {
 
   return (
     <SafeAreaViewSA style={[styles.safeArea, { backgroundColor: isDark ? '#15202B' : '#fff' }]}> 
-      {/* Fullscreen Image Modal */}
-      <Modal
-        isVisible={imageModalVisible}
-        onBackdropPress={() => setImageModalVisible(false)}
-        onBackButtonPress={() => setImageModalVisible(false)}
-        style={{ margin: 0, justifyContent: 'center', alignItems: 'center' }}
-      >
-        {/* Debug: log modalImageUrl in useEffect instead of inline */}
-        <View style={{ backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100%' }}>
+      {/* Image Modal with react-native-image-viewing */}
+      <ImageView
+        images={modalImages}
+        imageIndex={modalImageIndex}
+        visible={imageModalVisible}
+        onRequestClose={() => {
+          setImageModalVisible(false);
+          // Force status bar refresh after modal closes
+          setTimeout(() => {
+            // This helps prevent white stripe issues
+          }, 100);
+        }}
+        backgroundColor="rgba(0, 0, 0, 0.95)"
+        swipeToCloseEnabled={true}
+        doubleTapToZoomEnabled={true}
+        presentationStyle="fullScreen"
+        HeaderComponent={() => (
           <TouchableOpacity
-            style={{ position: 'absolute', top: 40, right: 20, zIndex: 2 }}
+            style={{
+              position: 'absolute',
+              top: 50,
+              right: 20,
+              zIndex: 1000,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              borderRadius: 20,
+              width: 40,
+              height: 40,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
             onPress={() => setImageModalVisible(false)}
             accessibilityLabel="Close image"
           >
-            <FontAwesome name="close" size={32} color="#fff" />
+            <FontAwesome name="close" size={20} color="#fff" />
           </TouchableOpacity>
-          {/* Try hardcoded fallback image if modalImageUrl is not valid */}
-          {modalImageUrl ? (
-            <ExpoImage
-              key={modalImageUrl}
-              source={{ uri: modalImageUrl }}
-              style={{ width: '96%', height: '80%', borderRadius: 16, backgroundColor: '#222' }}
-              contentFit="contain"
-            />
-          ) : (
-            <ExpoImage
-              source={{ uri: 'https://placekitten.com/800/800' }}
-              style={{ width: '96%', height: '80%', borderRadius: 16, backgroundColor: '#222' }}
-              contentFit="contain"
-            />
-          )}
-        </View>
-      </Modal>
+        )}
+      />
       {/* Conversation list (snap as header, replies as data) */}
       {loading ? (
         <View style={{ alignItems: 'center', marginTop: 40 }}>
