@@ -555,6 +555,17 @@ const ConversationScreen = () => {
     return text.replace(/(https?:\/\/[\w.-]+(?:\/[\w\-./?%&=+#@]*)?)/gi, (url) => {
       // If already inside a markdown or html link, skip
       if (/\]\([^)]+\)$/.test(url) || /href=/.test(url)) return url;
+      
+      // Skip URLs that should be handled as embedded media (YouTube, 3Speak, IPFS, MP4)
+      const youtubeMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+      const threeSpeakMatch = url.match(/https:\/\/3speak\.tv\/watch\?v=([^\/\s]+)\/([a-zA-Z0-9_-]+)/);
+      const ipfsMatch = url.match(/ipfs\/([A-Za-z0-9]+)/);
+      const mp4Match = url.match(/\.mp4($|\?)/i);
+      
+      if (youtubeMatch || threeSpeakMatch || ipfsMatch || mp4Match) {
+        return url; // Don't linkify, let markdown rules handle video embedding
+      }
+      
       // Use full URL as display text (no shortening in conversation view)
       return `[${url}](${url})`;
     });
