@@ -68,7 +68,7 @@ const FeedScreen = () => {
   const [hasUnclaimedRewards, setHasUnclaimedRewards] = useState(false);
   // Cache for snaps and avatars
   const [snapsCache, setSnapsCache] = useState<Record<string, Snap[]>>({});
-  const [avatarCache, setAvatarCache] = useState<Record<string, string>>({});
+  const [avatarCache, setAvatarCache] = useState<Record<string, { url: string; timestamp: number }>>({});
   const [lastFetchTime, setLastFetchTime] = useState<Record<string, number>>({});
   const [upvoteModalVisible, setUpvoteModalVisible] = useState(false);
   const [upvoteTarget, setUpvoteTarget] = useState<{ author: string; permlink: string } | null>(null);
@@ -182,17 +182,23 @@ const FeedScreen = () => {
     fetchUser();
   }, []);
 
-  // Enhanced avatar fetching with caching
+  // Enhanced avatar fetching with time-based caching
   const enhanceSnapsWithAvatar = async (snaps: Snap[]) => {
-    // Get unique authors not already in cache
+    // Get unique authors not already in cache or with expired cache
     const authors = Array.from(new Set(snaps.map(s => s.author)));
-    const uncachedAuthors = authors.filter(author => !avatarCache[author]);
+    const now = Date.now();
+    const AVATAR_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
     
-    // Only fetch accounts for authors not in cache
+    const uncachedAuthors = authors.filter(author => {
+      const cached = avatarCache[author];
+      return !cached || (now - cached.timestamp) > AVATAR_CACHE_DURATION;
+    });
+    
+    // Only fetch accounts for authors not in cache or with expired cache
     if (uncachedAuthors.length > 0) {
       try {
         const accounts = await client.database.getAccounts(uncachedAuthors);
-        const newAvatars: Record<string, string> = {};
+        const newAvatars: Record<string, { url: string; timestamp: number }> = {};
         
         for (const acc of accounts) {
           let meta = null;
@@ -211,7 +217,7 @@ const FeedScreen = () => {
           const url = meta && meta.profile && meta.profile.profile_image 
             ? meta.profile.profile_image.replace(/[\\/]+$/, '') 
             : '';
-          newAvatars[acc.name] = url;
+          newAvatars[acc.name] = { url, timestamp: now };
         }
         
         // Update avatar cache
@@ -224,7 +230,7 @@ const FeedScreen = () => {
     // Use cached avatars
     return snaps.map(snap => ({ 
       ...snap, 
-      avatarUrl: avatarCache[snap.author] || '' 
+      avatarUrl: avatarCache[snap.author]?.url || '' 
     }));
   };
 
@@ -753,6 +759,23 @@ const FeedScreen = () => {
     }
   };
 
+  // Avatar cache invalidation function
+  const invalidateUserAvatar = (author: string) => {
+    setAvatarCache(prev => {
+      const updated = { ...prev };
+      delete updated[author];
+      return updated;
+    });
+  };
+
+  // Register cache invalidator on mount
+  useEffect(() => {
+    registerAvatarCacheInvalidator(invalidateUserAvatar);
+    return () => {
+      unregisterAvatarCacheInvalidator(invalidateUserAvatar);
+    };
+  }, []);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Upvote Modal */}
@@ -1144,3 +1167,18 @@ const styles = StyleSheet.create({
 });
 
 export default FeedScreen;
+
+// Cache management utility
+let avatarCacheInvalidators: Array<(author: string) => void> = [];
+
+export const registerAvatarCacheInvalidator = (invalidator: (author: string) => void) => {
+  avatarCacheInvalidators.push(invalidator);
+};
+
+export const unregisterAvatarCacheInvalidator = (invalidator: (author: string) => void) => {
+  avatarCacheInvalidators = avatarCacheInvalidators.filter(i => i !== invalidator);
+};
+
+export const invalidateAvatarCache = (author: string) => {
+  avatarCacheInvalidators.forEach(invalidator => invalidator(author));
+};
