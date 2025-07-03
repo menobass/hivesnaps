@@ -45,6 +45,7 @@ interface SnapProps {
   onSpeechBubblePress?: () => void; // NEW: handler for speech bubble
   onUserPress?: (username: string) => void; // NEW: handler for username/avatar press
   onContentPress?: () => void; // NEW: handler for content/text press
+  onImagePress?: (imageUrl: string) => void; // NEW: handler for image press
 }
 
 // Utility to extract raw image URLs from text (not in markdown or html)
@@ -125,7 +126,40 @@ const renderMp4Video = (uri: string, key?: string | number) => (
 
 // Custom markdown rules for mp4 and video support
 const markdownRules = {
-  // ...existing code...
+  image: (
+    node: any,
+    children: any,
+    parent: any,
+    styles: any
+  ) => {
+    const { src, alt } = node.attributes;
+    return (
+      <Pressable
+        key={src || alt}
+        onPress={() => {
+          const handler = (globalThis as any)._snapOnImagePress;
+          if (typeof handler === 'function') {
+            handler(src);
+          }
+        }}
+      >
+        <Image
+          source={{ uri: src }}
+          style={{
+            width: '100%',
+            aspectRatio: 1.2,
+            maxHeight: 340,
+            borderRadius: 14,
+            marginVertical: 10,
+            alignSelf: 'center',
+            backgroundColor: '#eee',
+          }}
+          resizeMode="cover"
+          accessibilityLabel={alt || 'image'}
+        />
+      </Pressable>
+    );
+  },
   link: (
     node: any,
     children: any,
@@ -187,7 +221,7 @@ const markdownRules = {
   // ...existing code...
 };
 
-const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount = 0, replyCount = 0, payout = 0, onUpvotePress, permlink, hasUpvoted = false, onSpeechBubblePress, onUserPress, onContentPress }) => {
+const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount = 0, replyCount = 0, payout = 0, onUpvotePress, permlink, hasUpvoted = false, onSpeechBubblePress, onUserPress, onContentPress, onImagePress }) => {
   const colorScheme = useColorScheme() || 'light';
   const isDark = colorScheme === 'dark';
   const colors = twitterColors[colorScheme];
@@ -213,6 +247,7 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
 
   // Expose onUserPress globally for markdownRules
   (globalThis as any)._snapOnUserPress = onUserPress;
+  (globalThis as any)._snapOnImagePress = onImagePress;
 
   return (
     <View style={[styles.bubble, { backgroundColor: colors.bubble, borderColor: colors.border, width: '100%', alignSelf: 'stretch' }]}> 
@@ -294,7 +329,14 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
       {imageUrls.length > 0 && (
         <View style={{ marginBottom: 8 }}>
           {imageUrls.map((url, idx) => (
-            <Pressable key={url + idx} onPress={() => { setModalImageUrl(url); setModalVisible(true); }}>
+            <Pressable key={url + idx} onPress={() => {
+              if (onImagePress) {
+                onImagePress(url);
+              } else {
+                setModalImageUrl(url);
+                setModalVisible(true);
+              }
+            }}>
               <Image
                 source={{ uri: url }}
                 style={{ width: '100%', height: 200, borderRadius: 12, marginBottom: 6, backgroundColor: '#eee' }}
@@ -308,7 +350,14 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
       {rawImageUrls.length > 0 && (
         <View style={{ marginBottom: 8 }}>
           {rawImageUrls.map((url, idx) => (
-            <Pressable key={url + idx} onPress={() => { setModalImageUrl(url); setModalVisible(true); }}>
+            <Pressable key={url + idx} onPress={() => {
+              if (onImagePress) {
+                onImagePress(url);
+              } else {
+                setModalImageUrl(url);
+                setModalVisible(true);
+              }
+            }}>
               <Image
                 source={{ uri: url }}
                 style={{ width: '100%', height: 200, borderRadius: 12, marginBottom: 6, backgroundColor: '#eee' }}
