@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { SafeAreaView as SafeAreaViewSA } from 'react-native-safe-area-context';
-import { View, Text, StyleSheet, TouchableOpacity, useColorScheme, Image, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, useColorScheme, Image, ScrollView, Modal, Pressable, Platform, ActivityIndicator, TextInput, KeyboardAvoidingView } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Client, PrivateKey } from '@hiveio/dhive';
 import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
+import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
 
 // Profile data interface
 interface ProfileData {
@@ -95,6 +97,16 @@ const ProfileScreen = () => {
   const [snapsLoading, setSnapsLoading] = useState(false);
   const [snapsError, setSnapsError] = useState<string | null>(null);
   const [snapsLoaded, setSnapsLoaded] = useState(false);
+  
+  // Profile image update state
+  const [editAvatarModalVisible, setEditAvatarModalVisible] = useState(false);
+  const [newAvatarImage, setNewAvatarImage] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarUpdateLoading, setAvatarUpdateLoading] = useState(false);
+  const [avatarUpdateSuccess, setAvatarUpdateSuccess] = useState(false);
+  // Active key modal state (second step)
+  const [activeKeyModalVisible, setActiveKeyModalVisible] = useState(false);
+  const [activeKeyInput, setActiveKeyInput] = useState('');
 
   const colors = {
     background: isDark ? '#15202B' : '#fff',
@@ -712,6 +724,220 @@ const ProfileScreen = () => {
     );
   }
 
+  // Avatar update functions
+  const handleEditAvatarPress = () => {
+    setNewAvatarImage(null);
+    setAvatarUpdateSuccess(false);
+    setActiveKeyInput(''); // Clear active key input
+    setEditAvatarModalVisible(true);
+  };
+
+  const handleSelectNewAvatar = async () => {
+    try {
+      // Ask user: Take Photo or Choose from Gallery
+      const options = [
+        { text: 'Take Photo', value: 'camera' },
+        { text: 'Choose from Gallery', value: 'gallery' },
+        { text: 'Cancel', value: 'cancel', style: 'cancel' },
+      ];
+      let pickType: 'camera' | 'gallery' | 'cancel' = 'cancel';
+      
+      if (Platform.OS === 'ios') {
+        const { ActionSheetIOS } = await import('react-native');
+        await new Promise<void>(resolve => {
+          ActionSheetIOS.showActionSheetWithOptions(
+            {
+              options: options.map(o => o.text),
+              cancelButtonIndex: 2,
+            },
+            async (buttonIndex) => {
+              if (buttonIndex === 0) pickType = 'camera';
+              else if (buttonIndex === 1) pickType = 'gallery';
+              resolve();
+            }
+          );
+        });
+      } else {
+        pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(resolve => {
+          import('react-native').then(({ Alert }) => {
+            Alert.alert(
+              'Select Avatar Image',
+              'Choose an option',
+              [
+                { text: 'Take Photo', onPress: () => resolve('camera') },
+                { text: 'Choose from Gallery', onPress: () => resolve('gallery') },
+                { text: 'Cancel', style: 'cancel', onPress: () => resolve('cancel') },
+              ],
+              { cancelable: true }
+            );
+          });
+        });
+      }
+      
+      if (pickType === 'cancel') return;
+      
+      // Pick image
+      let result;
+      if (pickType === 'camera') {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          alert('Permission to access camera is required!');
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          allowsEditing: true,
+          quality: 0.8,
+          aspect: [1, 1], // Square aspect ratio for avatar
+        });
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          alert('Permission to access media library is required!');
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          quality: 0.8,
+          aspect: [1, 1], // Square aspect ratio for avatar
+        });
+      }
+      
+      if (!result || result.canceled || !result.assets || !result.assets[0]) return;
+      
+      const asset = result.assets[0];
+      setAvatarUploading(true);
+      
+      try {
+        const fileToUpload = {
+          uri: asset.uri,
+          name: `avatar-${currentUsername}-${Date.now()}.jpg`,
+          type: 'image/jpeg',
+        };
+        const cloudinaryUrl = await uploadImageToCloudinaryFixed(fileToUpload);
+        setNewAvatarImage(cloudinaryUrl);
+      } catch (err) {
+        alert('Image upload failed: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
+      }
+      
+      setAvatarUploading(false);
+    } catch (err) {
+      setAvatarUploading(false);
+      alert('Failed to pick image: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
+    }
+  };
+
+  const handleNextStep = () => {
+    // Move to active key input modal
+    setEditAvatarModalVisible(false);
+    setActiveKeyModalVisible(true);
+  };
+
+  const handleUpdateAvatar = async () => {
+    if (!newAvatarImage || !currentUsername || !activeKeyInput.trim()) return;
+    
+    setAvatarUpdateLoading(true);
+    setAvatarUpdateSuccess(false);
+    
+    try {
+      // Validate and create active key
+      let activeKey;
+      try {
+        const keyStr = activeKeyInput.trim();
+        // Basic validation: should start with 5 and be roughly the right length
+        if (!keyStr.startsWith('5') || keyStr.length < 50) {
+          throw new Error('Invalid key format');
+        }
+        activeKey = PrivateKey.fromString(keyStr);
+      } catch (err) {
+        throw new Error('Invalid active key format. Please check your key and try again.');
+      }
+      
+      // Get current account data to preserve existing metadata
+      const accounts = await client.database.getAccounts([currentUsername]);
+      if (!accounts || !accounts[0]) throw new Error('Account not found');
+      
+      const account = accounts[0];
+      
+      // Parse existing metadata and preserve it
+      let postingMeta = {};
+      let jsonMeta = {};
+      
+      // Parse posting_json_metadata
+      if (account.posting_json_metadata) {
+        try {
+          postingMeta = JSON.parse(account.posting_json_metadata);
+        } catch (err) {
+          console.log('Error parsing existing posting_json_metadata:', err);
+        }
+      }
+      
+      // Parse json_metadata  
+      if (account.json_metadata) {
+        try {
+          jsonMeta = JSON.parse(account.json_metadata);
+        } catch (err) {
+          console.log('Error parsing existing json_metadata:', err);
+        }
+      }
+      
+      // Update profile image in both metadata objects
+      const updatedPostingMeta = {
+        ...postingMeta,
+        profile: {
+          ...(postingMeta as any)?.profile,
+          profile_image: newAvatarImage,
+        },
+      };
+      
+      const updatedJsonMeta = {
+        ...jsonMeta,
+        profile: {
+          ...(jsonMeta as any)?.profile,
+          profile_image: newAvatarImage,
+        },
+      };
+      
+      // Broadcast account update - dhive uses account_update operation directly
+      const operation = [
+        'account_update',
+        {
+          account: currentUsername,
+          memo_key: account.memo_key,
+          json_metadata: JSON.stringify(updatedJsonMeta),
+          posting_json_metadata: JSON.stringify(updatedPostingMeta),
+        }
+      ] as const;
+      
+      await client.broadcast.sendOperations([operation], activeKey);
+      
+      setAvatarUpdateLoading(false);
+      setAvatarUpdateSuccess(true);
+      
+      // Clear sensitive data immediately
+      setActiveKeyInput('');
+      
+      // Clear any cached avatar data and refresh profile
+      setTimeout(async () => {
+        setActiveKeyModalVisible(false);
+        setEditAvatarModalVisible(false);
+        setNewAvatarImage(null);
+        setAvatarUpdateSuccess(false);
+        
+        // Refresh profile data to show new avatar
+        await fetchProfileData();
+      }, 2000);
+      
+    } catch (err) {
+      setAvatarUpdateLoading(false);
+      setAvatarUpdateSuccess(false);
+      // Clear sensitive data on error too
+      setActiveKeyInput('');
+      const errorMsg = err instanceof Error ? err.message : JSON.stringify(err);
+      alert('Failed to update profile image: ' + errorMsg);
+    }
+  };
+
   const isOwnProfile = currentUsername === username;
 
   return (
@@ -749,6 +975,19 @@ const ProfileScreen = () => {
                 </View>
               )}
             </View>
+
+            {/* Edit Profile Image Button (Only for own profile) */}
+            {isOwnProfile && (
+              <TouchableOpacity 
+                style={styles.editAvatarButton}
+                onPress={handleEditAvatarPress}
+              >
+                <FontAwesome name="camera" size={16} color={colors.icon} />
+                <Text style={[styles.editAvatarText, { color: colors.icon }]}>
+                  Edit Profile Image
+                </Text>
+              </TouchableOpacity>
+            )}
 
             {/* Display Name */}
             {profile.displayName && (
@@ -1100,6 +1339,278 @@ const ProfileScreen = () => {
           </Text>
         </View>
       )}
+      
+      {/* Edit Avatar Modal */}
+      <Modal
+        visible={editAvatarModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditAvatarModalVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: colors.background, borderRadius: 16, padding: 24, width: '90%', alignItems: 'center' }}>
+            <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>
+              Update Profile Image
+            </Text>
+            
+            {/* Current vs New Avatar Preview */}
+            <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 20 }}>
+              {/* Current Avatar */}
+              <View style={{ alignItems: 'center', flex: 1 }}>
+                <Text style={{ color: colors.text, fontSize: 14, marginBottom: 8 }}>Current</Text>
+                {profile?.avatarUrl ? (
+                  <Image source={{ uri: profile.avatarUrl }} style={{ width: 80, height: 80, borderRadius: 40 }} />
+                ) : (
+                  <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: colors.bubble, justifyContent: 'center', alignItems: 'center' }}>
+                    <FontAwesome name="user" size={40} color={colors.icon} />
+                  </View>
+                )}
+              </View>
+              
+              {/* Arrow */}
+              <FontAwesome name="arrow-right" size={20} color={colors.icon} style={{ marginHorizontal: 16 }} />
+              
+              {/* New Avatar */}
+              <View style={{ alignItems: 'center', flex: 1 }}>
+                <Text style={{ color: colors.text, fontSize: 14, marginBottom: 8 }}>New</Text>
+                {newAvatarImage ? (
+                  <Image source={{ uri: newAvatarImage }} style={{ width: 80, height: 80, borderRadius: 40 }} />
+                ) : (
+                  <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: colors.buttonInactive, justifyContent: 'center', alignItems: 'center' }}>
+                    <FontAwesome name="camera" size={30} color={colors.icon} />
+                  </View>
+                )}
+              </View>
+            </View>
+            
+            {/* Select Image Button */}
+            {!newAvatarImage && (
+              <Pressable
+                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.buttonInactive, borderRadius: 8, paddingVertical: 12, paddingHorizontal: 16, marginBottom: 16 }}
+                onPress={handleSelectNewAvatar}
+                disabled={avatarUploading || avatarUpdateLoading}
+              >
+                <FontAwesome name="image" size={20} color={colors.icon} style={{ marginRight: 8 }} />
+                <Text style={{ color: colors.text, fontWeight: '600' }}>
+                  {avatarUploading ? 'Uploading...' : 'Select New Image'}
+                </Text>
+                {avatarUploading && (
+                  <ActivityIndicator size="small" color={colors.icon} style={{ marginLeft: 8 }} />
+                )}
+              </Pressable>
+            )}
+            
+            {/* Change Image Button (if image already selected) */}
+            {newAvatarImage && !avatarUpdateLoading && !avatarUpdateSuccess && (
+              <Pressable
+                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.buttonInactive, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12, marginBottom: 16 }}
+                onPress={handleSelectNewAvatar}
+                disabled={avatarUploading}
+              >
+                <FontAwesome name="refresh" size={16} color={colors.icon} style={{ marginRight: 6 }} />
+                <Text style={{ color: colors.text, fontWeight: '500', fontSize: 14 }}>
+                  Change Image
+                </Text>
+              </Pressable>
+            )}
+            
+            {/* Action Buttons or Loading/Success States */}
+            {avatarUpdateLoading ? (
+              <View style={{ marginTop: 8, alignItems: 'center' }}>
+                <FontAwesome name="hourglass-half" size={32} color={colors.icon} />
+                <Text style={{ color: colors.text, marginTop: 8 }}>Updating profile...</Text>
+              </View>
+            ) : avatarUpdateSuccess ? (
+              <View style={{ marginTop: 8, alignItems: 'center' }}>
+                <FontAwesome name="check-circle" size={32} color={colors.button} />
+                <Text style={{ color: colors.text, marginTop: 8 }}>Profile updated!</Text>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', marginTop: 8 }}>
+                <Pressable
+                  style={{ flex: 1, marginRight: 8, backgroundColor: colors.buttonInactive, borderRadius: 8, padding: 12, alignItems: 'center' }}
+                  onPress={() => {
+                    setEditAvatarModalVisible(false);
+                    setNewAvatarImage(null);
+                    setActiveKeyInput(''); // Clear active key on cancel
+                  }}
+                  disabled={avatarUpdateLoading || avatarUploading}
+                >
+                  <Text style={{ color: colors.text, fontWeight: '600' }}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={{ 
+                    flex: 1, 
+                    marginLeft: 8, 
+                    backgroundColor: newAvatarImage ? colors.button : colors.buttonInactive, 
+                    borderRadius: 8, 
+                    padding: 12, 
+                    alignItems: 'center' 
+                  }}
+                  onPress={handleNextStep}
+                  disabled={!newAvatarImage || avatarUpdateLoading || avatarUploading}
+                >
+                  <Text style={{ 
+                    color: newAvatarImage ? colors.buttonText : colors.text, 
+                    fontWeight: '600' 
+                  }}>
+                    Next
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+      
+      {/* Active Key Input Modal (Second Step) */}
+      <Modal
+        visible={activeKeyModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setActiveKeyModalVisible(false);
+          setActiveKeyInput('');
+        }}
+      >
+        <KeyboardAvoidingView 
+          style={{ flex: 1 }} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }}>
+            <View style={{ backgroundColor: colors.background, borderRadius: 16, padding: 24, width: '90%', maxWidth: 400 }}>
+              <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 16, textAlign: 'center' }}>
+                Confirm Avatar Update
+              </Text>
+              
+              {/* Security Notice */}
+              <View style={{ backgroundColor: colors.bubble, borderRadius: 8, padding: 16, marginBottom: 20 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                  <FontAwesome name="shield" size={20} color={colors.icon} style={{ marginRight: 8 }} />
+                  <Text style={{ color: colors.text, fontSize: 16, fontWeight: '600' }}>Security Notice</Text>
+                </View>
+                <Text style={{ color: colors.text, fontSize: 14, lineHeight: 20 }}>
+                  To change your avatar, your active key is needed. This will be used to sign the transaction only. 
+                  It will not be stored on this phone for security reasons.
+                </Text>
+              </View>
+              
+              {/* Active Key Input */}
+              <View style={{ marginBottom: 20 }}>
+                <Text style={{ color: colors.text, fontSize: 15, marginBottom: 8 }}>
+                  Enter your active key:
+                </Text>
+                <View style={{ 
+                  borderWidth: 1, 
+                  borderColor: colors.buttonInactive, 
+                  borderRadius: 8, 
+                  backgroundColor: colors.background,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8
+                }}>
+                  <TextInput
+                    style={{ 
+                      color: colors.text, 
+                      fontSize: 16, 
+                      minHeight: 40,
+                      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+                    }}
+                    placeholder="5K... (your active private key)"
+                    placeholderTextColor={colors.buttonInactive}
+                    value={activeKeyInput}
+                    onChangeText={setActiveKeyInput}
+                    secureTextEntry={true}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    editable={!avatarUpdateLoading}
+                    multiline={true}
+                    textAlignVertical="top"
+                  />
+                </View>
+              </View>
+              
+              {/* Preview of change */}
+              <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 20 }}>
+                {/* Current Avatar */}
+                <View style={{ alignItems: 'center', flex: 1 }}>
+                  <Text style={{ color: colors.text, fontSize: 12, marginBottom: 4 }}>Current</Text>
+                  {profile?.avatarUrl ? (
+                    <Image source={{ uri: profile.avatarUrl }} style={{ width: 50, height: 50, borderRadius: 25 }} />
+                  ) : (
+                    <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: colors.bubble, justifyContent: 'center', alignItems: 'center' }}>
+                      <FontAwesome name="user" size={25} color={colors.icon} />
+                    </View>
+                  )}
+                </View>
+                
+                {/* Arrow */}
+                <FontAwesome name="arrow-right" size={16} color={colors.icon} style={{ marginHorizontal: 12 }} />
+                
+                {/* New Avatar */}
+                <View style={{ alignItems: 'center', flex: 1 }}>
+                  <Text style={{ color: colors.text, fontSize: 12, marginBottom: 4 }}>New</Text>
+                  {newAvatarImage && (
+                    <Image source={{ uri: newAvatarImage }} style={{ width: 50, height: 50, borderRadius: 25 }} />
+                  )}
+                </View>
+              </View>
+              
+              {/* Action Buttons or Loading/Success States */}
+              {avatarUpdateLoading ? (
+                <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+                  <FontAwesome name="hourglass-half" size={32} color={colors.icon} />
+                  <Text style={{ color: colors.text, marginTop: 8 }}>Signing transaction...</Text>
+                </View>
+              ) : avatarUpdateSuccess ? (
+                <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+                  <FontAwesome name="check-circle" size={32} color={colors.button} />
+                  <Text style={{ color: colors.text, marginTop: 8 }}>Avatar updated successfully!</Text>
+                </View>
+              ) : (
+                <View style={{ flexDirection: 'row' }}>
+                  <Pressable
+                    style={{ 
+                      flex: 1, 
+                      marginRight: 8, 
+                      backgroundColor: colors.buttonInactive, 
+                      borderRadius: 8, 
+                      padding: 12, 
+                      alignItems: 'center' 
+                    }}
+                    onPress={() => {
+                      setActiveKeyModalVisible(false);
+                      setActiveKeyInput('');
+                      setEditAvatarModalVisible(true); // Go back to first modal
+                    }}
+                    disabled={avatarUpdateLoading}
+                  >
+                    <Text style={{ color: colors.text, fontWeight: '600' }}>Back</Text>
+                  </Pressable>
+                  <Pressable
+                    style={{ 
+                      flex: 1, 
+                      marginLeft: 8, 
+                      backgroundColor: activeKeyInput.trim() ? colors.button : colors.buttonInactive, 
+                      borderRadius: 8, 
+                      padding: 12, 
+                      alignItems: 'center' 
+                    }}
+                    onPress={handleUpdateAvatar}
+                    disabled={!activeKeyInput.trim() || avatarUpdateLoading}
+                  >
+                    <Text style={{ 
+                      color: activeKeyInput.trim() ? colors.buttonText : colors.text, 
+                      fontWeight: '600' 
+                    }}>
+                      Sign Transaction
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaViewSA>
   );
 };
@@ -1153,6 +1664,20 @@ const styles = StyleSheet.create({
   defaultAvatar: {
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  editAvatarButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  editAvatarText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 6,
   },
   displayName: {
     fontSize: 18,

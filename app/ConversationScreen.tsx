@@ -1121,37 +1121,26 @@ const ConversationScreen = () => {
           <Text style={{ color: colors.text, fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>
             Reply to {replyTarget?.author}
           </Text>
-          {/* Reply modal composer */}
+          
+          {/* Reply image preview */}
+          {replyImage ? (
+            <View style={{ marginBottom: 10 }}>
+              <ExpoImage source={{ uri: replyImage }} style={{ width: 120, height: 120, borderRadius: 10 }} contentFit="cover" />
+              <TouchableOpacity onPress={() => setReplyImage(null)} style={{ position: 'absolute', top: 4, right: 4 }} disabled={posting}>
+                <FontAwesome name="close" size={20} color={colors.icon} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          
+          {/* Error message */}
+          {postError ? (
+            <Text style={{ color: 'red', marginBottom: 8 }}>{postError}</Text>
+          ) : null}
+          
+          {/* Reply input row */}
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={{ backgroundColor: colors.background, padding: 16, borderTopLeftRadius: 18, borderTopRightRadius: 18 }}
           >
-            <TextInput
-              value={replyText}
-              onChangeText={setReplyText}
-              style={{
-                minHeight: 60,
-                color: colors.text,
-                backgroundColor: colors.bubble,
-                borderRadius: 10,
-                padding: 10,
-                marginBottom: 10,
-              }}
-              placeholder="Write your reply..."
-              placeholderTextColor={isDark ? '#8899A6' : '#888'}
-              multiline
-            />
-            {replyImage ? (
-              <View style={{ marginBottom: 10 }}>
-                <ExpoImage source={{ uri: replyImage }} style={{ width: 120, height: 120, borderRadius: 10 }} contentFit="cover" />
-                <TouchableOpacity onPress={() => setReplyImage(null)} style={{ position: 'absolute', top: 4, right: 4 }} disabled={posting}>
-                  <FontAwesome name="close" size={20} color={colors.icon} />
-                </TouchableOpacity>
-              </View>
-            ) : null}
-            {postError ? (
-              <Text style={{ color: 'red', marginBottom: 8 }}>{postError}</Text>
-            ) : null}
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
               <TouchableOpacity onPress={handleAddImage} disabled={uploading || posting} style={{ marginRight: 16 }}>
                 <FontAwesome name="image" size={22} color={colors.icon} />
