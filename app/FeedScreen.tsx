@@ -372,32 +372,45 @@ const FeedScreen = () => {
     
     setFeedLoading(true);
     try {
-      // Get the most recent post by @peak.snaps (container account)
+      // Get recent container posts (same as newest feed for consistency)
       const discussions = await client.database.call('get_discussions_by_blog', [{
         tag: 'peak.snaps',
-        limit: 1
+        limit: 3 // Changed from 1 to 3 to match other feeds
       }]);
+      
       let allSnaps: Snap[] = [];
-      if (discussions && discussions.length > 0) {
-        const post = discussions[0];
-        // Get all replies (snaps) to the latest container post
-        allSnaps = await client.database.call('get_content_replies', [post.author, post.permlink]);
-        // Sort by payout (pending + total + curator) descending
-        allSnaps.sort((a, b) => {
-          const payoutA =
-            parseFloat(a.pending_payout_value ? a.pending_payout_value.replace(' HBD', '') : '0') +
-            parseFloat(a.total_payout_value ? a.total_payout_value.replace(' HBD', '') : '0') +
-            parseFloat(a.curator_payout_value ? a.curator_payout_value.replace(' HBD', '') : '0');
-          const payoutB =
-            parseFloat(b.pending_payout_value ? b.pending_payout_value.replace(' HBD', '') : '0') +
-            parseFloat(b.total_payout_value ? b.total_payout_value.replace(' HBD', '') : '0') +
-            parseFloat(b.curator_payout_value ? b.curator_payout_value.replace(' HBD', '') : '0');
-          return payoutB - payoutA;
-        });
-        // Limit for performance
-        allSnaps = allSnaps.slice(0, 50);
-      }
-      const enhanced = await enhanceSnapsWithAvatar(allSnaps);
+      
+      // Process container posts in parallel for better performance
+      const snapPromises = discussions.map(async (post: any) => {
+        try {
+          const replies: Snap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
+          return replies;
+        } catch (err) {
+          console.log('Error fetching replies for post:', post.permlink, err);
+          return [];
+        }
+      });
+      
+      const snapResults = await Promise.all(snapPromises);
+      allSnaps = snapResults.flat();
+      
+      // Sort by payout (pending + total + curator) descending
+      allSnaps.sort((a, b) => {
+        const payoutA =
+          parseFloat(a.pending_payout_value ? a.pending_payout_value.replace(' HBD', '') : '0') +
+          parseFloat(a.total_payout_value ? a.total_payout_value.replace(' HBD', '') : '0') +
+          parseFloat(a.curator_payout_value ? a.curator_payout_value.replace(' HBD', '') : '0');
+        const payoutB =
+          parseFloat(b.pending_payout_value ? b.pending_payout_value.replace(' HBD', '') : '0') +
+          parseFloat(b.total_payout_value ? b.total_payout_value.replace(' HBD', '') : '0') +
+          parseFloat(b.curator_payout_value ? b.curator_payout_value.replace(' HBD', '') : '0');
+        return payoutB - payoutA;
+      });
+      
+      // Limit to most recent 50 snaps for better performance
+      const limitedSnaps = allSnaps.slice(0, 50);
+      
+      const enhanced = await enhanceSnapsWithAvatar(limitedSnaps);
       setSnaps(enhanced);
       setCachedSnaps(cacheKey, enhanced);
       console.log('Fetched and cached trending snaps:', enhanced.length);
@@ -423,23 +436,37 @@ const FeedScreen = () => {
     
     setFeedLoading(true);
     try {
-      // Get the most recent post by @peak.snaps (container account)
+      // Get recent container posts (same as other feeds for consistency)
       const discussions = await client.database.call('get_discussions_by_blog', [{
         tag: 'peak.snaps',
-        limit: 1
+        limit: 3 // Changed from 1 to 3 to match other feeds
       }]);
+      
       let mySnaps: Snap[] = [];
+      
       if (discussions && discussions.length > 0 && username) {
-        const post = discussions[0];
-        // Get all replies (snaps) to the latest container post
-        const replies: Snap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
-        // Filter to only those by the logged-in user
-        mySnaps = replies.filter((reply) => reply.author === username);
+        // Process container posts in parallel for better performance
+        const snapPromises = discussions.map(async (post: any) => {
+          try {
+            const replies: Snap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
+            // Filter to only those by the logged-in user
+            return replies.filter((reply) => reply.author === username);
+          } catch (err) {
+            console.log('Error fetching replies for post:', post.permlink, err);
+            return [];
+          }
+        });
+        
+        const snapResults = await Promise.all(snapPromises);
+        mySnaps = snapResults.flat();
+        
         // Sort by created date descending
         mySnaps.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
+        
         // Limit for performance
         mySnaps = mySnaps.slice(0, 50);
       }
+      
       const enhanced = await enhanceSnapsWithAvatar(mySnaps);
       setSnaps(enhanced);
       setCachedSnaps(cacheKey, enhanced);
