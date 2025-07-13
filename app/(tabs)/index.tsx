@@ -111,7 +111,7 @@ export default function LoginScreen() {
       {autoLoading ? (
         // Show loading screen during auto-login check
         <View style={[styles.flexContainer, styles.loadingContainer]}>
-          <Image source={require('../../assets/images/logo.jpg')} style={styles.logo} resizeMode="contain" />
+          <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
           <ActivityIndicator size="large" color={colors.button} style={{ marginTop: 24 }} />
           <Text style={[styles.loadingText, { color: colors.info }]}>Checking credentials...</Text>
         </View>
@@ -125,8 +125,7 @@ export default function LoginScreen() {
             <View style={styles.flexContainer}>
               <View style={styles.innerContainer}>
                 {/* App logo at the top */}
-                <Image source={require('../../assets/images/logo.jpg')} style={styles.logo} resizeMode="contain" />
-                <Text style={[styles.title, { color: colors.text }]}>Hive Snaps Login</Text>
+                <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
                 <TextInput
                   style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text, width: FIELD_WIDTH }]}
                   placeholder="username do not use @"
@@ -191,8 +190,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logo: {
-    width: 120,
-    height: 120,
+    width: 200,
+    height: 200,
     marginBottom: 24,
   },
   title: {
