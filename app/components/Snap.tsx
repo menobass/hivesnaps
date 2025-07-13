@@ -296,7 +296,7 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
           <Image source={avatarUrl ? { uri: avatarUrl } : require('../../assets/images/logo.jpg')} style={styles.avatar} />       
           <Text style={[styles.username, { color: colors.text }]}>{author}</Text>
         </Pressable>
-        <Text style={[styles.timestamp, { color: colors.text }]}>{new Date(created).toLocaleString()}</Text>    
+        <Text style={[styles.timestamp, { color: colors.text }]}>{new Date(created + 'Z').toLocaleString()}</Text>    
       </View>
       {/* Video Player (YouTube, 3speak, IPFS) - Click to play */}
       {videoInfo && (

@@ -835,8 +835,8 @@ const ConversationScreen = () => {
                 </View>
               )}
               <Text style={[styles.replyAuthor, { color: colors.text, marginLeft: 10 }]}>{reply.author}</Text>
+              <Text style={[styles.snapTimestamp, { color: colors.text }]}>{reply.created ? new Date(reply.created + 'Z').toLocaleString() : ''}</Text>
             </Pressable>
-            <Text style={[styles.snapTimestamp, { color: colors.text }]}>{reply.created ? new Date(reply.created).toLocaleString() : ''}</Text>
           </View>
           {/* Video Player (YouTube, 3speak, IPFS) - Click to play */}
           {videoInfo && (
@@ -968,8 +968,8 @@ const ConversationScreen = () => {
               </View>
             )}
             <Text style={[styles.snapAuthor, { color: colors.text, marginLeft: 10 }]}>{snap.author}</Text>
+            <Text style={[styles.snapTimestamp, { color: colors.text }]}>{snap.created ? new Date(snap.created + 'Z').toLocaleString() : ''}</Text>
           </Pressable>
-          <Text style={[styles.snapTimestamp, { color: colors.text }]}>{snap.created ? new Date(snap.created).toLocaleString() : ''}</Text>
         </View>
         {/* Video Player (YouTube, 3speak, IPFS) - Click to play */}
         {videoInfo && (
