@@ -20,6 +20,7 @@ import { Dimensions } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import { extractImageUrls } from '../utils/extractImageUrls';
 import ImageView from 'react-native-image-viewing';
+import genericAvatar from '../assets/images/generic-avatar.png';
 
 // Utility to remove image markdown/html from text
 function stripImageTags(text: string): string {
@@ -828,11 +829,18 @@ const ConversationScreen = () => {
               accessibilityLabel={`View ${reply.author}'s profile`}
             >
               {reply.avatarUrl ? (
-                <ExpoImage source={{ uri: reply.avatarUrl }} style={styles.avatar} contentFit="cover" />
+                <ExpoImage
+                  source={reply.avatarUrl ? { uri: reply.avatarUrl } : genericAvatar}
+                  style={styles.avatar}
+                  contentFit="cover"
+                  onError={() => {}}
+                />
               ) : (
-                <View style={[styles.avatar, { backgroundColor: isDark ? '#22303C' : '#eee', justifyContent: 'center', alignItems: 'center' }]}> 
-                  <FontAwesome name="user" size={22} color={isDark ? '#8899A6' : '#bbb'} />
-                </View>
+                <ExpoImage
+                  source={genericAvatar}
+                  style={styles.avatar}
+                  contentFit="cover"
+                />
               )}
               <Text style={[styles.replyAuthor, { color: colors.text, marginLeft: 10 }]}>{reply.author}</Text>
               <Text style={[styles.snapTimestamp, { color: colors.text }]}>{reply.created ? new Date(reply.created + 'Z').toLocaleString() : ''}</Text>
@@ -961,11 +969,18 @@ const ConversationScreen = () => {
             accessibilityLabel={`View ${snap.author}'s profile`}
           >
             {snap.avatarUrl ? (
-              <ExpoImage source={{ uri: snap.avatarUrl }} style={styles.avatar} contentFit="cover" />
+              <ExpoImage
+                source={snap.avatarUrl ? { uri: snap.avatarUrl } : genericAvatar}
+                style={styles.avatar}
+                contentFit="cover"
+                onError={() => {}}
+              />
             ) : (
-              <View style={[styles.avatar, { backgroundColor: isDark ? '#22303C' : '#eee', justifyContent: 'center', alignItems: 'center' }]}> 
-                <FontAwesome name="user" size={22} color={isDark ? '#8899A6' : '#bbb'} />
-              </View>
+              <ExpoImage
+                source={genericAvatar}
+                style={styles.avatar}
+                contentFit="cover"
+              />
             )}
             <Text style={[styles.snapAuthor, { color: colors.text, marginLeft: 10 }]}>{snap.author}</Text>
             <Text style={[styles.snapTimestamp, { color: colors.text }]}>{snap.created ? new Date(snap.created + 'Z').toLocaleString() : ''}</Text>

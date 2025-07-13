@@ -29,7 +29,7 @@ export default function SnapMock() {
     <View style={[styles.bubble, { backgroundColor: colors.bubble, borderColor: colors.border }]}> 
       {/* Top row: avatar, username, timestamp */}
       <View style={styles.topRow}>
-        <Image source={require('../../assets/images/logo.jpg')} style={styles.avatar} />       
+        <Image source={require('../../assets/images/generic-avatar.png')} style={styles.avatar} />       
         <Text style={[styles.username, { color: colors.text }]}>menoshops</Text>
         <Text style={[styles.timestamp, { color: colors.text }]}>2025-06-24 14:32</Text>    
       </View>
