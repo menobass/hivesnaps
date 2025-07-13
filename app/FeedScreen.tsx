@@ -861,7 +861,7 @@ const FeedScreen = () => {
             ) : (
               <View style={{ position: 'relative' }}>
                 <Image
-                  source={avatarUrl ? { uri: avatarUrl } : require('../assets/images/logo.jpg')}
+                  source={avatarUrl ? { uri: avatarUrl } : require('../assets/images/generic-avatar.png')}
                   style={styles.avatar}
                 />
                 {/* Subtle reward indicator as avatar overlay */}

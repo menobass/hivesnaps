@@ -293,7 +293,7 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
           accessibilityRole="button"
           accessibilityLabel={`View ${author}'s profile`}
         >
-          <Image source={avatarUrl ? { uri: avatarUrl } : require('../../assets/images/logo.jpg')} style={styles.avatar} />       
+          <Image source={avatarUrl ? { uri: avatarUrl } : require('../../assets/images/generic-avatar.png')} style={styles.avatar} />       
           <Text style={[styles.username, { color: colors.text }]}>{author}</Text>
         </Pressable>
         <Text style={[styles.timestamp, { color: colors.text }]}>{new Date(created + 'Z').toLocaleString()}</Text>    
