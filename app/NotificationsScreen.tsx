@@ -39,12 +39,24 @@ interface NotificationItemProps {
   isDark: boolean;
 }
 
+
 const NotificationItem: React.FC<NotificationItemProps> = ({
   notification,
   onPress,
   onMarkAsRead,
   isDark,
 }) => {
+  // Convert UTC timestamp to local time before formatting
+  const rawTimestamp = notification.date;
+  // Parse as UTC and let JS handle local conversion
+  const localDate = typeof rawTimestamp === 'string' ? new Date(rawTimestamp + 'Z') : new Date(rawTimestamp);
+  const translatedTimestamp = formatNotificationTime(localDate.toISOString());
+  // Log both to console for inspection
+  console.log(`Notification ID: ${notification.id}`);
+  console.log(`Raw timestamp:`, rawTimestamp);
+  console.log(`Local date:`, localDate);
+  console.log(`Translated timestamp:`, translatedTimestamp);
+
   const handlePress = () => {
     if (!notification.read) {
       onMarkAsRead(notification.id);
@@ -90,7 +102,11 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
           </View>
           <View style={styles.notificationBottom}>
             <Text style={[styles.timeText, { color: isDark ? '#8899A6' : '#657786' }]}>
-              {formatNotificationTime(notification.date)}
+              {translatedTimestamp}
+            </Text>
+            {/* Debug: show raw timestamp in UI for now */}
+            <Text style={[styles.timeText, { color: '#E74C3C', fontSize: 11 }]}>
+              {String(rawTimestamp)}
             </Text>
             {notification.amount && (
               <Text style={[styles.amountText, { color: '#17BF63' }]}>
