@@ -62,6 +62,8 @@ const FeedScreen = () => {
   console.log('FeedScreen mounted'); // Debug log
 
   const [username, setUsername] = useState('');
+  // Voting Power info modal state
+  const [vpInfoModalVisible, setVpInfoModalVisible] = useState(false);
   // Voting power hook
   const { votingPower, loading: vpLoading, error: vpError } = useVotingPower(username);
   const [avatarUrl, setAvatarUrl] = useState('');
@@ -850,50 +852,88 @@ const FeedScreen = () => {
       <SafeAreaView style={{ backgroundColor: colors.background, paddingTop: insets.top }} edges={['top']}>
         <View style={styles.topBar}>
           {/* User avatar instead of logo */}
-          <Pressable
-            onPress={() => {
-              console.log('Navigating to ProfileScreen for:', username);
-              router.push(`/ProfileScreen?username=${username}` as any);
-            }}
-            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, flexDirection: 'row', alignItems: 'center', position: 'relative' }]}
-            accessibilityRole="button"
-            accessibilityLabel={`View your profile`}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color={colors.text} style={styles.avatar} />
-            ) : (
-              <View style={{ position: 'relative' }}>
-                <Image
-                  source={avatarUrl ? { uri: avatarUrl } : require('../assets/images/generic-avatar.png')}
-                  style={styles.avatar}
-                />
-                {/* Subtle reward indicator as avatar overlay */}
-                {hasUnclaimedRewards && (
-                  <View style={[styles.rewardIndicator, { 
-                    position: 'absolute', 
-                    top: -2, 
-                    right: -2, 
-                    backgroundColor: '#FFD700',
-                    borderWidth: 1,
-                    borderColor: colors.background
-                  }]}>
-                    <FontAwesome name="dollar" size={8} color="#FFF" />
-                  </View>
-                )}
-              </View>
-            )}
-            <Text style={[styles.username, { color: colors.text }]}>{username}</Text>
-            {/* Voting Power display */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', position: 'relative' }}>
+            <Pressable
+              onPress={() => {
+                console.log('Navigating to ProfileScreen for:', username);
+                router.push(`/ProfileScreen?username=${username}` as any);
+              }}
+              style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, flexDirection: 'row', alignItems: 'center' }]}
+              accessibilityRole="button"
+              accessibilityLabel={`View your profile`}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color={colors.text} style={styles.avatar} />
+              ) : (
+                <View style={{ position: 'relative' }}>
+                  <Image
+                    source={avatarUrl ? { uri: avatarUrl } : require('../assets/images/generic-avatar.png')}
+                    style={styles.avatar}
+                  />
+                  {/* Subtle reward indicator as avatar overlay */}
+                  {hasUnclaimedRewards && (
+                    <View style={[styles.rewardIndicator, { 
+                      position: 'absolute', 
+                      top: -2, 
+                      right: -2, 
+                      backgroundColor: '#FFD700',
+                      borderWidth: 1,
+                      borderColor: colors.background
+                    }]}> 
+                      <FontAwesome name="dollar" size={8} color="#FFF" />
+                    </View>
+                  )}
+                </View>
+              )}
+              <Text style={[styles.username, { color: colors.text }]}>{username}</Text>
+            </Pressable>
+            {/* Voting Power display and help icon as a single, larger Pressable */}
             {username && (
               vpLoading ? (
                 <ActivityIndicator size="small" color={colors.button} style={{ marginLeft: 8 }} />
               ) : (
-                <Text style={{ color: colors.button, fontSize: 14, fontWeight: 'bold', marginLeft: 8 }}>
-                  VP: {votingPower !== null ? (votingPower / 100).toFixed(2) : '--'}%
-                </Text>
+                <Pressable
+                  onPress={() => setVpInfoModalVisible(true)}
+                  style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', marginLeft: 8, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: pressed ? colors.buttonInactive : 'transparent' }]}
+                  accessibilityLabel="Show Voting Power info"
+                  accessibilityRole="button"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={{ color: colors.button, fontSize: 14, fontWeight: 'bold' }}>
+                    VP: {votingPower !== null ? (votingPower / 100).toFixed(2) : '--'}%
+                  </Text>
+                  <FontAwesome name="question-circle" size={18} color={colors.button} style={{ marginLeft: 6 }} />
+                </Pressable>
               )
             )}
-          </Pressable>
+            {/* Voting Power Info Modal */}
+            <Modal
+              visible={vpInfoModalVisible}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setVpInfoModalVisible(false)}
+            >
+              <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }}>
+                <View style={{ backgroundColor: colors.background, borderRadius: 16, padding: 24, width: '85%', alignItems: 'center' }}>
+                  <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>What is Voting Power (VP)?</Text>
+                  <Text style={{ color: colors.text, fontSize: 15, marginBottom: 18, textAlign: 'left' }}>
+                    Voting Power (VP) is a measure of your ability to upvote posts and comments on the Hive blockchain. The higher your VP, the more influence your votes have.{"\n\n"}
+                    - VP decreases each time you upvote.{"\n"}
+                    - VP regenerates automatically over time (about 20% per day).{"\n"}
+                    - Keeping your VP high means your votes have more impact.{"\n\n"}
+                    You can see your current VP in the top bar. After upvoting, your VP will drop slightly and recharge over time.
+                  </Text>
+                  <Pressable
+                    style={{ backgroundColor: colors.button, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 24, marginTop: 8 }}
+                    onPress={() => setVpInfoModalVisible(false)}
+                    accessibilityLabel="Close Voting Power info"
+                  >
+                    <Text style={{ color: colors.buttonText, fontWeight: '600', fontSize: 16 }}>Close</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </Modal>
+          </View>
         </View>
         {/* Slogan row */}
         <View style={styles.sloganRow}>
@@ -1154,10 +1194,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#E1E8ED',
   },
   username: {
-    flex: 1,
+    maxWidth: 120, // Prevent username from taking too much space
     fontSize: 18,
     fontWeight: 'bold',
     marginLeft: 4,
+    overflow: 'hidden', // Only works for View, but safe to keep for now
   },
   rewardIndicator: {
     width: 14,
