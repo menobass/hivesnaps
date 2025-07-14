@@ -12,6 +12,7 @@ import * as MediaLibrary from 'expo-media-library';
 import { useRouter } from 'expo-router';
 import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
 import { useNotifications } from '../hooks/useNotifications';
+import { useVotingPower } from '../hooks/useVotingPower';
 import ConversationScreen from './ConversationScreen';
 import ImageView from 'react-native-image-viewing';
 
@@ -61,6 +62,8 @@ const FeedScreen = () => {
   console.log('FeedScreen mounted'); // Debug log
 
   const [username, setUsername] = useState('');
+  // Voting power hook
+  const { votingPower, loading: vpLoading, error: vpError } = useVotingPower(username);
   const [avatarUrl, setAvatarUrl] = useState('');
   const [loading, setLoading] = useState(true);
   const [snaps, setSnaps] = useState<Snap[]>([]);
@@ -880,6 +883,16 @@ const FeedScreen = () => {
               </View>
             )}
             <Text style={[styles.username, { color: colors.text }]}>{username}</Text>
+            {/* Voting Power display */}
+            {username && (
+              vpLoading ? (
+                <ActivityIndicator size="small" color={colors.button} style={{ marginLeft: 8 }} />
+              ) : (
+                <Text style={{ color: colors.button, fontSize: 14, fontWeight: 'bold', marginLeft: 8 }}>
+                  VP: {votingPower !== null ? (votingPower / 100).toFixed(2) : '--'}%
+                </Text>
+              )
+            )}
           </Pressable>
         </View>
         {/* Slogan row */}
