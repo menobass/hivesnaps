@@ -120,6 +120,9 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
   );
 };
 
+
+
+
 const NotificationsScreen = () => {
   const colorScheme = useColorScheme() || 'light';
   const isDark = colorScheme === 'dark';
@@ -132,6 +135,8 @@ const NotificationsScreen = () => {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [settings, setSettings] = useState(getDefaultNotificationSettings());
 
+
+
   const colors = {
     background: isDark ? '#15202B' : '#fff',
     text: isDark ? '#D7DBDC' : '#0F1419',
@@ -140,6 +145,8 @@ const NotificationsScreen = () => {
     cardBackground: isDark ? '#1C2938' : '#F8F9FA',
     buttonBackground: isDark ? '#1DA1F2' : '#1DA1F2',
   };
+
+
 
   // Load username on mount
   useEffect(() => {
