@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
 import { useNotifications } from '../hooks/useNotifications';
 import { useVotingPower } from '../hooks/useVotingPower';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import ConversationScreen from './ConversationScreen';
 import ImageView from 'react-native-image-viewing';
 
@@ -78,7 +79,9 @@ const FeedScreen = () => {
   const [lastFetchTime, setLastFetchTime] = useState<Record<string, number>>({});
   const [upvoteModalVisible, setUpvoteModalVisible] = useState(false);
   const [upvoteTarget, setUpvoteTarget] = useState<{ author: string; permlink: string } | null>(null);
+  // Local state for upvote slider
   const [voteWeight, setVoteWeight] = useState(100);
+  const [voteWeightLoading, setVoteWeightLoading] = useState(false);
   const [upvoteLoading, setUpvoteLoading] = useState(false);
   const [upvoteSuccess, setUpvoteSuccess] = useState(false);
   // --- New Snap Modal State ---
@@ -522,9 +525,21 @@ const FeedScreen = () => {
   };
 
   // Corrected: Accepts { author, permlink } object
-  const handleUpvotePress = ({ author, permlink }: { author: string; permlink: string }) => {
+  const handleUpvotePress = async ({ author, permlink }: { author: string; permlink: string }) => {
     setUpvoteTarget({ author, permlink });
-    setVoteWeight(100);
+    setVoteWeightLoading(true);
+    // Load last vote weight from AsyncStorage only when modal opens
+    try {
+      const val = await AsyncStorage.getItem('hivesnaps_vote_weight');
+      if (val !== null) {
+        setVoteWeight(Number(val));
+      } else {
+        setVoteWeight(100);
+      }
+    } catch {
+      setVoteWeight(100);
+    }
+    setVoteWeightLoading(false);
     setUpvoteModalVisible(true);
     setPendingScrollToKey(author + '-' + permlink); // Remember which snap to scroll to
   };
@@ -532,7 +547,7 @@ const FeedScreen = () => {
   const handleUpvoteCancel = () => {
     setUpvoteModalVisible(false);
     setUpvoteTarget(null);
-    setVoteWeight(100);
+    // Do not reset voteWeight, keep last used value
   };
 
   const handleUpvoteConfirm = async () => {
@@ -561,6 +576,9 @@ const FeedScreen = () => {
         },
         postingKey
       );
+
+      // Persist the vote weight after successful vote
+      await AsyncStorage.setItem('hivesnaps_vote_weight', String(voteWeight));
 
       setUpvoteLoading(false);
       setUpvoteSuccess(true);
@@ -806,17 +824,23 @@ const FeedScreen = () => {
           <View style={{ backgroundColor: colors.background, borderRadius: 16, padding: 24, width: '85%', alignItems: 'center' }}>
             <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>Upvote Snap</Text>
             <Text style={{ color: colors.text, fontSize: 15, marginBottom: 16 }}>Vote Weight: {voteWeight}%</Text>
-            <Slider
-              style={{ width: '100%', height: 40 }}
-              minimumValue={1}
-              maximumValue={100}
-              step={1}
-              value={voteWeight}
-              onValueChange={setVoteWeight}
-              minimumTrackTintColor={colors.button}
-              maximumTrackTintColor={colors.buttonInactive}
-              thumbTintColor={colors.button}
-            />
+            {/* Show loading indicator if vote weight is loading */}
+            {voteWeightLoading ? (
+              <ActivityIndicator size="small" color={colors.button} style={{ marginVertical: 16 }} />
+            ) : (
+              <Slider
+                style={{ width: '100%', height: 40 }}
+                minimumValue={1}
+                maximumValue={100}
+                step={1}
+                value={voteWeight}
+                onValueChange={val => setVoteWeight(val)}
+                onSlidingComplete={val => setVoteWeight(val)}
+                minimumTrackTintColor={colors.button}
+                maximumTrackTintColor={colors.buttonInactive}
+                thumbTintColor={colors.button}
+              />
+            )}
             {upvoteLoading ? (
               <View style={{ marginTop: 24, alignItems: 'center' }}>
                 <FontAwesome name="hourglass-half" size={32} color={colors.icon} />
