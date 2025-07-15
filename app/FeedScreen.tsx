@@ -16,6 +16,9 @@ import { useVotingPower } from '../hooks/useVotingPower';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ConversationScreen from './ConversationScreen';
 import ImageView from 'react-native-image-viewing';
+import { calculateVoteValue } from '../utils/calculateVoteValue';
+import { getHivePriceUSD } from '../utils/getHivePrice';
+
 
 const twitterColors = {
   light: {
@@ -60,9 +63,61 @@ interface Snap {
 }
 
 const FeedScreen = () => {
+  // HIVE price in USD for vote value calculation
+  const [hivePrice, setHivePrice] = useState<number>(1);
+
+  // Fetch HIVE price on mount
+  useEffect(() => {
+    const fetchHivePrice = async () => {
+      try {
+        const price = await getHivePriceUSD();
+        if (price > 0) setHivePrice(price);
+      } catch (err) {
+        console.log('[HivePriceDebug] Error fetching HIVE price:', err);
+        setHivePrice(1);
+      }
+    };
+    fetchHivePrice();
+  }, []);
+  // Hive reward fund for vote value calculation
+  const [rewardFund, setRewardFund] = useState<any | null>(null);
+
+  // Fetch Hive global properties and reward fund on mount
+  useEffect(() => {
+    const fetchHiveProps = async () => {
+      try {
+        const props = await client.database.getDynamicGlobalProperties();
+        setGlobalProps(props);
+        const fund = await client.database.call('get_reward_fund', ['post']);
+        setRewardFund(fund);
+      } catch (err) {
+        console.log('Error fetching Hive globalProps or rewardFund:', err);
+        setGlobalProps(null);
+        setRewardFund(null);
+      }
+    };
+    fetchHiveProps();
+  }, []);
   console.log('FeedScreen mounted'); // Debug log
 
   const [username, setUsername] = useState('');
+  // Estimated Hive vote value for upvote modal
+  const [voteValue, setVoteValue] = useState<{ hbd: string, usd: string } | null>(null);
+  // Hive global properties for vote value calculation
+  const [globalProps, setGlobalProps] = useState<any | null>(null);
+  // Fetch Hive global properties on mount
+  useEffect(() => {
+    const fetchGlobalProps = async () => {
+      try {
+        const props = await client.database.getDynamicGlobalProperties();
+        setGlobalProps(props);
+      } catch (err) {
+        console.log('Error fetching Hive globalProps:', err);
+        setGlobalProps(null);
+      }
+    };
+    fetchGlobalProps();
+  }, []);
   // Voting Power info modal state
   const [vpInfoModalVisible, setVpInfoModalVisible] = useState(false);
   // Voting power hook
@@ -528,16 +583,46 @@ const FeedScreen = () => {
   const handleUpvotePress = async ({ author, permlink }: { author: string; permlink: string }) => {
     setUpvoteTarget({ author, permlink });
     setVoteWeightLoading(true);
-    // Load last vote weight from AsyncStorage only when modal opens
     try {
       const val = await AsyncStorage.getItem('hivesnaps_vote_weight');
-      if (val !== null) {
-        setVoteWeight(Number(val));
+      const weight = val !== null ? Number(val) : 100;
+      setVoteWeight(weight);
+      // Fetch account object for vote value calculation
+      let accountObj = null;
+      if (username) {
+        const accounts = await client.database.getAccounts([username]);
+        accountObj = accounts && accounts[0] ? accounts[0] : null;
+      }
+      // Calculate initial vote value
+      if (accountObj && globalProps && rewardFund) {
+        console.log('[VoteValueDebug] accountObj:', accountObj);
+        console.log('[VoteValueDebug] globalProps:', globalProps);
+        console.log('[VoteValueDebug] rewardFund:', rewardFund);
+        console.log('[VoteValueDebug] hivePrice:', hivePrice);
+        const calcValue = calculateVoteValue(accountObj, globalProps, rewardFund, weight, hivePrice);
+        console.log('[VoteValueDebug] calculateVoteValue result:', calcValue);
+        setVoteValue(calcValue);
       } else {
-        setVoteWeight(100);
+        setVoteValue(null);
       }
     } catch {
       setVoteWeight(100);
+      let accountObj = null;
+      if (username) {
+        const accounts = await client.database.getAccounts([username]);
+        accountObj = accounts && accounts[0] ? accounts[0] : null;
+      }
+      if (accountObj && globalProps && rewardFund) {
+        console.log('[VoteValueDebug] accountObj:', accountObj);
+        console.log('[VoteValueDebug] globalProps:', globalProps);
+        console.log('[VoteValueDebug] rewardFund:', rewardFund);
+        console.log('[VoteValueDebug] hivePrice:', hivePrice);
+        const calcValue = calculateVoteValue(accountObj, globalProps, rewardFund, 100, hivePrice);
+        console.log('[VoteValueDebug] calculateVoteValue result:', calcValue);
+        setVoteValue(calcValue);
+      } else {
+        setVoteValue(null);
+      }
     }
     setVoteWeightLoading(false);
     setUpvoteModalVisible(true);
@@ -547,6 +632,7 @@ const FeedScreen = () => {
   const handleUpvoteCancel = () => {
     setUpvoteModalVisible(false);
     setUpvoteTarget(null);
+    setVoteValue(null);
     // Do not reset voteWeight, keep last used value
   };
 
@@ -828,18 +914,67 @@ const FeedScreen = () => {
             {voteWeightLoading ? (
               <ActivityIndicator size="small" color={colors.button} style={{ marginVertical: 16 }} />
             ) : (
-              <Slider
-                style={{ width: '100%', height: 40 }}
-                minimumValue={1}
-                maximumValue={100}
-                step={1}
-                value={voteWeight}
-                onValueChange={val => setVoteWeight(val)}
-                onSlidingComplete={val => setVoteWeight(val)}
-                minimumTrackTintColor={colors.button}
-                maximumTrackTintColor={colors.buttonInactive}
-                thumbTintColor={colors.button}
-              />
+              <>
+                <Slider
+                  style={{ width: '100%', height: 40 }}
+                  minimumValue={1}
+                  maximumValue={100}
+                  step={1}
+                  value={voteWeight}
+                  onValueChange={async val => {
+                    setVoteWeight(val);
+                    // Live update vote value
+                    let accountObj = null;
+                    if (username) {
+                      const accounts = await client.database.getAccounts([username]);
+                      accountObj = accounts && accounts[0] ? accounts[0] : null;
+                    }
+                    if (accountObj && globalProps && rewardFund) {
+                      console.log('[VoteValueDebug] accountObj:', accountObj);
+                      console.log('[VoteValueDebug] globalProps:', globalProps);
+                      console.log('[VoteValueDebug] rewardFund:', rewardFund);
+                      console.log('[VoteValueDebug] hivePrice:', hivePrice);
+                      const calcValue = calculateVoteValue(accountObj, globalProps, rewardFund, val, hivePrice);
+                      console.log('[VoteValueDebug] calculateVoteValue result:', calcValue);
+                      setVoteValue(calcValue);
+                    } else {
+                      setVoteValue(null);
+                    }
+                  }}
+                  onSlidingComplete={async val => {
+                    setVoteWeight(val);
+                    // Live update vote value
+                    let accountObj = null;
+                    if (username) {
+                      const accounts = await client.database.getAccounts([username]);
+                      accountObj = accounts && accounts[0] ? accounts[0] : null;
+                    }
+                    if (accountObj && globalProps && rewardFund) {
+                      console.log('[VoteValueDebug] accountObj:', accountObj);
+                      console.log('[VoteValueDebug] globalProps:', globalProps);
+                      console.log('[VoteValueDebug] rewardFund:', rewardFund);
+                      console.log('[VoteValueDebug] hivePrice:', hivePrice);
+                      const calcValue = calculateVoteValue(accountObj, globalProps, rewardFund, val, hivePrice);
+                      console.log('[VoteValueDebug] calculateVoteValue result:', calcValue);
+                      setVoteValue(calcValue);
+                    } else {
+                      setVoteValue(null);
+                    }
+                  }}
+                  minimumTrackTintColor={colors.button}
+                  maximumTrackTintColor={colors.buttonInactive}
+                  thumbTintColor={colors.button}
+                />
+                {/* Show estimated vote value below slider */}
+                {voteValue !== null && (
+                  <Text style={{ color: colors.text, fontSize: 15, marginTop: 8 }}>
+                    Estimated Vote Value: {voteValue?.hbd ?? '0.000'} HBD
+                    {voteValue?.usd && (
+                      <> {' '}(${voteValue.usd} USD @ {hivePrice.toFixed(3)} per HIVE)</>
+                    )}
+                  </Text>
+                )}
+              </>
             )}
             {upvoteLoading ? (
               <View style={{ marginTop: 24, alignItems: 'center' }}>
