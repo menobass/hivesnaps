@@ -256,18 +256,23 @@ const FeedScreen = () => {
     const authors = Array.from(new Set(snaps.map(s => s.author)));
     const now = Date.now();
     const AVATAR_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-    
+
+    // Helper to update snaps state for a given author
+    const updateSnapsWithAvatar = (author: string, url: string) => {
+      setSnaps(prevSnaps => prevSnaps.map(snap =>
+        snap.author === author ? { ...snap, avatarUrl: url } : snap
+      ));
+    };
+
     const uncachedAuthors = authors.filter(author => {
       const cached = avatarCache[author];
       return !cached || (now - cached.timestamp) > AVATAR_CACHE_DURATION;
     });
-    
+
     // Only fetch accounts for authors not in cache or with expired cache
     if (uncachedAuthors.length > 0) {
       try {
         const accounts = await client.database.getAccounts(uncachedAuthors);
-        const newAvatars: Record<string, { url: string; timestamp: number }> = {};
-        
         for (const acc of accounts) {
           let meta = null;
           // Try posting_json_metadata first (most up-to-date)
@@ -282,23 +287,23 @@ const FeedScreen = () => {
               meta = JSON.parse(acc.json_metadata);
             } catch {}
           }
-          const url = meta && meta.profile && meta.profile.profile_image 
-            ? meta.profile.profile_image.replace(/[\\/]+$/, '') 
+          const url = meta && meta.profile && meta.profile.profile_image
+            ? meta.profile.profile_image.replace(/[\\/]+$/, '')
             : '';
-          newAvatars[acc.name] = { url, timestamp: now };
+          // Update avatar cache for this author
+          setAvatarCache(prev => ({ ...prev, [acc.name]: { url, timestamp: now } }));
+          // Progressive update: update snaps state for this author
+          updateSnapsWithAvatar(acc.name, url);
         }
-        
-        // Update avatar cache
-        setAvatarCache(prev => ({ ...prev, ...newAvatars }));
       } catch (e) {
         console.log('Error fetching accounts for avatars:', e);
       }
     }
-    
-    // Use cached avatars
-    return snaps.map(snap => ({ 
-      ...snap, 
-      avatarUrl: avatarCache[snap.author]?.url || '' 
+
+    // After all, ensure all snaps have the latest avatar URLs (from cache)
+    return snaps.map(snap => ({
+      ...snap,
+      avatarUrl: avatarCache[snap.author]?.url || ''
     }));
   };
 
