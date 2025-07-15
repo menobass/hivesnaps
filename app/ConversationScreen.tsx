@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { SafeAreaView as SafeAreaViewRN } from 'react-native';
 import { SafeAreaView as SafeAreaViewSA, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, FlatList, useColorScheme, Image, Pressable, ScrollView, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, FlatList, useColorScheme, Image, Pressable, ScrollView, Linking, ActivityIndicator } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
@@ -13,6 +13,9 @@ import { WebView } from 'react-native-webview';
 import { extractVideoInfo, removeVideoUrls, extractYouTubeId } from '../utils/extractVideoInfo';
 import * as SecureStore from 'expo-secure-store';
 import Slider from '@react-native-community/slider';
+import { useVoteWeightMemory } from '../hooks/useVoteWeightMemory';
+import { calculateVoteValue } from '../utils/calculateVoteValue';
+import { getHivePriceUSD } from '../utils/getHivePrice';
 import IPFSVideoPlayer from './components/IPFSVideoPlayer';
 import { Image as ExpoImage } from 'expo-image';
 import RenderHtml, { defaultHTMLElementModels, HTMLContentModel } from 'react-native-render-html';
@@ -100,9 +103,50 @@ const ConversationScreen = () => {
   // Upvote modal state
   const [upvoteModalVisible, setUpvoteModalVisible] = useState(false);
   const [upvoteTarget, setUpvoteTarget] = useState<{ author: string; permlink: string } | null>(null);
-  const [voteWeight, setVoteWeight] = useState(100);
+  const { voteWeight, setVoteWeight, persistVoteWeight, loading: voteWeightLoading } = useVoteWeightMemory(100);
   const [upvoteLoading, setUpvoteLoading] = useState(false);
   const [upvoteSuccess, setUpvoteSuccess] = useState(false);
+  const [voteValue, setVoteValue] = useState<{ hbd: string, usd: string } | null>(null);
+  const [globalProps, setGlobalProps] = useState<any | null>(null);
+  const [rewardFund, setRewardFund] = useState<any | null>(null);
+  const [hivePrice, setHivePrice] = useState<number>(1);
+
+  // Fetch Hive global props, reward fund, and price on mount
+  React.useEffect(() => {
+    const fetchProps = async () => {
+      try {
+        const props = await client.database.getDynamicGlobalProperties();
+        setGlobalProps(props);
+        const fund = await client.database.call('get_reward_fund', ['post']);
+        setRewardFund(fund);
+      } catch (err) {
+        setGlobalProps(null);
+        setRewardFund(null);
+      }
+    };
+    fetchProps();
+    getHivePriceUSD().then(setHivePrice);
+  }, []);
+
+  // Update vote value estimate when modal opens or voteWeight changes
+  React.useEffect(() => {
+    const updateValue = async () => {
+      if (!currentUsername || !upvoteModalVisible) return;
+      try {
+        const accounts = await client.database.getAccounts([currentUsername]);
+        const accountObj = accounts && accounts[0] ? accounts[0] : null;
+        if (accountObj && globalProps && rewardFund) {
+          const calcValue = calculateVoteValue(accountObj, globalProps, rewardFund, voteWeight, hivePrice);
+          setVoteValue(calcValue);
+        } else {
+          setVoteValue(null);
+        }
+      } catch {
+        setVoteValue(null);
+      }
+    };
+    updateValue();
+  }, [voteWeight, upvoteModalVisible, currentUsername, globalProps, rewardFund, hivePrice]);
 
   // Load user credentials on mount
   React.useEffect(() => {
@@ -116,6 +160,9 @@ const ConversationScreen = () => {
     };
     loadCredentials();
   }, []);
+
+  // In-memory avatar/profile cache for this session
+  const avatarProfileCache: Record<string, string | undefined> = {};
 
   // Recursively fetch replies, ensuring each reply has full content (including payout info and avatar)
   async function fetchRepliesTreeWithContent(author: string, permlink: string, depth = 0, maxDepth = 3): Promise<any[]> {
@@ -133,46 +180,54 @@ const ConversationScreen = () => {
     });
     const data = await res.json();
     const shallowReplies = data.result || [];
-    // For each reply, fetch full content and recurse
-    const fullReplies: ReplyData[] = [];
-    for (const reply of shallowReplies) {
-      // Fetch full content for this reply
-      let fullReply;
+
+    // Batch fetch full content for all replies in parallel
+    const fullContentArr = await Promise.all(
+      shallowReplies.map((reply: { author: string; permlink: string }) =>
+        client.database.call('get_content', [reply.author, reply.permlink])
+          .catch(() => reply)
+      )
+    );
+
+    // Collect all unique authors for avatar batch fetch, skipping those already cached
+    const authorsToFetch = Array.from(new Set(fullContentArr.map(r => r.author))).filter(a => !(a in avatarProfileCache));
+    let accountsArr: any[] = [];
+    if (authorsToFetch.length > 0) {
       try {
-        fullReply = await client.database.call('get_content', [reply.author, reply.permlink]);
+        accountsArr = await client.database.call('get_accounts', [authorsToFetch]);
       } catch (e) {
-        fullReply = reply; // fallback
+        accountsArr = [];
       }
-      // Fetch avatar for reply author
-      let avatarUrl: string | undefined = undefined;
-      try {
-        const accounts = await client.database.call('get_accounts', [[fullReply.author]]);
-        if (accounts && accounts[0]) {
-          let meta = accounts[0].posting_json_metadata;
-          if (!meta || meta === '{}') {
-            meta = accounts[0].json_metadata;
-          }
-          if (meta) {
-            let profile;
-            try {
-              profile = JSON.parse(meta).profile;
-            } catch (e) {
-              profile = undefined;
-            }
-            if (profile && profile.profile_image) {
-              avatarUrl = profile.profile_image;
-            }
-          }
+      // Update cache with fetched avatars
+      for (const acc of accountsArr) {
+        let meta = acc.posting_json_metadata;
+        if (!meta || meta === '{}') {
+          meta = acc.json_metadata;
         }
-      } catch (e) {
-        // Avatar fetch fail fallback
+        if (meta) {
+          let profile;
+          try {
+            profile = JSON.parse(meta).profile;
+          } catch (e) {
+            profile = undefined;
+          }
+          if (profile && profile.profile_image) {
+            avatarProfileCache[acc.name] = profile.profile_image;
+          } else {
+            avatarProfileCache[acc.name] = undefined;
+          }
+        } else {
+          avatarProfileCache[acc.name] = undefined;
+        }
       }
-      // Parse payout
+    }
+
+    // Build replies with avatar and recurse
+    const fullReplies: ReplyData[] = await Promise.all(fullContentArr.map(async (fullReply) => {
+      const avatarUrl = avatarProfileCache[fullReply.author];
       const payout = parseFloat(fullReply.pending_payout_value ? fullReply.pending_payout_value.replace(' HBD', '') : '0');
-      // Recursively fetch children
-      const childrenReplies = await fetchRepliesTreeWithContent(reply.author, reply.permlink, depth + 1, maxDepth);
-      // Build reply object
-      fullReplies.push({
+      const childrenReplies = await fetchRepliesTreeWithContent(fullReply.author, fullReply.permlink, depth + 1, maxDepth);
+      return {
         author: fullReply.author,
         avatarUrl,
         body: fullReply.body,
@@ -183,8 +238,8 @@ const ConversationScreen = () => {
         permlink: fullReply.permlink,
         active_votes: fullReply.active_votes, // Keep the raw active_votes data
         replies: childrenReplies,
-      });
-    }
+      };
+    }));
     return fullReplies;
   }
 
@@ -420,14 +475,14 @@ const ConversationScreen = () => {
   // --- Upvote handlers ---
   const handleUpvotePress = ({ author, permlink }: { author: string; permlink: string }) => {
     setUpvoteTarget({ author, permlink });
-    setVoteWeight(100);
     setUpvoteModalVisible(true);
   };
 
   const handleUpvoteCancel = () => {
     setUpvoteModalVisible(false);
     setUpvoteTarget(null);
-    setVoteWeight(100);
+    setVoteValue(null);
+    // Do not reset voteWeight, keep last used value
   };
 
   const handleUpvoteConfirm = async () => {
@@ -450,6 +505,7 @@ const ConversationScreen = () => {
         },
         postingKey
       );
+      persistVoteWeight();
       // Optimistically update UI
       setSnap((prev) =>
         prev && prev.author === upvoteTarget.author && prev.permlink === upvoteTarget.permlink
@@ -464,7 +520,7 @@ const ConversationScreen = () => {
           : prev
       );
       setReplies((prevReplies) =>
-        prevReplies.map((reply) =>
+        prevReplies.map((reply: ReplyData) =>
           updateReplyUpvoteOptimistic(reply, upvoteTarget, currentUsername, weight)
         )
       );
@@ -1233,17 +1289,28 @@ const ConversationScreen = () => {
         <View style={{ backgroundColor: colors.background, borderRadius: 16, padding: 24, width: '85%', alignItems: 'center' }}>
           <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>Upvote</Text>
           <Text style={{ color: colors.text, fontSize: 15, marginBottom: 16 }}>Vote Weight: {voteWeight}%</Text>
-          <Slider
-            style={{ width: '100%', height: 40 }}
-            minimumValue={1}
-            maximumValue={100}
-            step={1}
-            value={voteWeight}
-            onValueChange={setVoteWeight}
-            minimumTrackTintColor={colors.icon}
-            maximumTrackTintColor={colors.border}
-            thumbTintColor={colors.icon}
-          />
+          {voteWeightLoading ? (
+            <ActivityIndicator size="small" color={colors.icon} style={{ marginVertical: 16 }} />
+          ) : (
+            <>
+              <Slider
+                style={{ width: '100%', height: 40 }}
+                minimumValue={1}
+                maximumValue={100}
+                step={1}
+                value={voteWeight}
+                onValueChange={setVoteWeight}
+                minimumTrackTintColor={colors.icon}
+                maximumTrackTintColor={colors.border}
+                thumbTintColor={colors.icon}
+              />
+              {voteValue && (
+                <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginTop: 12 }}>
+                  ${voteValue.usd} USD
+                </Text>
+              )}
+            </>
+          )}
           {upvoteLoading ? (
             <View style={{ marginTop: 24, alignItems: 'center' }}>
               <FontAwesome name="hourglass-half" size={32} color={colors.icon} />
