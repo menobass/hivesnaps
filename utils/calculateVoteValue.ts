@@ -32,21 +32,30 @@ export function calculateVoteValue(
   const delegatedVestingShares = parseFloat((account.delegated_vesting_shares || '0').replace(' VESTS', ''));
   const effectiveVests = vestingShares + receivedVestingShares - delegatedVestingShares;
 
-  // Calculate Hive Power conversion ratio
+  // Get global blockchain parameters
   const totalVestingShares = parseFloat(globalProps.total_vesting_shares.replace(' VESTS', ''));
   const totalVestingFundHive = parseFloat(globalProps.total_vesting_fund_hive.replace(' HIVE', ''));
-  const vestingToHp = totalVestingFundHive / totalVestingShares;
-  const hp = effectiveVests * vestingToHp;
 
-  // Voting mana (0-10000)
+  // Convert HP to VESTS (if you want to use HP as input, otherwise use effectiveVests directly)
+  // const hp = effectiveVests * (totalVestingFundHive / totalVestingShares);
+  // const totalVests = (hp * totalVestingShares) / totalVestingFundHive;
+  // For now, use effectiveVests as VESTS
+  const totalVests = effectiveVests;
+
+  // Voting power and vote weight
   const votingPower = account.voting_power || 10000; // out of 10000
-  // voteWeight: 1-100 (slider)
-  const voteWeightRatio = voteWeight / 100;
-
-  // Ecency/legacy frontend rshares formula (division by 200)
-  // rshares = Math.floor((votingPower * effectiveVests * voteWeightBP) / 10000 / 10000 / 200)
   const voteWeightBP = Math.round(voteWeight * 100); // basis points (1-10000)
-  const rshares = Math.floor((votingPower * effectiveVests * voteWeightBP) / 10000 / 10000 / 200);
+
+  // Calculate vote strength and weight as percent
+  const voteStrength = Math.min(Math.max(votingPower / 100, 0), 100);
+  const voteWeightPercent = Math.min(Math.max(voteWeightBP / 100, 0), 100);
+  const votePowerFactor = (voteStrength / 100) * (voteWeightPercent / 100);
+
+  // Official Hive rshares formula
+  // rshares = voting_power * vests * 1e6 / 10000
+  const finalVest = totalVests * 1e6;
+  const power = (votePowerFactor * 10000) / 50;
+  const rshares = (power * finalVest) / 10000;
 
   // Reward fund
   const recentClaims = parseFloat(rewardFund.recent_claims);

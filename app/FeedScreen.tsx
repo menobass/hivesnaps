@@ -965,15 +965,12 @@ const FeedScreen = () => {
                   maximumTrackTintColor={colors.buttonInactive}
                   thumbTintColor={colors.button}
                 />
-                {/* Show estimated vote value below slider */}
-                {voteValue !== null && (
-                  <Text style={{ color: colors.text, fontSize: 15, marginTop: 8 }}>
-                    Estimated Vote Value: {voteValue?.hbd ?? '0.000'} HBD
-                    {voteValue?.usd && (
-                      <> {' '}(${voteValue.usd} USD @ {hivePrice.toFixed(3)} per HIVE)</>
-                    )}
-                  </Text>
-                )}
+            {/* Show only USD value below slider, live update */}
+            {voteValue !== null && (
+              <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginTop: 12 }}>
+                ${voteValue.usd} USD
+              </Text>
+            )}
               </>
             )}
             {upvoteLoading ? (
