@@ -46,6 +46,8 @@ interface SnapProps {
   onUserPress?: (username: string) => void; // NEW: handler for username/avatar press
   onContentPress?: () => void; // NEW: handler for content/text press
   onImagePress?: (imageUrl: string) => void; // NEW: handler for image press
+  showAuthor?: boolean; // Optional: show author info in Snap bubble
+  onHashtagPress?: (hashtag: string) => void; // Optional: handle hashtag press
 }
 
 // Utility to extract raw image URLs from text (not in markdown or html)
@@ -232,7 +234,28 @@ const markdownRules = {
   // ...existing code...
 };
 
-const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount = 0, replyCount = 0, payout = 0, onUpvotePress, permlink, hasUpvoted = false, onSpeechBubblePress, onUserPress, onContentPress, onImagePress }) => {
+const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount = 0, replyCount = 0, payout = 0, onUpvotePress, permlink, hasUpvoted = false, onSpeechBubblePress, onUserPress, onContentPress, onImagePress, showAuthor = false, onHashtagPress }) => {
+  // Hashtag parsing: split text and wrap hashtags in clickable Text
+  function renderBodyWithHashtags(text: string) {
+    const hashtagRegex = /(#\w+)/g;
+    const parts = text.split(hashtagRegex);
+    return parts.map((part, idx) => {
+      if (hashtagRegex.test(part)) {
+        const tag = part.replace('#', '');
+        return (
+          <Text
+            key={idx}
+            style={{ color: '#1DA1F2' }}
+            onPress={() => onHashtagPress && onHashtagPress(tag)}
+          >
+            {part}
+          </Text>
+        );
+      } else {
+        return <Text key={idx}>{part}</Text>;
+      }
+    });
+  }
   const colorScheme = useColorScheme() || 'light';
   const isDark = colorScheme === 'dark';
   const colors = twitterColors[colorScheme];
@@ -284,20 +307,22 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
           </View>
         </View>
       </Modal>
-      {/* Top row: avatar, username, timestamp */}
-      <View style={styles.topRow}>
-        <Pressable
-          onPress={() => onUserPress && onUserPress(author)}
-          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, flexDirection: 'row', alignItems: 'center' }]}
-          disabled={!onUserPress}
-          accessibilityRole="button"
-          accessibilityLabel={`View ${author}'s profile`}
-        >
-          <Image source={avatarUrl ? { uri: avatarUrl } : require('../../assets/images/generic-avatar.png')} style={styles.avatar} />       
-          <Text style={[styles.username, { color: colors.text }]}>{author}</Text>
-        </Pressable>
-        <Text style={[styles.timestamp, { color: colors.text }]}>{new Date(created + 'Z').toLocaleString()}</Text>    
-      </View>
+      {/* Top row: avatar, username, timestamp (conditionally rendered) */}
+      {showAuthor && (
+        <View style={styles.topRow}>
+          <Pressable
+            onPress={() => onUserPress && onUserPress(author)}
+            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, flexDirection: 'row', alignItems: 'center' }]}
+            disabled={!onUserPress}
+            accessibilityRole="button"
+            accessibilityLabel={`View ${author}'s profile`}
+          >
+            <Image source={avatarUrl ? { uri: avatarUrl } : require('../../assets/images/generic-avatar.png')} style={styles.avatar} />       
+            <Text style={[styles.username, { color: colors.text }]}>{author}</Text>
+          </Pressable>
+          <Text style={[styles.timestamp, { color: colors.text }]}>{new Date(created + 'Z').toLocaleString()}</Text>    
+        </View>
+      )}
       {/* Video Player (YouTube, 3speak, IPFS) - Click to play */}
       {videoInfo && (
         <View style={{ marginBottom: 8 }}>
@@ -409,15 +434,9 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
                   }}
                 />
               ) : (
-                <Markdown
-                  style={{
-                    body: { color: colors.text, fontSize: 15, marginBottom: 8 },
-                    link: { color: colors.icon },
-                  }}
-                  rules={markdownRules}
-                >
-                  {cleanTextBody}
-                </Markdown>
+                <Text style={{ color: colors.text, fontSize: 15, marginBottom: 8, flexWrap: 'wrap' }}>
+                  {renderBodyWithHashtags(cleanTextBody)}
+                </Text>
               )}
             </Pressable>
           );
@@ -441,15 +460,9 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
               }}
             />
           ) : (
-            <Markdown
-              style={{
-                body: { color: colors.text, fontSize: 15, marginBottom: 8 },
-                link: { color: colors.icon },
-              }}
-              rules={markdownRules}
-            >
-              {cleanTextBody}
-            </Markdown>
+            <Text style={{ color: colors.text, fontSize: 15, marginBottom: 8, flexWrap: 'wrap' }}>
+              {renderBodyWithHashtags(cleanTextBody)}
+            </Text>
           );
         }
       })()}
