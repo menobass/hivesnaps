@@ -1183,6 +1183,10 @@ const FeedScreen = () => {
                   router.push(`/ProfileScreen?username=${username}` as any);
                 }}
                 onImagePress={handleImagePress}
+                showAuthor // Show author info in feed
+                onHashtagPress={tag => {
+                  router.push({ pathname: '/DiscoveryScreen', params: { hashtag: tag } });
+                }}
               />
             )}
             contentContainerStyle={{ paddingBottom: 80 }}
