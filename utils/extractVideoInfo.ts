@@ -93,6 +93,31 @@ export function removeVideoUrls(text: string): string {
 }
 
 /**
+ * Remove Twitter/X URLs from text content when they're rendered as embeds
+ * @param text - The text to clean
+ * @returns Cleaned text with Twitter/X URLs removed
+ */
+export function removeTwitterUrls(text: string): string {
+  return text
+    // Remove Twitter/X status URLs
+    .replace(/(?:https?:\/\/)?(?:www\.)?(twitter\.com|x\.com)\/[a-zA-Z0-9_]+\/status\/\d+(\S*)?/gi, '')
+    // Clean up extra whitespace
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+/**
+ * Remove all social media and video URLs that should be rendered as embeds
+ * @param text - The text to clean
+ * @returns Cleaned text with embed URLs removed
+ */
+export function removeEmbedUrls(text: string): string {
+  let cleanText = removeVideoUrls(text);
+  cleanText = removeTwitterUrls(cleanText);
+  return cleanText;
+}
+
+/**
  * Legacy function for backward compatibility
  * @deprecated Use extractVideoInfo instead
  */
