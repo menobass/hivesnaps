@@ -46,6 +46,7 @@ interface SnapData {
   permlink?: string;
   hasUpvoted?: boolean;
   active_votes?: any[]; // Add active_votes to store raw voting data
+  json_metadata?: string; // Add json_metadata for edit tracking
 }
 
 // Placeholder reply type
@@ -99,6 +100,15 @@ const ConversationScreen = () => {
   const [modalImageUrl, setModalImageUrl] = useState<string | null>(null);
   const [modalImages, setModalImages] = useState<Array<{uri: string}>>([]);
   const [modalImageIndex, setModalImageIndex] = useState(0);
+
+  // Edit modal state
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editText, setEditText] = useState('');
+  const [editImage, setEditImage] = useState<string | null>(null);
+  const [editUploading, setEditUploading] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<{author: string, permlink: string, type: 'snap' | 'reply'} | null>(null);
 
   // Upvote modal state
   const [upvoteModalVisible, setUpvoteModalVisible] = useState(false);
@@ -237,6 +247,7 @@ const ConversationScreen = () => {
         payout,
         permlink: fullReply.permlink,
         active_votes: fullReply.active_votes, // Keep the raw active_votes data
+        json_metadata: fullReply.json_metadata, // Include metadata for edit tracking
         replies: childrenReplies,
       };
     }));
@@ -284,6 +295,7 @@ const ConversationScreen = () => {
         payout: parseFloat(post.pending_payout_value ? post.pending_payout_value.replace(' HBD', '') : '0'),
         permlink: post.permlink,
         active_votes: post.active_votes, // Keep the raw active_votes data
+        json_metadata: post.json_metadata, // Include metadata for edit tracking
       });
       // Fetch replies tree with full content (including payout info)
       const tree = await fetchRepliesTreeWithContent(author, permlink);
@@ -316,7 +328,7 @@ const ConversationScreen = () => {
     fetchSnapAndReplies();
   };
 
-  const handleAddImage = async () => {
+  const handleAddImage = async (mode: 'reply' | 'edit' = 'reply') => {
     try {
       // Show action sheet to choose between camera and gallery
       let pickType: 'camera' | 'gallery' | 'cancel';
@@ -458,15 +470,27 @@ const ConversationScreen = () => {
       if (!result || result.canceled || !result.assets || !result.assets[0]) return;
       const asset = result.assets[0];
       
-      setUploading(true);
+      // Set appropriate loading state based on mode
+      if (mode === 'edit') {
+        setEditUploading(true);
+      } else {
+        setUploading(true);
+      }
+      
       try {
         const fileToUpload = {
           uri: asset.uri,
-          name: `reply-${Date.now()}.jpg`,
+          name: `${mode}-${Date.now()}.jpg`,
           type: 'image/jpeg',
         };
         const cloudinaryUrl = await uploadImageToCloudinaryFixed(fileToUpload);
-        setReplyImage(cloudinaryUrl);
+        
+        // Set appropriate image state based on mode
+        if (mode === 'edit') {
+          setEditImage(cloudinaryUrl);
+        } else {
+          setReplyImage(cloudinaryUrl);
+        }
       } catch (err) {
         console.error('Image upload error:', err);
         const errorMessage = err instanceof Error ? err.message : 'Unknown upload error';
@@ -478,7 +502,11 @@ const ConversationScreen = () => {
           );
         });
       } finally {
-        setUploading(false);
+        if (mode === 'edit') {
+          setEditUploading(false);
+        } else {
+          setUploading(false);
+        }
       }
     } catch (err) {
       console.error('Image picker error:', err);
@@ -490,7 +518,12 @@ const ConversationScreen = () => {
           [{ text: 'OK' }]
         );
       });
-      setUploading(false);
+      
+      if (mode === 'edit') {
+        setEditUploading(false);
+      } else {
+        setUploading(false);
+      }
     }
   };
 
@@ -503,6 +536,118 @@ const ConversationScreen = () => {
     setReplyText('');
     setReplyImage(null);
     setReplyTarget(null);
+  };
+
+  // Edit handlers
+  const handleOpenEditModal = (content?: { author: string; permlink: string; body: string }, type: 'snap' | 'reply' = 'snap') => {
+    if (type === 'snap') {
+      if (!snap) return;
+      // Pre-populate with current snap content
+      const textBody = stripImageTags(snap.body);
+      setEditText(textBody);
+      setEditTarget({ author: snap.author, permlink: snap.permlink!, type: 'snap' });
+    } else {
+      // Reply editing
+      if (!content) return;
+      const textBody = stripImageTags(content.body);
+      setEditText(textBody);
+      setEditTarget({ author: content.author, permlink: content.permlink, type: 'reply' });
+    }
+    setEditImage(null); // Keep it simple - no image editing for now
+    setEditModalVisible(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setEditModalVisible(false);
+    setEditText('');
+    setEditImage(null);
+    setEditError(null);
+    setEditTarget(null);
+  };
+
+  const handleSubmitEdit = async () => {
+    if (!editTarget || !editText.trim() || !currentUsername) return;
+    setEditing(true);
+    setEditError(null);
+    
+    try {
+      // Get posting key from secure storage
+      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
+      if (!postingKeyStr) {
+        throw new Error('No posting key found. Please log in again.');
+      }
+      const postingKey = PrivateKey.fromString(postingKeyStr);
+
+      let body = editText.trim();
+      if (editImage) {
+        body += `\n![image](${editImage})`;
+      }
+
+      // Get the original post to preserve parent relationships
+      const originalPost = await client.database.call('get_content', [editTarget.author, editTarget.permlink]);
+      
+      // Parse existing metadata and add edited flag
+      let existingMetadata: any = {};
+      try {
+        if (originalPost.json_metadata) {
+          existingMetadata = JSON.parse(originalPost.json_metadata);
+        }
+      } catch (e) {
+        // Invalid JSON, start fresh
+      }
+
+      const json_metadata = {
+        ...existingMetadata,
+        app: 'hivesnaps/1.0',
+        format: 'markdown',
+        edited: true,
+        edit_timestamp: new Date().toISOString(),
+      };
+
+      if (editImage && !json_metadata.image) {
+        json_metadata.image = [editImage];
+      }
+
+      // Edit the post/reply using same author/permlink with new content
+      await client.broadcast.comment({
+        parent_author: originalPost.parent_author, // Keep original parent
+        parent_permlink: originalPost.parent_permlink, // Keep original parent permlink
+        author: currentUsername,
+        permlink: editTarget.permlink,
+        title: originalPost.title || '', // Keep original title
+        body,
+        json_metadata: JSON.stringify(json_metadata),
+      }, postingKey);
+
+      // Update local state optimistically based on edit type
+      if (editTarget.type === 'snap') {
+        setSnap(prev => prev ? {
+          ...prev,
+          body,
+          json_metadata: JSON.stringify(json_metadata)
+        } : null);
+      } else {
+        // Update the specific reply in the replies tree
+        setReplies(prevReplies => 
+          updateReplyInTree(prevReplies, editTarget.author, editTarget.permlink, body, JSON.stringify(json_metadata))
+        );
+      }
+
+      setEditModalVisible(false);
+      setEditText('');
+      setEditImage(null);
+      setEditing(false);
+      setEditTarget(null);
+
+      // Refresh after a delay to get updated content from blockchain
+      setTimeout(() => {
+        handleRefresh();
+      }, 3000);
+      
+    } catch (e: any) {
+      setEditError(e.message || 'Failed to edit post.');
+      setEditing(false);
+    }
   };
 
   const handleSubmitReply = async () => {
@@ -644,6 +789,26 @@ const ConversationScreen = () => {
       updated.replies = reply.replies.map((r) => updateReplyUpvoteOptimistic(r, target, username, weight));
     }
     return updated;
+  }
+
+  // Helper to update a reply in the nested tree structure
+  function updateReplyInTree(replies: ReplyData[], targetAuthor: string, targetPermlink: string, newBody: string, newMetadata: string): ReplyData[] {
+    return replies.map(reply => {
+      if (reply.author === targetAuthor && reply.permlink === targetPermlink) {
+        return {
+          ...reply,
+          body: newBody,
+          json_metadata: newMetadata
+        };
+      }
+      if (reply.replies && reply.replies.length > 0) {
+        return {
+          ...reply,
+          replies: updateReplyInTree(reply.replies, targetAuthor, targetPermlink, newBody, newMetadata)
+        };
+      }
+      return reply;
+    });
   }
 
   // Image modal handler
@@ -996,6 +1161,19 @@ const ConversationScreen = () => {
               )}
               <Text style={[styles.replyAuthor, { color: colors.text, marginLeft: 10 }]}>{reply.author}</Text>
               <Text style={[styles.snapTimestamp, { color: colors.text }]}>{reply.created ? new Date(reply.created + 'Z').toLocaleString() : ''}</Text>
+              {/* Edited indicator */}
+              {reply.json_metadata && (() => {
+                try {
+                  const metadata = JSON.parse(reply.json_metadata);
+                  return metadata.edited ? (
+                    <Text style={[styles.snapTimestamp, { color: colors.icon, fontStyle: 'italic', marginLeft: 8 }]}>
+                      • edited
+                    </Text>
+                  ) : null;
+                } catch {
+                  return null;
+                }
+              })()}
             </Pressable>
           </View>
           {/* Video Player (YouTube, 3speak, IPFS) - Click to play */}
@@ -1080,6 +1258,21 @@ const ConversationScreen = () => {
             <Text style={[styles.replyMetaText, { color: colors.text }]}>{reply.voteCount || 0}</Text>
             <FontAwesome name="comment-o" size={16} color={colors.icon} style={{ marginLeft: 12 }} />
             <Text style={[styles.replyMetaText, { color: colors.payout, marginLeft: 12 }]}>{reply.payout !== undefined ? `$${reply.payout.toFixed(2)}` : ''}</Text>
+            <View style={{ flex: 1 }} />
+            {/* Edit button - only show for own replies */}
+            {reply.author === currentUsername && (
+              <TouchableOpacity 
+                style={styles.replyButton} 
+                onPress={() => handleOpenEditModal({ 
+                  author: reply.author, 
+                  permlink: reply.permlink!, 
+                  body: reply.body 
+                }, 'reply')}
+              >
+                <FontAwesome name="edit" size={14} color={colors.icon} />
+                <Text style={[styles.replyButtonText, { color: colors.icon, fontSize: 12 }]}>Edit</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={styles.replyButton} onPress={() => handleOpenReplyModal(reply.author, reply.permlink!)}>
               <FontAwesome name="reply" size={16} color={colors.icon} />
               <Text style={[styles.replyButtonText, { color: colors.icon }]}>Reply</Text>
@@ -1136,6 +1329,19 @@ const ConversationScreen = () => {
             )}
             <Text style={[styles.snapAuthor, { color: colors.text, marginLeft: 10 }]}>{snap.author}</Text>
             <Text style={[styles.snapTimestamp, { color: colors.text }]}>{snap.created ? new Date(snap.created + 'Z').toLocaleString() : ''}</Text>
+            {/* Edited indicator */}
+            {snap.json_metadata && (() => {
+              try {
+                const metadata = JSON.parse(snap.json_metadata);
+                return metadata.edited ? (
+                  <Text style={[styles.snapTimestamp, { color: colors.icon, fontStyle: 'italic', marginLeft: 8 }]}>
+                    • edited
+                  </Text>
+                ) : null;
+              } catch {
+                return null;
+              }
+            })()}
           </Pressable>
         </View>
         {/* Video Player (YouTube, 3speak, IPFS) - Click to play */}
@@ -1236,6 +1442,13 @@ const ConversationScreen = () => {
           <Text style={[styles.snapMetaText, { color: colors.text }]}>{snap.replyCount || 0}</Text>
           <Text style={[styles.snapMetaText, { color: colors.payout, marginLeft: 12 }]}>{snap.payout ? `$${snap.payout.toFixed(2)}` : ''}</Text>
           <View style={{ flex: 1 }} />
+          {/* Edit button - only show for own content */}
+          {snap.author === currentUsername && (
+            <TouchableOpacity style={styles.replyButton} onPress={() => handleOpenEditModal(undefined, 'snap')}>
+              <FontAwesome name="edit" size={16} color={colors.icon} />
+              <Text style={[styles.replyButtonText, { color: colors.icon }]}>Edit</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={styles.replyButton} onPress={() => handleOpenReplyModal(snap.author, snap.permlink!)}>
             <FontAwesome name="reply" size={18} color={colors.icon} />
             <Text style={[styles.replyButtonText, { color: colors.icon }]}>Reply</Text>
@@ -1339,7 +1552,7 @@ const ConversationScreen = () => {
           
           {/* Reply input row */}
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-            <TouchableOpacity onPress={handleAddImage} disabled={uploading || posting} style={{ marginRight: 16 }}>
+            <TouchableOpacity onPress={() => handleAddImage('reply')} disabled={uploading || posting} style={{ marginRight: 16 }}>
               <FontAwesome name="image" size={22} color={colors.icon} />
             </TouchableOpacity>
             <TextInput
@@ -1377,6 +1590,81 @@ const ConversationScreen = () => {
           </View>
         </View>
       </Modal>
+      
+      {/* Edit Modal */}
+      <Modal
+        isVisible={editModalVisible}
+        onBackdropPress={editing ? undefined : handleCloseEditModal}
+        onBackButtonPress={editing ? undefined : handleCloseEditModal}
+        style={{ justifyContent: 'flex-end', margin: 0 }}
+        useNativeDriver
+      >
+        <View style={{ 
+          backgroundColor: colors.background, 
+          padding: 16, 
+          borderTopLeftRadius: 18, 
+          borderTopRightRadius: 18 
+        }}>
+          <Text style={{ color: colors.text, fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>
+            Edit {editTarget?.type === 'reply' ? 'Reply' : 'Snap'}
+          </Text>
+          
+          {/* Edit image preview */}
+          {editImage ? (
+            <View style={{ marginBottom: 10 }}>
+              <ExpoImage source={{ uri: editImage }} style={{ width: 120, height: 120, borderRadius: 10 }} contentFit="cover" />
+              <TouchableOpacity onPress={() => setEditImage(null)} style={{ position: 'absolute', top: 4, right: 4 }} disabled={editing}>
+                <FontAwesome name="close" size={20} color={colors.icon} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          
+          {/* Error message */}
+          {editError ? (
+            <Text style={{ color: 'red', marginBottom: 8 }}>{editError}</Text>
+          ) : null}
+          
+          {/* Edit input row */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+            <TouchableOpacity onPress={() => handleAddImage('edit')} disabled={editUploading || editing} style={{ marginRight: 16 }}>
+              <FontAwesome name="image" size={22} color={colors.icon} />
+            </TouchableOpacity>
+            <TextInput
+              value={editText}
+              onChangeText={setEditText}
+              style={{
+                flex: 1,
+                minHeight: 80,
+                color: colors.text,
+                backgroundColor: colors.bubble,
+                borderRadius: 10,
+                padding: 10,
+                marginRight: 10,
+              }}
+              placeholder={`Edit your ${editTarget?.type === 'reply' ? 'reply' : 'snap'}...`}
+              placeholderTextColor={isDark ? '#8899A6' : '#888'}
+              multiline
+            />
+            {editUploading ? (
+              <FontAwesome name="spinner" size={16} color="#fff" style={{ marginRight: 8 }} />
+            ) : null}
+            <TouchableOpacity
+              onPress={handleSubmitEdit}
+              disabled={editUploading || editing || !editText.trim() || !currentUsername}
+              style={{
+                backgroundColor: colors.icon,
+                borderRadius: 20,
+                paddingHorizontal: 18,
+                paddingVertical: 8,
+                opacity: editUploading || editing || !editText.trim() || !currentUsername ? 0.6 : 1,
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{editing ? 'Saving...' : 'Save'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <Modal
         isVisible={upvoteModalVisible}
         onBackdropPress={handleUpvoteCancel}
