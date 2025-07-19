@@ -330,10 +330,9 @@ const ConversationScreen = () => {
                 cancelButtonIndex: 0,
               },
               buttonIndex => {
-                if (buttonIndex === 0) pickType = 'cancel';
-                else if (buttonIndex === 1) pickType = 'camera';
-                else if (buttonIndex === 2) pickType = 'gallery';
-                resolve(pickType);
+                if (buttonIndex === 0) resolve('cancel');
+                else if (buttonIndex === 1) resolve('camera');
+                else if (buttonIndex === 2) resolve('gallery');
               }
             );
           });
@@ -357,26 +356,100 @@ const ConversationScreen = () => {
       
       if (pickType === 'cancel') return;
       
-      // Pick image
+      // Enhanced permission handling with better error messages
       let result;
       if (pickType === 'camera') {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
-          alert('Permission to access camera is required!');
+        // Check current permission status first
+        const currentPermission = await ImagePicker.getCameraPermissionsAsync();
+        let finalStatus = currentPermission.status;
+        
+        if (finalStatus !== 'granted') {
+          // Request permission if not granted
+          const requestPermission = await ImagePicker.requestCameraPermissionsAsync();
+          finalStatus = requestPermission.status;
+        }
+        
+        if (finalStatus !== 'granted') {
+          import('react-native').then(({ Alert }) => {
+            Alert.alert(
+              'Camera Permission Required',
+              'HiveSnaps needs camera access to take photos. Please enable camera permissions in your device settings.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Open Settings', onPress: () => {
+                  if (Platform.OS === 'ios') {
+                    import('expo-linking').then(({ default: Linking }) => {
+                      Linking.openURL('app-settings:');
+                    });
+                  } else {
+                    import('expo-intent-launcher').then(({ default: IntentLauncher }) => {
+                      IntentLauncher.startActivityAsync(
+                        IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS,
+                        { data: 'package:com.anonymous.hivesnaps' }
+                      );
+                    }).catch(() => {
+                      // Fallback for older Android versions
+                      import('expo-linking').then(({ default: Linking }) => {
+                        Linking.openURL('app-settings:');
+                      });
+                    });
+                  }
+                }}
+              ]
+            );
+          });
           return;
         }
+        
         result = await ImagePicker.launchCameraAsync({
           allowsEditing: true,
           quality: 0.8,
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
         });
       } else {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          alert('Permission to access media library is required!');
+        // Media library permission handling
+        const currentPermission = await ImagePicker.getMediaLibraryPermissionsAsync();
+        let finalStatus = currentPermission.status;
+        
+        if (finalStatus !== 'granted') {
+          const requestPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          finalStatus = requestPermission.status;
+        }
+        
+        if (finalStatus !== 'granted') {
+          import('react-native').then(({ Alert }) => {
+            Alert.alert(
+              'Photo Library Permission Required',
+              'HiveSnaps needs photo library access to select images. Please enable photo permissions in your device settings.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Open Settings', onPress: () => {
+                  if (Platform.OS === 'ios') {
+                    import('expo-linking').then(({ default: Linking }) => {
+                      Linking.openURL('app-settings:');
+                    });
+                  } else {
+                    import('expo-intent-launcher').then(({ default: IntentLauncher }) => {
+                      IntentLauncher.startActivityAsync(
+                        IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS,
+                        { data: 'package:com.anonymous.hivesnaps' }
+                      );
+                    }).catch(() => {
+                      // Fallback for older Android versions
+                      import('expo-linking').then(({ default: Linking }) => {
+                        Linking.openURL('app-settings:');
+                      });
+                    });
+                  }
+                }}
+              ]
+            );
+          });
           return;
         }
+        
         result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ['images'], // Fixed deprecation warning - use array of strings
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
           allowsEditing: true,
           quality: 0.8,
         });
@@ -395,11 +468,28 @@ const ConversationScreen = () => {
         const cloudinaryUrl = await uploadImageToCloudinaryFixed(fileToUpload);
         setReplyImage(cloudinaryUrl);
       } catch (err) {
-        alert('Image upload failed: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
+        console.error('Image upload error:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Unknown upload error';
+        import('react-native').then(({ Alert }) => {
+          Alert.alert(
+            'Upload Failed',
+            `Image upload failed: ${errorMessage}`,
+            [{ text: 'OK' }]
+          );
+        });
+      } finally {
+        setUploading(false);
       }
-      setUploading(false);
     } catch (err) {
-      alert('Failed to pick image: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
+      console.error('Image picker error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      import('react-native').then(({ Alert }) => {
+        Alert.alert(
+          'Error',
+          `Failed to pick image: ${errorMessage}`,
+          [{ text: 'OK' }]
+        );
+      });
       setUploading(false);
     }
   };
@@ -1157,11 +1247,17 @@ const ConversationScreen = () => {
 
   return (
     <SafeAreaViewSA style={[styles.safeArea, { backgroundColor: isDark ? '#15202B' : '#fff' }]}> 
-      {/* Image Modal with react-native-image-viewing */}
-      <ImageView
-        images={modalImages}
-        imageIndex={modalImageIndex}
-        visible={imageModalVisible}
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+        enabled
+      >
+        {/* Image Modal with react-native-image-viewing */}
+        <ImageView
+          images={modalImages}
+          imageIndex={modalImageIndex}
+          visible={imageModalVisible}
         onRequestClose={() => {
           setImageModalVisible(false);
           // Force status bar refresh after modal closes
@@ -1244,6 +1340,8 @@ const ConversationScreen = () => {
           {/* Reply input row */}
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ flex: 1 }}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
               <TouchableOpacity onPress={handleAddImage} disabled={uploading || posting} style={{ marginRight: 16 }}>
@@ -1347,6 +1445,7 @@ const ConversationScreen = () => {
           )}
         </View>
       </Modal>
+      </KeyboardAvoidingView>
     </SafeAreaViewSA>
   );
 };

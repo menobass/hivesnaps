@@ -736,27 +736,24 @@ const FeedScreen = () => {
   };
   const handleAddImage = async () => {
     try {
-      // Ask user: Take Photo or Choose from Gallery
-      const options = [
-        { text: 'Take Photo', value: 'camera' },
-        { text: 'Choose from Gallery', value: 'gallery' },
-        { text: 'Cancel', value: 'cancel', style: 'cancel' },
-      ];
-      let pickType: 'camera' | 'gallery' | 'cancel' = 'cancel';
+      // Show action sheet to choose between camera and gallery
+      let pickType: 'camera' | 'gallery' | 'cancel';
+      
       if (Platform.OS === 'ios') {
-        const { ActionSheetIOS } = await import('react-native');
-        await new Promise<void>(resolve => {
-          ActionSheetIOS.showActionSheetWithOptions(
-            {
-              options: options.map(o => o.text),
-              cancelButtonIndex: 2,
-            },
-            async (buttonIndex) => {
-              if (buttonIndex === 0) pickType = 'camera';
-              else if (buttonIndex === 1) pickType = 'gallery';
-              resolve();
-            }
-          );
+        pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(resolve => {
+          import('react-native').then(({ ActionSheetIOS }) => {
+            ActionSheetIOS.showActionSheetWithOptions(
+              {
+                options: ['Cancel', 'Take Photo', 'Choose from Gallery'],
+                cancelButtonIndex: 0,
+              },
+              buttonIndex => {
+                if (buttonIndex === 0) resolve('cancel');
+                else if (buttonIndex === 1) resolve('camera');
+                else if (buttonIndex === 2) resolve('gallery');
+              }
+            );
+          });
         });
       } else {
         pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(resolve => {
@@ -774,33 +771,111 @@ const FeedScreen = () => {
           });
         });
       }
+      
       if (pickType === 'cancel') return;
-      // Pick image
+      
+      // Enhanced permission handling with better error messages
       let result;
       if (pickType === 'camera') {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
-          alert('Permission to access camera is required!');
+        // Check current permission status first
+        const currentPermission = await ImagePicker.getCameraPermissionsAsync();
+        let finalStatus = currentPermission.status;
+        
+        if (finalStatus !== 'granted') {
+          // Request permission if not granted
+          const requestPermission = await ImagePicker.requestCameraPermissionsAsync();
+          finalStatus = requestPermission.status;
+        }
+        
+        if (finalStatus !== 'granted') {
+          import('react-native').then(({ Alert }) => {
+            Alert.alert(
+              'Camera Permission Required',
+              'HiveSnaps needs camera access to take photos. Please enable camera permissions in your device settings.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Open Settings', onPress: () => {
+                  if (Platform.OS === 'ios') {
+                    import('expo-linking').then(({ default: Linking }) => {
+                      Linking.openURL('app-settings:');
+                    });
+                  } else {
+                    import('expo-intent-launcher').then(({ default: IntentLauncher }) => {
+                      IntentLauncher.startActivityAsync(
+                        IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS,
+                        { data: 'package:com.anonymous.hivesnaps' }
+                      );
+                    }).catch(() => {
+                      // Fallback for older Android versions
+                      import('expo-linking').then(({ default: Linking }) => {
+                        Linking.openURL('app-settings:');
+                      });
+                    });
+                  }
+                }}
+              ]
+            );
+          });
           return;
         }
+        
         result = await ImagePicker.launchCameraAsync({
           allowsEditing: true,
           quality: 0.8,
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
         });
       } else {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          alert('Permission to access media library is required!');
+        // Media library permission handling
+        const currentPermission = await ImagePicker.getMediaLibraryPermissionsAsync();
+        let finalStatus = currentPermission.status;
+        
+        if (finalStatus !== 'granted') {
+          const requestPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          finalStatus = requestPermission.status;
+        }
+        
+        if (finalStatus !== 'granted') {
+          import('react-native').then(({ Alert }) => {
+            Alert.alert(
+              'Photo Library Permission Required',
+              'HiveSnaps needs photo library access to select images. Please enable photo permissions in your device settings.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Open Settings', onPress: () => {
+                  if (Platform.OS === 'ios') {
+                    import('expo-linking').then(({ default: Linking }) => {
+                      Linking.openURL('app-settings:');
+                    });
+                  } else {
+                    import('expo-intent-launcher').then(({ default: IntentLauncher }) => {
+                      IntentLauncher.startActivityAsync(
+                        IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS,
+                        { data: 'package:com.anonymous.hivesnaps' }
+                      );
+                    }).catch(() => {
+                      // Fallback for older Android versions
+                      import('expo-linking').then(({ default: Linking }) => {
+                        Linking.openURL('app-settings:');
+                      });
+                    });
+                  }
+                }}
+              ]
+            );
+          });
           return;
         }
+        
         result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
           allowsEditing: true,
           quality: 0.8,
         });
       }
+      
       if (!result || result.canceled || !result.assets || !result.assets[0]) return;
       const asset = result.assets[0];
+      
       setNewSnapUploading(true);
       try {
         const fileToUpload = {
@@ -811,11 +886,29 @@ const FeedScreen = () => {
         const cloudinaryUrl = await uploadImageToCloudinaryFixed(fileToUpload);
         setNewSnapImage(cloudinaryUrl);
       } catch (err) {
-        alert('Image upload failed: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
+        console.error('Image upload error:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Unknown upload error';
+        import('react-native').then(({ Alert }) => {
+          Alert.alert(
+            'Upload Failed',
+            `Image upload failed: ${errorMessage}`,
+            [{ text: 'OK' }]
+          );
+        });
+      } finally {
+        setNewSnapUploading(false);
       }
-      setNewSnapUploading(false);
     } catch (err) {
-      alert('Failed to pick image: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
+      console.error('Image picker error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      import('react-native').then(({ Alert }) => {
+        Alert.alert(
+          'Error',
+          `Failed to pick image: ${errorMessage}`,
+          [{ text: 'OK' }]
+        );
+      });
+      setNewSnapUploading(false);
     }
   };
 
