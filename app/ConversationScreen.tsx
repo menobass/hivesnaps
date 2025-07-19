@@ -1338,49 +1338,43 @@ const ConversationScreen = () => {
           ) : null}
           
           {/* Reply input row */}
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={{ flex: 1 }}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-              <TouchableOpacity onPress={handleAddImage} disabled={uploading || posting} style={{ marginRight: 16 }}>
-                <FontAwesome name="image" size={22} color={colors.icon} />
-              </TouchableOpacity>
-              <TextInput
-                value={replyText}
-                onChangeText={setReplyText}
-                style={{
-                  flex: 1,
-                  minHeight: 60,
-                  color: colors.text,
-                  backgroundColor: colors.bubble,
-                  borderRadius: 10,
-                  padding: 10,
-                  marginRight: 10,
-                }}
-                placeholder="Write your reply..."
-                placeholderTextColor={isDark ? '#8899A6' : '#888'}
-                multiline
-              />
-              {uploading ? (
-                <FontAwesome name="spinner" size={16} color="#fff" style={{ marginRight: 8 }} />
-              ) : null}
-              <TouchableOpacity
-                onPress={handleSubmitReply}
-                disabled={uploading || posting || !replyText.trim() || !currentUsername}
-                style={{
-                  backgroundColor: colors.icon,
-                  borderRadius: 20,
-                  paddingHorizontal: 18,
-                  paddingVertical: 8,
-                  opacity: uploading || posting || !replyText.trim() || !currentUsername ? 0.6 : 1,
-                }}
-              >
-                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{posting ? 'Posting...' : 'Send'}</Text>
-              </TouchableOpacity>
-            </View>
-          </KeyboardAvoidingView>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+            <TouchableOpacity onPress={handleAddImage} disabled={uploading || posting} style={{ marginRight: 16 }}>
+              <FontAwesome name="image" size={22} color={colors.icon} />
+            </TouchableOpacity>
+            <TextInput
+              value={replyText}
+              onChangeText={setReplyText}
+              style={{
+                flex: 1,
+                minHeight: 60,
+                color: colors.text,
+                backgroundColor: colors.bubble,
+                borderRadius: 10,
+                padding: 10,
+                marginRight: 10,
+              }}
+              placeholder="Write your reply..."
+              placeholderTextColor={isDark ? '#8899A6' : '#888'}
+              multiline
+            />
+            {uploading ? (
+              <FontAwesome name="spinner" size={16} color="#fff" style={{ marginRight: 8 }} />
+            ) : null}
+            <TouchableOpacity
+              onPress={handleSubmitReply}
+              disabled={uploading || posting || !replyText.trim() || !currentUsername}
+              style={{
+                backgroundColor: colors.icon,
+                borderRadius: 20,
+                paddingHorizontal: 18,
+                paddingVertical: 8,
+                opacity: uploading || posting || !replyText.trim() || !currentUsername ? 0.6 : 1,
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{posting ? 'Posting...' : 'Send'}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
       <Modal
