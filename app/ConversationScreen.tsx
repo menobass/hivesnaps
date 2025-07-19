@@ -10,7 +10,7 @@ import { Client, PrivateKey } from '@hiveio/dhive';
 import Modal from 'react-native-modal';
 import Markdown from 'react-native-markdown-display';
 import { WebView } from 'react-native-webview';
-import { extractVideoInfo, removeVideoUrls, extractYouTubeId } from '../utils/extractVideoInfo';
+import { extractVideoInfo, removeVideoUrls, removeTwitterUrls, removeEmbedUrls, extractYouTubeId } from '../utils/extractVideoInfo';
 import * as SecureStore from 'expo-secure-store';
 import Slider from '@react-native-community/slider';
 import { useVoteWeightMemory } from '../hooks/useVoteWeightMemory';
@@ -861,6 +861,21 @@ const ConversationScreen = () => {
     return removeVideoUrls(text);
   }
 
+  // Utility to extract Twitter/X URLs from text
+  function extractTwitterUrl(text: string): string | null {
+    console.log('🔍 extractTwitterUrl called with text:', text.substring(0, 200));
+    const twitterMatch = text.match(/(?:https?:\/\/)?(?:www\.)?(twitter\.com|x\.com)\/([a-zA-Z0-9_]+)\/status\/(\d+)/i);
+    console.log('🔍 Twitter regex match result:', twitterMatch);
+    const result = twitterMatch ? twitterMatch[0] : null;
+    console.log('🔍 Returning Twitter URL:', result);
+    return result;
+  }
+
+  // Utility to remove all embed URLs (videos and social media) from text
+  function removeAllEmbedUrls(text: string): string {
+    return removeEmbedUrls(text);
+  }
+
   // Utility: Preprocess raw URLs to clickable markdown links (if not already linked)
   function linkifyUrls(text: string): string {
     // Regex for URLs (http/https) - includes @ character for Hive frontend URLs
@@ -868,14 +883,15 @@ const ConversationScreen = () => {
       // If already inside a markdown or html link, skip
       if (/\]\([^)]+\)$/.test(url) || /href=/.test(url)) return url;
       
-      // Skip URLs that should be handled as embedded media (YouTube, 3Speak, IPFS, MP4)
+      // Skip URLs that should be handled as embedded media (YouTube, 3Speak, IPFS, MP4, Twitter/X)
       const youtubeMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
       const threeSpeakMatch = url.match(/https:\/\/3speak\.tv\/watch\?v=([^\/\s]+)\/([a-zA-Z0-9_-]+)/);
       const ipfsMatch = url.match(/ipfs\/([A-Za-z0-9]+)/);
       const mp4Match = url.match(/\.mp4($|\?)/i);
+      const twitterMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(twitter\.com|x\.com)\/([a-zA-Z0-9_]+)\/status\/(\d+)/i);
       
-      if (youtubeMatch || threeSpeakMatch || ipfsMatch || mp4Match) {
-        return url; // Don't linkify, let markdown rules handle video embedding
+      if (youtubeMatch || threeSpeakMatch || ipfsMatch || mp4Match || twitterMatch) {
+        return url; // Don't linkify, let markdown rules handle embedding
       }
       
       // Use full URL as display text (no shortening in conversation view)
@@ -1012,6 +1028,9 @@ const ConversationScreen = () => {
       const threeSpeakMatch = href && href.match(/https:\/\/3speak\.tv\/watch\?v=([^\/\s]+)\/([a-zA-Z0-9_-]+)/);
       const ipfsMatch = href && href.match(/ipfs\/([A-Za-z0-9]+)/);
       const mp4Match = href && href.match(/\.mp4($|\?)/i);
+      
+      // Twitter/X post detection - matches various Twitter/X URL formats
+      const twitterMatch = href && href.match(/(?:https?:\/\/)?(?:www\.)?(twitter\.com|x\.com)\/([a-zA-Z0-9_]+)\/status\/(\d+)/i);
 
       if (youtubeMatch) {
         const videoId = youtubeMatch[1];
@@ -1074,6 +1093,168 @@ const ConversationScreen = () => {
         );
       }
       
+      if (twitterMatch) {
+        const domain = twitterMatch[1]; // twitter.com or x.com
+        const username = twitterMatch[2];
+        const tweetId = twitterMatch[3];
+        const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        return (
+          <View key={uniqueKey} style={{ 
+            width: '100%', 
+            minHeight: 400, 
+            maxHeight: 600, 
+            marginVertical: 10, 
+            borderRadius: 12, 
+            overflow: 'hidden', 
+            backgroundColor: isDark ? '#222' : '#eee', 
+            position: 'relative' 
+          }}>
+            <WebView
+              source={{ 
+                html: `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                  <meta charset="utf-8">
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+                  <style>
+                    * {
+                      margin: 0;
+                      padding: 0;
+                      box-sizing: border-box;
+                    }
+                    html, body {
+                      height: 100%;
+                      background-color: ${isDark ? '#222' : '#fff'};
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                    }
+                    body {
+                      padding: 10px;
+                      display: flex;
+                      flex-direction: column;
+                      justify-content: flex-start;
+                      align-items: center;
+                    }
+                    .loading {
+                      text-align: center;
+                      padding: 40px 20px;
+                      color: ${isDark ? '#D7DBDC' : '#0F1419'};
+                      font-size: 14px;
+                    }
+                    .loading-emoji {
+                      font-size: 28px;
+                      margin-bottom: 10px;
+                      display: block;
+                    }
+                    .twitter-tweet-rendered {
+                      margin: 10px auto !important;
+                      max-width: 100% !important;
+                    }
+                    .error {
+                      text-align: center;
+                      padding: 40px 20px;
+                      color: ${isDark ? '#ff6b6b' : '#e74c3c'};
+                      font-size: 14px;
+                    }
+                  </style>
+                </head>
+                <body>
+                  <div class="loading" id="loading">
+                    <span class="loading-emoji">🐦</span>
+                    <div>Loading ${domain === 'x.com' ? 'X' : 'Twitter'} post...</div>
+                  </div>
+                  
+                  <div id="error" class="error" style="display: none;">
+                    <span class="loading-emoji">❌</span>
+                    <div>Failed to load tweet</div>
+                  </div>
+
+                  <blockquote class="twitter-tweet" data-lang="en" data-theme="${isDark ? 'dark' : 'light'}" data-dnt="true">
+                    <a href="${href}" style="color: #1DA1F2; text-decoration: none;">
+                      <div style="text-align: center; padding: 20px;">
+                        <div style="font-size: 16px; margin-bottom: 8px;">🐦</div>
+                        <div>Tap to load tweet</div>
+                      </div>
+                    </a>
+                  </blockquote>
+
+                  <script>
+                    // Timeout handler
+                    let loadTimeout = setTimeout(() => {
+                      document.getElementById('loading').style.display = 'none';
+                      document.getElementById('error').style.display = 'block';
+                      console.log('Tweet loading timed out');
+                    }, 10000);
+
+                    // Twitter widget loader with error handling
+                    (function(d, s, id) {
+                      var js, fjs = d.getElementsByTagName(s)[0];
+                      if (d.getElementById(id)) return;
+                      js = d.createElement(s); js.id = id;
+                      js.onload = function() {
+                        console.log('Twitter widgets script loaded');
+                        if (window.twttr && window.twttr.widgets) {
+                          window.twttr.widgets.load().then(function() {
+                            console.log('Twitter widgets rendered');
+                            clearTimeout(loadTimeout);
+                            document.getElementById('loading').style.display = 'none';
+                          }).catch(function(error) {
+                            console.log('Twitter widgets error:', error);
+                            clearTimeout(loadTimeout);
+                            document.getElementById('loading').style.display = 'none';
+                            document.getElementById('error').style.display = 'block';
+                          });
+                        }
+                      };
+                      js.onerror = function() {
+                        console.log('Failed to load Twitter widgets script');
+                        clearTimeout(loadTimeout);
+                        document.getElementById('loading').style.display = 'none';
+                        document.getElementById('error').style.display = 'block';
+                      };
+                      js.src = 'https://platform.twitter.com/widgets.js';
+                      js.charset = 'utf-8';
+                      js.async = true;
+                      fjs.parentNode.insertBefore(js, fjs);
+                    }(document, 'script', 'twitter-wjs'));
+                  </script>
+                </body>
+                </html>
+                `
+              }}
+              style={{ flex: 1 }}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              originWhitelist={['*']}
+              allowsLinkPreview={false}
+              showsVerticalScrollIndicator={false}
+              showsHorizontalScrollIndicator={false}
+              bounces={false}
+              scrollEnabled={true}
+              startInLoadingState={false}
+              onLoadStart={() => console.log('WebView loading started')}
+              onLoad={() => console.log('WebView loaded')}
+              onError={(error) => console.log('WebView error:', error)}
+              onHttpError={(error) => console.log('WebView HTTP error:', error)}
+            />
+            <View style={{ 
+              position: 'absolute', 
+              top: 8, 
+              right: 8, 
+              backgroundColor: 'rgba(0,0,0,0.7)', 
+              paddingHorizontal: 6, 
+              paddingVertical: 2, 
+              borderRadius: 4 
+            }}>
+              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+                {domain === 'x.com' ? 'X' : 'TWITTER'}
+              </Text>
+            </View>
+          </View>
+        );
+      }
+      
       if (ipfsMatch) {
         const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
         return (
@@ -1112,11 +1293,14 @@ const ConversationScreen = () => {
 
   // Recursive threaded reply renderer
   const renderReplyTree = (reply: ReplyData, level = 0) => {
+    console.log('📱 Rendering reply tree for reply:', reply.author, reply.permlink);
     const videoInfo = extractVideoInfo(reply.body);
+    const twitterUrl = extractTwitterUrl(reply.body);
+    console.log('📱 Reply twitterUrl:', twitterUrl);
     const imageUrls = extractImageUrls(reply.body);
     let textBody = reply.body;
-    if (videoInfo) {
-      textBody = removeAllVideoUrls(textBody);
+    if (videoInfo || twitterUrl) {
+      textBody = removeAllEmbedUrls(textBody);
     }
     // Remove image tags from text body
     textBody = stripImageTags(textBody);
@@ -1214,6 +1398,160 @@ const ConversationScreen = () => {
               )}
             </View>
           )}
+          {/* Twitter/X Post Embed */}
+          {twitterUrl && (
+            <View style={{ marginBottom: 8 }}>
+              <View style={{ 
+                width: '100%', 
+                minHeight: 400, 
+                maxHeight: 600, 
+                borderRadius: 12, 
+                overflow: 'hidden', 
+                backgroundColor: isDark ? '#222' : '#eee', 
+                position: 'relative' 
+              }}>
+                <WebView
+                  source={{ 
+                    html: `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                      <meta charset="utf-8">
+                      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+                      <style>
+                        * {
+                          margin: 0;
+                          padding: 0;
+                          box-sizing: border-box;
+                        }
+                        html, body {
+                          height: 100%;
+                          background-color: ${isDark ? '#222' : '#fff'};
+                          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                        }
+                        body {
+                          padding: 10px;
+                          display: flex;
+                          flex-direction: column;
+                          justify-content: flex-start;
+                          align-items: center;
+                        }
+                        .loading {
+                          text-align: center;
+                          padding: 40px 20px;
+                          color: ${isDark ? '#D7DBDC' : '#0F1419'};
+                          font-size: 14px;
+                        }
+                        .loading-emoji {
+                          font-size: 28px;
+                          margin-bottom: 10px;
+                          display: block;
+                        }
+                        .twitter-tweet-rendered {
+                          margin: 10px auto !important;
+                          max-width: 100% !important;
+                        }
+                        .error {
+                          text-align: center;
+                          padding: 40px 20px;
+                          color: ${isDark ? '#ff6b6b' : '#e74c3c'};
+                          font-size: 14px;
+                        }
+                      </style>
+                    </head>
+                    <body>
+                      <div class="loading" id="loading">
+                        <span class="loading-emoji">🐦</span>
+                        <div>Loading ${twitterUrl.includes('x.com') ? 'X' : 'Twitter'} post...</div>
+                      </div>
+                      
+                      <div id="error" class="error" style="display: none;">
+                        <span class="loading-emoji">❌</span>
+                        <div>Failed to load tweet</div>
+                      </div>
+
+                  <blockquote class="twitter-tweet" data-lang="en" data-theme="${isDark ? 'dark' : 'light'}" data-dnt="true">
+                    <a href="${twitterUrl}" style="color: #1DA1F2; text-decoration: none;">
+                      <div style="text-align: center; padding: 20px;">
+                        <div style="font-size: 16px; margin-bottom: 8px;">🐦</div>
+                        <div>Tap to load tweet</div>
+                      </div>
+                    </a>
+                  </blockquote>                      <script>
+                        // Timeout handler
+                        let loadTimeout = setTimeout(() => {
+                          document.getElementById('loading').style.display = 'none';
+                          document.getElementById('error').style.display = 'block';
+                          console.log('Tweet loading timed out');
+                        }, 10000);
+
+                        // Twitter widget loader with error handling
+                        (function(d, s, id) {
+                          var js, fjs = d.getElementsByTagName(s)[0];
+                          if (d.getElementById(id)) return;
+                          js = d.createElement(s); js.id = id;
+                          js.onload = function() {
+                            console.log('Twitter widgets script loaded');
+                            if (window.twttr && window.twttr.widgets) {
+                              window.twttr.widgets.load().then(function() {
+                                console.log('Twitter widgets rendered');
+                                clearTimeout(loadTimeout);
+                                document.getElementById('loading').style.display = 'none';
+                              }).catch(function(error) {
+                                console.log('Twitter widgets error:', error);
+                                clearTimeout(loadTimeout);
+                                document.getElementById('loading').style.display = 'none';
+                                document.getElementById('error').style.display = 'block';
+                              });
+                            }
+                          };
+                          js.onerror = function() {
+                            console.log('Failed to load Twitter widgets script');
+                            clearTimeout(loadTimeout);
+                            document.getElementById('loading').style.display = 'none';
+                            document.getElementById('error').style.display = 'block';
+                          };
+                          js.src = 'https://platform.twitter.com/widgets.js';
+                          js.charset = 'utf-8';
+                          js.async = true;
+                          fjs.parentNode.insertBefore(js, fjs);
+                        }(document, 'script', 'twitter-wjs'));
+                      </script>
+                    </body>
+                    </html>
+                    `
+                  }}
+                  style={{ flex: 1 }}
+                  javaScriptEnabled={true}
+                  domStorageEnabled={true}
+                  originWhitelist={['*']}
+                  allowsLinkPreview={false}
+                  showsVerticalScrollIndicator={false}
+                  showsHorizontalScrollIndicator={false}
+                  bounces={false}
+                  scrollEnabled={true}
+                  startInLoadingState={false}
+                  onLoadStart={() => console.log('Reply Twitter WebView loading started')}
+                  onLoad={() => console.log('Reply Twitter WebView loaded')}
+                  onError={(error) => console.log('Reply Twitter WebView error:', error)}
+                  onHttpError={(error) => console.log('Reply Twitter WebView HTTP error:', error)}
+                />
+                <View style={{ 
+                  position: 'absolute', 
+                  top: 8, 
+                  right: 8, 
+                  backgroundColor: 'rgba(0,0,0,0.7)', 
+                  paddingHorizontal: 6, 
+                  paddingVertical: 2, 
+                  borderRadius: 4 
+                }}>
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+                    {twitterUrl.includes('x.com') ? 'X' : 'TWITTER'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
           {/* Images from markdown/html */}
           {imageUrls.length > 0 && (
             <View style={{ marginBottom: 8 }}>
@@ -1288,11 +1626,14 @@ const ConversationScreen = () => {
   // Render the snap as a header for the replies list
   const renderSnapHeader = () => {
     if (!snap) return null;
+    console.log('🎯 Rendering snap header for:', snap.author, snap.permlink);
     const videoInfo = extractVideoInfo(snap.body);
+    const twitterUrl = extractTwitterUrl(snap.body);
+    console.log('🎯 Snap twitterUrl:', twitterUrl);
     const imageUrls = extractImageUrls(snap.body);
     let textBody = snap.body;
-    if (videoInfo) {
-      textBody = removeAllVideoUrls(textBody);
+    if (videoInfo || twitterUrl) {
+      textBody = removeAllEmbedUrls(textBody);
     }
     // Remove image tags from text body
     textBody = stripImageTags(textBody);
@@ -1380,6 +1721,162 @@ const ConversationScreen = () => {
                 </View>
               </View>
             )}
+          </View>
+        )}
+        {/* Twitter/X Post Embed */}
+        {twitterUrl && (
+          <View style={{ marginBottom: 8 }}>
+            <View style={{ 
+              width: '100%', 
+              minHeight: 400, 
+              maxHeight: 600, 
+              borderRadius: 12, 
+              overflow: 'hidden', 
+              backgroundColor: isDark ? '#222' : '#eee', 
+              position: 'relative' 
+            }}>
+              <WebView
+                source={{ 
+                  html: `
+                  <!DOCTYPE html>
+                  <html>
+                  <head>
+                    <meta charset="utf-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+                    <style>
+                      * {
+                        margin: 0;
+                        padding: 0;
+                        box-sizing: border-box;
+                      }
+                      html, body {
+                        height: 100%;
+                        background-color: ${isDark ? '#222' : '#fff'};
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                      }
+                      body {
+                        padding: 10px;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: flex-start;
+                        align-items: center;
+                      }
+                      .loading {
+                        text-align: center;
+                        padding: 40px 20px;
+                        color: ${isDark ? '#D7DBDC' : '#0F1419'};
+                        font-size: 14px;
+                      }
+                      .loading-emoji {
+                        font-size: 28px;
+                        margin-bottom: 10px;
+                        display: block;
+                      }
+                      .twitter-tweet-rendered {
+                        margin: 10px auto !important;
+                        max-width: 100% !important;
+                      }
+                      .error {
+                        text-align: center;
+                        padding: 40px 20px;
+                        color: ${isDark ? '#ff6b6b' : '#e74c3c'};
+                        font-size: 14px;
+                      }
+                    </style>
+                  </head>
+                  <body>
+                    <div class="loading" id="loading">
+                      <span class="loading-emoji">🐦</span>
+                      <div>Loading ${twitterUrl.includes('x.com') ? 'X' : 'Twitter'} post...</div>
+                    </div>
+                    
+                    <div id="error" class="error" style="display: none;">
+                      <span class="loading-emoji">❌</span>
+                      <div>Failed to load tweet</div>
+                    </div>
+
+                    <blockquote class="twitter-tweet" data-lang="en" data-theme="${isDark ? 'dark' : 'light'}" data-dnt="true">
+                      <a href="${twitterUrl}" style="color: #1DA1F2; text-decoration: none;">
+                        <div style="text-align: center; padding: 20px;">
+                          <div style="font-size: 16px; margin-bottom: 8px;">🐦</div>
+                          <div>Tap to load tweet</div>
+                        </div>
+                      </a>
+                    </blockquote>
+
+                    <script>
+                      // Timeout handler
+                      let loadTimeout = setTimeout(() => {
+                        document.getElementById('loading').style.display = 'none';
+                        document.getElementById('error').style.display = 'block';
+                        console.log('Tweet loading timed out');
+                      }, 10000);
+
+                      // Twitter widget loader with error handling
+                      (function(d, s, id) {
+                        var js, fjs = d.getElementsByTagName(s)[0];
+                        if (d.getElementById(id)) return;
+                        js = d.createElement(s); js.id = id;
+                        js.onload = function() {
+                          console.log('Twitter widgets script loaded');
+                          if (window.twttr && window.twttr.widgets) {
+                            window.twttr.widgets.load().then(function() {
+                              console.log('Twitter widgets rendered');
+                              clearTimeout(loadTimeout);
+                              document.getElementById('loading').style.display = 'none';
+                            }).catch(function(error) {
+                              console.log('Twitter widgets error:', error);
+                              clearTimeout(loadTimeout);
+                              document.getElementById('loading').style.display = 'none';
+                              document.getElementById('error').style.display = 'block';
+                            });
+                          }
+                        };
+                        js.onerror = function() {
+                          console.log('Failed to load Twitter widgets script');
+                          clearTimeout(loadTimeout);
+                          document.getElementById('loading').style.display = 'none';
+                          document.getElementById('error').style.display = 'block';
+                        };
+                        js.src = 'https://platform.twitter.com/widgets.js';
+                        js.charset = 'utf-8';
+                        js.async = true;
+                        fjs.parentNode.insertBefore(js, fjs);
+                      }(document, 'script', 'twitter-wjs'));
+                    </script>
+                  </body>
+                  </html>
+                  `
+                }}
+                style={{ flex: 1 }}
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
+                originWhitelist={['*']}
+                allowsLinkPreview={false}
+                showsVerticalScrollIndicator={false}
+                showsHorizontalScrollIndicator={false}
+                bounces={false}
+                scrollEnabled={true}
+                startInLoadingState={false}
+                onLoadStart={() => console.log('Snap Twitter WebView loading started')}
+                onLoad={() => console.log('Snap Twitter WebView loaded')}
+                onError={(error) => console.log('Snap Twitter WebView error:', error)}
+                onHttpError={(error) => console.log('Snap Twitter WebView HTTP error:', error)}
+              />
+              <View style={{ 
+                position: 'absolute', 
+                top: 8, 
+                right: 8, 
+                backgroundColor: 'rgba(0,0,0,0.7)', 
+                paddingHorizontal: 6, 
+                paddingVertical: 2, 
+                borderRadius: 4 
+              }}>
+                <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+                  {twitterUrl.includes('x.com') ? 'X' : 'TWITTER'}
+                </Text>
+              </View>
+            </View>
           </View>
         )}
         {/* Images from markdown/html */}
