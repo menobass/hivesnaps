@@ -168,6 +168,12 @@ const DiscoveryScreen = () => {
     loadUsernameAndFetch();
   }, [hashtag]);
 
+  // Create refresh handler that uses current username
+  const handleRefresh = async () => {
+    const currentUsername = await SecureStore.getItemAsync('hive_username');
+    fetchHashtagSnaps(currentUsername ?? undefined);
+  };
+
 
   // Upvote modal state and logic (copied/adapted from FeedScreen)
   const [upvoteModalVisible, setUpvoteModalVisible] = useState(false);
@@ -440,7 +446,7 @@ const DiscoveryScreen = () => {
           contentContainerStyle={{ paddingBottom: 80 }}
           style={{ width: '100%' }}
           refreshing={loading}
-          onRefresh={fetchHashtagSnaps}
+          onRefresh={handleRefresh}
         />
       )}
     </View>
