@@ -146,9 +146,10 @@ const markdownRules = {
     styles: any
   ) => {
     const { src, alt } = node.attributes;
+    const uniqueKey = `${src || alt}-${Math.random().toString(36).substr(2, 9)}`;
     return (
       <Pressable
-        key={src || alt}
+        key={uniqueKey}
         onPress={() => {
           const handler = (globalThis as any)._snapOnImagePress;
           if (typeof handler === 'function') {
@@ -187,10 +188,12 @@ const markdownRules = {
     // Handle profile:// links for mentions
     if (href && href.startsWith('profile://')) {
       const username = href.replace('profile://', '');
+      // Generate unique key to avoid React key conflicts when same user is mentioned multiple times
+      const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
       // Use global onUserPress from Snap props
       return (
         <Pressable
-          key={href}
+          key={uniqueKey}
           onPress={() => {
             const handler = (globalThis as any)._snapOnUserPress;
             if (typeof handler === 'function') handler(username);
@@ -203,10 +206,32 @@ const markdownRules = {
         </Pressable>
       );
     }
+    // Handle hashtag:// links for hashtags
+    if (href && href.startsWith('hashtag://')) {
+      const tag = href.replace('hashtag://', '');
+      // Generate unique key to avoid React key conflicts when same hashtag appears multiple times
+      const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
+      // Use global onHashtagPress from Snap props
+      return (
+        <Pressable
+          key={uniqueKey}
+          onPress={() => {
+            const handler = (globalThis as any)._snapOnHashtagPress;
+            if (typeof handler === 'function') handler(tag);
+          }}
+          style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+          accessibilityRole="link"
+          accessibilityLabel={`View #${tag} hashtag`}
+        >
+          <Text style={{ color: '#1DA1F2', textDecorationLine: 'underline' }}>{children}</Text>
+        </Pressable>
+      );
+    }
     // Default: open external link
+    const uniqueKey = href ? `${href}-${Math.random().toString(36).substr(2, 9)}` : Math.random().toString(36).substr(2, 9);
     return (
       <Text
-        key={href}
+        key={uniqueKey}
         style={{ color: twitterColors.light.icon, textDecorationLine: 'underline' }}
         onPress={() => {
           if (href) Linking.openURL(href);
@@ -235,25 +260,11 @@ const markdownRules = {
 };
 
 const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount = 0, replyCount = 0, payout = 0, onUpvotePress, permlink, hasUpvoted = false, onSpeechBubblePress, onUserPress, onContentPress, onImagePress, showAuthor = false, onHashtagPress }) => {
-  // Hashtag parsing: split text and wrap hashtags in clickable Text
-  function renderBodyWithHashtags(text: string) {
-    const hashtagRegex = /(#\w+)/g;
-    const parts = text.split(hashtagRegex);
-    return parts.map((part, idx) => {
-      if (hashtagRegex.test(part)) {
-        const tag = part.replace('#', '');
-        return (
-          <Text
-            key={idx}
-            style={{ color: '#1DA1F2' }}
-            onPress={() => onHashtagPress && onHashtagPress(tag)}
-          >
-            {part}
-          </Text>
-        );
-      } else {
-        return <Text key={idx}>{part}</Text>;
-      }
+  // Process hashtags in text, converting them to clickable markdown links
+  function processHashtags(text: string): string {
+    return text.replace(/(#\w+)/g, (match, hashtag) => {
+      const tag = hashtag.replace('#', '');
+      return `[${hashtag}](hashtag://${tag})`;
     });
   }
   const colorScheme = useColorScheme() || 'light';
@@ -271,9 +282,10 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
   if (rawImageUrls.length > 0) {
     textBody = removeRawImageUrls(textBody);
   }
-  // Add: linkify URLs first, then mentions (order matters!)
+  // Add: linkify URLs first, then mentions, then hashtags (order matters!)
   textBody = linkifyUrls(textBody);
   textBody = linkifyMentions(textBody);
+  textBody = processHashtags(textBody);
   // Remove extraction of external links
   const cleanTextBody = textBody; // Just use the processed textBody
   const [modalVisible, setModalVisible] = useState(false);
@@ -282,6 +294,7 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
   // Expose onUserPress globally for markdownRules
   (globalThis as any)._snapOnUserPress = onUserPress;
   (globalThis as any)._snapOnImagePress = onImagePress;
+  (globalThis as any)._snapOnHashtagPress = onHashtagPress;
 
   return (
     <View style={[styles.bubble, { backgroundColor: colors.bubble, borderColor: colors.border, width: '100%', alignSelf: 'stretch' }]}> 
@@ -434,9 +447,15 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
                   }}
                 />
               ) : (
-                <Text style={{ color: colors.text, fontSize: 15, marginBottom: 8, flexWrap: 'wrap' }}>
-                  {renderBodyWithHashtags(cleanTextBody)}
-                </Text>
+                <Markdown
+                  style={{
+                    body: { color: colors.text, fontSize: 15, marginBottom: 8 },
+                    link: { color: colors.icon },
+                  }}
+                  rules={markdownRules}
+                >
+                  {cleanTextBody}
+                </Markdown>
               )}
             </Pressable>
           );
@@ -460,9 +479,15 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
               }}
             />
           ) : (
-            <Text style={{ color: colors.text, fontSize: 15, marginBottom: 8, flexWrap: 'wrap' }}>
-              {renderBodyWithHashtags(cleanTextBody)}
-            </Text>
+            <Markdown
+              style={{
+                body: { color: colors.text, fontSize: 15, marginBottom: 8 },
+                link: { color: colors.icon },
+              }}
+              rules={markdownRules}
+            >
+              {cleanTextBody}
+            </Markdown>
           );
         }
       })()}

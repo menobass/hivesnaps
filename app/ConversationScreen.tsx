@@ -660,9 +660,10 @@ const ConversationScreen = () => {
       styles: any
     ) => {
       const { src, alt } = node.attributes;
+      const uniqueKey = `${src || alt}-${Math.random().toString(36).substr(2, 9)}`;
       return (
         <Pressable
-          key={src || alt}
+          key={uniqueKey}
           onPress={() => handleImagePress(src)}
         >
           <Image
@@ -738,9 +739,10 @@ const ConversationScreen = () => {
       // Handle profile:// links for mentions
       if (href && href.startsWith('profile://')) {
         const username = href.replace('profile://', '');
+        const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
         return (
           <Text
-            key={href}
+            key={uniqueKey}
             style={{ color: colors.icon, fontWeight: 'bold', textDecorationLine: 'underline' }}
             onPress={() => router.push(`/ProfileScreen?username=${username}` as any)}
             accessibilityRole="link"
@@ -758,8 +760,9 @@ const ConversationScreen = () => {
 
       if (youtubeMatch) {
         const videoId = youtubeMatch[1];
+        const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
         return (
-          <View key={href} style={{ width: '100%', aspectRatio: 16 / 9, marginVertical: 10, borderRadius: 10, overflow: 'hidden', backgroundColor: isDark ? '#222' : '#eee', position: 'relative' }}>
+          <View key={uniqueKey} style={{ width: '100%', aspectRatio: 16 / 9, marginVertical: 10, borderRadius: 10, overflow: 'hidden', backgroundColor: isDark ? '#222' : '#eee', position: 'relative' }}>
             <WebView
               source={{ uri: `https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0&modestbranding=1` }}
               style={{ flex: 1 }}
@@ -788,8 +791,9 @@ const ConversationScreen = () => {
       if (threeSpeakMatch) {
         const username = threeSpeakMatch[1];
         const videoId = threeSpeakMatch[2];
+        const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
         return (
-          <View key={href} style={{ width: '100%', aspectRatio: 16 / 9, marginVertical: 10, borderRadius: 10, overflow: 'hidden', backgroundColor: isDark ? '#222' : '#eee', position: 'relative' }}>
+          <View key={uniqueKey} style={{ width: '100%', aspectRatio: 16 / 9, marginVertical: 10, borderRadius: 10, overflow: 'hidden', backgroundColor: isDark ? '#222' : '#eee', position: 'relative' }}>
             <WebView
               source={{ uri: `https://3speak.tv/embed?v=${username}/${videoId}&autoplay=0` }}
               style={{ flex: 1 }}
@@ -816,8 +820,9 @@ const ConversationScreen = () => {
       }
       
       if (ipfsMatch) {
+        const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
         return (
-          <View key={href} style={{ marginVertical: 10 }}>
+          <View key={uniqueKey} style={{ marginVertical: 10 }}>
             <IPFSVideoPlayer ipfsUrl={href} isDark={isDark} />
           </View>
         );
@@ -826,8 +831,9 @@ const ConversationScreen = () => {
         return renderMp4Video(href, href);
       }
       // Default link rendering
+      const uniqueKey = href ? `${href}-${Math.random().toString(36).substr(2, 9)}` : Math.random().toString(36).substr(2, 9);
       return (
-        <Text key={href} style={[{ color: colors.icon, textDecorationLine: 'underline' }]} onPress={() => {
+        <Text key={uniqueKey} style={[{ color: colors.icon, textDecorationLine: 'underline' }]} onPress={() => {
           // Open link in browser
           if (href) {
             Linking.openURL(href);
