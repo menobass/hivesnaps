@@ -121,6 +121,24 @@ export function removeTwitterUrls(text: string): string {
 }
 
 /**
+ * Remove Hive post URLs from text content when they're rendered as previews
+ * @param text - The text to clean
+ * @returns Cleaned text with Hive post URLs removed
+ */
+export function removeHivePostUrls(text: string): string {
+  return text
+    // Remove ecency.com URLs
+    .replace(/(?:https?:\/\/)?(?:www\.)?ecency\.com\/(?:hive-\d+\/)?@[a-z0-9.-]{3,16}\/[a-z0-9-]+(\S*)?/gi, '')
+    // Remove peakd.com URLs
+    .replace(/(?:https?:\/\/)?(?:www\.)?peakd\.com\/(?:hive-\d+\/)?@[a-z0-9.-]{3,16}\/[a-z0-9-]+(\S*)?/gi, '')
+    // Remove hive.blog URLs
+    .replace(/(?:https?:\/\/)?(?:www\.)?hive\.blog\/(?:hive-\d+\/)?@[a-z0-9.-]{3,16}\/[a-z0-9-]+(\S*)?/gi, '')
+    // Clean up extra whitespace
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+/**
  * Remove all social media and video URLs that should be rendered as embeds
  * @param text - The text to clean
  * @returns Cleaned text with embed URLs removed
@@ -128,6 +146,7 @@ export function removeTwitterUrls(text: string): string {
 export function removeEmbedUrls(text: string): string {
   let cleanText = removeVideoUrls(text);
   cleanText = removeTwitterUrls(cleanText);
+  cleanText = removeHivePostUrls(cleanText);
   return cleanText;
 }
 
