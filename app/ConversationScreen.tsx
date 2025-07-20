@@ -892,6 +892,16 @@ const ConversationScreen = () => {
     return removeEmbedUrls(text);
   }
 
+  // Utility to preserve paragraph spacing in text
+  function preserveParagraphSpacing(text: string): string {
+    // Normalize line endings and preserve double line breaks as paragraph breaks
+    return text
+      .replace(/\r\n/g, '\n') // Normalize Windows line endings
+      .replace(/\r/g, '\n')   // Normalize Mac line endings
+      .replace(/\n\n+/g, '\n\n') // Normalize multiple line breaks to double
+      .replace(/\n\n/g, '\n\n'); // Ensure paragraph breaks are preserved
+  }
+
   // Utility: Preprocess raw URLs to clickable markdown links (if not already linked)
   function linkifyUrls(text: string): string {
     // Regex for URLs (http/https) - includes @ character for Hive frontend URLs
@@ -1413,6 +1423,8 @@ const ConversationScreen = () => {
     }
     // Remove image tags from text body
     textBody = stripImageTags(textBody);
+    // Preserve paragraph spacing before processing
+    textBody = preserveParagraphSpacing(textBody);
     // Process URLs first, then mentions, then hashtags (order matters!)
     textBody = linkifyUrls(textBody);
     textBody = linkifyMentions(textBody);
@@ -1680,24 +1692,33 @@ const ConversationScreen = () => {
           {/* Hive Post Previews */}
           <HivePostPreviewRenderer postUrls={hivePostUrls} />
           
-          {isHtml ? (
-            <RenderHtml
-              contentWidth={windowWidth - (visualLevel * 18) - 32}
-              source={{ html: textBody }}
-              baseStyle={{ color: colors.text, fontSize: 14, marginBottom: 4 }}
-              enableExperimentalMarginCollapsing
-              tagsStyles={{ a: { color: colors.icon } }}
-            />
-          ) : (
-            <Markdown
-              style={{
-                body: { color: colors.text, fontSize: 14, marginBottom: 4 },
-                link: { color: colors.icon },
-              }}
-              rules={markdownRules}
-            >
-              {textBody}
-            </Markdown>
+          {/* Text Content */}
+          {textBody.trim().length > 0 && (
+            <View style={{ marginTop: (videoInfo || twitterUrl || imageUrls.length > 0 || hivePostUrls.length > 0) ? 8 : 0 }}>
+              {isHtml ? (
+                <RenderHtml
+                  contentWidth={windowWidth - (visualLevel * 18) - 32}
+                  source={{ html: textBody }}
+                  baseStyle={{ color: colors.text, fontSize: 14, marginBottom: 4, lineHeight: 20 }}
+                  enableExperimentalMarginCollapsing
+                  tagsStyles={{ 
+                    a: { color: colors.icon },
+                    p: { marginBottom: 12, lineHeight: 20 }
+                  }}
+                />
+              ) : (
+                <Markdown
+                  style={{
+                    body: { color: colors.text, fontSize: 14, marginBottom: 4 },
+                    paragraph: { color: colors.text, fontSize: 14, marginBottom: 12, lineHeight: 20 },
+                    link: { color: colors.icon },
+                  }}
+                  rules={markdownRules}
+                >
+                  {textBody}
+                </Markdown>
+              )}
+            </View>
           )}
           <View style={styles.replyMeta}>
             <TouchableOpacity
@@ -1760,6 +1781,8 @@ const ConversationScreen = () => {
     }
     // Remove image tags from text body
     textBody = stripImageTags(textBody);
+    // Preserve paragraph spacing before processing
+    textBody = preserveParagraphSpacing(textBody);
     // Process URLs first, then mentions, then hashtags (order matters!)
     textBody = linkifyUrls(textBody);
     textBody = linkifyMentions(textBody);
@@ -2021,38 +2044,47 @@ const ConversationScreen = () => {
         {/* Hive Post Previews */}
         <HivePostPreviewRenderer postUrls={hivePostUrls} />
         
-        {isHtml ? (
-          <RenderHtml
-            contentWidth={windowWidth - 32}
-            source={{ html: textBody }}
-            baseStyle={{ color: colors.text, fontSize: 15, marginBottom: 8 }}
-            enableExperimentalMarginCollapsing
-            tagsStyles={{ a: { color: colors.icon } }}
-            customHTMLElementModels={{
-              video: defaultHTMLElementModels.video.extend({
-                contentModel: HTMLContentModel.mixed,
-              }),
-            }}
-            renderers={{
-              video: ({ tnode }: any) => {
-                const src = tnode?.attributes?.src;
-                if (src && src.endsWith('.mp4')) {
-                  return renderMp4Video(src);
-                }
-                return null;
-              },
-            }}
-          />
-        ) : (
-          <Markdown
-            style={{
-              body: { color: colors.text, fontSize: 15, marginBottom: 8 },
-              link: { color: colors.icon },
-            }}
-            rules={markdownRules}
-          >
-            {textBody}
-          </Markdown>
+        {/* Text Content */}
+        {textBody.trim().length > 0 && (
+          <View style={{ marginTop: (videoInfo || twitterUrl || imageUrls.length > 0 || hivePostUrls.length > 0) ? 8 : 0 }}>
+            {isHtml ? (
+              <RenderHtml
+                contentWidth={windowWidth - 32}
+                source={{ html: textBody }}
+                baseStyle={{ color: colors.text, fontSize: 15, marginBottom: 8, lineHeight: 22 }}
+                enableExperimentalMarginCollapsing
+                tagsStyles={{ 
+                  a: { color: colors.icon },
+                  p: { marginBottom: 16, lineHeight: 22 }
+                }}
+                customHTMLElementModels={{
+                  video: defaultHTMLElementModels.video.extend({
+                    contentModel: HTMLContentModel.mixed,
+                  }),
+                }}
+                renderers={{
+                  video: ({ tnode }: any) => {
+                    const src = tnode?.attributes?.src;
+                    if (src && src.endsWith('.mp4')) {
+                      return renderMp4Video(src);
+                    }
+                    return null;
+                  },
+                }}
+              />
+            ) : (
+              <Markdown
+                style={{
+                  body: { color: colors.text, fontSize: 15, marginBottom: 8 },
+                  paragraph: { color: colors.text, fontSize: 15, marginBottom: 16, lineHeight: 22 },
+                  link: { color: colors.icon },
+                }}
+                rules={markdownRules}
+              >
+                {textBody}
+              </Markdown>
+            )}
+          </View>
         )}
         <View style={[styles.snapMeta, { alignItems: 'center' }]}> 
           <TouchableOpacity
