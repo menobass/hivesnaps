@@ -97,16 +97,21 @@ const DiscoveryScreen = () => {
   const fetchHashtagSnaps = async (currentUsername?: string) => {
     setLoading(true);
     try {
-      // Get recent container posts
-      const discussions = await client.database.call('get_discussions_by_blog', [{ tag: 'peak.snaps', limit: 5 }]);
+      // Get more container posts to ensure good hashtag coverage
+      const discussions = await client.database.call('get_discussions_by_blog', [{ tag: 'peak.snaps', limit: 15 }]);
       let allSnaps: Snap[] = [];
       const snapPromises = discussions.map(async (post: any) => {
         try {
           const replies: Snap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
-          // Filter snaps containing the hashtag
-          return replies.filter(reply =>
-            reply.body && reply.body.toLowerCase().includes(`#${hashtag?.toLowerCase()}`)
-          );
+          // Filter snaps containing the hashtag (more precise matching)
+          return replies.filter(reply => {
+            if (!reply.body || !hashtag) return false;
+            const body = reply.body.toLowerCase();
+            const tag = hashtag.toLowerCase();
+            // Match hashtag at word boundaries to avoid partial matches
+            const hashtagRegex = new RegExp(`\\B#${tag}\\b`, 'i');
+            return hashtagRegex.test(reply.body);
+          });
         } catch {
           return [];
         }
@@ -115,10 +120,14 @@ const DiscoveryScreen = () => {
       allSnaps = snapResults.flat();
       // Sort by created date descending
       allSnaps.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
+      
+      // Limit results for better performance (show most recent 30 hashtag matches)
+      const limitedSnaps = allSnaps.slice(0, 30);
+      console.log(`[DiscoveryScreen] Found ${allSnaps.length} snaps with hashtag #${hashtag}, showing ${limitedSnaps.length}`);
 
       // Fetch avatars for all unique authors
       const now = Date.now();
-      const uniqueAuthors = Array.from(new Set(allSnaps.map(s => s.author)));
+      const uniqueAuthors = Array.from(new Set(limitedSnaps.map(s => s.author)));
       const newCache = { ...avatarCache };
       const avatarFetchPromises = uniqueAuthors.map(async username => {
         // Use cache if not expired
@@ -142,7 +151,7 @@ const DiscoveryScreen = () => {
       setAvatarCache(newCache);
 
       // Attach avatarUrl and hasUpvoted to each snap
-      const snapsWithAvatars = allSnaps.map(snap => {
+      const snapsWithAvatars = limitedSnaps.map(snap => {
         const hasUpvoted = Array.isArray(snap.active_votes) && currentUsername && snap.active_votes.some((v: any) => v.voter === currentUsername && v.percent > 0);
         return {
           ...snap,
