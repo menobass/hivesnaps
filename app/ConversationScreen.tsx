@@ -753,8 +753,14 @@ const ConversationScreen = () => {
         postingKey
       );
       persistVoteWeight();
-      // Optimistically update UI - add payout calculation
-      const estimatedValueIncrease = voteValue ? parseFloat(voteValue.hbd) : 0;
+      // Optimistically update UI - add payout calculation (use USD since app displays in dollars)
+      const estimatedValueIncrease = voteValue ? parseFloat(voteValue.usd) : 0;
+      console.log('[OptimisticUpvote] Current payout:', snap?.payout);
+      console.log('[OptimisticUpvote] Vote value USD:', voteValue?.usd);
+      console.log('[OptimisticUpvote] Vote value HBD:', voteValue?.hbd);
+      console.log('[OptimisticUpvote] Estimated increase:', estimatedValueIncrease);
+      console.log('[OptimisticUpvote] Vote weight used:', voteWeight);
+      
       setSnap((prev) =>
         prev && prev.author === upvoteTarget.author && prev.permlink === upvoteTarget.permlink
           ? { 
@@ -768,6 +774,7 @@ const ConversationScreen = () => {
             }
           : prev
       );
+      console.log('[OptimisticUpvote] New calculated payout:', (snap?.payout || 0) + estimatedValueIncrease);
       setReplies((prevReplies) =>
         prevReplies.map((reply: ReplyData) =>
           updateReplyUpvoteOptimistic(reply, upvoteTarget, currentUsername, weight, estimatedValueIncrease)

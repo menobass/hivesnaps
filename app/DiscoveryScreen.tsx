@@ -284,8 +284,8 @@ const DiscoveryScreen = () => {
       // Persist the vote weight after successful vote
       await AsyncStorage.setItem('hivesnaps_vote_weight', String(voteWeight));
 
-      // Optimistically update UI - add payout calculation
-      const estimatedValueIncrease = voteValue ? parseFloat(voteValue.hbd) : 0;
+      // Optimistically update UI - add payout calculation (use USD since app displays in dollars)
+      const estimatedValueIncrease = voteValue ? parseFloat(voteValue.usd) : 0;
       setSnaps(prevSnaps => prevSnaps.map(snap => {
         if (snap.author === upvoteTarget.author && snap.permlink === upvoteTarget.permlink) {
           return {
