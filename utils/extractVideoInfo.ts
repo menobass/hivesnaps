@@ -35,7 +35,19 @@ export function extractVideoInfo(text: string): VideoInfo | null {
     };
   }
 
-  // 3Speak detection
+  // 3Speak detection - iframe embeds first (more common in Hive posts)
+  const threeSpeakIframeMatch = text.match(/<iframe[^>]+src=["']https:\/\/3speak\.tv\/embed\?v=([^\/\s"']+)\/([a-zA-Z0-9_-]+)["'][^>]*>/i);
+  if (threeSpeakIframeMatch) {
+    return {
+      type: '3speak',
+      username: threeSpeakIframeMatch[1],
+      videoId: threeSpeakIframeMatch[2],
+      embedUrl: `https://3speak.tv/embed?v=${threeSpeakIframeMatch[1]}/${threeSpeakIframeMatch[2]}`,
+      originalUrl: threeSpeakIframeMatch[0]
+    };
+  }
+
+  // 3Speak direct URLs (less common but still supported)
   const threeSpeakMatch = text.match(/https:\/\/3speak\.tv\/watch\?v=([^\/\s]+)\/([a-zA-Z0-9_-]+)/);
   if (threeSpeakMatch) {
     return {
@@ -81,7 +93,9 @@ export function removeVideoUrls(text: string): string {
   return text
     // Remove YouTube URLs
     .replace(/(?:https?:\/\/(?:www\.)?)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)\w{11}(\S*)?/gi, '')
-    // Remove 3speak URLs
+    // Remove 3speak iframe embeds (common in Hive posts)
+    .replace(/<iframe[^>]+src=["']https:\/\/3speak\.tv\/embed\?v=[^"']*["'][^>]*><\/iframe>/gi, '')
+    // Remove 3speak direct URLs
     .replace(/https:\/\/3speak\.tv\/watch\?v=[^\/\s]+\/[a-zA-Z0-9_-]+/gi, '')
     // Remove IPFS iframe tags
     .replace(/<iframe[^>]+src=["'][^"']*ipfs[^"']*["'][^>]*><\/iframe>/gi, '')
