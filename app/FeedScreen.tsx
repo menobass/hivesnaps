@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Image, useColorScheme, Dimensions, ActivityIndicator, FlatList, Modal, Pressable, Platform, TextInput, KeyboardAvoidingView } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Image, useColorScheme, Dimensions, ActivityIndicator, FlatList, Modal, Pressable, Platform, TextInput, KeyboardAvoidingView, BackHandler, ToastAndroid } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
@@ -10,6 +10,7 @@ import Slider from '@react-native-community/slider';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
 import { useNotifications } from '../hooks/useNotifications';
 import { useVotingPower } from '../hooks/useVotingPower';
@@ -158,6 +159,9 @@ const FeedScreen = () => {
   const [viewableSnaps, setViewableSnaps] = useState<string[]>([]); // Track visible snap keys
   const [viewableItems, setViewableItems] = useState<any[]>([]); // Track visible items
   const router = useRouter();
+
+  // Exit confirmation state for double-tap back (prevents accidental logout)
+  const [exitTimestamp, setExitTimestamp] = useState<number | null>(null);
 
   // Notifications
   const { unreadCount } = useNotifications(username || null);
@@ -994,6 +998,56 @@ const FeedScreen = () => {
       unregisterAvatarCacheInvalidator(invalidateUserAvatar);
     };
   }, []);
+
+  // Handle back button for exit confirmation (double-tap to exit) - only when FeedScreen is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      const backAction = () => {
+        const now = Date.now();
+        
+        if (exitTimestamp && (now - exitTimestamp) < 2000) {
+          // Second press within 2 seconds - actually log out
+          handleLogout();
+          return true; // Prevent default back action
+        } else {
+          // First press - show toast and set timestamp
+          setExitTimestamp(now);
+          
+          if (Platform.OS === 'android') {
+            ToastAndroid.show('Press back again to log out', ToastAndroid.SHORT);
+          } else {
+            // For iOS, you could show a temporary alert or use a library like react-native-toast-message
+            // For now, we'll just rely on the user understanding the double-tap pattern
+            console.log('Press back again to log out');
+          }
+          
+          // Reset the timestamp after 2 seconds
+          setTimeout(() => {
+            setExitTimestamp(null);
+          }, 2000);
+          
+          return true; // Prevent default back action
+        }
+      };
+
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+
+      return () => backHandler.remove();
+    }, [exitTimestamp])
+  );
+
+  // Handle logout functionality
+  const handleLogout = async () => {
+    try {
+      // Clear stored credentials
+      await SecureStore.deleteItemAsync('hive_username');
+      await SecureStore.deleteItemAsync('hive_posting_key');
+      // Navigate back to login screen
+      router.replace('/');
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
