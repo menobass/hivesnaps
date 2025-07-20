@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { View, Text, Pressable, Image, useColorScheme, Dimensions } from 'react-native';
+import { View, Text, Pressable, Image, useColorScheme, Dimensions, Linking } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { HivePostInfo } from '../utils/extractHivePostInfo';
@@ -58,9 +58,11 @@ export const HivePostPreview: React.FC<HivePostPreviewProps> = ({
   const handleExternalLinkPress = (e: any) => {
     e.stopPropagation();
     // Open original URL in browser
-    import('expo-linking').then(({ default: Linking }) => {
-      Linking.openURL(postInfo.originalUrl);
-    });
+    if (postInfo.originalUrl) {
+      Linking.openURL(postInfo.originalUrl).catch(err => {
+        console.error('Failed to open URL:', err);
+      });
+    }
   };
 
   const handleAuthorPress = (e: any) => {
