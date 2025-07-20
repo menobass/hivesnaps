@@ -741,12 +741,14 @@ const ConversationScreen = () => {
         postingKey
       );
       persistVoteWeight();
-      // Optimistically update UI
+      // Optimistically update UI - add payout calculation
+      const estimatedValueIncrease = voteValue ? parseFloat(voteValue.hbd) : 0;
       setSnap((prev) =>
         prev && prev.author === upvoteTarget.author && prev.permlink === upvoteTarget.permlink
           ? { 
               ...prev, 
               voteCount: (prev.voteCount || 0) + 1,
+              payout: (prev.payout || 0) + estimatedValueIncrease,
               active_votes: [
                 ...(prev.active_votes || []),
                 { voter: currentUsername, percent: weight }
@@ -756,17 +758,18 @@ const ConversationScreen = () => {
       );
       setReplies((prevReplies) =>
         prevReplies.map((reply: ReplyData) =>
-          updateReplyUpvoteOptimistic(reply, upvoteTarget, currentUsername, weight)
+          updateReplyUpvoteOptimistic(reply, upvoteTarget, currentUsername, weight, estimatedValueIncrease)
         )
       );
       setUpvoteLoading(false);
       setUpvoteSuccess(true);
+      // Close modal without refresh - maintain scroll position!
       setTimeout(() => {
         setUpvoteModalVisible(false);
         setUpvoteSuccess(false);
         setUpvoteTarget(null);
-        handleRefresh();
-      }, 2000);
+        setVoteValue(null);
+      }, 1500);
     } catch (err) {
       setUpvoteLoading(false);
       setUpvoteSuccess(false);
@@ -776,17 +779,18 @@ const ConversationScreen = () => {
   };
 
   // Helper to optimistically update hasUpvoted for replies (recursive)
-  function updateReplyUpvoteOptimistic(reply: ReplyData, target: { author: string; permlink: string }, username: string, weight: number): ReplyData {
+  function updateReplyUpvoteOptimistic(reply: ReplyData, target: { author: string; permlink: string }, username: string, weight: number, estimatedValue: number = 0): ReplyData {
     let updated = { ...reply };
     if (reply.author === target.author && reply.permlink === target.permlink) {
       updated.voteCount = (reply.voteCount || 0) + 1;
+      updated.payout = (reply.payout || 0) + estimatedValue;
       updated.active_votes = [
         ...(reply.active_votes || []),
         { voter: username, percent: weight }
       ];
     }
     if (reply.replies && reply.replies.length > 0) {
-      updated.replies = reply.replies.map((r) => updateReplyUpvoteOptimistic(r, target, username, weight));
+      updated.replies = reply.replies.map((r) => updateReplyUpvoteOptimistic(r, target, username, weight, estimatedValue));
     }
     return updated;
   }

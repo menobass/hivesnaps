@@ -284,13 +284,15 @@ const DiscoveryScreen = () => {
       // Persist the vote weight after successful vote
       await AsyncStorage.setItem('hivesnaps_vote_weight', String(voteWeight));
 
-      // Update snap in state to reflect upvote
+      // Optimistically update UI - add payout calculation
+      const estimatedValueIncrease = voteValue ? parseFloat(voteValue.hbd) : 0;
       setSnaps(prevSnaps => prevSnaps.map(snap => {
         if (snap.author === upvoteTarget.author && snap.permlink === upvoteTarget.permlink) {
           return {
             ...snap,
             hasUpvoted: true,
             net_votes: (snap.net_votes || 0) + 1,
+            payout: (snap.payout || 0) + estimatedValueIncrease,
             active_votes: Array.isArray(snap.active_votes)
               ? [...snap.active_votes, { voter: username, percent: voteWeight * 100 }]
               : [{ voter: username, percent: voteWeight * 100 }],
@@ -299,18 +301,15 @@ const DiscoveryScreen = () => {
         return snap;
       }));
 
-      // Refresh snaps from blockchain after upvote
-      await fetchHashtagSnaps(username);
-
       setUpvoteLoading(false);
       setUpvoteSuccess(true);
-      // Close modal after short delay, then immediately reset upvote state
+      // Close modal without refresh - maintain scroll position!
       setTimeout(() => {
         setUpvoteModalVisible(false);
         setUpvoteSuccess(false);
         setUpvoteTarget(null);
         setVoteValue(null);
-      }, 1200);
+      }, 1500);
     } catch {
       setUpvoteLoading(false);
       setUpvoteSuccess(false);
