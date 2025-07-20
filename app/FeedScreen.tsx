@@ -155,7 +155,8 @@ const FeedScreen = () => {
   const colors = twitterColors[colorScheme];
   const insets = useSafeAreaInsets();
   const flatListRef = useRef<FlatList<any>>(null); // FlatList ref for scroll control
-  const [pendingScrollToKey, setPendingScrollToKey] = useState<string | null>(null); // Key to scroll to after refresh
+  // Snap to scroll to in FlatList after refresh - no longer needed with optimistic updates
+  // const [pendingScrollToKey, setPendingScrollToKey] = useState<string | null>(null);
   const [viewableSnaps, setViewableSnaps] = useState<string[]>([]); // Track visible snap keys
   const [viewableItems, setViewableItems] = useState<any[]>([]); // Track visible items
   const router = useRouter();
@@ -635,7 +636,7 @@ const FeedScreen = () => {
     }
     setVoteWeightLoading(false);
     setUpvoteModalVisible(true);
-    setPendingScrollToKey(author + '-' + permlink); // Remember which snap to scroll to
+    // Note: No longer need to track scroll position with optimistic updates
   };
 
   const handleUpvoteCancel = () => {
@@ -675,20 +676,33 @@ const FeedScreen = () => {
       // Persist the vote weight after successful vote
       await AsyncStorage.setItem('hivesnaps_vote_weight', String(voteWeight));
 
+      // Optimistically update UI immediately - no refresh needed!
+      const estimatedValueIncrease = voteValue ? parseFloat(voteValue.hbd) : 0;
+      setSnaps(prevSnaps => 
+        prevSnaps.map(snap => 
+          snap.author === upvoteTarget.author && snap.permlink === upvoteTarget.permlink
+            ? { 
+                ...snap, 
+                voteCount: (snap.voteCount || 0) + 1,
+                payout: (snap.payout || 0) + estimatedValueIncrease,
+                active_votes: [
+                  ...(snap.active_votes || []),
+                  { voter: username, percent: weight, rshares: weight * 100 }
+                ]
+              }
+            : snap
+        )
+      );
+
       setUpvoteLoading(false);
       setUpvoteSuccess(true);
-      // Refresh feed and scroll to upvoted snap after short delay
-      setTimeout(async () => {
+      // Close modal after showing success - no refresh!
+      setTimeout(() => {
         setUpvoteModalVisible(false);
         setUpvoteSuccess(false);
         setUpvoteTarget(null);
-        // Refresh feed
-        if (activeFilter === 'newest') await fetchSnaps(false); // Force refresh
-        else if (activeFilter === 'following') await fetchFollowingSnaps(false);
-        else if (activeFilter === 'trending') await fetchTrendingSnaps(false);
-        else if (activeFilter === 'my') await fetchMySnaps(false);
-        // Scrolling will be handled in useEffect below
-      }, 2000);
+        setVoteValue(null);
+      }, 1500);
     } catch (err) {
       setUpvoteLoading(false);
       setUpvoteSuccess(false);
@@ -698,13 +712,11 @@ const FeedScreen = () => {
   };
 
   // ---
-  // WISHLIST / WORK IN PROGRESS:
-  // The following scroll-to-upvoted Snap logic is intended to bring the upvoted Snap into view after voting.
-  // However, with variable-height FlatList items, this does not reliably center or scroll to the correct Snap.
-  // As of now, this feature is NOT working as intended. If you have experience with FlatList and dynamic item heights,
-  // please help improve or fix this logic! See related discussion in commit and/or GitHub issue.
+  // REMOVED: Scroll-to-upvoted logic is no longer needed with optimistic updates
+  // Users maintain their scroll position since we don't refresh the feed after upvoting
   // ---
   // Scroll to upvoted snap after snaps update if needed
+  /*
   useEffect(() => {
     if (pendingScrollToKey && snaps.length > 0 && flatListRef.current) {
       const idx = snaps.findIndex(s => (s.author + '-' + s.permlink) === pendingScrollToKey);
@@ -724,6 +736,7 @@ const FeedScreen = () => {
       }
     }
   }, [snaps, pendingScrollToKey]);
+  */
 
   // --- New Snap Modal Handlers ---
   const openNewSnapModal = () => {
