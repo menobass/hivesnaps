@@ -922,6 +922,28 @@ const ConversationScreen = () => {
     });
   }
 
+  // Utility: Preprocess #hashtags to clickable links
+  function linkifyHashtags(text: string): string {
+    // Match hashtags (# followed by alphanumeric characters and underscores)
+    // Avoid matching hashtags that are already inside markdown links
+    return text.replace(/(^|[^\w/#])#(\w+)(?![a-z0-9\-\.])/gi, (match, pre, hashtag, offset, string) => {
+      // Don't process if we're inside a markdown link [text](url)
+      const beforeMatch = string.substring(0, offset);
+      const afterMatch = string.substring(offset + match.length);
+      
+      // Check if we're inside a markdown link by looking for unmatched brackets
+      const openBrackets = (beforeMatch.match(/\[/g) || []).length;
+      const closeBrackets = (beforeMatch.match(/\]/g) || []).length;
+      const isInsideMarkdownLink = openBrackets > closeBrackets && afterMatch.includes('](');
+      
+      if (isInsideMarkdownLink) {
+        return match; // Don't modify if inside a markdown link
+      }
+      
+      return `${pre}[**#${hashtag}**](hashtag://${hashtag})`;
+    });
+  }
+
   // Custom markdown rules with 'any' types to silence TS warnings
   const markdownRules = {
     image: (
@@ -1018,6 +1040,22 @@ const ConversationScreen = () => {
             onPress={() => router.push(`/ProfileScreen?username=${username}` as any)}
             accessibilityRole="link"
             accessibilityLabel={`View @${username}'s profile`}
+          >
+            {children}
+          </Text>
+        );
+      }
+      // Handle hashtag:// links for hashtags
+      if (href && href.startsWith('hashtag://')) {
+        const tag = href.replace('hashtag://', '');
+        const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
+        return (
+          <Text
+            key={uniqueKey}
+            style={{ color: colors.icon, fontWeight: 'bold', textDecorationLine: 'underline' }}
+            onPress={() => router.push({ pathname: '/DiscoveryScreen', params: { hashtag: tag } })}
+            accessibilityRole="link"
+            accessibilityLabel={`View #${tag} hashtag`}
           >
             {children}
           </Text>
@@ -1304,9 +1342,10 @@ const ConversationScreen = () => {
     }
     // Remove image tags from text body
     textBody = stripImageTags(textBody);
-    // Process URLs first, then mentions (order matters!)
+    // Process URLs first, then mentions, then hashtags (order matters!)
     textBody = linkifyUrls(textBody);
     textBody = linkifyMentions(textBody);
+    textBody = linkifyHashtags(textBody);
     const windowWidth = Dimensions.get('window').width;
     const isHtml = containsHtml(textBody);
     
@@ -1637,9 +1676,10 @@ const ConversationScreen = () => {
     }
     // Remove image tags from text body
     textBody = stripImageTags(textBody);
-    // Process URLs first, then mentions (order matters!)
+    // Process URLs first, then mentions, then hashtags (order matters!)
     textBody = linkifyUrls(textBody);
     textBody = linkifyMentions(textBody);
+    textBody = linkifyHashtags(textBody);
     const windowWidth = Dimensions.get('window').width;
     const isHtml = containsHtml(textBody);
     return (
