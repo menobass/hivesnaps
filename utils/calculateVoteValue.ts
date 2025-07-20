@@ -64,14 +64,14 @@ export function calculateVoteValue(
   // Get Hive price (default 1 if not provided)
   const price = typeof hivePrice === 'number' && hivePrice > 0 ? hivePrice : 1;
 
-  // Calculate vote value (no recentClaims division needed)
+  // Calculate vote value (full vote value as shown in frontends)
   let voteValueHIVE = 0;
   if (recentClaims > 0) {
     voteValueHIVE = (rshares / recentClaims) * rewardBalance;
   }
   // Full payout in HBD (dollars), matching Hive frontends
   const voteValueHBD = voteValueHIVE; // 1 HIVE = 1 HBD for display
-  const voteValueUSD = voteValueHBD * price;
+  const voteValueUSD = voteValueHIVE * price;
 
   // Debug logs for verification
   console.log('[VoteCalcDebug] effectiveVests:', effectiveVests);
