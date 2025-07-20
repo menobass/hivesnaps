@@ -4,7 +4,7 @@ import { FontAwesome } from '@expo/vector-icons';
 import { extractImageUrls } from '../../utils/extractImageUrls';
 import { uploadImageToCloudinaryFixed } from '../../utils/cloudinaryImageUploadFixed';
 import { stripImageTags } from '../../utils/stripImageTags';
-import { extractVideoInfo, removeVideoUrls, extractYouTubeId } from '../../utils/extractVideoInfo';
+import { extractVideoInfo, removeVideoUrls, removeEmbedUrls, extractYouTubeId } from '../../utils/extractVideoInfo';
 import { extractExternalLinks } from '../../utils/extractExternalLinks';
 import IPFSVideoPlayer from './IPFSVideoPlayer';
 import { WebView } from 'react-native-webview';
@@ -322,7 +322,8 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
   const imageUrls = extractImageUrls(body);
   const rawImageUrls = extractRawImageUrls(body);
   const videoInfo = extractVideoInfo(body);
-  // Remove video URLs and raw image URLs from text body if present
+  
+  // Remove video URLs and image URLs from text body if present
   let textBody = stripImageTags(body);
   if (videoInfo) {
     textBody = removeVideoUrls(textBody);
@@ -464,6 +465,7 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
           ))}
         </View>
       )}
+      
       {/* Body */}
       {cleanTextBody.length > 0 && (() => {
         const windowWidth = Dimensions.get('window').width;

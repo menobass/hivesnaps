@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { HivePostPreviewProvider } from '../context/HivePostPreviewContext';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -49,15 +50,17 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="FeedScreen" />
-        <Stack.Screen name="NotificationsScreen" />
-        <Stack.Screen name="ConversationScreen" />
-        <Stack.Screen name="ProfileScreen" />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
-    </ThemeProvider>
+    <HivePostPreviewProvider>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="FeedScreen" />
+          <Stack.Screen name="NotificationsScreen" />
+          <Stack.Screen name="ConversationScreen" />
+          <Stack.Screen name="ProfileScreen" />
+          <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+        </Stack>
+      </ThemeProvider>
+    </HivePostPreviewProvider>
   );
 }

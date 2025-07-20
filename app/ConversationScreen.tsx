@@ -24,6 +24,14 @@ import { Video, ResizeMode } from 'expo-av';
 import { extractImageUrls } from '../utils/extractImageUrls';
 import ImageView from 'react-native-image-viewing';
 import genericAvatar from '../assets/images/generic-avatar.png';
+import { 
+  extractHivePostUrls, 
+  fetchMultipleHivePostInfos, 
+  removeHivePostUrls, 
+  HivePostInfo 
+} from '../utils/extractHivePostInfo';
+import { ContextHivePostPreviewRenderer } from '../components/ContextHivePostPreviewRenderer';
+import { HivePostPreview } from '../components/HivePostPreview';
 
 // Utility to remove image markdown/html from text
 function stripImageTags(text: string): string {
@@ -120,6 +128,10 @@ const ConversationScreen = () => {
   const [globalProps, setGlobalProps] = useState<any | null>(null);
   const [rewardFund, setRewardFund] = useState<any | null>(null);
   const [hivePrice, setHivePrice] = useState<number>(1);
+
+  // Hive post preview state
+  const [hivePostPreviews, setHivePostPreviews] = useState<HivePostInfo[]>([]);
+  const [loadingHivePosts, setLoadingHivePosts] = useState(false);
 
   // Fetch Hive global props, reward fund, and price on mount
   React.useEffect(() => {
@@ -948,6 +960,23 @@ const ConversationScreen = () => {
     });
   }
 
+  // Process Hive post URLs for preview rendering
+  const processHivePostUrls = React.useCallback(async (text: string): Promise<HivePostInfo[]> => {
+    const hiveUrls = extractHivePostUrls(text);
+    if (hiveUrls.length === 0) return [];
+    
+    try {
+      setLoadingHivePosts(true);
+      const postInfos = await fetchMultipleHivePostInfos(hiveUrls);
+      return postInfos;
+    } catch (error) {
+      console.error('Error processing Hive post URLs:', error);
+      return [];
+    } finally {
+      setLoadingHivePosts(false);
+    }
+  }, []);
+
   // Custom markdown rules with 'any' types to silence TS warnings
   const markdownRules = {
     image: (
@@ -1374,9 +1403,13 @@ const ConversationScreen = () => {
     const twitterUrl = extractTwitterUrl(reply.body);
     console.log('📱 Reply twitterUrl:', twitterUrl);
     const imageUrls = extractImageUrls(reply.body);
+    
+    // Extract Hive post URLs for preview rendering
+    const hivePostUrls = extractHivePostUrls(reply.body);
+    
     let textBody = reply.body;
-    if (videoInfo || twitterUrl) {
-      textBody = removeAllEmbedUrls(textBody);
+    if (videoInfo || twitterUrl || hivePostUrls.length > 0) {
+      textBody = removeEmbedUrls(textBody);
     }
     // Remove image tags from text body
     textBody = stripImageTags(textBody);
@@ -1643,6 +1676,10 @@ const ConversationScreen = () => {
               ))}
             </View>
           )}
+          
+          {/* Hive Post Previews */}
+          <HivePostPreviewRenderer postUrls={hivePostUrls} />
+          
           {isHtml ? (
             <RenderHtml
               contentWidth={windowWidth - (visualLevel * 18) - 32}
@@ -1700,6 +1737,11 @@ const ConversationScreen = () => {
     );
   };
 
+  // Component to render Hive post previews
+  const HivePostPreviewRenderer: React.FC<{ postUrls: string[] }> = React.memo(({ postUrls }) => {
+    return <ContextHivePostPreviewRenderer text={postUrls.join(' ')} colors={colors} />;
+  });
+
   // Render the snap as a header for the replies list
   const renderSnapHeader = () => {
     if (!snap) return null;
@@ -1708,9 +1750,13 @@ const ConversationScreen = () => {
     const twitterUrl = extractTwitterUrl(snap.body);
     console.log('🎯 Snap twitterUrl:', twitterUrl);
     const imageUrls = extractImageUrls(snap.body);
+    
+    // Extract Hive post URLs for preview rendering
+    const hivePostUrls = extractHivePostUrls(snap.body);
+    
     let textBody = snap.body;
-    if (videoInfo || twitterUrl) {
-      textBody = removeAllEmbedUrls(textBody);
+    if (videoInfo || twitterUrl || hivePostUrls.length > 0) {
+      textBody = removeEmbedUrls(textBody);
     }
     // Remove image tags from text body
     textBody = stripImageTags(textBody);
@@ -1971,6 +2017,10 @@ const ConversationScreen = () => {
             ))}
           </View>
         )}
+        
+        {/* Hive Post Previews */}
+        <HivePostPreviewRenderer postUrls={hivePostUrls} />
+        
         {isHtml ? (
           <RenderHtml
             contentWidth={windowWidth - 32}
