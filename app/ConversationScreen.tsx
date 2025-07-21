@@ -133,6 +133,15 @@ const ConversationScreen = () => {
   const [hivePostPreviews, setHivePostPreviews] = useState<HivePostInfo[]>([]);
   const [loadingHivePosts, setLoadingHivePosts] = useState(false);
 
+  // GIF picker state
+  const [gifModalVisible, setGifModalVisible] = useState(false);
+  const [gifSearchQuery, setGifSearchQuery] = useState('');
+  const [gifResults, setGifResults] = useState<any[]>([]);
+  const [gifLoading, setGifLoading] = useState(false);
+  const [replyGif, setReplyGif] = useState<string | null>(null);
+  const [editGif, setEditGif] = useState<string | null>(null);
+  const [gifMode, setGifMode] = useState<'reply' | 'edit'>('reply');
+
   // Fetch Hive global props, reward fund, and price on mount
   React.useEffect(() => {
     const fetchProps = async () => {
@@ -547,7 +556,48 @@ const ConversationScreen = () => {
     setReplyModalVisible(false);
     setReplyText('');
     setReplyImage(null);
+    setReplyGif(null);
     setReplyTarget(null);
+  };
+
+  // GIF handlers
+  const handleOpenGifPicker = (mode: 'reply' | 'edit' = 'reply') => {
+    setGifMode(mode);
+    setGifModalVisible(true);
+    // Start with empty state - let user search for what they want
+    setGifResults([]);
+    setGifSearchQuery('');
+  };
+
+  const handleCloseGifModal = () => {
+    setGifModalVisible(false);
+    setGifSearchQuery('');
+    setGifResults([]);
+  };
+
+  const handleSearchGifs = async (query: string) => {
+    setGifLoading(true);
+    try {
+      const { searchGifs, getTrendingGifs } = await import('../utils/tenorApi');
+      const response = query.trim() 
+        ? await searchGifs(query, 20) 
+        : await getTrendingGifs(20);
+      setGifResults(response.results);
+    } catch (error) {
+      console.error('Error searching GIFs:', error);
+      setGifResults([]);
+    } finally {
+      setGifLoading(false);
+    }
+  };
+
+  const handleSelectGif = (gifUrl: string) => {
+    if (gifMode === 'edit') {
+      setEditGif(gifUrl);
+    } else {
+      setReplyGif(gifUrl);
+    }
+    handleCloseGifModal();
   };
 
   // Edit handlers
@@ -573,12 +623,13 @@ const ConversationScreen = () => {
     setEditModalVisible(false);
     setEditText('');
     setEditImage(null);
+    setEditGif(null);
     setEditError(null);
     setEditTarget(null);
   };
 
   const handleSubmitEdit = async () => {
-    if (!editTarget || !editText.trim() || !currentUsername) return;
+    if (!editTarget || (!editText.trim() && !editImage && !editGif) || !currentUsername) return;
     setEditing(true);
     setEditError(null);
     
@@ -593,6 +644,9 @@ const ConversationScreen = () => {
       let body = editText.trim();
       if (editImage) {
         body += `\n![image](${editImage})`;
+      }
+      if (editGif) {
+        body += `\n![gif](${editGif})`;
       }
 
       // Get the original post to preserve parent relationships
@@ -618,6 +672,10 @@ const ConversationScreen = () => {
 
       if (editImage && !json_metadata.image) {
         json_metadata.image = [editImage];
+      }
+      if (editGif) {
+        if (!json_metadata.image) json_metadata.image = [];
+        json_metadata.image.push(editGif);
       }
 
       // Edit the post/reply using same author/permlink with new content
@@ -648,6 +706,7 @@ const ConversationScreen = () => {
       setEditModalVisible(false);
       setEditText('');
       setEditImage(null);
+      setEditGif(null);
       setEditing(false);
       setEditTarget(null);
 
@@ -663,7 +722,7 @@ const ConversationScreen = () => {
   };
 
   const handleSubmitReply = async () => {
-    if (!replyTarget || !replyText.trim() || !currentUsername) return;
+    if (!replyTarget || (!replyText.trim() && !replyImage && !replyGif) || !currentUsername) return;
     setPosting(true);
     setPostError(null);
     try {
@@ -677,6 +736,9 @@ const ConversationScreen = () => {
       let body = replyText.trim();
       if (replyImage) {
         body += `\n![image](${replyImage})`;
+      }
+      if (replyGif) {
+        body += `\n![gif](${replyGif})`;
       }
       const parent_author = replyTarget.author;
       const parent_permlink = replyTarget.permlink;
@@ -693,6 +755,10 @@ const ConversationScreen = () => {
       if (replyImage) {
         json_metadata.image = [replyImage];
       }
+      if (replyGif) {
+        if (!json_metadata.image) json_metadata.image = [];
+        json_metadata.image.push(replyGif);
+      }
       // Real posting to Hive blockchain
       await client.broadcast.comment({
         parent_author,
@@ -707,6 +773,7 @@ const ConversationScreen = () => {
       setReplyModalVisible(false);
       setReplyText('');
       setReplyImage(null);
+      setReplyGif(null);
       setPosting(false);
       setReplyTarget(null);
       // Refresh after a delay to allow blockchain confirmation
@@ -2116,6 +2183,196 @@ const ConversationScreen = () => {
     );
   };
 
+  // GIF Picker Modal Component
+  const renderGifPickerModal = () => {
+    const { getBestGifUrl, getGifPreviewUrl } = require('../utils/tenorApi');
+    
+    const renderGifItem = ({ item, index }: { item: any; index: number }) => {
+      const gifUrl = getBestGifUrl(item);
+      const previewUrl = getGifPreviewUrl(item);
+      
+      return (
+        <Pressable
+          onPress={() => handleSelectGif(gifUrl)}
+          style={({ pressed }) => [
+            {
+              flex: 1,
+              margin: 2,
+              borderRadius: 8,
+              overflow: 'hidden',
+              aspectRatio: 1,
+              opacity: pressed ? 0.7 : 1,
+            }
+          ]}
+        >
+          <Image
+            source={{ uri: previewUrl || gifUrl }}
+            style={{
+              width: '100%',
+              height: '100%',
+              backgroundColor: isDark ? '#333' : '#f0f0f0',
+            }}
+            resizeMode="cover"
+          />
+        </Pressable>
+      );
+    };
+
+    return (
+      <Modal
+        isVisible={gifModalVisible}
+        onBackdropPress={handleCloseGifModal}
+        onBackButtonPress={handleCloseGifModal}
+        style={{ justifyContent: 'flex-start', margin: 0 }}
+        useNativeDriver
+      >
+        <View style={[{ flex: 1, backgroundColor: isDark ? '#15202B' : '#fff' }]}>
+          {/* Header */}
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+          }}>
+            <Text style={{
+              fontSize: 18,
+              fontWeight: '600',
+              color: colors.text,
+            }}>
+              Choose a GIF
+            </Text>
+            <Pressable
+              onPress={handleCloseGifModal}
+              style={({ pressed }) => ({
+                opacity: pressed ? 0.7 : 1,
+                padding: 4,
+              })}
+            >
+              <FontAwesome name="times" size={24} color={colors.text} />
+            </Pressable>
+          </View>
+
+          {/* Search Bar */}
+          <View style={{
+            padding: 16,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+          }}>
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: colors.bubble,
+              borderRadius: 25,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+            }}>
+              <FontAwesome name="search" size={16} color={colors.text} style={{ marginRight: 12 }} />
+              <TextInput
+                placeholder="Search GIFs..."
+                placeholderTextColor={colors.text + '80'}
+                value={gifSearchQuery}
+                onChangeText={setGifSearchQuery}
+                onSubmitEditing={() => handleSearchGifs(gifSearchQuery)}
+                style={{
+                  flex: 1,
+                  fontSize: 16,
+                  color: colors.text,
+                }}
+                returnKeyType="search"
+              />
+              {gifSearchQuery.length > 0 && (
+                <Pressable
+                  onPress={() => {
+                    setGifSearchQuery('');
+                    handleSearchGifs('');
+                  }}
+                  style={{ marginLeft: 8 }}
+                >
+                  <FontAwesome name="times-circle" size={16} color={colors.text + '60'} />
+                </Pressable>
+              )}
+            </View>
+          </View>
+
+          {/* GIF Grid */}
+          <View style={{ flex: 1, padding: 16 }}>
+            {gifLoading ? (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={colors.icon} />
+                <Text style={{ color: colors.text, marginTop: 12, fontSize: 16 }}>
+                  {gifSearchQuery.trim() ? 'Searching GIFs...' : 'Loading...'}
+                </Text>
+              </View>
+            ) : gifResults.length > 0 ? (
+              <FlatList
+                data={gifResults}
+                renderItem={renderGifItem}
+                keyExtractor={(item) => item.id}
+                numColumns={3}
+                columnWrapperStyle={{ justifyContent: 'space-between' }}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 20 }}
+              />
+            ) : (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ 
+                  fontSize: 48,
+                  marginBottom: 16,
+                }}>
+                  🎭
+                </Text>
+                <Text style={{ 
+                  color: colors.text, 
+                  fontSize: 18, 
+                  textAlign: 'center',
+                  fontWeight: '600',
+                  marginBottom: 8,
+                }}>
+                  {gifSearchQuery.trim() 
+                    ? `No GIFs found for "${gifSearchQuery}"` 
+                    : 'Search for the perfect GIF'
+                  }
+                </Text>
+                <Text style={{ 
+                  color: colors.text, 
+                  fontSize: 14, 
+                  textAlign: 'center',
+                  opacity: 0.7,
+                  marginTop: 4,
+                }}>
+                  {gifSearchQuery.trim() 
+                    ? 'Try a different search term'
+                    : 'Type something in the search bar above'
+                  }
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Powered by Tenor */}
+          <View style={{
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+            alignItems: 'center',
+          }}>
+            <Text style={{
+              fontSize: 12,
+              color: colors.text + '60',
+              fontStyle: 'italic',
+            }}>
+              Powered by Tenor
+            </Text>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
   return (
     <SafeAreaViewSA style={[styles.safeArea, { backgroundColor: isDark ? '#15202B' : '#fff' }]}> 
       <KeyboardAvoidingView 
@@ -2202,6 +2459,19 @@ const ConversationScreen = () => {
               </TouchableOpacity>
             </View>
           ) : null}
+
+          {/* Reply GIF preview */}
+          {replyGif ? (
+            <View style={{ marginBottom: 10 }}>
+              <ExpoImage source={{ uri: replyGif }} style={{ width: 120, height: 120, borderRadius: 10 }} contentFit="cover" />
+              <TouchableOpacity onPress={() => setReplyGif(null)} style={{ position: 'absolute', top: 4, right: 4 }} disabled={posting}>
+                <FontAwesome name="close" size={20} color={colors.icon} />
+              </TouchableOpacity>
+              <View style={{ position: 'absolute', bottom: 4, left: 4, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>GIF</Text>
+              </View>
+            </View>
+          ) : null}
           
           {/* Error message */}
           {postError ? (
@@ -2212,6 +2482,9 @@ const ConversationScreen = () => {
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
             <TouchableOpacity onPress={() => handleAddImage('reply')} disabled={uploading || posting} style={{ marginRight: 16 }}>
               <FontAwesome name="image" size={22} color={colors.icon} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => handleOpenGifPicker('reply')} disabled={uploading || posting} style={{ marginRight: 16 }}>
+              <Text style={{ fontSize: 18, color: colors.icon }}>GIF</Text>
             </TouchableOpacity>
             <TextInput
               value={replyText}
@@ -2234,13 +2507,13 @@ const ConversationScreen = () => {
             ) : null}
             <TouchableOpacity
               onPress={handleSubmitReply}
-              disabled={uploading || posting || !replyText.trim() || !currentUsername}
+              disabled={uploading || posting || (!replyText.trim() && !replyImage && !replyGif) || !currentUsername}
               style={{
                 backgroundColor: colors.icon,
                 borderRadius: 20,
                 paddingHorizontal: 18,
                 paddingVertical: 8,
-                opacity: uploading || posting || !replyText.trim() || !currentUsername ? 0.6 : 1,
+                opacity: uploading || posting || (!replyText.trim() && !replyImage && !replyGif) || !currentUsername ? 0.6 : 1,
               }}
             >
               <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{posting ? 'Posting...' : 'Send'}</Text>
@@ -2276,6 +2549,19 @@ const ConversationScreen = () => {
               </TouchableOpacity>
             </View>
           ) : null}
+
+          {/* Edit GIF preview */}
+          {editGif ? (
+            <View style={{ marginBottom: 10 }}>
+              <ExpoImage source={{ uri: editGif }} style={{ width: 120, height: 120, borderRadius: 10 }} contentFit="cover" />
+              <TouchableOpacity onPress={() => setEditGif(null)} style={{ position: 'absolute', top: 4, right: 4 }} disabled={editing}>
+                <FontAwesome name="close" size={20} color={colors.icon} />
+              </TouchableOpacity>
+              <View style={{ position: 'absolute', bottom: 4, left: 4, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>GIF</Text>
+              </View>
+            </View>
+          ) : null}
           
           {/* Error message */}
           {editError ? (
@@ -2286,6 +2572,9 @@ const ConversationScreen = () => {
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
             <TouchableOpacity onPress={() => handleAddImage('edit')} disabled={editUploading || editing} style={{ marginRight: 16 }}>
               <FontAwesome name="image" size={22} color={colors.icon} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => handleOpenGifPicker('edit')} disabled={editUploading || editing} style={{ marginRight: 16 }}>
+              <Text style={{ fontSize: 18, color: colors.icon }}>GIF</Text>
             </TouchableOpacity>
             <TextInput
               value={editText}
@@ -2308,13 +2597,13 @@ const ConversationScreen = () => {
             ) : null}
             <TouchableOpacity
               onPress={handleSubmitEdit}
-              disabled={editUploading || editing || !editText.trim() || !currentUsername}
+              disabled={editUploading || editing || (!editText.trim() && !editImage && !editGif) || !currentUsername}
               style={{
                 backgroundColor: colors.icon,
                 borderRadius: 20,
                 paddingHorizontal: 18,
                 paddingVertical: 8,
-                opacity: editUploading || editing || !editText.trim() || !currentUsername ? 0.6 : 1,
+                opacity: editUploading || editing || (!editText.trim() && !editImage && !editGif) || !currentUsername ? 0.6 : 1,
               }}
             >
               <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{editing ? 'Saving...' : 'Save'}</Text>
@@ -2385,6 +2674,10 @@ const ConversationScreen = () => {
           )}
         </View>
       </Modal>
+      
+      {/* GIF Picker Modal */}
+      {renderGifPickerModal()}
+
       </KeyboardAvoidingView>
     </SafeAreaViewSA>
   );
