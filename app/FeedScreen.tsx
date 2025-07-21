@@ -19,6 +19,7 @@ import ConversationScreen from './ConversationScreen';
 import ImageView from 'react-native-image-viewing';
 import { calculateVoteValue } from '../utils/calculateVoteValue';
 import { getHivePriceUSD } from '../utils/getHivePrice';
+import ReactNativeModal from 'react-native-modal';
 
 
 const twitterColors = {
@@ -147,6 +148,12 @@ const FeedScreen = () => {
   const [newSnapLoading, setNewSnapLoading] = useState(false);
   const [newSnapSuccess, setNewSnapSuccess] = useState(false);
   const [newSnapUploading, setNewSnapUploading] = useState(false);
+  // GIF picker state for new snap
+  const [newSnapGif, setNewSnapGif] = useState<string | null>(null);
+  const [gifModalVisible, setGifModalVisible] = useState(false);
+  const [gifSearchQuery, setGifSearchQuery] = useState('');
+  const [gifResults, setGifResults] = useState<any[]>([]);
+  const [gifLoading, setGifLoading] = useState(false);
   // Image modal state
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [modalImages, setModalImages] = useState<Array<{uri: string}>>([]);
@@ -749,6 +756,7 @@ const FeedScreen = () => {
     setNewSnapModalVisible(false);
     setNewSnapText('');
     setNewSnapImage(null);
+    setNewSnapGif(null);
     setNewSnapSuccess(false);
   };
   const handleAddImage = async () => {
@@ -936,13 +944,48 @@ const FeedScreen = () => {
     setImageModalVisible(true);
   };
 
+  // GIF handlers
+  const handleOpenGifPicker = () => {
+    setGifModalVisible(true);
+    // Start with empty state - let user search for what they want
+    setGifResults([]);
+    setGifSearchQuery('');
+  };
+
+  const handleCloseGifModal = () => {
+    setGifModalVisible(false);
+    setGifSearchQuery('');
+    setGifResults([]);
+  };
+
+  const handleSearchGifs = async (query: string) => {
+    setGifLoading(true);
+    try {
+      const { searchGifs, getTrendingGifs } = await import('../utils/tenorApi');
+      const response = query.trim() 
+        ? await searchGifs(query, 20) 
+        : await getTrendingGifs(20);
+      setGifResults(response.results);
+    } catch (error) {
+      console.error('Error searching GIFs:', error);
+      setGifResults([]);
+    } finally {
+      setGifLoading(false);
+    }
+  };
+
+  const handleSelectGif = (gifUrl: string) => {
+    setNewSnapGif(gifUrl);
+    handleCloseGifModal();
+  };
+
   const handleSubmitNewSnap = async () => {
     if (!username) {
       alert('You must be logged in to post a Snap.');
       return;
     }
-    if (!newSnapText.trim()) {
-      alert('Snap text cannot be empty.');
+    if (!newSnapText.trim() && !newSnapImage && !newSnapGif) {
+      alert('Snap cannot be empty. Add some text, an image, or a GIF.');
       return;
     }
     setNewSnapLoading(true);
@@ -958,13 +1001,19 @@ const FeedScreen = () => {
       const container = discussions[0];
       // Generate permlink
       const permlink = `snap-${Date.now()}`;
-      // Compose body (append image if present)
+      // Compose body (append image and/or GIF if present)
       let body = newSnapText.trim();
       if (newSnapImage) {
         body += `\n![image](${newSnapImage})`;
       }
+      if (newSnapGif) {
+        body += `\n![gif](${newSnapGif})`;
+      }
       // Compose metadata
-      const json_metadata = JSON.stringify({ app: 'hivesnaps/1.0', image: newSnapImage ? [newSnapImage] : [] });
+      const images = [];
+      if (newSnapImage) images.push(newSnapImage);
+      if (newSnapGif) images.push(newSnapGif);
+      const json_metadata = JSON.stringify({ app: 'hivesnaps/1.0', image: images });
       // Broadcast comment (reply)
       await client.broadcast.comment({
         parent_author: container.author,
@@ -981,6 +1030,7 @@ const FeedScreen = () => {
         setNewSnapModalVisible(false);
         setNewSnapText('');
         setNewSnapImage(null);
+        setNewSnapGif(null);
         setNewSnapSuccess(false);
         // Switch to 'newest' and refresh feed
         setActiveFilter('newest');
@@ -1408,22 +1458,62 @@ const FeedScreen = () => {
                 />
               </View>
             </View>
-            {/* Add Image Button & Preview */}
-            <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-              <Pressable
-                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.buttonInactive, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 14, marginRight: 10 }}
-                onPress={handleAddImage}
-                disabled={newSnapLoading || newSnapSuccess || newSnapUploading}
-              >
-                <FontAwesome name="image" size={20} color={colors.icon} style={{ marginRight: 6 }} />
-                <Text style={{ color: colors.text, fontWeight: '600' }}>Add Image</Text>
-              </Pressable>
-              {newSnapUploading && (
-                <ActivityIndicator size="small" color={colors.button} style={{ marginLeft: 8 }} />
-              )}
-              {newSnapImage && !newSnapUploading && (
-                <Image source={{ uri: newSnapImage }} style={{ width: 48, height: 48, borderRadius: 8, borderWidth: 1, borderColor: colors.buttonInactive }} />
-              )}
+            {/* Add Image & GIF Buttons with Previews */}
+            <View style={{ width: '100%', marginBottom: 12 }}>
+              {/* Buttons Row */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                <Pressable
+                  style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.buttonInactive, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 14, marginRight: 10 }}
+                  onPress={handleAddImage}
+                  disabled={newSnapLoading || newSnapSuccess || newSnapUploading}
+                >
+                  <FontAwesome name="image" size={20} color={colors.icon} style={{ marginRight: 6 }} />
+                  <Text style={{ color: colors.text, fontWeight: '600' }}>Add Image</Text>
+                </Pressable>
+                
+                <Pressable
+                  style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.buttonInactive, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 14 }}
+                  onPress={handleOpenGifPicker}
+                  disabled={newSnapLoading || newSnapSuccess}
+                >
+                  <FontAwesome name="file-image-o" size={20} color={colors.icon} style={{ marginRight: 6 }} />
+                  <Text style={{ color: colors.text, fontWeight: '600' }}>Add GIF</Text>
+                </Pressable>
+                
+                {newSnapUploading && (
+                  <ActivityIndicator size="small" color={colors.button} style={{ marginLeft: 12 }} />
+                )}
+              </View>
+              
+              {/* Previews Row */}
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {newSnapImage && !newSnapUploading && (
+                  <View style={{ marginRight: 10 }}>
+                    <Image source={{ uri: newSnapImage }} style={{ width: 48, height: 48, borderRadius: 8, borderWidth: 1, borderColor: colors.buttonInactive }} />
+                    <Pressable
+                      style={{ position: 'absolute', top: -5, right: -5, backgroundColor: colors.button, borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}
+                      onPress={() => setNewSnapImage(null)}
+                    >
+                      <FontAwesome name="close" size={12} color="white" />
+                    </Pressable>
+                  </View>
+                )}
+                {newSnapGif && (
+                  <View style={{ marginRight: 10 }}>
+                    <Image source={{ uri: newSnapGif }} style={{ width: 48, height: 48, borderRadius: 8, borderWidth: 1, borderColor: colors.buttonInactive }} />
+                    <Pressable
+                      style={{ position: 'absolute', top: -5, right: -5, backgroundColor: colors.button, borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}
+                      onPress={() => setNewSnapGif(null)}
+                    >
+                      <FontAwesome name="close" size={12} color="white" />
+                    </Pressable>
+                    {/* GIF badge */}
+                    <View style={{ position: 'absolute', bottom: 2, right: 2, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3 }}>
+                      <Text style={{ color: 'white', fontSize: 8, fontWeight: 'bold' }}>GIF</Text>
+                    </View>
+                  </View>
+                )}
+              </View>
             </View>
             {/* Action Buttons or Loading/Success */}
             {newSnapLoading ? (
@@ -1446,17 +1536,151 @@ const FeedScreen = () => {
                   <Text style={{ color: colors.text, fontWeight: '600' }}>Cancel</Text>
                 </Pressable>
                 <Pressable
-                  style={{ flex: 1, marginLeft: 8, backgroundColor: colors.button, borderRadius: 8, padding: 12, alignItems: 'center' }}
+                  style={{ 
+                    flex: 1, 
+                    marginLeft: 8, 
+                    backgroundColor: (!newSnapText.trim() && !newSnapImage && !newSnapGif) ? colors.buttonInactive : colors.button, 
+                    borderRadius: 8, 
+                    padding: 12, 
+                    alignItems: 'center' 
+                  }}
                   onPress={handleSubmitNewSnap}
-                  disabled={newSnapLoading}
+                  disabled={newSnapLoading || (!newSnapText.trim() && !newSnapImage && !newSnapGif)}
                 >
-                  <Text style={{ color: colors.buttonText, fontWeight: '600' }}>Submit</Text>
+                  <Text style={{ 
+                    color: (!newSnapText.trim() && !newSnapImage && !newSnapGif) ? colors.text : colors.buttonText, 
+                    fontWeight: '600' 
+                  }}>Submit</Text>
                 </Pressable>
               </View>
             )}
           </View>
         </View>
       </Modal>
+
+      {/* GIF Picker Modal */}
+      <ReactNativeModal
+        isVisible={gifModalVisible}
+        onBackdropPress={handleCloseGifModal}
+        onBackButtonPress={handleCloseGifModal}
+        style={{ margin: 0, justifyContent: 'flex-end' }}
+        backdropOpacity={0.5}
+      >
+        <View style={{
+          backgroundColor: colors.background,
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          maxHeight: '80%',
+          paddingTop: 20
+        }}>
+          {/* Modal Header */}
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 20,
+            paddingBottom: 15,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.buttonInactive
+          }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>
+              Choose a GIF
+            </Text>
+            <Pressable onPress={handleCloseGifModal}>
+              <FontAwesome name="close" size={24} color={colors.text} />
+            </Pressable>
+          </View>
+
+          {/* Search Bar */}
+          <View style={{
+            paddingHorizontal: 20,
+            paddingVertical: 15
+          }}>
+            <TextInput
+              style={{
+                backgroundColor: colors.buttonInactive,
+                borderRadius: 20,
+                paddingHorizontal: 15,
+                paddingVertical: 10,
+                fontSize: 16,
+                color: colors.text
+              }}
+              placeholder="Search for GIFs..."
+              placeholderTextColor={colors.text + '80'}
+              value={gifSearchQuery}
+              onChangeText={(text) => {
+                setGifSearchQuery(text);
+                if (text.length > 2) {
+                  handleSearchGifs(text);
+                } else if (text.length === 0) {
+                  setGifResults([]);
+                }
+              }}
+              returnKeyType="search"
+              onSubmitEditing={() => {
+                if (gifSearchQuery.trim()) {
+                  handleSearchGifs(gifSearchQuery.trim());
+                }
+              }}
+            />
+          </View>
+
+          {/* GIF Results */}
+          <View style={{ flex: 1, paddingHorizontal: 10 }}>
+            {gifLoading ? (
+              <View style={{ alignItems: 'center', justifyContent: 'center', height: 200 }}>
+                <ActivityIndicator size="large" color={colors.button} />
+                <Text style={{ color: colors.text, marginTop: 10 }}>Searching GIFs...</Text>
+              </View>
+            ) : gifResults.length > 0 ? (
+              <FlatList
+                data={gifResults}
+                keyExtractor={(item, index) => `gif-${index}-${item?.id || Math.random()}`}
+                numColumns={2}
+                showsVerticalScrollIndicator={false}
+                renderItem={({ item }) => {
+                  // Get the best GIF URL (preview size for picker)
+                  const gifUrl = item?.media_formats?.gif?.url || 
+                               item?.media_formats?.tinygif?.url || 
+                               item?.media_formats?.nanogif?.url;
+                  
+                  if (!gifUrl) return null;
+                  
+                  return (
+                    <Pressable
+                      onPress={() => handleSelectGif(gifUrl)}
+                      style={{
+                        flex: 1,
+                        margin: 5,
+                        borderRadius: 8,
+                        overflow: 'hidden',
+                        backgroundColor: colors.buttonInactive
+                      }}
+                    >
+                      <Image
+                        source={{ uri: gifUrl }}
+                        style={{
+                          width: '100%',
+                          aspectRatio: 1,
+                          borderRadius: 8
+                        }}
+                        resizeMode="cover"
+                      />
+                    </Pressable>
+                  );
+                }}
+              />
+            ) : (
+              <View style={{ alignItems: 'center', justifyContent: 'center', height: 200 }}>
+                <FontAwesome name="search" size={48} color={colors.buttonInactive} />
+                <Text style={{ color: colors.text, marginTop: 10, textAlign: 'center' }}>
+                  {gifSearchQuery ? 'No GIFs found' : 'Search for GIFs above'}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </ReactNativeModal>
 
       {/* Image Modal with react-native-image-viewing */}
       <ImageView

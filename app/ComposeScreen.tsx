@@ -14,6 +14,7 @@ import {
   ScrollView,
   Alert,
   Pressable,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -25,6 +26,7 @@ import { uploadImageToCloudinaryFixed } from '@/utils/cloudinaryImageUploadFixed
 import { useSharedContent } from '@/hooks/useSharedContent';
 import { useShare } from '@/context/ShareContext';
 import { useNotifications } from '@/context/NotificationContext';
+import ReactNativeModal from 'react-native-modal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -53,6 +55,13 @@ export default function ComposeScreen() {
   const [posting, setPosting] = useState(false);
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  
+  // GIF picker state
+  const [gifs, setGifs] = useState<string[]>([]);
+  const [gifModalVisible, setGifModalVisible] = useState(false);
+  const [gifSearchQuery, setGifSearchQuery] = useState('');
+  const [gifResults, setGifResults] = useState<any[]>([]);
+  const [gifLoading, setGifLoading] = useState(false);
 
   const colors = {
     background: isDark ? '#15202B' : '#fff',
@@ -263,9 +272,57 @@ export default function ComposeScreen() {
     setImages([]);
   };
 
+  // GIF handlers
+  const handleOpenGifPicker = () => {
+    setGifModalVisible(true);
+    // Load trending GIFs initially
+    setGifResults([]);
+    setGifSearchQuery('');
+    // Load trending GIFs when modal opens
+    handleSearchGifs('');
+  };
+
+  const handleCloseGifModal = () => {
+    setGifModalVisible(false);
+    setGifSearchQuery('');
+    setGifResults([]);
+  };
+
+  const handleSearchGifs = async (query: string) => {
+    console.log('[GIF Search Debug] Starting search with query:', query);
+    setGifLoading(true);
+    try {
+      console.log('[GIF Search Debug] Importing tenor API...');
+      const { searchGifs, getTrendingGifs } = await import('../utils/tenorApi');
+      console.log('[GIF Search Debug] Tenor API imported successfully');
+      
+      const response = query.trim() 
+        ? await searchGifs(query, 20) 
+        : await getTrendingGifs(20);
+      
+      console.log('[GIF Search Debug] API response:', response);
+      console.log('[GIF Search Debug] Results count:', response?.results?.length || 0);
+      setGifResults(response.results);
+    } catch (error) {
+      console.error('[GIF Search Debug] Error searching GIFs:', error);
+      setGifResults([]);
+    } finally {
+      setGifLoading(false);
+    }
+  };
+
+  const handleSelectGif = (gifUrl: string) => {
+    setGifs(prev => [...prev, gifUrl]);
+    handleCloseGifModal();
+  };
+
+  const handleRemoveGif = (indexToRemove: number) => {
+    setGifs(prev => prev.filter((_, index) => index !== indexToRemove));
+  };
+
   const handleSubmit = async () => {
-    if (!text.trim() && images.length === 0) {
-      Alert.alert('Empty Post', 'Please add some text or images before posting.');
+    if (!text.trim() && images.length === 0 && gifs.length === 0) {
+      Alert.alert('Empty Post', 'Please add some text, images, or GIFs before posting.');
       return;
     }
 
@@ -292,6 +349,12 @@ export default function ComposeScreen() {
           body += `\n![image${index + 1}](${imageUrl})`;
         });
       }
+      if (gifs.length > 0) {
+        // Add all GIFs to the body
+        gifs.forEach((gifUrl, index) => {
+          body += `\n![gif${index + 1}](${gifUrl})`;
+        });
+      }
 
       // Get latest @peak.snaps post (container) - Same as FeedScreen
       const discussions = await client.database.call('get_discussions_by_blog', [{ tag: 'peak.snaps', limit: 1 }]);
@@ -304,9 +367,10 @@ export default function ComposeScreen() {
       const permlink = `snap-${Date.now()}`;
       
       // Compose metadata - Same format as FeedScreen
+      const allMedia = [...images, ...gifs];
       const json_metadata = JSON.stringify({ 
         app: 'hivesnaps/1.0', 
-        image: images, // Include all images in metadata
+        image: allMedia, // Include all images and GIFs in metadata
         shared: hasSharedContent, // Additional flag for shared content
       });
 
@@ -324,6 +388,7 @@ export default function ComposeScreen() {
       // Success - clear form and navigate back to feed
       setText('');
       setImages([]);
+      setGifs([]);
       clearSharedContent(); // Clear any shared content
       
       Alert.alert(
@@ -352,7 +417,7 @@ export default function ComposeScreen() {
   };
 
   const handleCancel = () => {
-    if (text.trim() || images.length > 0) {
+    if (text.trim() || images.length > 0 || gifs.length > 0) {
       Alert.alert(
         'Discard Post?',
         'Are you sure you want to discard this post?',
@@ -364,6 +429,7 @@ export default function ComposeScreen() {
             onPress: () => {
               setText('');
               setImages([]);
+              setGifs([]);
               router.back();
             }
           }
@@ -390,11 +456,11 @@ export default function ComposeScreen() {
           
           <TouchableOpacity 
             onPress={handleSubmit}
-            disabled={posting || (!text.trim() && images.length === 0)}
+            disabled={posting || (!text.trim() && images.length === 0 && gifs.length === 0)}
             style={[
               styles.headerButton,
               styles.postButton,
-              { backgroundColor: posting || (!text.trim() && images.length === 0) ? colors.buttonInactive : colors.button }
+              { backgroundColor: posting || (!text.trim() && images.length === 0 && gifs.length === 0) ? colors.buttonInactive : colors.button }
             ]}
           >
             {posting ? (
@@ -568,6 +634,42 @@ export default function ComposeScreen() {
             </View>
           )}
 
+          {/* GIF Previews */}
+          {gifs.length > 0 && (
+            <View style={styles.imagesContainer}>
+              <View style={styles.imagesHeader}>
+                <Text style={[styles.imagesCount, { color: colors.text }]}>GIFs ({gifs.length})</Text>
+                {gifs.length > 1 && (
+                  <TouchableOpacity onPress={() => setGifs([])}>
+                    <Text style={[styles.clearAllText, { color: colors.info }]}>Clear All</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                style={styles.imagesScrollView}
+                contentContainerStyle={styles.imagesScrollContent}
+              >
+                {gifs.map((gifUrl, index) => (
+                  <View key={`gif-${gifUrl}-${index}`} style={styles.imageContainer}>
+                    <Image source={{ uri: gifUrl }} style={styles.imagePreview} />
+                    <TouchableOpacity 
+                      style={styles.removeImageButton}
+                      onPress={() => handleRemoveGif(index)}
+                    >
+                      <FontAwesome name="times" size={16} color="#fff" />
+                    </TouchableOpacity>
+                    {/* GIF badge */}
+                    <View style={styles.gifBadge}>
+                      <Text style={styles.gifBadgeText}>GIF</Text>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
           {/* Action buttons */}
           <View style={styles.actions}>
             <TouchableOpacity
@@ -588,10 +690,28 @@ export default function ComposeScreen() {
                 </>
               )}
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: colors.inputBg, marginLeft: 12 }]}
+              onPress={handleOpenGifPicker}
+              disabled={gifs.length >= 5}
+            >
+              <Text style={{ fontSize: 18, color: gifs.length >= 5 ? colors.info : colors.button, fontWeight: 'bold' }}>GIF</Text>
+              {gifs.length > 0 && (
+                <View style={[styles.imageBadge, { backgroundColor: colors.button }]}>
+                  <Text style={styles.imageBadgeText}>{gifs.length}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
             
             {images.length >= 10 && (
               <Text style={[styles.limitText, { color: colors.info }]}>
                 Maximum 10 images
+              </Text>
+            )}
+            {gifs.length >= 5 && (
+              <Text style={[styles.limitText, { color: colors.info }]}>
+                Maximum 5 GIFs
               </Text>
             )}
           </View>
@@ -607,6 +727,127 @@ export default function ComposeScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* GIF Picker Modal */}
+      <ReactNativeModal
+        isVisible={gifModalVisible}
+        onBackdropPress={handleCloseGifModal}
+        onBackButtonPress={handleCloseGifModal}
+        style={{ margin: 0, justifyContent: 'flex-start' }}
+        backdropOpacity={0.5}
+        avoidKeyboard={true}
+      >
+        <View style={{
+          backgroundColor: colors.background,
+          borderBottomLeftRadius: 20,
+          borderBottomRightRadius: 20,
+          height: '85%',
+          paddingTop: 60, // Account for status bar
+          marginTop: Platform.OS === 'ios' ? 44 : 24
+        }}>
+          {/* Modal Header */}
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 20,
+            paddingBottom: 15,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.inputBorder
+          }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>
+              Choose a GIF
+            </Text>
+            <Pressable onPress={handleCloseGifModal}>
+              <FontAwesome name="close" size={24} color={colors.text} />
+            </Pressable>
+          </View>
+
+          {/* Search Bar */}
+          <View style={{
+            paddingHorizontal: 20,
+            paddingVertical: 15
+          }}>
+            <TextInput
+              style={{
+                backgroundColor: colors.inputBg,
+                borderRadius: 20,
+                paddingHorizontal: 15,
+                paddingVertical: 10,
+                fontSize: 16,
+                color: colors.text
+              }}
+              placeholder="Search for GIFs..."
+              placeholderTextColor={colors.text + '80'}
+              value={gifSearchQuery}
+              onChangeText={setGifSearchQuery}
+              returnKeyType="search"
+              onSubmitEditing={() => {
+                if (gifSearchQuery.trim()) {
+                  handleSearchGifs(gifSearchQuery.trim());
+                } else {
+                  handleSearchGifs(''); // This will load trending GIFs
+                }
+              }}
+            />
+          </View>
+
+          {/* GIF Results */}
+          <View style={{ flex: 1, paddingHorizontal: 10, paddingBottom: 20 }}>
+            {gifLoading ? (
+              <View style={{ alignItems: 'center', justifyContent: 'center', height: 200 }}>
+                <ActivityIndicator size="large" color={colors.button} />
+                <Text style={{ color: colors.text, marginTop: 10 }}>Searching GIFs...</Text>
+              </View>
+            ) : gifResults.length > 0 ? (
+              <FlatList
+                data={gifResults}
+                keyExtractor={(item, index) => `gif-${index}-${item?.id || Math.random()}`}
+                numColumns={2}
+                showsVerticalScrollIndicator={false}
+                renderItem={({ item }) => {
+                  // Get the best GIF URL (preview size for picker)
+                  const gifUrl = item?.media_formats?.gif?.url || 
+                               item?.media_formats?.tinygif?.url || 
+                               item?.media_formats?.nanogif?.url;
+                  
+                  if (!gifUrl) return null;
+                  
+                  return (
+                    <Pressable
+                      onPress={() => handleSelectGif(gifUrl)}
+                      style={{
+                        flex: 1,
+                        margin: 5,
+                        borderRadius: 8,
+                        overflow: 'hidden',
+                        backgroundColor: colors.inputBg
+                      }}
+                    >
+                      <Image
+                        source={{ uri: gifUrl }}
+                        style={{
+                          width: '100%',
+                          aspectRatio: 1,
+                          borderRadius: 8
+                        }}
+                        resizeMode="cover"
+                      />
+                    </Pressable>
+                  );
+                }}
+              />
+            ) : (
+              <View style={{ alignItems: 'center', justifyContent: 'center', height: 200 }}>
+                <FontAwesome name="search" size={48} color={colors.inputBorder} />
+                <Text style={{ color: colors.text, marginTop: 10, textAlign: 'center' }}>
+                  {gifSearchQuery ? 'No GIFs found' : 'Search for GIFs above'}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </ReactNativeModal>
     </SafeAreaView>
   );
 }
@@ -756,6 +997,20 @@ const styles = StyleSheet.create({
   imageBadgeText: {
     color: '#fff',
     fontSize: 10,
+    fontWeight: 'bold',
+  },
+  gifBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 3,
+  },
+  gifBadgeText: {
+    color: '#fff',
+    fontSize: 8,
     fontWeight: 'bold',
   },
   limitText: {
