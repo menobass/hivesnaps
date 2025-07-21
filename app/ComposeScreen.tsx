@@ -24,6 +24,7 @@ import { Client, PrivateKey } from '@hiveio/dhive';
 import { uploadImageToCloudinaryFixed } from '@/utils/cloudinaryImageUploadFixed';
 import { useSharedContent } from '@/hooks/useSharedContent';
 import { useShare } from '@/context/ShareContext';
+import { useNotifications } from '@/context/NotificationContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -43,6 +44,7 @@ export default function ComposeScreen() {
   // Share extension integration
   const { sharedContent, hasSharedContent, clearSharedContent } = useSharedContent();
   const shareContext = useShare();
+  const notifications = useNotifications();
 
   // Component state
   const [text, setText] = useState('');
@@ -447,6 +449,59 @@ export default function ComposeScreen() {
                   <Text style={[styles.testButtonText, { color: colors.button }]}>Share URL</Text>
                 </TouchableOpacity>
               </View>
+              
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={[styles.testButton, { backgroundColor: colors.inputBg }]}
+                  onPress={() => shareContext.simulateSharedContent?.({ 
+                    type: 'image', 
+                    data: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=500' 
+                  })}
+                >
+                  <Text style={[styles.testButtonText, { color: colors.button }]}>Share Image</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.testButton, { backgroundColor: colors.inputBg }]}
+                  onPress={() => shareContext.simulateSharedContent?.({ 
+                    type: 'images', 
+                    data: [
+                      'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=500',
+                      'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=500'
+                    ]
+                  })}
+                >
+                  <Text style={[styles.testButtonText, { color: colors.button }]}>Share Multiple</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <Text style={[styles.sectionTitle, { color: colors.info, marginTop: 20 }]}>🔔 Test Notifications</Text>
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={[styles.testButton, { backgroundColor: colors.inputBg }]}
+                  onPress={notifications.sendTestNotification}
+                >
+                  <Text style={[styles.testButtonText, { color: colors.button }]}>Test Notification</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.testButton, { backgroundColor: colors.inputBg }]}
+                  onPress={notifications.clearAllNotifications}
+                >
+                  <Text style={[styles.testButtonText, { color: colors.button }]}>Clear All</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.notificationStatus}>
+                <Text style={[styles.testButtonText, { color: colors.text }]}>
+                  🔔 Status: {notifications.isEnabled ? 'Enabled' : 'Disabled'}
+                </Text>
+                {notifications.currentUsername && (
+                  <Text style={[styles.testButtonText, { color: colors.text }]}>
+                    👤 User: @{notifications.currentUsername}
+                  </Text>
+                )}
+              </View>
             </View>
           )}
 
@@ -745,5 +800,11 @@ const styles = StyleSheet.create({
   testButtonText: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  notificationStatus: {
+    marginTop: 8,
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: 'rgba(0,0,0,0.05)',
   },
 });
