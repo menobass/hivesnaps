@@ -1379,7 +1379,7 @@ const FeedScreen = () => {
           },
         ]}
         activeOpacity={0.8}
-        onPress={() => setNewSnapModalVisible(true)}
+        onPress={() => router.push('/ComposeScreen' as any)}
         accessibilityLabel="Create new snap"
       >
         <Text style={styles.fabIcon}>+</Text>

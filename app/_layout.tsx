@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { HivePostPreviewProvider } from '../context/HivePostPreviewContext';
+import { ShareProvider } from '../context/ShareContext';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -50,17 +51,20 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   return (
-    <HivePostPreviewProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="FeedScreen" />
-          <Stack.Screen name="NotificationsScreen" />
-          <Stack.Screen name="ConversationScreen" />
-          <Stack.Screen name="ProfileScreen" />
-          <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-        </Stack>
-      </ThemeProvider>
-    </HivePostPreviewProvider>
+    <ShareProvider>
+      <HivePostPreviewProvider>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="FeedScreen" />
+            <Stack.Screen name="NotificationsScreen" />
+            <Stack.Screen name="ConversationScreen" />
+            <Stack.Screen name="ProfileScreen" />
+            <Stack.Screen name="ComposeScreen" />
+            <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+          </Stack>
+        </ThemeProvider>
+      </HivePostPreviewProvider>
+    </ShareProvider>
   );
 }
