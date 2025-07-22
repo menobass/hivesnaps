@@ -23,7 +23,40 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.hivesnaps"
+      "package": "com.anonymous.hivesnaps",
+      "intentFilters": [
+        {
+          "action": "android.intent.action.SEND",
+          "category": [
+            "android.intent.category.DEFAULT"
+          ],
+          "data": [
+            {
+              "mimeType": "image/*"
+            },
+            {
+              "mimeType": "video/*"
+            },
+            {
+              "mimeType": "text/plain"
+            }
+          ]
+        },
+        {
+          "action": "android.intent.action.SEND_MULTIPLE",
+          "category": [
+            "android.intent.category.DEFAULT"
+          ],
+          "data": [
+            {
+              "mimeType": "image/*"
+            },
+            {
+              "mimeType": "video/*"
+            }
+          ]
+        }
+      ]
     },
     "web": {
       "bundler": "metro",
