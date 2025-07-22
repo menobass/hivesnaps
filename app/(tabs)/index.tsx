@@ -4,6 +4,7 @@ import { Text, View } from '@/components/Themed';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { Client, PrivateKey } from '@hiveio/dhive';
+import * as Linking from 'expo-linking';
 
 const twitterColors = {
   light: {
@@ -106,6 +107,10 @@ export default function LoginScreen() {
     }
   };
 
+  const handleSignUpPress = () => {
+    Linking.openURL('https://signup.hive.io/');
+  };
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}> 
       {autoLoading ? (
@@ -154,7 +159,20 @@ export default function LoginScreen() {
                 <Text style={[styles.info, { color: colors.text, width: FIELD_WIDTH }]}>Your keys are locally stored and encrypted. Only your posting key is required</Text>
                 {/* Add space and move the phrase up here */}
                 <View style={{ height: 32 }} />
-                <Text style={styles.footerText}>Hivesnaps, made with love by @meno</Text>
+                
+                {/* Signup link */}
+                <TouchableOpacity 
+                  onPress={handleSignUpPress}
+                  style={{ marginBottom: 16 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Sign up for a Hive account"
+                >
+                  <Text style={[styles.signupLink, { color: colors.button }]}>
+                    Don't have a Hive account?
+                  </Text>
+                </TouchableOpacity>
+                
+                <Text style={[styles.footerText, { color: colors.footer }]}>Hivesnaps, made with love by @meno</Text>
               </View>
             </View>
           </KeyboardAvoidingView>
@@ -225,6 +243,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     alignSelf: 'center',
+  },
+  signupLink: {
+    fontSize: 16,
+    textAlign: 'center',
+    textDecorationLine: 'underline',
+    fontWeight: '500',
   },
   footerText: {
     fontSize: 13,
