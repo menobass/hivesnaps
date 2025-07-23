@@ -8,14 +8,12 @@ import Snap from './components/Snap';
 import NotificationBadge from './components/NotificationBadge';
 import Slider from '@react-native-community/slider';
 import * as ImagePicker from 'expo-image-picker';
-import * as MediaLibrary from 'expo-media-library';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
 import { useNotifications } from '../hooks/useNotifications';
 import { useVotingPower } from '../hooks/useVotingPower';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import ConversationScreen from './ConversationScreen';
 import ImageView from 'react-native-image-viewing';
 import { calculateVoteValue } from '../utils/calculateVoteValue';
 import { getHivePriceUSD } from '../utils/getHivePrice';
@@ -1113,7 +1111,7 @@ const FeedScreen = () => {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: colors.background, paddingHorizontal: 16 }}>
       {/* Upvote Modal */}
       <Modal
         visible={upvoteModalVisible}
