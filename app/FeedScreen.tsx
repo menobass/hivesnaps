@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Image, useColorScheme, Dimensions, ActivityIndicator, FlatList, Modal, Pressable, Platform, TextInput, KeyboardAvoidingView, BackHandler, ToastAndroid } from 'react-native';
+import { View, Text, TouchableOpacity, Image, useColorScheme, Dimensions, ActivityIndicator, FlatList, Modal, Pressable, Platform, TextInput, ScrollView, BackHandler, ToastAndroid } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
@@ -18,6 +18,7 @@ import ImageView from 'react-native-image-viewing';
 import { calculateVoteValue } from '../utils/calculateVoteValue';
 import { getHivePriceUSD } from '../utils/getHivePrice';
 import ReactNativeModal from 'react-native-modal';
+import { createFeedScreenStyles, baseStyles } from './styles/FeedScreenStyles';
 
 
 const twitterColors = {
@@ -40,7 +41,6 @@ const twitterColors = {
 };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const BUTTON_WIDTH = (SCREEN_WIDTH - 48) / 4; // 12px margin on each side, 8px between buttons
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -63,6 +63,25 @@ interface Snap {
 }
 
 const FeedScreen = () => {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+
+  // Theme colors
+  const colors = {
+    background: isDark ? '#000' : '#fff',
+    text: isDark ? '#fff' : '#000',
+    button: '#1DA1F2',
+    buttonText: '#fff',
+    buttonInactive: isDark ? '#8899A6' : '#E1E8ED',
+    icon: isDark ? '#8899A6' : '#1DA1F2',
+    bubble: isDark ? '#192734' : '#f0f0f0',
+  };
+
+  // Initialize styles with current theme
+  const styles = createFeedScreenStyles(colors, isDark);
+
   // HIVE price in USD for vote value calculation
   const [hivePrice, setHivePrice] = useState<number>(1);
 
@@ -156,15 +175,12 @@ const FeedScreen = () => {
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [modalImages, setModalImages] = useState<Array<{uri: string}>>([]);
   const [modalImageIndex, setModalImageIndex] = useState(0);
-  const colorScheme = useColorScheme() || 'light';
-  const colors = twitterColors[colorScheme];
-  const insets = useSafeAreaInsets();
+  
   const flatListRef = useRef<FlatList<any>>(null); // FlatList ref for scroll control
   // Snap to scroll to in FlatList after refresh - no longer needed with optimistic updates
   // const [pendingScrollToKey, setPendingScrollToKey] = useState<string | null>(null);
   const [viewableSnaps, setViewableSnaps] = useState<string[]>([]); // Track visible snap keys
   const [viewableItems, setViewableItems] = useState<any[]>([]); // Track visible items
-  const router = useRouter();
 
   // Exit confirmation state for double-tap back (prevents accidental logout)
   const [exitTimestamp, setExitTimestamp] = useState<number | null>(null);
@@ -1111,7 +1127,7 @@ const FeedScreen = () => {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background, paddingHorizontal: 16 }}>
+    <View style={styles.container}>
       {/* Upvote Modal */}
       <Modal
         visible={upvoteModalVisible}
@@ -1218,7 +1234,7 @@ const FeedScreen = () => {
         </View>
       </Modal>
       {/* Top bar inside SafeAreaView for status bar/notch safety */}
-      <SafeAreaView style={{ backgroundColor: colors.background, paddingTop: insets.top }} edges={['top']}>
+      <SafeAreaView style={[styles.safeArea, { paddingTop: insets.top }]} edges={['top']}>
         <View style={styles.topBar}>
           {/* User avatar instead of logo */}
           <View style={{ flexDirection: 'row', alignItems: 'center', position: 'relative' }}>
@@ -1324,32 +1340,48 @@ const FeedScreen = () => {
             </TouchableOpacity>
           </View>
         </View>
-        {/* Filter buttons */}
-        <View style={styles.filterRow}>
-          <TouchableOpacity
-            style={[styles.filterBtn, { backgroundColor: activeFilter === 'following' ? colors.button : colors.buttonInactive }]}
-            onPress={() => handleFilterPress('following')}
+        {/* Enhanced Filter Row with Horizontal Scroll */}
+        <View style={styles.filterContainer}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterScrollContent}
+            style={styles.filterScrollView}
           >
-            <Text style={[styles.filterText, { color: activeFilter === 'following' ? colors.buttonText : colors.text }]}>Following</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.filterBtn, { backgroundColor: activeFilter === 'newest' ? colors.button : colors.buttonInactive }]}
-            onPress={() => handleFilterPress('newest')}
-          >
-            <Text style={[styles.filterText, { color: activeFilter === 'newest' ? colors.buttonText : colors.text }]}>Newest</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.filterBtn, { backgroundColor: activeFilter === 'trending' ? colors.button : colors.buttonInactive }]}
-            onPress={() => handleFilterPress('trending')}
-          >
-            <Text style={[styles.filterText, { color: activeFilter === 'trending' ? colors.buttonText : colors.text }]}>Trending</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.filterBtn, { backgroundColor: activeFilter === 'my' ? colors.button : colors.buttonInactive }]}
-            onPress={() => handleFilterPress('my')}
-          >
-            <Text style={[styles.filterText, { color: activeFilter === 'my' ? colors.buttonText : colors.text }]}>My Snaps</Text>
-          </TouchableOpacity>
+            {[
+              { key: 'following', label: 'Following', icon: 'users' },
+              { key: 'newest', label: 'Newest', icon: 'clock-o' },
+              { key: 'trending', label: 'Trending', icon: 'fire' },
+              { key: 'my', label: 'My Snaps', icon: 'user' }
+            ].map((filter, index) => (
+              <TouchableOpacity
+                key={filter.key}
+                style={[
+                  styles.filterBtnScrollable, 
+                  { 
+                    backgroundColor: activeFilter === filter.key ? colors.button : colors.buttonInactive,
+                    marginLeft: index === 0 ? 0 : 8,
+                    marginRight: index === 3 ? 0 : 0
+                  }
+                ]}
+                onPress={() => handleFilterPress(filter.key as any)}
+                activeOpacity={0.7}
+              >
+                <FontAwesome 
+                  name={filter.icon as any} 
+                  size={16} 
+                  color={activeFilter === filter.key ? colors.buttonText : colors.text} 
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={[
+                  styles.filterTextScrollable, 
+                  { color: activeFilter === filter.key ? colors.buttonText : colors.text }
+                ]}>
+                  {filter.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       </SafeAreaView>
       {/* Feed list */}
@@ -1720,103 +1752,6 @@ const FeedScreen = () => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop: 32,
-    paddingHorizontal: 12,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    marginRight: 8,
-    backgroundColor: '#E1E8ED',
-  },
-  username: {
-    maxWidth: 120, // Prevent username from taking too much space
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 4,
-    overflow: 'hidden', // Only works for View, but safe to keep for now
-  },
-  rewardIndicator: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3,
-    shadowRadius: 1,
-    elevation: 2,
-  },
-  sloganRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    justifyContent: 'space-between',
-  },
-  bellBtn: {
-    marginLeft: 8,
-    padding: 4,
-  },
-  slogan: {
-    fontSize: 17,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
-  filterRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 18,
-  },
-  filterBtn: {
-    flex: 1,
-    marginHorizontal: 2,
-    borderRadius: 8,
-    height: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  filterText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  feedContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fab: {
-    position: 'absolute',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 100,
-    elevation: 8,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-  },
-  fabIcon: {
-    color: '#fff',
-    fontSize: 36,
-    fontWeight: 'bold',
-    marginBottom: 2,
-  },
-});
 
 export default FeedScreen;
 
