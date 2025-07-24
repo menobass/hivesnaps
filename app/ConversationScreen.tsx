@@ -2433,13 +2433,21 @@ const ConversationScreen = () => {
         </ScrollView>
       )}
       {/* Reply modal composer and upvote modal remain unchanged */}
-      <Modal
-        isVisible={replyModalVisible}
-        onBackdropPress={posting ? undefined : handleCloseReplyModal}
-        onBackButtonPress={posting ? undefined : handleCloseReplyModal}
-        style={{ justifyContent: 'flex-end', margin: 0 }}
-        useNativeDriver
-      >
+        <Modal
+          isVisible={replyModalVisible}
+          onBackdropPress={posting ? undefined : handleCloseReplyModal}
+          onBackButtonPress={posting ? undefined : handleCloseReplyModal}
+          style={{
+            justifyContent: 'flex-end',
+            margin: 0,
+            // Add keyboard avoidance for iOS
+            ...(Platform.OS === 'ios' && {
+              paddingBottom: insets.bottom,
+            })
+          }}
+          useNativeDriver
+          avoidKeyboard={true}
+        >
         <View style={{ 
           backgroundColor: colors.background, 
           padding: 16, 
