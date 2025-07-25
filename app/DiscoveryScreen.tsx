@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { PrivateKey } from '@hiveio/dhive';
-import { useColorScheme } from 'react-native';
-import { View, FlatList, Text, ActivityIndicator, Modal, Pressable } from 'react-native';
+import { useColorScheme, StyleSheet } from 'react-native';
+import { View, FlatList, Text, ActivityIndicator, Modal, Pressable, TouchableOpacity } from 'react-native';
+import { FontAwesome } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { calculateVoteValue } from '../utils/calculateVoteValue';
@@ -411,6 +412,16 @@ const DiscoveryScreen = () => {
           </View>
         </View>
       </Modal>
+      
+      {/* Header with back arrow */}
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <FontAwesome name="arrow-left" size={24} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+      </View>
+      
       <View style={{ padding: 16 }}>
         <Text style={{ fontSize: 22, fontWeight: 'bold', color: colors.text }}>
           #{hashtag} Snaps
@@ -460,5 +471,26 @@ const DiscoveryScreen = () => {
     </View>
   );
 };
+
+// Header styles (copied from ConversationScreen)
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  backButton: {
+    marginRight: 16,
+    padding: 4,
+  },
+});
 
 export default DiscoveryScreen;
