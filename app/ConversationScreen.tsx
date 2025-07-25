@@ -2418,6 +2418,16 @@ const ConversationScreen = () => {
           </TouchableOpacity>
         )}
       />
+      
+      {/* Header with back arrow */}
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <FontAwesome name="arrow-left" size={24} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+      </View>
+      
       {/* Conversation list (snap as header, replies as data) */}
       {loading ? (
         <View style={{ alignItems: 'center', marginTop: 40 }}>
@@ -2727,4 +2737,22 @@ const styles = StyleSheet.create({
   replyMetaText: { marginLeft: 4, fontSize: 13 },
   avatar: { width: 40, height: 40, borderRadius: 20, marginRight: 10 },
   snapTimestamp: { fontSize: 12, color: '#8899A6', marginLeft: 8 },
+  // Header styles (copied from NotificationsScreen)
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  backButton: {
+    marginRight: 16,
+    padding: 4,
+  },
 });
