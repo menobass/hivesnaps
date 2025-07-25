@@ -68,15 +68,15 @@ const FeedScreen = () => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  // Theme colors
+  // Theme colors - use the twitterColors defined above
   const colors = {
-    background: isDark ? '#000' : '#fff',
-    text: isDark ? '#fff' : '#000',
-    button: '#1DA1F2',
-    buttonText: '#fff',
-    buttonInactive: isDark ? '#8899A6' : '#E1E8ED',
-    icon: isDark ? '#8899A6' : '#1DA1F2',
-    bubble: isDark ? '#192734' : '#f0f0f0',
+    background: isDark ? twitterColors.dark.background : twitterColors.light.background,
+    text: isDark ? twitterColors.dark.text : twitterColors.light.text,
+    button: isDark ? twitterColors.dark.button : twitterColors.light.button,
+    buttonText: isDark ? twitterColors.dark.buttonText : twitterColors.light.buttonText,
+    buttonInactive: isDark ? twitterColors.dark.buttonInactive : twitterColors.light.buttonInactive,
+    icon: isDark ? twitterColors.dark.icon : twitterColors.light.icon,
+    bubble: isDark ? '#192734' : '#f0f0f0', // Keep the bubble color as it wasn't in original twitterColors
   };
 
   // Initialize styles with current theme
