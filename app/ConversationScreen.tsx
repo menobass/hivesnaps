@@ -55,6 +55,8 @@ interface SnapData {
   hasUpvoted?: boolean;
   active_votes?: any[]; // Add active_votes to store raw voting data
   json_metadata?: string; // Add json_metadata for edit tracking
+  parent_author?: string; // Add parent info for navigation
+  parent_permlink?: string; // Add parent permlink for navigation
 }
 
 // Placeholder reply type
@@ -317,6 +319,8 @@ const ConversationScreen = () => {
         permlink: post.permlink,
         active_votes: post.active_votes, // Keep the raw active_votes data
         json_metadata: post.json_metadata, // Include metadata for edit tracking
+        parent_author: post.parent_author, // Include parent info for navigation
+        parent_permlink: post.parent_permlink, // Include parent permlink for navigation
       });
       // Fetch replies tree with full content (including payout info)
       const tree = await fetchRepliesTreeWithContent(author, permlink);
@@ -347,6 +351,29 @@ const ConversationScreen = () => {
 
   const handleRefresh = () => {
     fetchSnapAndReplies();
+  };
+
+  // Handle navigation to parent snap
+  const handleGoToParentSnap = () => {
+    if (!snap?.parent_author || !snap?.parent_permlink) {
+      console.log('No parent snap available');
+      return;
+    }
+    
+    // Navigate to parent snap conversation
+    router.push({ 
+      pathname: '/ConversationScreen', 
+      params: { 
+        author: snap.parent_author, 
+        permlink: snap.parent_permlink 
+      } 
+    });
+  };
+
+  // Helper function to check if current snap is a top-level snap (direct reply to container)
+  const isTopLevelSnap = () => {
+    // A top-level snap has parent_author as 'peak.snaps' (the container account)
+    return !snap?.parent_author || snap.parent_author === '' || snap.parent_author === 'peak.snaps';
   };
 
   const handleAddImage = async (mode: 'reply' | 'edit' = 'reply') => {
@@ -2426,6 +2453,20 @@ const ConversationScreen = () => {
             <FontAwesome name="arrow-left" size={24} color={colors.text} />
           </TouchableOpacity>
         </View>
+        
+        {/* Parent snap navigation - only show if not a top-level snap */}
+        {!isTopLevelSnap() && (
+          <View style={styles.headerRight}>
+            <TouchableOpacity 
+              onPress={handleGoToParentSnap} 
+              style={styles.parentButton}
+              accessibilityLabel="Go to parent snap"
+            >
+              <Text style={[styles.parentButtonText, { color: colors.text }]}>Parent Snap</Text>
+              <FontAwesome name="arrow-up" size={16} color={colors.text} style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
       
       {/* Conversation list (snap as header, replies as data) */}
@@ -2751,8 +2792,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   backButton: {
     marginRight: 16,
     padding: 4,
+  },
+  parentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  parentButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
