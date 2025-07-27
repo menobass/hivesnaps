@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, Image, useColorScheme, Dimensions, ActivityIndicator, FlatList, Modal, Pressable, Platform, TextInput, ScrollView, BackHandler, ToastAndroid } from 'react-native';
+import { View, Text, TouchableOpacity, Image, useColorScheme, Dimensions, ActivityIndicator, FlatList, Modal, Pressable, Platform, TextInput, ScrollView, BackHandler, ToastAndroid, KeyboardAvoidingView } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
@@ -18,7 +18,7 @@ import ImageView from 'react-native-image-viewing';
 import { calculateVoteValue } from '../utils/calculateVoteValue';
 import { getHivePriceUSD } from '../utils/getHivePrice';
 import ReactNativeModal from 'react-native-modal';
-import { createFeedScreenStyles, baseStyles } from './styles/FeedScreenStyles';
+import { createFeedScreenStyles } from './styles/FeedScreenStyles';
 
 
 const twitterColors = {
@@ -173,9 +173,20 @@ const FeedScreen = () => {
   const [gifLoading, setGifLoading] = useState(false);
   // Image modal state
   const [imageModalVisible, setImageModalVisible] = useState(false);
-  const [modalImages, setModalImages] = useState<Array<{uri: string}>>([]);
+  const [modalImages, setModalImages] = useState<Array<{ uri: string }>>([]);
   const [modalImageIndex, setModalImageIndex] = useState(0);
-  
+
+  // Search functionality state
+  const [isSearchModalVisible, setIsSearchModalVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<{
+    users: any[];
+  }>({ users: [] });
+  const [isSearchLoading, setIsSearchLoading] = useState(false);
+  const [searchType, setSearchType] = useState<'content' | 'users'>('users');
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [recentHashtags, setRecentHashtags] = useState<string[]>([]);
+
   const flatListRef = useRef<FlatList<any>>(null); // FlatList ref for scroll control
   // Snap to scroll to in FlatList after refresh - no longer needed with optimistic updates
   // const [pendingScrollToKey, setPendingScrollToKey] = useState<string | null>(null);
@@ -242,7 +253,7 @@ const FeedScreen = () => {
             }
             setAvatarUrl(profileImg);
             console.log('Avatar URL set to:', profileImg);
-            
+
             // Check for unclaimed rewards
             // Handle both Asset objects and string formats
             const parseRewardBalance = (balance: any, symbol: string) => {
@@ -258,11 +269,11 @@ const FeedScreen = () => {
                 return parseFloat(balance.toString().replace(` ${symbol}`, '')) || 0;
               }
             };
-            
+
             const unclaimedHive = parseRewardBalance(accounts[0].reward_hive_balance, 'HIVE');
             const unclaimedHbd = parseRewardBalance(accounts[0].reward_hbd_balance, 'HBD');
             const unclaimedVests = parseRewardBalance(accounts[0].reward_vesting_balance, 'VESTS');
-            
+
             const hasRewards = unclaimedHive > 0 || unclaimedHbd > 0 || unclaimedVests > 0;
             setHasUnclaimedRewards(hasRewards);
           }
@@ -275,6 +286,188 @@ const FeedScreen = () => {
     };
     fetchUser();
   }, []);
+
+  // Load recent searches from AsyncStorage
+  useEffect(() => {
+    const loadRecentSearches = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('hivesnaps_recent_searches');
+        if (stored) {
+          setRecentSearches(JSON.parse(stored));
+        }
+        
+        const storedHashtags = await AsyncStorage.getItem('hivesnaps_recent_hashtags');
+        if (storedHashtags) {
+          setRecentHashtags(JSON.parse(storedHashtags));
+        }
+      } catch (err) {
+        console.log('Error loading recent searches:', err);
+      }
+    };
+    loadRecentSearches();
+  }, []);
+
+  // Save search to recent searches
+  const saveToRecentSearches = async (query: string) => {
+    try {
+      const trimmedQuery = query.trim().toLowerCase();
+      if (!trimmedQuery) return;
+
+      const updatedSearches = [
+        trimmedQuery,
+        ...recentSearches.filter(s => s !== trimmedQuery)
+      ].slice(0, 10); // Keep only last 10 searches
+
+      setRecentSearches(updatedSearches);
+      await AsyncStorage.setItem('hivesnaps_recent_searches', JSON.stringify(updatedSearches));
+    } catch (err) {
+      console.log('Error saving recent search:', err);
+    }
+  };
+
+  const saveToRecentHashtags = async (hashtag: string) => {
+    try {
+      const cleanHashtag = hashtag.replace('#', '').trim().toLowerCase();
+      if (!cleanHashtag) return;
+
+      const updatedHashtags = [
+        cleanHashtag,
+        ...recentHashtags.filter(h => h !== cleanHashtag)
+      ].slice(0, 10); // Keep only last 10 hashtags
+
+      setRecentHashtags(updatedHashtags);
+      await AsyncStorage.setItem('hivesnaps_recent_hashtags', JSON.stringify(updatedHashtags));
+    } catch (err) {
+      console.log('Error saving recent hashtag:', err);
+    }
+  };
+
+  // Search for users
+  const searchUsers = async (query: string): Promise<any[]> => {
+    try {
+      // Search for users using Hive's lookup_accounts API
+      const usernames = await client.database.call('lookup_accounts', [query.toLowerCase(), 10]);
+
+      if (usernames.length === 0) return [];
+
+      // Get account details for found usernames
+      const accounts = await client.database.getAccounts(usernames);
+
+      // Parse metadata and add avatar URLs
+      const usersWithAvatars = accounts.map(account => {
+        let meta = null;
+        let avatarUrl = '';
+
+        // Try posting_json_metadata first
+        if (account.posting_json_metadata) {
+          try {
+            meta = JSON.parse(account.posting_json_metadata);
+          } catch { }
+        }
+
+        // Fallback to json_metadata
+        if ((!meta || !meta.profile || !meta.profile.profile_image) && account.json_metadata) {
+          try {
+            meta = JSON.parse(account.json_metadata);
+          } catch { }
+        }
+
+        if (meta && meta.profile && meta.profile.profile_image) {
+          avatarUrl = meta.profile.profile_image.replace(/[\\/]+$/, '');
+        }
+
+        return {
+          ...account,
+          displayName: meta?.profile?.name || account.name,
+          about: meta?.profile?.about || '',
+          avatarUrl,
+          followerCount: 0, // Account stats not readily available in this API
+          followingCount: 0
+        };
+      });
+
+      return usersWithAvatars;
+    } catch (err) {
+      console.log('Error searching users:', err);
+      return [];
+    }
+  };
+
+  // Main search function
+  const handleSearch = async (query?: string) => {
+    const searchTerm = query || searchQuery;
+    if (!searchTerm.trim()) {
+      setSearchResults({ users: [] });
+      return;
+    }
+
+    if (searchType === 'content') {
+      // Handle hashtag search - redirect to DiscoveryScreen
+      const hashtag = searchTerm.startsWith('#') ? searchTerm.slice(1) : searchTerm;
+      const cleanHashtag = hashtag.trim();
+      
+      if (cleanHashtag) {
+        // Save to recent hashtags
+        await saveToRecentHashtags(cleanHashtag);
+        
+        // Navigate to DiscoveryScreen
+        router.push(`/DiscoveryScreen?hashtag=${encodeURIComponent(cleanHashtag)}`);
+        setIsSearchModalVisible(false);
+        clearSearch();
+      }
+      return;
+    }
+
+    if (searchType === 'users') {
+      setIsSearchLoading(true);
+      try {
+        const users = await searchUsers(searchTerm);
+        setSearchResults({ users });
+
+        // Save to recent searches
+        await saveToRecentSearches(searchTerm);
+      } catch (err) {
+        console.log('Search error:', err);
+        setSearchResults({ users: [] });
+      } finally {
+        setIsSearchLoading(false);
+      }
+    }
+  };
+
+  // Clear search results
+  const clearSearch = () => {
+    setSearchQuery('');
+    setSearchResults({ users: [] });
+  };
+
+  // Handle search modal close
+  const handleCloseSearchModal = () => {
+    setIsSearchModalVisible(false);
+    clearSearch();
+  };
+
+  // Remove a recent search
+  const removeRecentSearch = async (searchTerm: string) => {
+    try {
+      const filtered = recentSearches.filter(s => s !== searchTerm);
+      setRecentSearches(filtered);
+      await AsyncStorage.setItem('hivesnaps_recent_searches', JSON.stringify(filtered));
+    } catch (error) {
+      console.error('Error removing recent search:', error);
+    }
+  };
+
+  // Remove a recent hashtag
+  const removeRecentHashtag = async (hashtag: string) => {
+    try {
+      const filtered = recentHashtags.filter(h => h !== hashtag);
+      setRecentHashtags(filtered);
+      await AsyncStorage.setItem('hivesnaps_recent_hashtags', JSON.stringify(filtered));
+    } catch (error) {
+      console.error('Error removing recent hashtag:', error);
+    }
+  };
 
   // Enhanced avatar fetching with time-based caching
   const enhanceSnapsWithAvatar = async (snaps: Snap[]) => {
@@ -305,13 +498,13 @@ const FeedScreen = () => {
           if (acc.posting_json_metadata) {
             try {
               meta = JSON.parse(acc.posting_json_metadata);
-            } catch {}
+            } catch { }
           }
           // Fallback to json_metadata if posting_json_metadata doesn't have profile image
           if ((!meta || !meta.profile || !meta.profile.profile_image) && acc.json_metadata) {
             try {
               meta = JSON.parse(acc.json_metadata);
-            } catch {}
+            } catch { }
           }
           const url = meta && meta.profile && meta.profile.profile_image
             ? meta.profile.profile_image.replace(/[\\/]+$/, '')
@@ -355,7 +548,7 @@ const FeedScreen = () => {
   // Optimized Fetch Snaps (replies to @peak.snaps) with caching
   const fetchSnaps = async (useCache = true) => {
     const cacheKey = 'newest';
-    
+
     // Check cache first
     if (useCache) {
       const cachedSnaps = getCachedSnaps(cacheKey);
@@ -365,7 +558,7 @@ const FeedScreen = () => {
         return;
       }
     }
-    
+
     setFeedLoading(true);
     try {
       // Optimized: Get fewer container posts initially, focus on most recent
@@ -373,9 +566,9 @@ const FeedScreen = () => {
         tag: 'peak.snaps',
         limit: 3 // Reduced from 10 to 3 for faster loading
       }]);
-      
+
       let allSnaps: Snap[] = [];
-      
+
       // Process container posts in parallel for better performance
       const snapPromises = discussions.map(async (post: any) => {
         try {
@@ -386,16 +579,16 @@ const FeedScreen = () => {
           return [];
         }
       });
-      
+
       const snapResults = await Promise.all(snapPromises);
       allSnaps = snapResults.flat();
-      
+
       // Sort by created date descending
       allSnaps.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
-      
+
       // Limit to most recent 50 snaps for better performance
       const limitedSnaps = allSnaps.slice(0, 50);
-      
+
       const enhanced = await enhanceSnapsWithAvatar(limitedSnaps);
       setSnaps(enhanced);
       setCachedSnaps(cacheKey, enhanced);
@@ -409,7 +602,7 @@ const FeedScreen = () => {
   // Optimized Following Feed with caching
   const fetchFollowingSnaps = async (useCache = true) => {
     const cacheKey = 'following';
-    
+
     // Check cache first
     if (useCache) {
       const cachedSnaps = getCachedSnaps(cacheKey);
@@ -419,7 +612,7 @@ const FeedScreen = () => {
         return;
       }
     }
-    
+
     setFeedLoading(true);
     if (!username) return;
     try {
@@ -429,10 +622,10 @@ const FeedScreen = () => {
         ? followingResult.map((f: any) => f.following)
         : (followingResult && followingResult.following) ? followingResult.following : [];
       console.log('Following:', following);
-      
+
       // Get fewer container posts for faster loading
       const containerPosts = await client.database.call('get_discussions_by_blog', [{ tag: 'peak.snaps', limit: 3 }]);
-      
+
       // Process in parallel
       const snapPromises = containerPosts.map(async (post: any) => {
         try {
@@ -443,14 +636,14 @@ const FeedScreen = () => {
           return [];
         }
       });
-      
+
       const snapResults = await Promise.all(snapPromises);
       let allSnaps = snapResults.flat();
-      
+
       // Sort and limit
       allSnaps.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
       const limitedSnaps = allSnaps.slice(0, 50);
-      
+
       const enhanced = await enhanceSnapsWithAvatar(limitedSnaps);
       setSnaps(enhanced);
       setCachedSnaps(cacheKey, enhanced);
@@ -464,7 +657,7 @@ const FeedScreen = () => {
   // Optimized Trending Feed with caching
   const fetchTrendingSnaps = async (useCache = true) => {
     const cacheKey = 'trending';
-    
+
     // Check cache first
     if (useCache) {
       const cachedSnaps = getCachedSnaps(cacheKey);
@@ -474,7 +667,7 @@ const FeedScreen = () => {
         return;
       }
     }
-    
+
     setFeedLoading(true);
     try {
       // Get recent container posts (same as newest feed for consistency)
@@ -482,9 +675,9 @@ const FeedScreen = () => {
         tag: 'peak.snaps',
         limit: 3 // Changed from 1 to 3 to match other feeds
       }]);
-      
+
       let allSnaps: Snap[] = [];
-      
+
       // Process container posts in parallel for better performance
       const snapPromises = discussions.map(async (post: any) => {
         try {
@@ -495,10 +688,10 @@ const FeedScreen = () => {
           return [];
         }
       });
-      
+
       const snapResults = await Promise.all(snapPromises);
       allSnaps = snapResults.flat();
-      
+
       // Sort by payout (pending + total + curator) descending
       allSnaps.sort((a, b) => {
         const payoutA =
@@ -511,10 +704,10 @@ const FeedScreen = () => {
           parseFloat(b.curator_payout_value ? b.curator_payout_value.replace(' HBD', '') : '0');
         return payoutB - payoutA;
       });
-      
+
       // Limit to most recent 50 snaps for better performance
       const limitedSnaps = allSnaps.slice(0, 50);
-      
+
       const enhanced = await enhanceSnapsWithAvatar(limitedSnaps);
       setSnaps(enhanced);
       setCachedSnaps(cacheKey, enhanced);
@@ -528,7 +721,7 @@ const FeedScreen = () => {
   // Optimized My Snaps Feed with caching
   const fetchMySnaps = async (useCache = true) => {
     const cacheKey = `my-${username}`;
-    
+
     // Check cache first
     if (useCache) {
       const cachedSnaps = getCachedSnaps(cacheKey);
@@ -538,7 +731,7 @@ const FeedScreen = () => {
         return;
       }
     }
-    
+
     setFeedLoading(true);
     try {
       // Get recent container posts (same as other feeds for consistency)
@@ -546,9 +739,9 @@ const FeedScreen = () => {
         tag: 'peak.snaps',
         limit: 3 // Changed from 1 to 3 to match other feeds
       }]);
-      
+
       let mySnaps: Snap[] = [];
-      
+
       if (discussions && discussions.length > 0 && username) {
         // Process container posts in parallel for better performance
         const snapPromises = discussions.map(async (post: any) => {
@@ -561,17 +754,17 @@ const FeedScreen = () => {
             return [];
           }
         });
-        
+
         const snapResults = await Promise.all(snapPromises);
         mySnaps = snapResults.flat();
-        
+
         // Sort by created date descending
         mySnaps.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
-        
+
         // Limit for performance
         mySnaps = mySnaps.slice(0, 50);
       }
-      
+
       const enhanced = await enhanceSnapsWithAvatar(mySnaps);
       setSnaps(enhanced);
       setCachedSnaps(cacheKey, enhanced);
@@ -601,7 +794,7 @@ const FeedScreen = () => {
   // Handler for filter button presses with immediate cache loading
   const handleFilterPress = (filter: 'following' | 'newest' | 'trending' | 'my') => {
     setActiveFilter(filter);
-    
+
     // Immediately show cached content if available for instant UI response
     const cacheKey = filter === 'my' ? `my-${username}` : filter;
     const cachedSnaps = getCachedSnaps(cacheKey);
@@ -699,18 +892,18 @@ const FeedScreen = () => {
 
       // Optimistically update UI immediately - no refresh needed! (use USD since app displays in dollars)
       const estimatedValueIncrease = voteValue ? parseFloat(voteValue.usd) : 0;
-      setSnaps(prevSnaps => 
-        prevSnaps.map(snap => 
+      setSnaps(prevSnaps =>
+        prevSnaps.map(snap =>
           snap.author === upvoteTarget.author && snap.permlink === upvoteTarget.permlink
-            ? { 
-                ...snap, 
-                voteCount: (snap.voteCount || 0) + 1,
-                payout: (snap.payout || 0) + estimatedValueIncrease,
-                active_votes: [
-                  ...(snap.active_votes || []),
-                  { voter: username, percent: weight, rshares: weight * 100 }
-                ]
-              }
+            ? {
+              ...snap,
+              voteCount: (snap.voteCount || 0) + 1,
+              payout: (snap.payout || 0) + estimatedValueIncrease,
+              active_votes: [
+                ...(snap.active_votes || []),
+                { voter: username, percent: weight, rshares: weight * 100 }
+              ]
+            }
             : snap
         )
       );
@@ -777,7 +970,7 @@ const FeedScreen = () => {
     try {
       // Show action sheet to choose between camera and gallery
       let pickType: 'camera' | 'gallery' | 'cancel';
-      
+
       if (Platform.OS === 'ios') {
         pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(resolve => {
           import('react-native').then(({ ActionSheetIOS }) => {
@@ -810,22 +1003,22 @@ const FeedScreen = () => {
           });
         });
       }
-      
+
       if (pickType === 'cancel') return;
-      
+
       // Enhanced permission handling with better error messages
       let result;
       if (pickType === 'camera') {
         // Check current permission status first
         const currentPermission = await ImagePicker.getCameraPermissionsAsync();
         let finalStatus = currentPermission.status;
-        
+
         if (finalStatus !== 'granted') {
           // Request permission if not granted
           const requestPermission = await ImagePicker.requestCameraPermissionsAsync();
           finalStatus = requestPermission.status;
         }
-        
+
         if (finalStatus !== 'granted') {
           import('react-native').then(({ Alert }) => {
             Alert.alert(
@@ -833,31 +1026,33 @@ const FeedScreen = () => {
               'HiveSnaps needs camera access to take photos. Please enable camera permissions in your device settings.',
               [
                 { text: 'Cancel', style: 'cancel' },
-                { text: 'Open Settings', onPress: () => {
-                  if (Platform.OS === 'ios') {
-                    import('expo-linking').then(({ default: Linking }) => {
-                      Linking.openURL('app-settings:');
-                    });
-                  } else {
-                    import('expo-intent-launcher').then(({ default: IntentLauncher }) => {
-                      IntentLauncher.startActivityAsync(
-                        IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS,
-                        { data: 'package:com.anonymous.hivesnaps' }
-                      );
-                    }).catch(() => {
-                      // Fallback for older Android versions
+                {
+                  text: 'Open Settings', onPress: () => {
+                    if (Platform.OS === 'ios') {
                       import('expo-linking').then(({ default: Linking }) => {
                         Linking.openURL('app-settings:');
                       });
-                    });
+                    } else {
+                      import('expo-intent-launcher').then(({ default: IntentLauncher }) => {
+                        IntentLauncher.startActivityAsync(
+                          IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS,
+                          { data: 'package:com.anonymous.hivesnaps' }
+                        );
+                      }).catch(() => {
+                        // Fallback for older Android versions
+                        import('expo-linking').then(({ default: Linking }) => {
+                          Linking.openURL('app-settings:');
+                        });
+                      });
+                    }
                   }
-                }}
+                }
               ]
             );
           });
           return;
         }
-        
+
         result = await ImagePicker.launchCameraAsync({
           allowsEditing: true,
           quality: 0.8,
@@ -867,12 +1062,12 @@ const FeedScreen = () => {
         // Media library permission handling
         const currentPermission = await ImagePicker.getMediaLibraryPermissionsAsync();
         let finalStatus = currentPermission.status;
-        
+
         if (finalStatus !== 'granted') {
           const requestPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
           finalStatus = requestPermission.status;
         }
-        
+
         if (finalStatus !== 'granted') {
           import('react-native').then(({ Alert }) => {
             Alert.alert(
@@ -880,41 +1075,43 @@ const FeedScreen = () => {
               'HiveSnaps needs photo library access to select images. Please enable photo permissions in your device settings.',
               [
                 { text: 'Cancel', style: 'cancel' },
-                { text: 'Open Settings', onPress: () => {
-                  if (Platform.OS === 'ios') {
-                    import('expo-linking').then(({ default: Linking }) => {
-                      Linking.openURL('app-settings:');
-                    });
-                  } else {
-                    import('expo-intent-launcher').then(({ default: IntentLauncher }) => {
-                      IntentLauncher.startActivityAsync(
-                        IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS,
-                        { data: 'package:com.anonymous.hivesnaps' }
-                      );
-                    }).catch(() => {
-                      // Fallback for older Android versions
+                {
+                  text: 'Open Settings', onPress: () => {
+                    if (Platform.OS === 'ios') {
                       import('expo-linking').then(({ default: Linking }) => {
                         Linking.openURL('app-settings:');
                       });
-                    });
+                    } else {
+                      import('expo-intent-launcher').then(({ default: IntentLauncher }) => {
+                        IntentLauncher.startActivityAsync(
+                          IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS,
+                          { data: 'package:com.anonymous.hivesnaps' }
+                        );
+                      }).catch(() => {
+                        // Fallback for older Android versions
+                        import('expo-linking').then(({ default: Linking }) => {
+                          Linking.openURL('app-settings:');
+                        });
+                      });
+                    }
                   }
-                }}
+                }
               ]
             );
           });
           return;
         }
-        
+
         result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
           allowsEditing: true,
           quality: 0.8,
         });
       }
-      
+
       if (!result || result.canceled || !result.assets || !result.assets[0]) return;
       const asset = result.assets[0];
-      
+
       setNewSnapUploading(true);
       try {
         const fileToUpload = {
@@ -976,8 +1173,8 @@ const FeedScreen = () => {
     setGifLoading(true);
     try {
       const { searchGifs, getTrendingGifs } = await import('../utils/tenorApi');
-      const response = query.trim() 
-        ? await searchGifs(query, 20) 
+      const response = query.trim()
+        ? await searchGifs(query, 20)
         : await getTrendingGifs(20);
       setGifResults(response.results);
     } catch (error) {
@@ -1081,7 +1278,7 @@ const FeedScreen = () => {
     React.useCallback(() => {
       const backAction = () => {
         const now = Date.now();
-        
+
         if (exitTimestamp && (now - exitTimestamp) < 2000) {
           // Second press within 2 seconds - actually log out
           handleLogout();
@@ -1089,7 +1286,7 @@ const FeedScreen = () => {
         } else {
           // First press - show toast and set timestamp
           setExitTimestamp(now);
-          
+
           if (Platform.OS === 'android') {
             ToastAndroid.show('Press back again to log out', ToastAndroid.SHORT);
           } else {
@@ -1097,12 +1294,12 @@ const FeedScreen = () => {
             // For now, we'll just rely on the user understanding the double-tap pattern
             console.log('Press back again to log out');
           }
-          
+
           // Reset the timestamp after 2 seconds
           setTimeout(() => {
             setExitTimestamp(null);
           }, 2000);
-          
+
           return true; // Prevent default back action
         }
       };
@@ -1194,12 +1391,12 @@ const FeedScreen = () => {
                   maximumTrackTintColor={colors.buttonInactive}
                   thumbTintColor={colors.button}
                 />
-            {/* Show only USD value below slider, live update */}
-            {voteValue !== null && (
-              <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginTop: 12 }}>
-                ${voteValue.usd} USD
-              </Text>
-            )}
+                {/* Show only USD value below slider, live update */}
+                {voteValue !== null && (
+                  <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginTop: 12 }}>
+                    ${voteValue.usd} USD
+                  </Text>
+                )}
               </>
             )}
             {upvoteLoading ? (
@@ -1257,14 +1454,14 @@ const FeedScreen = () => {
                   />
                   {/* Subtle reward indicator as avatar overlay */}
                   {hasUnclaimedRewards && (
-                    <View style={[styles.rewardIndicator, { 
-                      position: 'absolute', 
-                      top: -2, 
-                      right: -2, 
+                    <View style={[styles.rewardIndicator, {
+                      position: 'absolute',
+                      top: -2,
+                      right: -2,
                       backgroundColor: '#FFD700',
                       borderWidth: 1,
                       borderColor: colors.background
-                    }]}> 
+                    }]}>
                       <FontAwesome name="dollar" size={8} color="#FFF" />
                     </View>
                   )}
@@ -1291,46 +1488,55 @@ const FeedScreen = () => {
                 </Pressable>
               )
             )}
-            {/* Voting Power Info Modal */}
-            <Modal
-              visible={vpInfoModalVisible}
-              transparent
-              animationType="fade"
-              onRequestClose={() => setVpInfoModalVisible(false)}
-            >
-              <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }}>
-                <View style={{ backgroundColor: colors.background, borderRadius: 16, padding: 24, width: '85%', alignItems: 'center' }}>
-                  <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>What is Voting Power (VP)?</Text>
-                  <Text style={{ color: colors.text, fontSize: 15, marginBottom: 18, textAlign: 'left' }}>
-                    Voting Power (VP) is a measure of your ability to upvote posts and comments on the Hive blockchain. The higher your VP, the more influence your votes have.{"\n\n"}
-                    - VP decreases each time you upvote.{"\n"}
-                    - VP regenerates automatically over time (about 20% per day).{"\n"}
-                    - Keeping your VP high means your votes have more impact.{"\n\n"}
-                    You can see your current VP in the top bar. After upvoting, your VP will drop slightly and recharge over time.
-                  </Text>
-                  <Pressable
-                    style={{ backgroundColor: colors.button, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 24, marginTop: 8 }}
-                    onPress={() => setVpInfoModalVisible(false)}
-                    accessibilityLabel="Close Voting Power info"
-                  >
-                    <Text style={{ color: colors.buttonText, fontWeight: '600', fontSize: 16 }}>Close</Text>
-                  </Pressable>
-                </View>
-              </View>
-            </Modal>
           </View>
         </View>
+
+        {/* Voting Power Info Modal */}
+        <Modal
+          visible={vpInfoModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setVpInfoModalVisible(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }}>
+            <View style={{ backgroundColor: colors.background, borderRadius: 16, padding: 24, width: '85%', alignItems: 'center' }}>
+              <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>What is Voting Power (VP)?</Text>
+              <Text style={{ color: colors.text, fontSize: 15, marginBottom: 18, textAlign: 'left' }}>
+                Voting Power (VP) is a measure of your ability to upvote posts and comments on the Hive blockchain. The higher your VP, the more influence your votes have.{"\n\n"}
+                - VP decreases each time you upvote.{"\n"}
+                - VP regenerates automatically over time (about 20% per day).{"\n"}
+                - Keeping your VP high means your votes have more impact.{"\n\n"}
+                You can see your current VP in the top bar. After upvoting, your VP will drop slightly and recharge over time.
+              </Text>
+              <Pressable
+                style={{ backgroundColor: colors.button, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 24, marginTop: 8 }}
+                onPress={() => setVpInfoModalVisible(false)}
+                accessibilityLabel="Close Voting Power info"
+              >
+                <Text style={{ color: colors.buttonText, fontWeight: '600', fontSize: 16 }}>Close</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
         {/* Slogan row */}
         <View style={styles.sloganRow}>
           <Text style={[styles.slogan, { color: colors.text }]}>What's snappening today?</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity 
+            <TouchableOpacity
+              style={[styles.searchBtn, { marginRight: 12 }]}
+              onPress={() => setIsSearchModalVisible(true)}
+              accessibilityLabel="Search posts and users"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <FontAwesome name="search" size={22} color={colors.icon} />
+            </TouchableOpacity>
+            <TouchableOpacity
               style={styles.bellBtn}
               onPress={() => router.push('/NotificationsScreen')}
             >
               <View style={{ position: 'relative' }}>
                 <FontAwesome name="bell" size={22} color={colors.icon} />
-                <NotificationBadge 
+                <NotificationBadge
                   count={unreadCount}
                   size="small"
                   color="#FF3B30"
@@ -1342,8 +1548,8 @@ const FeedScreen = () => {
         </View>
         {/* Enhanced Filter Row with Horizontal Scroll */}
         <View style={styles.filterContainer}>
-          <ScrollView 
-            horizontal 
+          <ScrollView
+            horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.filterScrollContent}
             style={styles.filterScrollView}
@@ -1357,8 +1563,8 @@ const FeedScreen = () => {
               <TouchableOpacity
                 key={filter.key}
                 style={[
-                  styles.filterBtnScrollable, 
-                  { 
+                  styles.filterBtnScrollable,
+                  {
                     backgroundColor: activeFilter === filter.key ? colors.button : colors.buttonInactive,
                     marginLeft: index === 0 ? 0 : 8,
                     marginRight: index === 3 ? 0 : 0
@@ -1367,14 +1573,14 @@ const FeedScreen = () => {
                 onPress={() => handleFilterPress(filter.key as any)}
                 activeOpacity={0.7}
               >
-                <FontAwesome 
-                  name={filter.icon as any} 
-                  size={16} 
-                  color={activeFilter === filter.key ? colors.buttonText : colors.text} 
+                <FontAwesome
+                  name={filter.icon as any}
+                  size={16}
+                  color={activeFilter === filter.key ? colors.buttonText : colors.text}
                   style={{ marginRight: 6 }}
                 />
                 <Text style={[
-                  styles.filterTextScrollable, 
+                  styles.filterTextScrollable,
                   { color: activeFilter === filter.key ? colors.buttonText : colors.text }
                 ]}>
                   {filter.label}
@@ -1383,6 +1589,9 @@ const FeedScreen = () => {
             ))}
           </ScrollView>
         </View>
+
+
+
       </SafeAreaView>
       {/* Feed list */}
       <View style={styles.feedContainer}>
@@ -1500,7 +1709,7 @@ const FeedScreen = () => {
                   <FontAwesome name="image" size={20} color={colors.icon} style={{ marginRight: 6 }} />
                   <Text style={{ color: colors.text, fontWeight: '600' }}>Add Image</Text>
                 </Pressable>
-                
+
                 <Pressable
                   style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.buttonInactive, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 14 }}
                   onPress={handleOpenGifPicker}
@@ -1509,12 +1718,12 @@ const FeedScreen = () => {
                   <FontAwesome name="file-image-o" size={20} color={colors.icon} style={{ marginRight: 6 }} />
                   <Text style={{ color: colors.text, fontWeight: '600' }}>Add GIF</Text>
                 </Pressable>
-                
+
                 {newSnapUploading && (
                   <ActivityIndicator size="small" color={colors.button} style={{ marginLeft: 12 }} />
                 )}
               </View>
-              
+
               {/* Previews Row */}
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 {newSnapImage && !newSnapUploading && (
@@ -1566,20 +1775,20 @@ const FeedScreen = () => {
                   <Text style={{ color: colors.text, fontWeight: '600' }}>Cancel</Text>
                 </Pressable>
                 <Pressable
-                  style={{ 
-                    flex: 1, 
-                    marginLeft: 8, 
-                    backgroundColor: (!newSnapText.trim() && !newSnapImage && !newSnapGif) ? colors.buttonInactive : colors.button, 
-                    borderRadius: 8, 
-                    padding: 12, 
-                    alignItems: 'center' 
+                  style={{
+                    flex: 1,
+                    marginLeft: 8,
+                    backgroundColor: (!newSnapText.trim() && !newSnapImage && !newSnapGif) ? colors.buttonInactive : colors.button,
+                    borderRadius: 8,
+                    padding: 12,
+                    alignItems: 'center'
                   }}
                   onPress={handleSubmitNewSnap}
                   disabled={newSnapLoading || (!newSnapText.trim() && !newSnapImage && !newSnapGif)}
                 >
-                  <Text style={{ 
-                    color: (!newSnapText.trim() && !newSnapImage && !newSnapGif) ? colors.text : colors.buttonText, 
-                    fontWeight: '600' 
+                  <Text style={{
+                    color: (!newSnapText.trim() && !newSnapImage && !newSnapGif) ? colors.text : colors.buttonText,
+                    fontWeight: '600'
                   }}>Submit</Text>
                 </Pressable>
               </View>
@@ -1593,48 +1802,24 @@ const FeedScreen = () => {
         isVisible={gifModalVisible}
         onBackdropPress={handleCloseGifModal}
         onBackButtonPress={handleCloseGifModal}
-        style={{ margin: 0, justifyContent: 'flex-end' }}
+        style={styles.gifModal}
         backdropOpacity={0.5}
       >
-        <View style={{
-          backgroundColor: colors.background,
-          borderTopLeftRadius: 20,
-          borderTopRightRadius: 20,
-          maxHeight: '80%',
-          paddingTop: 20
-        }}>
+        <View style={styles.gifModalContainer}>
           {/* Modal Header */}
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: 20,
-            paddingBottom: 15,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.buttonInactive
-          }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>
+          <View style={styles.gifModalHeader}>
+            <Text style={styles.gifModalTitle}>
               Choose a GIF
             </Text>
-            <Pressable onPress={handleCloseGifModal}>
+            <Pressable onPress={handleCloseGifModal} style={styles.gifModalCloseBtn}>
               <FontAwesome name="close" size={24} color={colors.text} />
             </Pressable>
           </View>
 
           {/* Search Bar */}
-          <View style={{
-            paddingHorizontal: 20,
-            paddingVertical: 15
-          }}>
+          <View style={styles.gifSearchBarContainer}>
             <TextInput
-              style={{
-                backgroundColor: colors.buttonInactive,
-                borderRadius: 20,
-                paddingHorizontal: 15,
-                paddingVertical: 10,
-                fontSize: 16,
-                color: colors.text
-              }}
+              style={styles.gifSearchInput}
               placeholder="Search for GIFs..."
               placeholderTextColor={colors.text + '80'}
               value={gifSearchQuery}
@@ -1656,11 +1841,11 @@ const FeedScreen = () => {
           </View>
 
           {/* GIF Results */}
-          <View style={{ flex: 1, paddingHorizontal: 10 }}>
+          <View style={styles.gifResultsContainer}>
             {gifLoading ? (
-              <View style={{ alignItems: 'center', justifyContent: 'center', height: 200 }}>
+              <View style={styles.gifLoadingContainer}>
                 <ActivityIndicator size="large" color={colors.button} />
-                <Text style={{ color: colors.text, marginTop: 10 }}>Searching GIFs...</Text>
+                <Text style={styles.searchLoadingText}>Searching...</Text>
               </View>
             ) : gifResults.length > 0 ? (
               <FlatList
@@ -1670,30 +1855,20 @@ const FeedScreen = () => {
                 showsVerticalScrollIndicator={false}
                 renderItem={({ item }) => {
                   // Get the best GIF URL (preview size for picker)
-                  const gifUrl = item?.media_formats?.gif?.url || 
-                               item?.media_formats?.tinygif?.url || 
-                               item?.media_formats?.nanogif?.url;
-                  
+                  const gifUrl = item?.media_formats?.gif?.url ||
+                    item?.media_formats?.tinygif?.url ||
+                    item?.media_formats?.nanogif?.url;
+
                   if (!gifUrl) return null;
-                  
+
                   return (
                     <Pressable
                       onPress={() => handleSelectGif(gifUrl)}
-                      style={{
-                        flex: 1,
-                        margin: 5,
-                        borderRadius: 8,
-                        overflow: 'hidden',
-                        backgroundColor: colors.buttonInactive
-                      }}
+                      style={styles.gifResultItem}
                     >
                       <Image
                         source={{ uri: gifUrl }}
-                        style={{
-                          width: '100%',
-                          aspectRatio: 1,
-                          borderRadius: 8
-                        }}
+                        style={styles.gifResultImage}
                         resizeMode="cover"
                       />
                     </Pressable>
@@ -1701,9 +1876,9 @@ const FeedScreen = () => {
                 }}
               />
             ) : (
-              <View style={{ alignItems: 'center', justifyContent: 'center', height: 200 }}>
+              <View style={styles.gifEmptyContainer}>
                 <FontAwesome name="search" size={48} color={colors.buttonInactive} />
-                <Text style={{ color: colors.text, marginTop: 10, textAlign: 'center' }}>
+                <Text style={styles.gifEmptyText}>
                   {gifSearchQuery ? 'No GIFs found' : 'Search for GIFs above'}
                 </Text>
               </View>
@@ -1749,6 +1924,219 @@ const FeedScreen = () => {
           </TouchableOpacity>
         )}
       />
+
+      {/* Search Modal */}
+      <Modal
+        visible={isSearchModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsSearchModalVisible(false)}
+      >
+        <View style={styles.searchModal}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.searchContainer}
+          >
+            {/* Search Header */}
+            <View style={styles.searchHeader}>
+              <Text style={styles.searchHeaderTitle}>Search</Text>
+              <TouchableOpacity
+                style={styles.searchCloseBtn}
+                onPress={() => setIsSearchModalVisible(false)}
+              >
+                <Text style={{ color: colors.text, fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Search Input */}
+            <View style={styles.searchInputContainer}>
+              <TextInput
+                style={styles.searchInput}
+                placeholder={searchType === 'content' ? "Search hashtags like photography, crypto..." : "Search users..."}
+                placeholderTextColor={colors.text + '60'}
+                value={searchType === 'content' && searchQuery && !searchQuery.startsWith('#') ? `#${searchQuery}` : searchQuery}
+                onChangeText={(text) => {
+                  if (searchType === 'content') {
+                    // Auto-add # for content searches, but allow user to type without it
+                    const cleanText = text.startsWith('#') ? text.slice(1) : text;
+                    setSearchQuery(cleanText);
+                  } else {
+                    setSearchQuery(text);
+                  }
+                }}
+                onSubmitEditing={() => handleSearch()}
+                returnKeyType="search"
+                autoFocus
+              />
+            </View>
+
+            {/* Search Filters */}
+            <View style={styles.searchFilters}>
+              <TouchableOpacity
+                style={[
+                  styles.searchFilterBtn,
+                  searchType === 'users' && styles.searchFilterBtnActive
+                ]}
+                onPress={() => {
+                  setSearchType('users');
+                  clearSearch();
+                }}
+              >
+                <Text
+                  style={[
+                    styles.searchFilterText,
+                    searchType === 'users' && styles.searchFilterTextActive
+                  ]}
+                >
+                  Users
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.searchFilterBtn,
+                  searchType === 'content' && styles.searchFilterBtnActive
+                ]}
+                onPress={() => {
+                  setSearchType('content');
+                  clearSearch();
+                }}
+              >
+                <Text
+                  style={[
+                    styles.searchFilterText,
+                    searchType === 'content' && styles.searchFilterTextActive
+                  ]}
+                >
+                  Content
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.searchContent}>
+              {/* Recent Searches - Users */}
+              {!searchQuery && searchType === 'users' && recentSearches.length > 0 && (
+                <View style={styles.recentSearchesSection}>
+                  <Text style={styles.recentSearchesTitle}>Recent User Searches</Text>
+                  {recentSearches.map((search, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.recentSearchItem}
+                      onPress={() => {
+                        setSearchQuery(search);
+                        handleSearch(search);
+                      }}
+                    >
+                      <FontAwesome name="user" size={14} color={colors.icon} style={{ marginRight: 8 }} />
+                      <Text style={styles.recentSearchText}>{search}</Text>
+                      <TouchableOpacity
+                        style={styles.clearRecentBtn}
+                        onPress={() => removeRecentSearch(search)}
+                      >
+                        <Text style={{ color: colors.text + '60', fontSize: 12 }}>✕</Text>
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {/* Recent Hashtags - Content */}
+              {!searchQuery && searchType === 'content' && recentHashtags.length > 0 && (
+                <View style={styles.recentSearchesSection}>
+                  <Text style={styles.recentSearchesTitle}>Recent Hashtags</Text>
+                  {recentHashtags.map((hashtag, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.recentSearchItem}
+                      onPress={() => {
+                        setSearchQuery(hashtag);
+                        handleSearch(hashtag);
+                      }}
+                    >
+                      <FontAwesome name="hashtag" size={14} color={colors.icon} style={{ marginRight: 8 }} />
+                      <Text style={styles.recentSearchText}>#{hashtag}</Text>
+                      <TouchableOpacity
+                        style={styles.clearRecentBtn}
+                        onPress={() => removeRecentHashtag(hashtag)}
+                      >
+                        <Text style={{ color: colors.text + '60', fontSize: 12 }}>✕</Text>
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {/* Search Results */}
+              {searchQuery && searchType === 'users' && (
+                <View style={styles.searchResults}>
+                  <Text style={styles.searchResultsTitle}>Users</Text>
+
+                  {isSearchLoading ? (
+                    <View style={styles.searchLoadingContainer}>
+                      <ActivityIndicator size="large" color={colors.button} />
+                      <Text style={styles.searchLoadingText}>Searching...</Text>
+                    </View>
+                  ) : searchResults.users.length === 0 ? (
+                    <View style={styles.searchEmptyContainer}>
+                      <Text style={styles.searchEmptyText}>
+                        No users found for "{searchQuery}"
+                      </Text>
+                    </View>
+                  ) : (
+                    searchResults.users.map((result: any, index: number) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.searchResultItem}
+                        onPress={() => {
+                          router.push(`/ProfileScreen?username=${result.name}` as any);
+                          setIsSearchModalVisible(false);
+                        }}
+                      >
+                        <Image
+                          source={{
+                            uri: result.avatarUrl || `https://images.hive.blog/u/${result.name}/avatar`
+                          }}
+                          style={styles.searchResultAvatar}
+                        />
+                        <View style={styles.searchResultInfo}>
+                          <Text style={styles.searchResultUsername}>@{result.name}</Text>
+                          <Text style={styles.searchResultMeta}>
+                            {result.displayName && result.displayName !== result.name ? result.displayName : ''}
+                          </Text>
+                          {result.about && (
+                            <Text
+                              style={styles.searchResultContent}
+                              numberOfLines={1}
+                              ellipsizeMode="tail"
+                            >
+                              {result.about}
+                            </Text>
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </View>
+              )}
+
+              {/* Content Search Hint */}
+              {searchQuery && searchType === 'content' && (
+                <View style={styles.searchResults}>
+                  <Text style={styles.searchResultsTitle}>Content Search</Text>
+                  <View style={styles.searchEmptyContainer}>
+                    <FontAwesome name="hashtag" size={32} color={colors.icon} style={{ marginBottom: 8 }} />
+                    <Text style={styles.searchEmptyText}>
+                      Searching for #{searchQuery}...
+                    </Text>
+                    <Text style={[styles.searchEmptyText, { fontSize: 14, opacity: 0.7, marginTop: 8 }]}>
+                      This will open the Discovery screen with your hashtag
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </View>
   );
 };

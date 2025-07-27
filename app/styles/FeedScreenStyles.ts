@@ -69,9 +69,10 @@ export const createFeedScreenStyles = (colors: any, isDark: boolean) => {
     sloganRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'space-between', // Changed from 'center' to 'space-between'
       marginBottom: 16,
       paddingHorizontal: 16,
+      minHeight: 40, // Added minimum height for consistent spacing
     },
     sloganText: {
       fontSize: 14,
@@ -79,6 +80,8 @@ export const createFeedScreenStyles = (colors: any, isDark: boolean) => {
       fontStyle: 'italic',
       textAlign: 'center',
       opacity: 0.8,
+      flex: 1, // Added flex to center the text properly
+      paddingHorizontal: 20, // Added horizontal padding for breathing room
     },
     slogan: {
       fontSize: 14,
@@ -281,73 +284,6 @@ export const createFeedScreenStyles = (colors: any, isDark: boolean) => {
       fontSize: 15,
     },
 
-    // GIF picker styles
-    gifPickerContainer: {
-      backgroundColor: colors.background,
-      borderTopLeftRadius: 18,
-      borderTopRightRadius: 18,
-      maxHeight: screenHeight * 0.8,
-      paddingBottom: 20,
-    },
-    gifPickerHeader: {
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: isDark ? '#38444d' : '#E1E8ED',
-    },
-    gifPickerTitle: {
-      fontSize: 18,
-      fontWeight: 'bold',
-      color: colors.text,
-      textAlign: 'center',
-    },
-    gifSearchContainer: {
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-    },
-    gifSearchInput: {
-      backgroundColor: colors.bubble,
-      borderRadius: 20,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      fontSize: 16,
-      color: colors.text,
-    },
-    gifGrid: {
-      paddingHorizontal: 8,
-    },
-    gifGridContent: {
-      paddingBottom: 20,
-    },
-    gifItem: {
-      flex: 1,
-      margin: 4,
-      borderRadius: 8,
-      overflow: 'hidden',
-      aspectRatio: 1,
-    },
-    gifImage: {
-      width: '100%',
-      height: '100%',
-    },
-    gifLoadingContainer: {
-      padding: 40,
-      alignItems: 'center',
-    },
-    gifLoadingText: {
-      color: colors.text,
-      marginTop: 16,
-    },
-    gifEmptyContainer: {
-      padding: 40,
-      alignItems: 'center',
-    },
-    gifEmptyText: {
-      color: colors.text,
-      fontSize: 16,
-      textAlign: 'center',
-    },
-
     // FAB (Floating Action Button) styles
     fab: {
       position: 'absolute',
@@ -368,7 +304,272 @@ export const createFeedScreenStyles = (colors: any, isDark: boolean) => {
     fabIcon: {
       fontSize: 24,
       fontWeight: 'bold',
-      color: '#fff',
+      color: '#FFFFFF',
+    },
+    
+    // Search styles
+    searchBtn: {
+      padding: 10, // Increased padding for better touch target
+      borderRadius: 20,
+      backgroundColor: colors.buttonInactive,
+      width: 40, // Fixed width for consistency
+      height: 40, // Fixed height for consistency
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    searchModal: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.4)',
+      justifyContent: 'flex-start',
+      paddingTop: 60,
+    },
+    searchContainer: {
+      backgroundColor: colors.background,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      flex: 1,
+      minHeight: '90%',
+    },
+    searchHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 10,
+      paddingVertical: 15,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.buttonInactive,
+    },
+    searchHeaderTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    searchCloseBtn: {
+      padding: 8,
+    },
+    searchInputContainer: {
+      paddingHorizontal: 20,
+      paddingVertical: 15,
+    },
+    searchInput: {
+      backgroundColor: isDark ? '#22303C' : '#F5F8FA',
+      borderRadius: 20,
+      paddingHorizontal: 15,
+      paddingVertical: 12,
+      fontSize: 16,
+      color: colors.text,
+      borderWidth: 1,
+      borderColor: colors.buttonInactive,
+    },
+    searchFilters: {
+      flexDirection: 'row',
+      paddingHorizontal: 20,
+      paddingBottom: 15,
+    },
+    searchFilterBtn: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      marginRight: 10,
+      borderWidth: 1,
+      borderColor: colors.buttonInactive,
+    },
+    searchFilterBtnActive: {
+      backgroundColor: colors.button,
+      borderColor: colors.button,
+    },
+    searchFilterText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    searchFilterTextActive: {
+      color: colors.buttonText,
+    },
+    searchContent: {
+      flex: 1,
+      paddingHorizontal: 20,
+    },
+    recentSearchesSection: {
+      paddingVertical: 15,
+    },
+    recentSearchesTitle: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginBottom: 10,
+    },
+    recentSearchItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      backgroundColor: colors.buttonInactive,
+      borderRadius: 8,
+      marginBottom: 6,
+    },
+    recentSearchText: {
+      fontSize: 14,
+      color: colors.text,
+      flex: 1,
+    },
+    clearRecentBtn: {
+      padding: 4,
+    },
+    searchResults: {
+      flex: 1,
+    },
+    searchResultsTitle: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginBottom: 15,
+    },
+    searchResultItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      backgroundColor: colors.buttonInactive,
+      borderRadius: 8,
+      marginBottom: 8,
+    },
+    searchResultAvatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      marginRight: 12,
+    },
+    searchResultInfo: {
+      flex: 1,
+    },
+    searchResultUsername: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    searchResultMeta: {
+      fontSize: 12,
+      color: colors.text + '80',
+      marginTop: 2,
+    },
+    searchResultContent: {
+      fontSize: 14,
+      color: colors.text,
+      marginTop: 4,
+      lineHeight: 18,
+    },
+    searchLoadingContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 40,
+    },
+    searchLoadingText: {
+      color: colors.text,
+      marginTop: 10,
+      fontSize: 16,
+    },
+    searchEmptyContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 40,
+    },
+    searchEmptyText: {
+      color: colors.text,
+      fontSize: 16,
+      textAlign: 'center',
+      marginTop: 10,
+    },
+
+    // GIF Picker Modal
+    gifModal: {
+      justifyContent: 'flex-end',
+      margin: 0,
+    },
+    gifModalContainer: {
+      backgroundColor: colors.background,
+      borderTopLeftRadius: 18,
+      borderTopRightRadius: 18,
+      paddingHorizontal: 18,
+      paddingTop: 18,
+      paddingBottom: 32,
+      minHeight: 420,
+      maxHeight: '80%',
+    },
+    gifModalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 12,
+    },
+    gifModalTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    gifModalCloseBtn: {
+      padding: 4,
+      borderRadius: 16,
+    },
+    gifSearchBarContainer: {
+      marginBottom: 12,
+    },
+    gifSearchInput: {
+      backgroundColor: colors.inputBackground,
+      color: colors.text,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      fontSize: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    gifResultsContainer: {
+      flex: 1,
+      minHeight: 200,
+    },
+    gifLoadingContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 32,
+    },
+    gifResultItem: {
+      flex: 1,
+      margin: 6,
+      borderRadius: 12,
+      overflow: 'hidden',
+      backgroundColor: colors.inputBackground,
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.08,
+      shadowRadius: 2,
+    },
+    gifResultImage: {
+      width: '100%',
+      aspectRatio: 1,
+      minHeight: 120,
+      maxHeight: 160,
+    },
+    gifEmptyContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 32,
+    },
+    gifEmptyText: {
+      marginTop: 12,
+      color: colors.text,
+      fontSize: 16,
+      opacity: 0.7,
+      textAlign: 'center',
     },
 
     // Keyboard avoiding view
