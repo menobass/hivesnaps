@@ -323,20 +323,47 @@ const ProfileScreen = () => {
     if (!currentUsername || !username || currentUsername === username) return;
     
     try {
-      // Check following status
-      const following = await client.call('condenser_api', 'get_following', [currentUsername, username, 'blog', 1]);
+      console.log(`🔍 Checking follow status: ${currentUsername} -> ${username}`);
+      
+      // Check following status - get all users that currentUsername follows
+      // Parameters: [follower, startFollowing, followType, limit]
+      const following = await client.call('condenser_api', 'get_following', [currentUsername, '', 'blog', 1000]);
+      console.log(`📊 Following API returned ${following?.length || 0} results`);
+      
+      // Check if the target username is in the list of people we follow
       const isCurrentlyFollowing = Array.isArray(following) && 
-        following.some((f: any) => f.following === username && f.what?.includes('blog'));
+        following.some((f: any) => {
+          const matches = f.following === username && f.what?.includes('blog');
+          if (matches) {
+            console.log(`✅ Found follow relationship: ${f.following} with what: ${f.what}`);
+          }
+          return matches;
+        });
+      
+      console.log(`🎯 Follow status result: ${isCurrentlyFollowing ? 'FOLLOWING' : 'NOT FOLLOWING'}`);
       setIsFollowing(isCurrentlyFollowing);
 
-      // Check mute status
-      const ignoring = await client.call('condenser_api', 'get_following', [currentUsername, username, 'ignore', 1]);
+      // Check mute status - get all users that currentUsername ignores
+      const ignoring = await client.call('condenser_api', 'get_following', [currentUsername, '', 'ignore', 1000]);
+      console.log(`🔇 Ignoring API returned ${ignoring?.length || 0} results`);
+      
       const isCurrentlyMuting = Array.isArray(ignoring) && 
-        ignoring.some((f: any) => f.following === username && f.what?.includes('ignore'));
+        ignoring.some((f: any) => {
+          const matches = f.following === username && f.what?.includes('ignore');
+          if (matches) {
+            console.log(`🔇 Found mute relationship: ${f.following} with what: ${f.what}`);
+          }
+          return matches;
+        });
+      
+      console.log(`🔇 Mute status result: ${isCurrentlyMuting ? 'MUTED' : 'NOT MUTED'}`);
       setIsMuted(isCurrentlyMuting);
       
     } catch (error) {
       console.log('Error checking follow/mute status:', error);
+      // Reset to default states on error
+      setIsFollowing(false);
+      setIsMuted(false);
     }
   };
 
