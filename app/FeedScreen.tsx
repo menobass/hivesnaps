@@ -180,12 +180,12 @@ const FeedScreen = () => {
   const [isSearchModalVisible, setIsSearchModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<{
-    posts: Snap[];
     users: any[];
-  }>({ posts: [], users: [] });
+  }>({ users: [] });
   const [isSearchLoading, setIsSearchLoading] = useState(false);
-  const [searchType, setSearchType] = useState<'posts' | 'users'>('posts');
+  const [searchType, setSearchType] = useState<'content' | 'users'>('users');
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [recentHashtags, setRecentHashtags] = useState<string[]>([]);
 
   const flatListRef = useRef<FlatList<any>>(null); // FlatList ref for scroll control
   // Snap to scroll to in FlatList after refresh - no longer needed with optimistic updates
@@ -295,6 +295,11 @@ const FeedScreen = () => {
         if (stored) {
           setRecentSearches(JSON.parse(stored));
         }
+        
+        const storedHashtags = await AsyncStorage.getItem('hivesnaps_recent_hashtags');
+        if (storedHashtags) {
+          setRecentHashtags(JSON.parse(storedHashtags));
+        }
       } catch (err) {
         console.log('Error loading recent searches:', err);
       }
@@ -320,58 +325,20 @@ const FeedScreen = () => {
     }
   };
 
-  // Search for posts (snaps)
-  const searchPosts = async (query: string): Promise<Snap[]> => {
+  const saveToRecentHashtags = async (hashtag: string) => {
     try {
-      // Get recent container posts to search within
-      const discussions = await client.database.call('get_discussions_by_blog', [{
-        tag: 'peak.snaps',
-        limit: 5 // Search in more containers for better results
-      }]);
+      const cleanHashtag = hashtag.replace('#', '').trim().toLowerCase();
+      if (!cleanHashtag) return;
 
-      let allSnaps: Snap[] = [];
+      const updatedHashtags = [
+        cleanHashtag,
+        ...recentHashtags.filter(h => h !== cleanHashtag)
+      ].slice(0, 10); // Keep only last 10 hashtags
 
-      // Get all replies from recent containers
-      const snapPromises = discussions.map(async (post: any) => {
-        try {
-          const replies: Snap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
-          return replies;
-        } catch (err) {
-          console.log('Error fetching replies for search:', err);
-          return [];
-        }
-      });
-
-      const snapResults = await Promise.all(snapPromises);
-      allSnaps = snapResults.flat();
-
-      // Filter snaps that match the search query
-      const filteredSnaps = allSnaps.filter(snap => {
-        const bodyText = snap.body.toLowerCase();
-        const authorText = snap.author.toLowerCase();
-        const queryLower = query.toLowerCase();
-
-        return bodyText.includes(queryLower) ||
-          authorText.includes(queryLower) ||
-          (snap.json_metadata && snap.json_metadata.toLowerCase().includes(queryLower));
-      });
-
-      // Sort by relevance (exact matches first, then by date)
-      filteredSnaps.sort((a, b) => {
-        const queryLower = query.toLowerCase();
-        const aExactMatch = a.body.toLowerCase().includes(queryLower) || a.author.toLowerCase() === queryLower;
-        const bExactMatch = b.body.toLowerCase().includes(queryLower) || b.author.toLowerCase() === queryLower;
-
-        if (aExactMatch && !bExactMatch) return -1;
-        if (!aExactMatch && bExactMatch) return 1;
-
-        return new Date(b.created).getTime() - new Date(a.created).getTime();
-      });
-
-      return filteredSnaps.slice(0, 20); // Limit to 20 results
+      setRecentHashtags(updatedHashtags);
+      await AsyncStorage.setItem('hivesnaps_recent_hashtags', JSON.stringify(updatedHashtags));
     } catch (err) {
-      console.log('Error searching posts:', err);
-      return [];
+      console.log('Error saving recent hashtag:', err);
     }
   };
 
@@ -430,38 +397,48 @@ const FeedScreen = () => {
   const handleSearch = async (query?: string) => {
     const searchTerm = query || searchQuery;
     if (!searchTerm.trim()) {
-      setSearchResults({ posts: [], users: [] });
+      setSearchResults({ users: [] });
       return;
     }
 
-    setIsSearchLoading(true);
-
-    try {
-      if (searchType === 'posts') {
-        const posts = await searchPosts(searchTerm);
-        const enhancedPosts = await enhanceSnapsWithAvatar(posts);
-        setSearchResults(prev => ({ ...prev, posts: enhancedPosts }));
+    if (searchType === 'content') {
+      // Handle hashtag search - redirect to DiscoveryScreen
+      const hashtag = searchTerm.startsWith('#') ? searchTerm.slice(1) : searchTerm;
+      const cleanHashtag = hashtag.trim();
+      
+      if (cleanHashtag) {
+        // Save to recent hashtags
+        await saveToRecentHashtags(cleanHashtag);
+        
+        // Navigate to DiscoveryScreen
+        router.push(`/DiscoveryScreen?hashtag=${encodeURIComponent(cleanHashtag)}`);
+        setIsSearchModalVisible(false);
+        clearSearch();
       }
+      return;
+    }
 
-      if (searchType === 'users') {
+    if (searchType === 'users') {
+      setIsSearchLoading(true);
+      try {
         const users = await searchUsers(searchTerm);
-        setSearchResults(prev => ({ ...prev, users }));
-      }
+        setSearchResults({ users });
 
-      // Save to recent searches
-      await saveToRecentSearches(searchTerm);
-    } catch (err) {
-      console.log('Search error:', err);
-      setSearchResults({ posts: [], users: [] });
-    } finally {
-      setIsSearchLoading(false);
+        // Save to recent searches
+        await saveToRecentSearches(searchTerm);
+      } catch (err) {
+        console.log('Search error:', err);
+        setSearchResults({ users: [] });
+      } finally {
+        setIsSearchLoading(false);
+      }
     }
   };
 
   // Clear search results
   const clearSearch = () => {
     setSearchQuery('');
-    setSearchResults({ posts: [], users: [] });
+    setSearchResults({ users: [] });
   };
 
   // Handle search modal close
@@ -478,6 +455,17 @@ const FeedScreen = () => {
       await AsyncStorage.setItem('hivesnaps_recent_searches', JSON.stringify(filtered));
     } catch (error) {
       console.error('Error removing recent search:', error);
+    }
+  };
+
+  // Remove a recent hashtag
+  const removeRecentHashtag = async (hashtag: string) => {
+    try {
+      const filtered = recentHashtags.filter(h => h !== hashtag);
+      setRecentHashtags(filtered);
+      await AsyncStorage.setItem('hivesnaps_recent_hashtags', JSON.stringify(filtered));
+    } catch (error) {
+      console.error('Error removing recent hashtag:', error);
     }
   };
 
@@ -1964,10 +1952,18 @@ const FeedScreen = () => {
             <View style={styles.searchInputContainer}>
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search posts or users..."
+                placeholder={searchType === 'content' ? "Search hashtags like photography, crypto..." : "Search users..."}
                 placeholderTextColor={colors.text + '60'}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
+                value={searchType === 'content' && searchQuery && !searchQuery.startsWith('#') ? `#${searchQuery}` : searchQuery}
+                onChangeText={(text) => {
+                  if (searchType === 'content') {
+                    // Auto-add # for content searches, but allow user to type without it
+                    const cleanText = text.startsWith('#') ? text.slice(1) : text;
+                    setSearchQuery(cleanText);
+                  } else {
+                    setSearchQuery(text);
+                  }
+                }}
                 onSubmitEditing={() => handleSearch()}
                 returnKeyType="search"
                 autoFocus
@@ -1979,25 +1975,12 @@ const FeedScreen = () => {
               <TouchableOpacity
                 style={[
                   styles.searchFilterBtn,
-                  searchType === 'posts' && styles.searchFilterBtnActive
-                ]}
-                onPress={() => setSearchType('posts')}
-              >
-                <Text
-                  style={[
-                    styles.searchFilterText,
-                    searchType === 'posts' && styles.searchFilterTextActive
-                  ]}
-                >
-                  Posts
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.searchFilterBtn,
                   searchType === 'users' && styles.searchFilterBtnActive
                 ]}
-                onPress={() => setSearchType('users')}
+                onPress={() => {
+                  setSearchType('users');
+                  clearSearch();
+                }}
               >
                 <Text
                   style={[
@@ -2008,23 +1991,42 @@ const FeedScreen = () => {
                   Users
                 </Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.searchFilterBtn,
+                  searchType === 'content' && styles.searchFilterBtnActive
+                ]}
+                onPress={() => {
+                  setSearchType('content');
+                  clearSearch();
+                }}
+              >
+                <Text
+                  style={[
+                    styles.searchFilterText,
+                    searchType === 'content' && styles.searchFilterTextActive
+                  ]}
+                >
+                  Content
+                </Text>
+              </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.searchContent}>
-              {/* Recent Searches */}
-              {!searchQuery && recentSearches.length > 0 && (
+              {/* Recent Searches - Users */}
+              {!searchQuery && searchType === 'users' && recentSearches.length > 0 && (
                 <View style={styles.recentSearchesSection}>
-                  <Text style={styles.recentSearchesTitle}>Recent Searches</Text>
+                  <Text style={styles.recentSearchesTitle}>Recent User Searches</Text>
                   {recentSearches.map((search, index) => (
                     <TouchableOpacity
                       key={index}
                       style={styles.recentSearchItem}
                       onPress={() => {
                         setSearchQuery(search);
-                        setSearchType('posts');
-                        handleSearch();
+                        handleSearch(search);
                       }}
                     >
+                      <FontAwesome name="user" size={14} color={colors.icon} style={{ marginRight: 8 }} />
                       <Text style={styles.recentSearchText}>{search}</Text>
                       <TouchableOpacity
                         style={styles.clearRecentBtn}
@@ -2037,69 +2039,98 @@ const FeedScreen = () => {
                 </View>
               )}
 
+              {/* Recent Hashtags - Content */}
+              {!searchQuery && searchType === 'content' && recentHashtags.length > 0 && (
+                <View style={styles.recentSearchesSection}>
+                  <Text style={styles.recentSearchesTitle}>Recent Hashtags</Text>
+                  {recentHashtags.map((hashtag, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.recentSearchItem}
+                      onPress={() => {
+                        setSearchQuery(hashtag);
+                        handleSearch(hashtag);
+                      }}
+                    >
+                      <FontAwesome name="hashtag" size={14} color={colors.icon} style={{ marginRight: 8 }} />
+                      <Text style={styles.recentSearchText}>#{hashtag}</Text>
+                      <TouchableOpacity
+                        style={styles.clearRecentBtn}
+                        onPress={() => removeRecentHashtag(hashtag)}
+                      >
+                        <Text style={{ color: colors.text + '60', fontSize: 12 }}>✕</Text>
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
               {/* Search Results */}
-              {searchQuery && (
+              {searchQuery && searchType === 'users' && (
                 <View style={styles.searchResults}>
-                  <Text style={styles.searchResultsTitle}>
-                    {searchType === 'posts' ? 'Posts' : 'Users'}
-                  </Text>
+                  <Text style={styles.searchResultsTitle}>Users</Text>
 
                   {isSearchLoading ? (
                     <View style={styles.searchLoadingContainer}>
                       <ActivityIndicator size="large" color={colors.button} />
                       <Text style={styles.searchLoadingText}>Searching...</Text>
                     </View>
-                  ) : (searchType === 'posts' ? searchResults.posts : searchResults.users).length === 0 ? (
+                  ) : searchResults.users.length === 0 ? (
                     <View style={styles.searchEmptyContainer}>
                       <Text style={styles.searchEmptyText}>
-                        No {searchType} found for "{searchQuery}"
+                        No users found for "{searchQuery}"
                       </Text>
                     </View>
                   ) : (
-                    (searchType === 'posts' ? searchResults.posts : searchResults.users).map((result: any, index: number) => (
+                    searchResults.users.map((result: any, index: number) => (
                       <TouchableOpacity
                         key={index}
                         style={styles.searchResultItem}
                         onPress={() => {
-                          if (searchType === 'users') {
-                            router.push(`/ProfileScreen?username=${result.name}` as any);
-                          } else {
-                            router.push({ pathname: '/ConversationScreen', params: { author: result.author, permlink: result.permlink } });
-                          }
+                          router.push(`/ProfileScreen?username=${result.name}` as any);
                           setIsSearchModalVisible(false);
                         }}
                       >
                         <Image
                           source={{
-                            uri: searchType === 'users'
-                              ? `https://images.hive.blog/u/${result.name}/avatar`
-                              : `https://images.hive.blog/u/${result.author}/avatar`
+                            uri: result.avatarUrl || `https://images.hive.blog/u/${result.name}/avatar`
                           }}
                           style={styles.searchResultAvatar}
                         />
                         <View style={styles.searchResultInfo}>
-                          <Text style={styles.searchResultUsername}>
-                            {searchType === 'users' ? `@${result.name}` : `@${result.author}`}
-                          </Text>
+                          <Text style={styles.searchResultUsername}>@{result.name}</Text>
                           <Text style={styles.searchResultMeta}>
-                            {searchType === 'users'
-                              ? `${result.post_count} posts • ${result.follower_count} followers`
-                              : new Date(result.created).toLocaleDateString()
-                            }
+                            {result.displayName && result.displayName !== result.name ? result.displayName : ''}
                           </Text>
-                          {searchType === 'posts' && (
+                          {result.about && (
                             <Text
                               style={styles.searchResultContent}
-                              numberOfLines={2}
+                              numberOfLines={1}
                               ellipsizeMode="tail"
                             >
-                              {result.title}
+                              {result.about}
                             </Text>
                           )}
                         </View>
                       </TouchableOpacity>
                     ))
                   )}
+                </View>
+              )}
+
+              {/* Content Search Hint */}
+              {searchQuery && searchType === 'content' && (
+                <View style={styles.searchResults}>
+                  <Text style={styles.searchResultsTitle}>Content Search</Text>
+                  <View style={styles.searchEmptyContainer}>
+                    <FontAwesome name="hashtag" size={32} color={colors.icon} style={{ marginBottom: 8 }} />
+                    <Text style={styles.searchEmptyText}>
+                      Searching for #{searchQuery}...
+                    </Text>
+                    <Text style={[styles.searchEmptyText, { fontSize: 14, opacity: 0.7, marginTop: 8 }]}>
+                      This will open the Discovery screen with your hashtag
+                    </Text>
+                  </View>
                 </View>
               )}
             </ScrollView>
