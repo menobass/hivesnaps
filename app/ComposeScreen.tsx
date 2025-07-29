@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -15,6 +15,7 @@ import {
   Alert,
   Pressable,
   FlatList,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -55,6 +56,15 @@ export default function ComposeScreen() {
   const [posting, setPosting] = useState(false);
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  
+  // Text selection state for markdown formatting
+  const [selectionStart, setSelectionStart] = useState(0);
+  const [selectionEnd, setSelectionEnd] = useState(0);
+  const textInputRef = useRef<TextInput>(null);
+  
+  // Spoiler modal state
+  const [spoilerModalVisible, setSpoilerModalVisible] = useState(false);
+  const [spoilerButtonText, setSpoilerButtonText] = useState('');
   
   // GIF picker state
   const [gifs, setGifs] = useState<string[]>([]);
@@ -440,6 +450,90 @@ export default function ComposeScreen() {
     }
   };
 
+  // Markdown formatting functions
+  const insertMarkdown = (before: string, after: string, placeholder: string) => {
+    const hasSelection = selectionStart !== selectionEnd;
+    
+    if (hasSelection) {
+      // Wrap selected text
+      const beforeText = text.substring(0, selectionStart);
+      const selectedText = text.substring(selectionStart, selectionEnd);
+      const afterText = text.substring(selectionEnd);
+      
+      const newText = beforeText + before + selectedText + after + afterText;
+      setText(newText);
+      
+      // Position cursor after the formatted text
+      const newCursorPosition = selectionStart + before.length + selectedText.length + after.length;
+      setTimeout(() => {
+        textInputRef.current?.setNativeProps({
+          selection: { start: newCursorPosition, end: newCursorPosition }
+        });
+      }, 10);
+    } else {
+      // Insert with placeholder and select it
+      const beforeText = text.substring(0, selectionStart);
+      const afterText = text.substring(selectionStart);
+      
+      const newText = beforeText + before + placeholder + after + afterText;
+      setText(newText);
+      
+      // Select the placeholder text for easy replacement
+      const placeholderStart = selectionStart + before.length;
+      const placeholderEnd = placeholderStart + placeholder.length;
+      setTimeout(() => {
+        textInputRef.current?.setNativeProps({
+          selection: { start: placeholderStart, end: placeholderEnd }
+        });
+      }, 10);
+    }
+  };
+
+  const handleBold = () => {
+    insertMarkdown('**', '**', 'bold text');
+  };
+
+  const handleItalic = () => {
+    insertMarkdown('*', '*', 'italic text');
+  };
+
+  const handleUnderline = () => {
+    insertMarkdown('__', '__', 'underlined text');
+  };
+
+  const handleSpoiler = () => {
+    setSpoilerButtonText('');
+    setSpoilerModalVisible(true);
+  };
+
+  const handleSpoilerConfirm = () => {
+    const buttonText = spoilerButtonText.trim() || 'button text';
+    const spoilerSyntax = `>! [${buttonText}] spoiler content`;
+    
+    const beforeText = text.substring(0, selectionStart);
+    const afterText = text.substring(selectionStart);
+    const newText = beforeText + spoilerSyntax + afterText;
+    setText(newText);
+    
+    // Position cursor after "spoiler content" and select it for easy replacement
+    const contentStart = selectionStart + `>! [${buttonText}] `.length;
+    const contentEnd = contentStart + 'spoiler content'.length;
+    setTimeout(() => {
+      textInputRef.current?.setNativeProps({
+        selection: { start: contentStart, end: contentEnd }
+      });
+    }, 10);
+    
+    setSpoilerModalVisible(false);
+    setSpoilerButtonText('');
+  };
+
+  const handleSelectionChange = (event: any) => {
+    const { start, end } = event.nativeEvent.selection;
+    setSelectionStart(start);
+    setSelectionEnd(end);
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView 
@@ -573,6 +667,7 @@ export default function ComposeScreen() {
 
           {/* Text input */}
           <TextInput
+            ref={textInputRef}
             style={[
               styles.textInput,
               {
@@ -583,6 +678,7 @@ export default function ComposeScreen() {
             ]}
             value={text}
             onChangeText={setText}
+            onSelectionChange={handleSelectionChange}
             placeholder="What's happening?"
             placeholderTextColor={colors.info}
             multiline
@@ -672,37 +768,71 @@ export default function ComposeScreen() {
 
           {/* Action buttons */}
           <View style={styles.actions}>
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: colors.inputBg }]}
-              onPress={handleAddImage}
-              disabled={uploading || images.length >= 10}
-            >
-              {uploading ? (
-                <ActivityIndicator size="small" color={colors.button} />
-              ) : (
-                <>
-                  <FontAwesome name="image" size={20} color={images.length >= 10 ? colors.info : colors.button} />
-                  {images.length > 0 && (
-                    <View style={[styles.imageBadge, { backgroundColor: colors.button }]}>
-                      <Text style={styles.imageBadgeText}>{images.length}</Text>
-                    </View>
-                  )}
-                </>
-              )}
-            </TouchableOpacity>
+            {/* Markdown formatting toolbar */}
+            <View style={styles.markdownToolbar}>
+              <TouchableOpacity
+                style={[styles.markdownButton, { backgroundColor: colors.inputBg }]}
+                onPress={handleBold}
+              >
+                <FontAwesome name="bold" size={16} color={colors.button} />
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.markdownButton, { backgroundColor: colors.inputBg }]}
+                onPress={handleItalic}
+              >
+                <FontAwesome name="italic" size={16} color={colors.button} />
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.markdownButton, { backgroundColor: colors.inputBg }]}
+                onPress={handleUnderline}
+              >
+                <FontAwesome name="underline" size={16} color={colors.button} />
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.markdownButton, { backgroundColor: colors.inputBg }]}
+                onPress={handleSpoiler}
+              >
+                <FontAwesome name="eye-slash" size={16} color={colors.button} />
+              </TouchableOpacity>
+            </View>
 
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: colors.inputBg, marginLeft: 12 }]}
-              onPress={handleOpenGifPicker}
-              disabled={gifs.length >= 5}
-            >
-              <Text style={{ fontSize: 18, color: gifs.length >= 5 ? colors.info : colors.button, fontWeight: 'bold' }}>GIF</Text>
-              {gifs.length > 0 && (
-                <View style={[styles.imageBadge, { backgroundColor: colors.button }]}>
-                  <Text style={styles.imageBadgeText}>{gifs.length}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
+            {/* Image and GIF buttons */}
+            <View style={styles.mediaButtons}>
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: colors.inputBg }]}
+                onPress={handleAddImage}
+                disabled={uploading || images.length >= 10}
+              >
+                {uploading ? (
+                  <ActivityIndicator size="small" color={colors.button} />
+                ) : (
+                  <>
+                    <FontAwesome name="image" size={20} color={images.length >= 10 ? colors.info : colors.button} />
+                    {images.length > 0 && (
+                      <View style={[styles.imageBadge, { backgroundColor: colors.button }]}>
+                        <Text style={styles.imageBadgeText}>{images.length}</Text>
+                      </View>
+                    )}
+                  </>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: colors.inputBg, marginLeft: 12 }]}
+                onPress={handleOpenGifPicker}
+                disabled={gifs.length >= 5}
+              >
+                <Text style={{ fontSize: 18, color: gifs.length >= 5 ? colors.info : colors.button, fontWeight: 'bold' }}>GIF</Text>
+                {gifs.length > 0 && (
+                  <View style={[styles.imageBadge, { backgroundColor: colors.button }]}>
+                    <Text style={styles.imageBadgeText}>{gifs.length}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
             
             {images.length >= 10 && (
               <Text style={[styles.limitText, { color: colors.info }]}>
@@ -848,6 +978,63 @@ export default function ComposeScreen() {
           </View>
         </View>
       </ReactNativeModal>
+
+      {/* Spoiler Modal */}
+      <Modal
+        visible={spoilerModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSpoilerModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.spoilerModal, { backgroundColor: colors.background, borderColor: colors.inputBorder }]}>
+            <Text style={[styles.spoilerModalTitle, { color: colors.text }]}>
+              Add Spoiler
+            </Text>
+            
+            <Text style={[styles.spoilerModalDescription, { color: colors.info }]}>
+              Enter the text that will appear on the spoiler button:
+            </Text>
+            
+            <TextInput
+              style={[
+                styles.spoilerInput,
+                {
+                  backgroundColor: colors.inputBg,
+                  color: colors.text,
+                  borderColor: colors.inputBorder,
+                }
+              ]}
+              value={spoilerButtonText}
+              onChangeText={setSpoilerButtonText}
+              placeholder="button text"
+              placeholderTextColor={colors.info}
+              maxLength={50}
+              autoFocus
+            />
+            
+            <View style={styles.spoilerModalButtons}>
+              <TouchableOpacity
+                style={[styles.spoilerModalButton, { backgroundColor: colors.inputBg }]}
+                onPress={() => setSpoilerModalVisible(false)}
+              >
+                <Text style={[styles.spoilerModalButtonText, { color: colors.text }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.spoilerModalButton, { backgroundColor: colors.button }]}
+                onPress={handleSpoilerConfirm}
+              >
+                <Text style={[styles.spoilerModalButtonText, { color: colors.buttonText }]}>
+                  Add Spoiler
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -971,9 +1158,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   actions: {
+    flexDirection: 'column',
+    marginBottom: 16,
+  },
+  markdownToolbar: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
+    gap: 8,
+  },
+  markdownButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  mediaButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   actionButton: {
     width: 44,
@@ -1061,5 +1266,52 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 6,
     backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  // Spoiler modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  spoilerModal: {
+    width: '85%',
+    borderRadius: 16,
+    padding: 24,
+    borderWidth: 1,
+  },
+  spoilerModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  spoilerModalDescription: {
+    fontSize: 14,
+    marginBottom: 16,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  spoilerInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 20,
+  },
+  spoilerModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  spoilerModalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  spoilerModalButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
