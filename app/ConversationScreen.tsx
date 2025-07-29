@@ -2588,6 +2588,7 @@ const ConversationScreen = () => {
         onBackButtonPress={editing ? undefined : handleCloseEditModal}
         style={{ justifyContent: 'flex-end', margin: 0 }}
         useNativeDriver
+        avoidKeyboard={true}
       >
         <View style={{ 
           backgroundColor: colors.background, 
