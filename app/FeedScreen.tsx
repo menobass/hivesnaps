@@ -18,7 +18,7 @@ import ImageView from 'react-native-image-viewing';
 import { calculateVoteValue } from '../utils/calculateVoteValue';
 import { getHivePriceUSD } from '../utils/getHivePrice';
 import ReactNativeModal from 'react-native-modal';
-import { createFeedScreenStyles } from './styles/FeedScreenStyles';
+import { createFeedScreenStyles } from '../styles/FeedScreenStyles';
 
 
 const twitterColors = {
@@ -1786,7 +1786,7 @@ const FeedScreen = () => {
                   onPress={handleSubmitNewSnap}
                   disabled={newSnapLoading || (!newSnapText.trim() && !newSnapImage && !newSnapGif)}
                 >
-                  <Text style={{
+                                   <Text style={{
                     color: (!newSnapText.trim() && !newSnapImage && !newSnapGif) ? colors.text : colors.buttonText,
                     fontWeight: '600'
                   }}>Submit</Text>

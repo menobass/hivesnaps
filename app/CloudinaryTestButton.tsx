@@ -3,7 +3,7 @@ import { View, Button, Alert } from 'react-native';
 import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
 
 // TestButton component for debugging Cloudinary upload
-export const CloudinaryTestButton = () => {
+const CloudinaryTestButton = () => {
   const handleTestUpload = async () => {
     console.log('Test button pressed. Starting dummy upload...');
     // Use a public image URL for testing
@@ -27,3 +27,5 @@ export const CloudinaryTestButton = () => {
     </View>
   );
 };
+
+export default CloudinaryTestButton;
