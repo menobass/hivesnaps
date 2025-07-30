@@ -11,6 +11,8 @@ import { WebView } from 'react-native-webview';
 import Markdown from 'react-native-markdown-display';
 import RenderHtml from 'react-native-render-html';
 import { Video, ResizeMode } from 'expo-av';
+import { convertSpoilerSyntax, type SpoilerData } from '../../utils/spoilerParser';
+import SpoilerText from './SpoilerText';
 
 const twitterColors = {
   light: {
@@ -331,6 +333,11 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
   if (rawImageUrls.length > 0) {
     textBody = removeRawImageUrls(textBody);
   }
+  
+  // Process spoiler syntax first, before other text processing
+  const spoilerData = convertSpoilerSyntax(textBody);
+  textBody = spoilerData.processedText;
+  
   // Add: linkify URLs first, then mentions, then hashtags (order matters!)
   textBody = linkifyUrls(textBody);
   textBody = linkifyMentions(textBody);
@@ -465,6 +472,13 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
           ))}
         </View>
       )}
+      
+      {/* Spoiler Components */}
+      {spoilerData.spoilers.map((spoiler: SpoilerData, index: number) => (
+        <SpoilerText key={`spoiler-${index}`} buttonText={spoiler.buttonText}>
+          {spoiler.content}
+        </SpoilerText>
+      ))}
       
       {/* Body */}
       {cleanTextBody.length > 0 && (() => {
