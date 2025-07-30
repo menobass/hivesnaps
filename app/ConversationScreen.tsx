@@ -32,7 +32,7 @@ import {
 } from '../utils/extractHivePostInfo';
 import { ContextHivePostPreviewRenderer } from '../components/ContextHivePostPreviewRenderer';
 import { HivePostPreview } from '../components/HivePostPreview';
-import { convertSpoilerSyntax, type SpoilerData } from '../utils/spoilerParser';
+import { convertSpoilerSyntax, SpoilerData } from '../utils/spoilerParser';
 import SpoilerText from './components/SpoilerText';
 
 // Utility to remove image markdown/html from text
