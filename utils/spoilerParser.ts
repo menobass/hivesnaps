@@ -15,7 +15,18 @@ export interface SpoilerParserResult {
 
 export function convertSpoilerSyntax(text: string): SpoilerParserResult {
   // Match spoiler pattern: >! [button_text] content (multiline support)
-  // Updated regex to handle multiline content better
+  // Regex breakdown:
+  // - >!\s*: Matches the spoiler syntax prefix ">!" followed by optional whitespace.
+  // - \[([^\]]+)\]: Captures the button text inside square brackets. [^\]]+ matches one or more characters that are not "]".
+  // - \s*: Matches optional whitespace after the button text.
+  // - ((?:(?!>!\s*\[)[\s\S])*?): Captures the spoiler content. 
+  //     - [\s\S] matches any character, including newlines (multiline support).
+  //     - (?!>!\s*\[) ensures that the content does not include another spoiler start sequence.
+  //     - The non-greedy quantifier *? ensures minimal matching up to the next spoiler or end of content.
+  // - (?=\n\n|>!\s*\[|$): A lookahead assertion that ensures the match ends at:
+  //     - A double newline (\n\n), indicating a paragraph break.
+  //     - Another spoiler start sequence (>! [).
+  //     - The end of the string ($).
   const spoilerRegex = />!\s*\[([^\]]+)\]\s*((?:(?!>!\s*\[)[\s\S])*?)(?=\n\n|>!\s*\[|$)/g;
   
   const spoilers: SpoilerData[] = [];
