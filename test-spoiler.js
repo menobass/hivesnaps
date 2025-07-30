@@ -5,14 +5,8 @@ const path = require('path');
 // Read the TypeScript file and eval it manually for testing
 const spoilerParserContent = fs.readFileSync(path.join(__dirname, 'utils/spoilerParser.ts'), 'utf8');
 
-// Extract the convertSpoilerSyntax function manually
-const convertSpoilerSyntax = (text) => {
-  const spoilerRegex = />!\s*\[([^\]]+)\]\s*([^\n\r]*)/g;
-  
-  return text.replace(spoilerRegex, (match, buttonText, content) => {
-    return `<spoiler data-button="${buttonText.trim()}">${content.trim()}</spoiler>`;
-  });
-};
+// Import the convertSpoilerSyntax function from utils
+const { convertSpoilerSyntax } = require('./utils/spoilerParser');
 
 // Test cases
 const tests = [
