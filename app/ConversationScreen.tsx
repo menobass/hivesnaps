@@ -32,6 +32,8 @@ import {
 } from '../utils/extractHivePostInfo';
 import { ContextHivePostPreviewRenderer } from '../components/ContextHivePostPreviewRenderer';
 import { HivePostPreview } from '../components/HivePostPreview';
+import { convertSpoilerSyntax, SpoilerData } from '../utils/spoilerParser';
+import SpoilerText from './components/SpoilerText';
 
 // Utility to remove image markdown/html from text
 function stripImageTags(text: string): string {
@@ -932,16 +934,29 @@ const ConversationScreen = () => {
   // Render a single reply (flat, not threaded yet)
   const renderReply = ({ item }: { item: ReplyData }) => {
     console.log('Reply payout:', item.payout, 'for', item.author, item.permlink);
+    
+    // Process spoiler syntax for replies
+    const spoilerData = convertSpoilerSyntax(item.body);
+    const processedBody = spoilerData.processedText;
+    
     return (
       <View style={[styles.replyBubble, { backgroundColor: colors.bubble }]}> 
         <Text style={[styles.replyAuthor, { color: colors.text }]}>{item.author}</Text>
+        
+        {/* Spoiler Components for replies */}
+        {spoilerData.spoilers.map((spoiler: SpoilerData, index: number) => (
+          <SpoilerText key={`reply-spoiler-${index}`} buttonText={spoiler.buttonText}>
+            {spoiler.content}
+          </SpoilerText>
+        ))}
+        
         <Markdown
           style={{
             body: { color: colors.text, fontSize: 14, marginBottom: 4 },
             link: { color: colors.icon },
           }}
         >
-          {item.body}
+          {processedBody}
         </Markdown>
         <View style={styles.replyMeta}>
           <FontAwesome name="arrow-up" size={16} color={colors.icon} />
@@ -1876,6 +1891,11 @@ const ConversationScreen = () => {
     }
     // Remove image tags from text body
     textBody = stripImageTags(textBody);
+    
+    // Process spoiler syntax first, before other text processing
+    const spoilerData = convertSpoilerSyntax(textBody);
+    textBody = spoilerData.processedText;
+    
     // Preserve paragraph spacing before processing
     textBody = preserveParagraphSpacing(textBody);
     // Process URLs first, then mentions, then hashtags (order matters!)
@@ -2138,6 +2158,13 @@ const ConversationScreen = () => {
         
         {/* Hive Post Previews */}
         <HivePostPreviewRenderer postUrls={hivePostUrls} />
+        
+        {/* Spoiler Components */}
+        {spoilerData.spoilers.map((spoiler: SpoilerData, index: number) => (
+          <SpoilerText key={`spoiler-${index}`} buttonText={spoiler.buttonText}>
+            {spoiler.content}
+          </SpoilerText>
+        ))}
         
         {/* Text Content */}
         {textBody.trim().length > 0 && (
