@@ -15,7 +15,7 @@ export function parseSpoilerBlocks(text) {
     const spoilerBlocks = [];
     // Regex to match: >! [button_text] content
     // The content continues until the end of the line or paragraph
-    const spoilerRegex = />!\s*\[([^\]]+)\]\s*([^\n\r]*)/g;
+    const spoilerRegex = />!\s*\[([^\]]+)\]\s*([\s\S]*?)(?=\n|$)/g;
     let match;
     while ((match = spoilerRegex.exec(text)) !== null) {
         const fullMatch = match[0];
