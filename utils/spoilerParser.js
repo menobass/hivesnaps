@@ -36,21 +36,23 @@ export function parseSpoilerBlocks(text) {
  */
 export function convertSpoilerSyntax(text) {
     const spoilerBlocks = parseSpoilerBlocks(text);
-    if (spoilerBlocks.length === 0) {
-        return text;
-    }
     let processedText = text;
-    // Process in reverse order to maintain correct indices
-    for (let i = spoilerBlocks.length - 1; i >= 0; i--) {
-        const block = spoilerBlocks[i];
-        // Replace with custom HTML-like syntax
-        const replacement = `<spoiler data-button="${block.buttonText}">${block.content}</spoiler>`;
-        processedText =
-            processedText.slice(0, block.startIndex) +
-                replacement +
-                processedText.slice(block.endIndex);
+    if (spoilerBlocks.length > 0) {
+        // Process in reverse order to maintain correct indices
+        for (let i = spoilerBlocks.length - 1; i >= 0; i--) {
+            const block = spoilerBlocks[i];
+            // Replace with custom HTML-like syntax
+            const replacement = `<spoiler data-button="${block.buttonText}">${block.content}</spoiler>`;
+            processedText =
+                processedText.slice(0, block.startIndex) +
+                    replacement +
+                    processedText.slice(block.endIndex);
+        }
     }
-    return processedText;
+    return {
+        spoilers: spoilerBlocks,
+        processedText,
+    };
 }
 /**
  * Test function to verify spoiler parsing
