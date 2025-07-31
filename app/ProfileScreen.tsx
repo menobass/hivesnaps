@@ -8,7 +8,6 @@ import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
-import { invalidateAvatarCache } from './FeedScreen';
 
 // Profile data interface
 interface ProfileData {
@@ -1052,9 +1051,6 @@ const ProfileScreen = () => {
       
       // Clear sensitive data immediately
       setActiveKeyInput('');
-      
-      // Invalidate avatar cache for this user across all feeds
-      invalidateAvatarCache(currentUsername);
       
       // Clear any cached avatar data and refresh profile
       setTimeout(async () => {

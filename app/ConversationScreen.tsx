@@ -23,7 +23,6 @@ import { Dimensions } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import { extractImageUrls } from '../utils/extractImageUrls';
 import ImageView from 'react-native-image-viewing';
-import genericAvatar from '../assets/images/generic-avatar.png';
 import { 
   extractHivePostUrls, 
   fetchMultipleHivePostInfos, 
@@ -1563,14 +1562,14 @@ const ConversationScreen = () => {
             >
               {reply.avatarUrl ? (
                 <ExpoImage
-                  source={reply.avatarUrl ? { uri: reply.avatarUrl } : genericAvatar}
+                  source={reply.avatarUrl ? { uri: reply.avatarUrl } : require('../assets/images/generic-avatar.png')}
                   style={styles.avatar}
                   contentFit="cover"
                   onError={() => {}}
                 />
               ) : (
                 <ExpoImage
-                  source={genericAvatar}
+                  source={require('../assets/images/generic-avatar.png')}
                   style={styles.avatar}
                   contentFit="cover"
                 />
@@ -1918,14 +1917,14 @@ const ConversationScreen = () => {
           >
             {snap.avatarUrl ? (
               <ExpoImage
-                source={snap.avatarUrl ? { uri: snap.avatarUrl } : genericAvatar}
+                source={snap.avatarUrl ? { uri: snap.avatarUrl } : require('../assets/images/generic-avatar.png')}
                 style={styles.avatar}
                 contentFit="cover"
                 onError={() => {}}
               />
             ) : (
               <ExpoImage
-                source={genericAvatar}
+                source={require('../assets/images/generic-avatar.png')}
                 style={styles.avatar}
                 contentFit="cover"
               />
