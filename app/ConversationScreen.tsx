@@ -1,12 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { SafeAreaView as SafeAreaViewRN } from 'react-native';
 import { SafeAreaView as SafeAreaViewSA, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, FlatList, useColorScheme, Image, Pressable, ScrollView, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, FlatList, useColorScheme, Image, Pressable, ScrollView, Linking, ActivityIndicator } from 'react-native';
+import { ConversationScreenStyles } from '../styles/ConversationScreenStyles';
 import { FontAwesome } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Client, PrivateKey } from '@hiveio/dhive';
 import Modal from 'react-native-modal';
 import Markdown from 'react-native-markdown-display';
 import { WebView } from 'react-native-webview';
@@ -35,310 +33,142 @@ import { HivePostPreview } from '../components/HivePostPreview';
 import { convertSpoilerSyntax, SpoilerData } from '../utils/spoilerParser';
 import SpoilerText from './components/SpoilerText';
 
-// Utility to remove image markdown/html from text
-function stripImageTags(text: string): string {
-  // Remove markdown images
-  let out = text.replace(/!\[[^\]]*\]\([^\)]+\)/g, '');
-  // Remove html <img ...>
-  out = out.replace(/<img[^>]+src=["'][^"'>]+["'][^>]*>/g, '');
-  return out;
-}
+// Custom hooks for business logic
+import { useUserAuth } from '../hooks/useUserAuth';
+import { useConversationData, SnapData, ReplyData } from '../hooks/useConversationData';
+import { useUpvote } from '../hooks/useUpvote';
+import { useHiveData } from '../hooks/useHiveData';
+import { useReply, ReplyTarget } from '../hooks/useReply';
+import { useEdit, EditTarget } from '../hooks/useEdit';
+import { useGifPicker, GifMode } from '../hooks/useGifPicker';
 
-// Placeholder Snap data type
-interface SnapData {
-  author: string;
-  avatarUrl?: string;
-  body: string;
-  created: string;
-  voteCount?: number;
-  replyCount?: number;
-  payout?: number;
-  permlink?: string;
-  hasUpvoted?: boolean;
-  active_votes?: any[]; // Add active_votes to store raw voting data
-  json_metadata?: string; // Add json_metadata for edit tracking
-  parent_author?: string; // Add parent info for navigation
-  parent_permlink?: string; // Add parent permlink for navigation
-}
-
-// Placeholder reply type
-interface ReplyData extends SnapData {
-  replies?: ReplyData[];
-  active_votes?: any[]; // Add active_votes to store raw voting data
-}
-
-const HIVE_NODES = [
-  'https://api.hive.blog',
-  'https://api.deathwing.me',
-  'https://api.openhive.network',
-];
-const client = new Client(HIVE_NODES);
-
-const ConversationScreen = () => {
+const ConversationScreenRefactored = () => {
   const colorScheme = useColorScheme() || 'light';
   const isDark = colorScheme === 'dark';
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  // Use Expo Router's useLocalSearchParams to get navigation params
+  // Get navigation params
   const params = useLocalSearchParams();
   const author = params.author as string | undefined;
   const permlink = params.permlink as string | undefined;
-  console.log('Expo Router params:', params); // Debug log
+
+  // Custom hooks for business logic
+  const { username: currentUsername } = useUserAuth();
+  
+  const {
+    snap,
+    replies,
+    loading,
+    error: conversationError,
+    refreshConversation,
+    checkForNewContent
+  } = useConversationData(author, permlink, currentUsername);
+
+  const {
+    hivePrice,
+    globalProps,
+    rewardFund
+  } = useHiveData();
+
+  const {
+    upvoteModalVisible,
+    upvoteTarget,
+    voteWeight,
+    voteValue,
+    upvoteLoading,
+    upvoteSuccess,
+    voteWeightLoading,
+    openUpvoteModal,
+    closeUpvoteModal,
+    setVoteWeight,
+    confirmUpvote,
+    updateSnapsOptimistically
+  } = useUpvote(currentUsername, globalProps, rewardFund, hivePrice);
+
+  // Content detection functions for polling
+  const [replySubmissionTime, setReplySubmissionTime] = useState<number | null>(null);
+  const [editSubmissionTime, setEditSubmissionTime] = useState<number | null>(null);
+
+  // Submission start callbacks
+  const handleReplySubmissionStart = useCallback(() => {
+    console.log(`Reply submission started at ${Date.now()}`);
+    setReplySubmissionTime(Date.now());
+  }, []);
+
+  const handleEditSubmissionStart = useCallback(() => {
+    console.log(`Edit submission started at ${Date.now()}`);
+    setEditSubmissionTime(Date.now());
+  }, []);
+
+  const {
+    replyModalVisible,
+    replyText,
+    replyImage,
+    replyGif,
+    replyTarget,
+    posting,
+    uploading,
+    processing: replyProcessing,
+    error: replyError,
+    openReplyModal,
+    closeReplyModal,
+    setReplyText,
+    setReplyImage,
+    setReplyGif,
+    submitReply,
+    addImage: addReplyImage,
+    addGif: addReplyGif
+  } = useReply(currentUsername, checkForNewContent, handleReplySubmissionStart);
+
+  const {
+    editModalVisible,
+    editText,
+    editImage,
+    editGif,
+    editTarget,
+    editing,
+    uploading: editUploading,
+    processing: editProcessing,
+    error: editError,
+    openEditModal,
+    closeEditModal,
+    setEditText,
+    setEditImage,
+    setEditGif,
+    submitEdit,
+    addImage: addEditImage,
+    addGif: addEditGif
+  } = useEdit(currentUsername, checkForNewContent, handleEditSubmissionStart);
+
+  const {
+    gifModalVisible,
+    gifSearchQuery,
+    gifResults,
+    gifLoading,
+    gifMode,
+    openGifPicker,
+    closeGifModal,
+    setGifSearchQuery,
+    searchGifs,
+    selectGif
+  } = useGifPicker();
+
+  // Local UI state
+  const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [modalImages, setModalImages] = useState<Array<{uri: string}>>([]);
+  const [modalImageIndex, setModalImageIndex] = useState(0);
+
+  // Error handling
   if (!author || !permlink) {
-    console.error('Missing navigation parameters: author and permlink');
     return (
-      <SafeAreaViewRN style={[styles.safeArea, { backgroundColor: isDark ? '#15202B' : '#fff' }]}> 
+      <SafeAreaViewRN style={[ConversationScreenStyles.safeArea, { backgroundColor: isDark ? '#15202B' : '#fff' }]}> 
         <View style={{ alignItems: 'center', marginTop: 40 }}>
           <Text style={{ color: isDark ? '#D7DBDC' : '#0F1419', fontSize: 16 }}>Error: Missing conversation parameters.</Text>
         </View>
       </SafeAreaViewRN>
     );
   }
-
-  const [snap, setSnap] = useState<SnapData | null>(null);
-  const [replies, setReplies] = useState<ReplyData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [replyImage, setReplyImage] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [replyModalVisible, setReplyModalVisible] = useState(false);
-  const [replyText, setReplyText] = useState('');
-  const [posting, setPosting] = useState(false);
-  const [postError, setPostError] = useState<string | null>(null);
-  // Track which reply (by author/permlink) is being replied to
-  const [replyTarget, setReplyTarget] = useState<{author: string, permlink: string} | null>(null);
-  const [currentUsername, setCurrentUsername] = useState<string | null>(null);
-  const [imageModalVisible, setImageModalVisible] = useState(false);
-  const [modalImageUrl, setModalImageUrl] = useState<string | null>(null);
-  const [modalImages, setModalImages] = useState<Array<{uri: string}>>([]);
-  const [modalImageIndex, setModalImageIndex] = useState(0);
-
-  // Edit modal state
-  const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editText, setEditText] = useState('');
-  const [editImage, setEditImage] = useState<string | null>(null);
-  const [editUploading, setEditUploading] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [editError, setEditError] = useState<string | null>(null);
-  const [editTarget, setEditTarget] = useState<{author: string, permlink: string, type: 'snap' | 'reply'} | null>(null);
-
-  // Upvote modal state
-  const [upvoteModalVisible, setUpvoteModalVisible] = useState(false);
-  const [upvoteTarget, setUpvoteTarget] = useState<{ author: string; permlink: string } | null>(null);
-  const { voteWeight, setVoteWeight, persistVoteWeight, loading: voteWeightLoading } = useVoteWeightMemory(100);
-  const [upvoteLoading, setUpvoteLoading] = useState(false);
-  const [upvoteSuccess, setUpvoteSuccess] = useState(false);
-  const [voteValue, setVoteValue] = useState<{ hbd: string, usd: string } | null>(null);
-  const [globalProps, setGlobalProps] = useState<any | null>(null);
-  const [rewardFund, setRewardFund] = useState<any | null>(null);
-  const [hivePrice, setHivePrice] = useState<number>(1);
-
-  // Hive post preview state
-  const [hivePostPreviews, setHivePostPreviews] = useState<HivePostInfo[]>([]);
-  const [loadingHivePosts, setLoadingHivePosts] = useState(false);
-
-  // GIF picker state
-  const [gifModalVisible, setGifModalVisible] = useState(false);
-  const [gifSearchQuery, setGifSearchQuery] = useState('');
-  const [gifResults, setGifResults] = useState<any[]>([]);
-  const [gifLoading, setGifLoading] = useState(false);
-  const [replyGif, setReplyGif] = useState<string | null>(null);
-  const [editGif, setEditGif] = useState<string | null>(null);
-  const [gifMode, setGifMode] = useState<'reply' | 'edit'>('reply');
-
-  // Fetch Hive global props, reward fund, and price on mount
-  React.useEffect(() => {
-    const fetchProps = async () => {
-      try {
-        const props = await client.database.getDynamicGlobalProperties();
-        setGlobalProps(props);
-        const fund = await client.database.call('get_reward_fund', ['post']);
-        setRewardFund(fund);
-      } catch (err) {
-        setGlobalProps(null);
-        setRewardFund(null);
-      }
-    };
-    fetchProps();
-    getHivePriceUSD().then(setHivePrice);
-  }, []);
-
-  // Update vote value estimate when modal opens or voteWeight changes
-  React.useEffect(() => {
-    const updateValue = async () => {
-      if (!currentUsername || !upvoteModalVisible) return;
-      try {
-        const accounts = await client.database.getAccounts([currentUsername]);
-        const accountObj = accounts && accounts[0] ? accounts[0] : null;
-        if (accountObj && globalProps && rewardFund) {
-          const calcValue = calculateVoteValue(accountObj, globalProps, rewardFund, voteWeight, hivePrice);
-          setVoteValue(calcValue);
-        } else {
-          setVoteValue(null);
-        }
-      } catch {
-        setVoteValue(null);
-      }
-    };
-    updateValue();
-  }, [voteWeight, upvoteModalVisible, currentUsername, globalProps, rewardFund, hivePrice]);
-
-  // Load user credentials on mount
-  React.useEffect(() => {
-    const loadCredentials = async () => {
-      try {
-        const storedUsername = await SecureStore.getItemAsync('hive_username');
-        setCurrentUsername(storedUsername);
-      } catch (e) {
-        console.error('Error loading credentials:', e);
-      }
-    };
-    loadCredentials();
-  }, []);
-
-  // In-memory avatar/profile cache for this session
-  const avatarProfileCache: Record<string, string | undefined> = {};
-
-  // Recursively fetch replies, ensuring each reply has full content (including payout info and avatar)
-  async function fetchRepliesTreeWithContent(author: string, permlink: string, depth = 0, maxDepth = 3): Promise<any[]> {
-    if (depth > maxDepth) return [];
-    // Fetch shallow replies
-    const res = await fetch('https://api.hive.blog', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        method: 'condenser_api.get_content_replies',
-        params: [author, permlink],
-        id: 1,
-      }),
-    });
-    const data = await res.json();
-    const shallowReplies = data.result || [];
-
-    // Batch fetch full content for all replies in parallel
-    const fullContentArr = await Promise.all(
-      shallowReplies.map((reply: { author: string; permlink: string }) =>
-        client.database.call('get_content', [reply.author, reply.permlink])
-          .catch(() => reply)
-      )
-    );
-
-    // Collect all unique authors for avatar batch fetch, skipping those already cached
-    const authorsToFetch = Array.from(new Set(fullContentArr.map(r => r.author))).filter(a => !(a in avatarProfileCache));
-    let accountsArr: any[] = [];
-    if (authorsToFetch.length > 0) {
-      try {
-        accountsArr = await client.database.call('get_accounts', [authorsToFetch]);
-      } catch (e) {
-        accountsArr = [];
-      }
-      // Update cache with fetched avatars
-      for (const acc of accountsArr) {
-        let meta = acc.posting_json_metadata;
-        if (!meta || meta === '{}') {
-          meta = acc.json_metadata;
-        }
-        if (meta) {
-          let profile;
-          try {
-            profile = JSON.parse(meta).profile;
-          } catch (e) {
-            profile = undefined;
-          }
-          if (profile && profile.profile_image) {
-            avatarProfileCache[acc.name] = profile.profile_image;
-          } else {
-            avatarProfileCache[acc.name] = undefined;
-          }
-        } else {
-          avatarProfileCache[acc.name] = undefined;
-        }
-      }
-    }
-
-    // Build replies with avatar and recurse
-    const fullReplies: ReplyData[] = await Promise.all(fullContentArr.map(async (fullReply) => {
-      const avatarUrl = avatarProfileCache[fullReply.author];
-      const payout = parseFloat(fullReply.pending_payout_value ? fullReply.pending_payout_value.replace(' HBD', '') : '0');
-      const childrenReplies = await fetchRepliesTreeWithContent(fullReply.author, fullReply.permlink, depth + 1, maxDepth);
-      return {
-        author: fullReply.author,
-        avatarUrl,
-        body: fullReply.body,
-        created: fullReply.created,
-        voteCount: fullReply.net_votes,
-        replyCount: fullReply.children,
-        payout,
-        permlink: fullReply.permlink,
-        active_votes: fullReply.active_votes, // Keep the raw active_votes data
-        json_metadata: fullReply.json_metadata, // Include metadata for edit tracking
-        replies: childrenReplies,
-      };
-    }));
-    return fullReplies;
-  }
-
-  // Fetch snap and replies (extracted for refresh)
-  const fetchSnapAndReplies = async () => {
-    setLoading(true);
-    try {
-      // Fetch the main post
-      const post = await client.database.call('get_content', [author, permlink]);
-      // Fetch avatar robustly from account profile
-      let avatarUrl: string | undefined = undefined;
-      try {
-        let meta;
-        const accounts = await client.database.call('get_accounts', [[post.author]]);
-        if (accounts && accounts[0]) {
-          meta = accounts[0].posting_json_metadata;
-          if (!meta || meta === '{}') {
-            meta = accounts[0].json_metadata;
-          }
-          if (meta) {
-            let profile;
-            try {
-              profile = JSON.parse(meta).profile;
-            } catch (e) {
-              profile = undefined;
-            }
-            if (profile && profile.profile_image) {
-              avatarUrl = profile.profile_image;
-            }
-          }
-        }
-      } catch (e) {
-        // Avatar fetch fail fallback
-      }
-      setSnap({
-        author: post.author,
-        avatarUrl,
-        body: post.body,
-        created: post.created,
-        voteCount: post.net_votes,
-        replyCount: post.children,
-        payout: parseFloat(post.pending_payout_value ? post.pending_payout_value.replace(' HBD', '') : '0'),
-        permlink: post.permlink,
-        active_votes: post.active_votes, // Keep the raw active_votes data
-        json_metadata: post.json_metadata, // Include metadata for edit tracking
-        parent_author: post.parent_author, // Include parent info for navigation
-        parent_permlink: post.parent_permlink, // Include parent permlink for navigation
-      });
-      // Fetch replies tree with full content (including payout info)
-      const tree = await fetchRepliesTreeWithContent(author, permlink);
-      setReplies(tree);
-    } catch (e) {
-      console.error('Error fetching snap and replies:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  React.useEffect(() => {
-    if (currentUsername) {
-      fetchSnapAndReplies();
-    }
-  }, [author, permlink, currentUsername]);
 
   const colors = {
     background: isDark ? '#15202B' : '#fff',
@@ -351,18 +181,17 @@ const ConversationScreen = () => {
     buttonInactive: isDark ? '#22303C' : '#E1E8ED',
   };
 
+  // Event handlers
   const handleRefresh = () => {
-    fetchSnapAndReplies();
+    refreshConversation();
   };
 
-  // Handle navigation to parent snap
   const handleGoToParentSnap = () => {
     if (!snap?.parent_author || !snap?.parent_permlink) {
       console.log('No parent snap available');
       return;
     }
     
-    // Navigate to parent snap conversation
     router.push({ 
       pathname: '/ConversationScreen', 
       params: { 
@@ -372,603 +201,119 @@ const ConversationScreen = () => {
     });
   };
 
-  // Helper function to check if current snap is a top-level snap (direct reply to container)
   const isTopLevelSnap = () => {
-    // A top-level snap has parent_author as 'peak.snaps' (the container account)
     return !snap?.parent_author || snap.parent_author === '' || snap.parent_author === 'peak.snaps';
   };
 
-  const handleAddImage = async (mode: 'reply' | 'edit' = 'reply') => {
-    try {
-      // Show action sheet to choose between camera and gallery
-      let pickType: 'camera' | 'gallery' | 'cancel';
-      
-      if (Platform.OS === 'ios') {
-        pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(resolve => {
-          import('react-native').then(({ ActionSheetIOS }) => {
-            ActionSheetIOS.showActionSheetWithOptions(
-              {
-                options: ['Cancel', 'Take Photo', 'Choose from Gallery'],
-                cancelButtonIndex: 0,
-              },
-              buttonIndex => {
-                if (buttonIndex === 0) resolve('cancel');
-                else if (buttonIndex === 1) resolve('camera');
-                else if (buttonIndex === 2) resolve('gallery');
-              }
-            );
-          });
-        });
-      } else {
-        pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(resolve => {
-          import('react-native').then(({ Alert }) => {
-            Alert.alert(
-              'Add Image',
-              'Choose an option',
-              [
-                { text: 'Take Photo', onPress: () => resolve('camera') },
-                { text: 'Choose from Gallery', onPress: () => resolve('gallery') },
-                { text: 'Cancel', style: 'cancel', onPress: () => resolve('cancel') },
-              ],
-              { cancelable: true }
-            );
-          });
-        });
-      }
-      
-      if (pickType === 'cancel') return;
-      
-      // Enhanced permission handling with better error messages
-      let result;
-      if (pickType === 'camera') {
-        // Check current permission status first
-        const currentPermission = await ImagePicker.getCameraPermissionsAsync();
-        let finalStatus = currentPermission.status;
-        
-        if (finalStatus !== 'granted') {
-          // Request permission if not granted
-          const requestPermission = await ImagePicker.requestCameraPermissionsAsync();
-          finalStatus = requestPermission.status;
-        }
-        
-        if (finalStatus !== 'granted') {
-          import('react-native').then(({ Alert }) => {
-            Alert.alert(
-              'Camera Permission Required',
-              'HiveSnaps needs camera access to take photos. Please enable camera permissions in your device settings.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Open Settings', onPress: () => {
-                  if (Platform.OS === 'ios') {
-                    import('expo-linking').then(({ default: Linking }) => {
-                      Linking.openURL('app-settings:');
-                    });
-                  } else {
-                    import('expo-intent-launcher').then(({ default: IntentLauncher }) => {
-                      IntentLauncher.startActivityAsync(
-                        IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS,
-                        { data: 'package:com.anonymous.hivesnaps' }
-                      );
-                    }).catch(() => {
-                      // Fallback for older Android versions
-                      import('expo-linking').then(({ default: Linking }) => {
-                        Linking.openURL('app-settings:');
-                      });
-                    });
-                  }
-                }}
-              ]
-            );
-          });
-          return;
-        }
-        
-        result = await ImagePicker.launchCameraAsync({
-          allowsEditing: true,
-          quality: 0.8,
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        });
-      } else {
-        // Media library permission handling
-        const currentPermission = await ImagePicker.getMediaLibraryPermissionsAsync();
-        let finalStatus = currentPermission.status;
-        
-        if (finalStatus !== 'granted') {
-          const requestPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          finalStatus = requestPermission.status;
-        }
-        
-        if (finalStatus !== 'granted') {
-          import('react-native').then(({ Alert }) => {
-            Alert.alert(
-              'Photo Library Permission Required',
-              'HiveSnaps needs photo library access to select images. Please enable photo permissions in your device settings.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Open Settings', onPress: () => {
-                  if (Platform.OS === 'ios') {
-                    import('expo-linking').then(({ default: Linking }) => {
-                      Linking.openURL('app-settings:');
-                    });
-                  } else {
-                    import('expo-intent-launcher').then(({ default: IntentLauncher }) => {
-                      IntentLauncher.startActivityAsync(
-                        IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS,
-                        { data: 'package:com.anonymous.hivesnaps' }
-                      );
-                    }).catch(() => {
-                      // Fallback for older Android versions
-                      import('expo-linking').then(({ default: Linking }) => {
-                        Linking.openURL('app-settings:');
-                      });
-                    });
-                  }
-                }}
-              ]
-            );
-          });
-          return;
-        }
-        
-        result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          quality: 0.8,
-        });
-      }
-      
-      if (!result || result.canceled || !result.assets || !result.assets[0]) return;
-      const asset = result.assets[0];
-      
-      // Set appropriate loading state based on mode
-      if (mode === 'edit') {
-        setEditUploading(true);
-      } else {
-        setUploading(true);
-      }
-      
-      try {
-        const fileToUpload = {
-          uri: asset.uri,
-          name: `${mode}-${Date.now()}.jpg`,
-          type: 'image/jpeg',
-        };
-        const cloudinaryUrl = await uploadImageToCloudinaryFixed(fileToUpload);
-        
-        // Set appropriate image state based on mode
-        if (mode === 'edit') {
-          setEditImage(cloudinaryUrl);
-        } else {
-          setReplyImage(cloudinaryUrl);
-        }
-      } catch (err) {
-        console.error('Image upload error:', err);
-        const errorMessage = err instanceof Error ? err.message : 'Unknown upload error';
-        import('react-native').then(({ Alert }) => {
-          Alert.alert(
-            'Upload Failed',
-            `Image upload failed: ${errorMessage}`,
-            [{ text: 'OK' }]
-          );
-        });
-      } finally {
-        if (mode === 'edit') {
-          setEditUploading(false);
-        } else {
-          setUploading(false);
-        }
-      }
-    } catch (err) {
-      console.error('Image picker error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      import('react-native').then(({ Alert }) => {
-        Alert.alert(
-          'Error',
-          `Failed to pick image: ${errorMessage}`,
-          [{ text: 'OK' }]
-        );
-      });
-      
-      if (mode === 'edit') {
-        setEditUploading(false);
-      } else {
-        setUploading(false);
-      }
-    }
+  const handleUpvotePress = ({ author, permlink }: { author: string; permlink: string }) => {
+    openUpvoteModal({ author, permlink });
   };
 
   const handleOpenReplyModal = (author: string, permlink: string) => {
-    setReplyTarget({ author, permlink });
-    setReplyModalVisible(true);
-  };
-  const handleCloseReplyModal = () => {
-    setReplyModalVisible(false);
-    setReplyText('');
-    setReplyImage(null);
-    setReplyGif(null);
-    setReplyTarget(null);
+    openReplyModal({ author, permlink });
   };
 
-  // GIF handlers
-  const handleOpenGifPicker = (mode: 'reply' | 'edit' = 'reply') => {
-    setGifMode(mode);
-    setGifModalVisible(true);
-    // Start with empty state - let user search for what they want
-    setGifResults([]);
-    setGifSearchQuery('');
-  };
-
-  const handleCloseGifModal = () => {
-    setGifModalVisible(false);
-    setGifSearchQuery('');
-    setGifResults([]);
-  };
-
-  const handleSearchGifs = async (query: string) => {
-    setGifLoading(true);
-    try {
-      const { searchGifs, getTrendingGifs } = await import('../utils/tenorApi');
-      const response = query.trim() 
-        ? await searchGifs(query, 20) 
-        : await getTrendingGifs(20);
-      setGifResults(response.results);
-    } catch (error) {
-      console.error('Error searching GIFs:', error);
-      setGifResults([]);
-    } finally {
-      setGifLoading(false);
-    }
-  };
-
-  const handleSelectGif = (gifUrl: string) => {
-    if (gifMode === 'edit') {
-      setEditGif(gifUrl);
-    } else {
-      setReplyGif(gifUrl);
-    }
-    handleCloseGifModal();
-  };
-
-  // Edit handlers
   const handleOpenEditModal = (content?: { author: string; permlink: string; body: string }, type: 'snap' | 'reply' = 'snap') => {
     if (type === 'snap') {
       if (!snap) return;
-      // Pre-populate with current snap content
-      const textBody = stripImageTags(snap.body);
-      setEditText(textBody);
-      setEditTarget({ author: snap.author, permlink: snap.permlink!, type: 'snap' });
+      openEditModal({ author: snap.author, permlink: snap.permlink!, type: 'snap' }, snap.body);
     } else {
-      // Reply editing
       if (!content) return;
-      const textBody = stripImageTags(content.body);
-      setEditText(textBody);
-      setEditTarget({ author: content.author, permlink: content.permlink, type: 'reply' });
-    }
-    setEditImage(null); // Keep it simple - no image editing for now
-    setEditModalVisible(true);
-  };
-
-  const handleCloseEditModal = () => {
-    setEditModalVisible(false);
-    setEditText('');
-    setEditImage(null);
-    setEditGif(null);
-    setEditError(null);
-    setEditTarget(null);
-  };
-
-  const handleSubmitEdit = async () => {
-    if (!editTarget || (!editText.trim() && !editImage && !editGif) || !currentUsername) return;
-    setEditing(true);
-    setEditError(null);
-    
-    try {
-      // Get posting key from secure storage
-      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
-      if (!postingKeyStr) {
-        throw new Error('No posting key found. Please log in again.');
-      }
-      const postingKey = PrivateKey.fromString(postingKeyStr);
-
-      let body = editText.trim();
-      if (editImage) {
-        body += `\n![image](${editImage})`;
-      }
-      if (editGif) {
-        body += `\n![gif](${editGif})`;
-      }
-
-      // Get the original post to preserve parent relationships
-      const originalPost = await client.database.call('get_content', [editTarget.author, editTarget.permlink]);
-      
-      // Parse existing metadata and add edited flag
-      let existingMetadata: any = {};
-      try {
-        if (originalPost.json_metadata) {
-          existingMetadata = JSON.parse(originalPost.json_metadata);
-        }
-      } catch (e) {
-        // Invalid JSON, start fresh
-      }
-
-      const json_metadata = {
-        ...existingMetadata,
-        app: 'hivesnaps/1.0',
-        format: 'markdown',
-        edited: true,
-        edit_timestamp: new Date().toISOString(),
-      };
-
-      if (editImage && !json_metadata.image) {
-        json_metadata.image = [editImage];
-      }
-      if (editGif) {
-        if (!json_metadata.image) json_metadata.image = [];
-        json_metadata.image.push(editGif);
-      }
-
-      // Edit the post/reply using same author/permlink with new content
-      await client.broadcast.comment({
-        parent_author: originalPost.parent_author, // Keep original parent
-        parent_permlink: originalPost.parent_permlink, // Keep original parent permlink
-        author: currentUsername,
-        permlink: editTarget.permlink,
-        title: originalPost.title || '', // Keep original title
-        body,
-        json_metadata: JSON.stringify(json_metadata),
-      }, postingKey);
-
-      // Update local state optimistically based on edit type
-      if (editTarget.type === 'snap') {
-        setSnap(prev => prev ? {
-          ...prev,
-          body,
-          json_metadata: JSON.stringify(json_metadata)
-        } : null);
-      } else {
-        // Update the specific reply in the replies tree
-        setReplies(prevReplies => 
-          updateReplyInTree(prevReplies, editTarget.author, editTarget.permlink, body, JSON.stringify(json_metadata))
-        );
-      }
-
-      setEditModalVisible(false);
-      setEditText('');
-      setEditImage(null);
-      setEditGif(null);
-      setEditing(false);
-      setEditTarget(null);
-
-      // Refresh after a delay to get updated content from blockchain
-      setTimeout(() => {
-        handleRefresh();
-      }, 3000);
-      
-    } catch (e: any) {
-      setEditError(e.message || 'Failed to edit post.');
-      setEditing(false);
+      openEditModal({ author: content.author, permlink: content.permlink, type: 'reply' }, content.body);
     }
   };
 
-  const handleSubmitReply = async () => {
-    if (!replyTarget || (!replyText.trim() && !replyImage && !replyGif) || !currentUsername) return;
-    setPosting(true);
-    setPostError(null);
-    try {
-      // Get posting key from secure storage
-      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
-      if (!postingKeyStr) {
-        throw new Error('No posting key found. Please log in again.');
-      }
-      const postingKey = PrivateKey.fromString(postingKeyStr);
-
-      let body = replyText.trim();
-      if (replyImage) {
-        body += `\n![image](${replyImage})`;
-      }
-      if (replyGif) {
-        body += `\n![gif](${replyGif})`;
-      }
-      const parent_author = replyTarget.author;
-      const parent_permlink = replyTarget.permlink;
-      const author = currentUsername;
-      
-      // Sanitize parent_author for use in permlink - remove invalid characters like dots and convert to lowercase
-      const sanitizedParentAuthor = parent_author.toLowerCase().replace(/[^a-z0-9-]/g, '');
-      const permlink = `re-${sanitizedParentAuthor}-${parent_permlink}-${Date.now()}`;
-      const json_metadata: any = {
-        app: 'hivesnaps/1.0',
-        format: 'markdown',
-        tags: ['hivesnaps', 'reply'],
-      };
-      if (replyImage) {
-        json_metadata.image = [replyImage];
-      }
-      if (replyGif) {
-        if (!json_metadata.image) json_metadata.image = [];
-        json_metadata.image.push(replyGif);
-      }
-      // Real posting to Hive blockchain
-      await client.broadcast.comment({
-        parent_author,
-        parent_permlink,
-        author,
-        permlink,
-        title: '',
-        body,
-        json_metadata: JSON.stringify(json_metadata),
-      }, postingKey);
-      
-      setReplyModalVisible(false);
-      setReplyText('');
-      setReplyImage(null);
-      setReplyGif(null);
-      setPosting(false);
-      setReplyTarget(null);
-      // Refresh after a delay to allow blockchain confirmation
-      setTimeout(() => {
-        handleRefresh();
-      }, 3000);
-    } catch (e: any) {
-      setPostError(e.message || 'Failed to post reply.');
-      setPosting(false);
-    }
-  };
-
-  // --- Upvote handlers ---
-  const handleUpvotePress = ({ author, permlink }: { author: string; permlink: string }) => {
-    setUpvoteTarget({ author, permlink });
-    setUpvoteModalVisible(true);
-  };
-
-  const handleUpvoteCancel = () => {
-    setUpvoteModalVisible(false);
-    setUpvoteTarget(null);
-    setVoteValue(null);
-    // Do not reset voteWeight, keep last used value
-  };
-
-  const handleUpvoteConfirm = async () => {
-    if (!upvoteTarget || !currentUsername) return;
-    setUpvoteLoading(true);
-    setUpvoteSuccess(false);
-    try {
-      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
-      if (!postingKeyStr) throw new Error('No posting key found. Please log in again.');
-      const postingKey = PrivateKey.fromString(postingKeyStr);
-      let weight = Math.round(voteWeight * 100);
-      if (weight > 10000) weight = 10000;
-      if (weight < 1) weight = 1;
-      await client.broadcast.vote(
-        {
-          voter: currentUsername,
-          author: upvoteTarget.author,
-          permlink: upvoteTarget.permlink,
-          weight,
-        },
-        postingKey
-      );
-      persistVoteWeight();
-      // Optimistically update UI - add payout calculation (use USD since app displays in dollars)
-      const estimatedValueIncrease = voteValue ? parseFloat(voteValue.usd) : 0;
-      
-      setSnap((prev) =>
-        prev && prev.author === upvoteTarget.author && prev.permlink === upvoteTarget.permlink
-          ? { 
-              ...prev, 
-              voteCount: (prev.voteCount || 0) + 1,
-              payout: (prev.payout || 0) + estimatedValueIncrease,
-              active_votes: [
-                ...(prev.active_votes || []),
-                { voter: currentUsername, percent: weight }
-              ]
-            }
-          : prev
-      );
-      setReplies((prevReplies) =>
-        prevReplies.map((reply: ReplyData) =>
-          updateReplyUpvoteOptimistic(reply, upvoteTarget, currentUsername, weight, estimatedValueIncrease)
-        )
-      );
-      setUpvoteLoading(false);
-      setUpvoteSuccess(true);
-      // Close modal without refresh - maintain scroll position!
-      setTimeout(() => {
-        setUpvoteModalVisible(false);
-        setUpvoteSuccess(false);
-        setUpvoteTarget(null);
-        setVoteValue(null);
-      }, 1500);
-    } catch (err) {
-      setUpvoteLoading(false);
-      setUpvoteSuccess(false);
-      const errorMsg = err instanceof Error ? err.message : JSON.stringify(err);
-      alert('Upvote failed: ' + errorMsg);
-    }
-  };
-
-  // Helper to optimistically update hasUpvoted for replies (recursive)
-  function updateReplyUpvoteOptimistic(reply: ReplyData, target: { author: string; permlink: string }, username: string, weight: number, estimatedValue: number = 0): ReplyData {
-    let updated = { ...reply };
-    if (reply.author === target.author && reply.permlink === target.permlink) {
-      updated.voteCount = (reply.voteCount || 0) + 1;
-      updated.payout = (reply.payout || 0) + estimatedValue;
-      updated.active_votes = [
-        ...(reply.active_votes || []),
-        { voter: username, percent: weight }
-      ];
-    }
-    if (reply.replies && reply.replies.length > 0) {
-      updated.replies = reply.replies.map((r) => updateReplyUpvoteOptimistic(r, target, username, weight, estimatedValue));
-    }
-    return updated;
-  }
-
-  // Helper to update a reply in the nested tree structure
-  function updateReplyInTree(replies: ReplyData[], targetAuthor: string, targetPermlink: string, newBody: string, newMetadata: string): ReplyData[] {
-    return replies.map(reply => {
-      if (reply.author === targetAuthor && reply.permlink === targetPermlink) {
-        return {
-          ...reply,
-          body: newBody,
-          json_metadata: newMetadata
-        };
-      }
-      if (reply.replies && reply.replies.length > 0) {
-        return {
-          ...reply,
-          replies: updateReplyInTree(reply.replies, targetAuthor, targetPermlink, newBody, newMetadata)
-        };
-      }
-      return reply;
-    });
-  }
-
-  // Image modal handler
   const handleImagePress = (imageUrl: string) => {
     setModalImages([{ uri: imageUrl }]);
     setModalImageIndex(0);
     setImageModalVisible(true);
   };
 
-  // Render a single reply (flat, not threaded yet)
-  const renderReply = ({ item }: { item: ReplyData }) => {
-    console.log('Reply payout:', item.payout, 'for', item.author, item.permlink);
-    
-    // Process spoiler syntax for replies
-    const spoilerData = convertSpoilerSyntax(item.body);
-    const processedBody = spoilerData.processedText;
-    
-    return (
-      <View style={[styles.replyBubble, { backgroundColor: colors.bubble }]}> 
-        <Text style={[styles.replyAuthor, { color: colors.text }]}>{item.author}</Text>
-        
-        {/* Spoiler Components for replies */}
-        {spoilerData.spoilers.map((spoiler: SpoilerData, index: number) => (
-          <SpoilerText key={`reply-spoiler-${index}`} buttonText={spoiler.buttonText}>
-            {spoiler.content}
-          </SpoilerText>
-        ))}
-        
-        <Markdown
-          style={{
-            body: { color: colors.text, fontSize: 14, marginBottom: 4 },
-            link: { color: colors.icon },
-          }}
-        >
-          {processedBody}
-        </Markdown>
-        <View style={styles.replyMeta}>
-          <FontAwesome name="arrow-up" size={16} color={colors.icon} />
-          <Text style={[styles.replyMetaText, { color: colors.text }]}>{item.voteCount || 0}</Text>
-          <FontAwesome name="comment-o" size={16} color={colors.icon} style={{ marginLeft: 12 }} />
-          <Text style={[styles.replyMetaText, { color: colors.payout, marginLeft: 12 }]}>{item.payout !== undefined ? `$${item.payout.toFixed(2)}` : ''}</Text>
-        </View>
-      </View>
-    );
+  const handleOpenGifPicker = (mode: GifMode) => {
+    openGifPicker(mode);
   };
 
-  // Helper: Render mp4 video using expo-av Video
+  const handleSelectGif = (gifUrl: string) => {
+    if (gifMode === 'edit') {
+      addEditGif(gifUrl);
+    } else {
+      addReplyGif(gifUrl);
+    }
+    closeGifModal();
+  };
+
+  // Utility functions (simplified versions)
+  const stripImageTags = (text: string): string => {
+    let out = text.replace(/!\[[^\]]*\]\([^\)]+\)/g, '');
+    out = out.replace(/<img[^>]+src=["'][^"'>]+["'][^>]*>/g, '');
+    return out;
+  };
+
+  const preserveParagraphSpacing = (text: string): string => {
+    return text
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .replace(/\n\n+/g, '\n\n')
+      .replace(/\n\n/g, '\n\n');
+  };
+
+  const linkifyUrls = (text: string): string => {
+    return text.replace(/(https?:\/\/[\w.-]+(?:\/[\w\-./?%&=+#@]*)?)/gi, (url) => {
+      if (/\]\([^)]+\)$/.test(url) || /href=/.test(url)) return url;
+      
+      const youtubeMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+      const threeSpeakMatch = url.match(/https:\/\/3speak\.tv\/watch\?v=([^\/\s]+)\/([a-zA-Z0-9_-]+)/);
+      const ipfsMatch = url.match(/ipfs\/([A-Za-z0-9]+)/);
+      const mp4Match = url.match(/\.mp4($|\?)/i);
+      const twitterMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(twitter\.com|x\.com)\/([a-zA-Z0-9_]+)\/status\/(\d+)/i);
+      
+      if (youtubeMatch || threeSpeakMatch || ipfsMatch || mp4Match || twitterMatch) {
+        return url;
+      }
+      
+      return `[${url}](${url})`;
+    });
+  };
+
+  const linkifyMentions = (text: string): string => {
+    return text.replace(/(^|[^\w/@])@([a-z0-9\-\.]{3,16})(?![a-z0-9\-\.])/gi, (match, pre, username, offset, string) => {
+      const beforeMatch = string.substring(0, offset);
+      const afterMatch = string.substring(offset + match.length);
+      
+      const openBrackets = (beforeMatch.match(/\[/g) || []).length;
+      const closeBrackets = (beforeMatch.match(/\]/g) || []).length;
+      const isInsideMarkdownLink = openBrackets > closeBrackets && afterMatch.includes('](');
+      
+      if (isInsideMarkdownLink) {
+        return match;
+      }
+      
+      return `${pre}[**@${username}**](profile://${username})`;
+    });
+  };
+
+  const linkifyHashtags = (text: string): string => {
+    return text.replace(/(^|[^\w/#])#(\w+)(?![a-z0-9\-\.])/gi, (match, pre, hashtag, offset, string) => {
+      const beforeMatch = string.substring(0, offset);
+      const afterMatch = string.substring(offset + match.length);
+      
+      const openBrackets = (beforeMatch.match(/\[/g) || []).length;
+      const closeBrackets = (beforeMatch.match(/\]/g) || []).length;
+      const isInsideMarkdownLink = openBrackets > closeBrackets && afterMatch.includes('](');
+      
+      if (isInsideMarkdownLink) {
+        return match;
+      }
+      
+      return `${pre}[**#${hashtag}**](hashtag://${hashtag})`;
+    });
+  };
+
+  const containsHtml = (str: string): boolean => {
+    return /<([a-z][\s\S]*?)>/i.test(str);
+  };
+
+  // Render functions (simplified)
   const renderMp4Video = (uri: string, key?: string | number) => (
     <View key={key || uri} style={{ width: '100%', aspectRatio: 16 / 9, marginVertical: 10, borderRadius: 12, overflow: 'hidden', backgroundColor: isDark ? '#222' : '#eee' }}>
       <Video
@@ -982,141 +327,18 @@ const ConversationScreen = () => {
     </View>
   );
 
-  // Utility to remove all video URLs from text (updated for multiple platforms)
-  function removeAllVideoUrls(text: string): string {
-    return removeVideoUrls(text);
-  }
-
-  // Utility to extract Twitter/X URLs from text
-  function extractTwitterUrl(text: string): string | null {
-    console.log('🔍 extractTwitterUrl called with text:', text.substring(0, 200));
-    const twitterMatch = text.match(/(?:https?:\/\/)?(?:www\.)?(twitter\.com|x\.com)\/([a-zA-Z0-9_]+)\/status\/(\d+)/i);
-    console.log('🔍 Twitter regex match result:', twitterMatch);
-    const result = twitterMatch ? twitterMatch[0] : null;
-    console.log('🔍 Returning Twitter URL:', result);
-    return result;
-  }
-
-  // Utility to remove all embed URLs (videos and social media) from text
-  function removeAllEmbedUrls(text: string): string {
-    return removeEmbedUrls(text);
-  }
-
-  // Utility to preserve paragraph spacing in text
-  function preserveParagraphSpacing(text: string): string {
-    // Normalize line endings and preserve double line breaks as paragraph breaks
-    return text
-      .replace(/\r\n/g, '\n') // Normalize Windows line endings
-      .replace(/\r/g, '\n')   // Normalize Mac line endings
-      .replace(/\n\n+/g, '\n\n') // Normalize multiple line breaks to double
-      .replace(/\n\n/g, '\n\n'); // Ensure paragraph breaks are preserved
-  }
-
-  // Utility: Preprocess raw URLs to clickable markdown links (if not already linked)
-  function linkifyUrls(text: string): string {
-    // Regex for URLs (http/https) - includes @ character for Hive frontend URLs
-    return text.replace(/(https?:\/\/[\w.-]+(?:\/[\w\-./?%&=+#@]*)?)/gi, (url) => {
-      // If already inside a markdown or html link, skip
-      if (/\]\([^)]+\)$/.test(url) || /href=/.test(url)) return url;
-      
-      // Skip URLs that should be handled as embedded media (YouTube, 3Speak, IPFS, MP4, Twitter/X)
-      const youtubeMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-      const threeSpeakMatch = url.match(/https:\/\/3speak\.tv\/watch\?v=([^\/\s]+)\/([a-zA-Z0-9_-]+)/);
-      const ipfsMatch = url.match(/ipfs\/([A-Za-z0-9]+)/);
-      const mp4Match = url.match(/\.mp4($|\?)/i);
-      const twitterMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(twitter\.com|x\.com)\/([a-zA-Z0-9_]+)\/status\/(\d+)/i);
-      
-      if (youtubeMatch || threeSpeakMatch || ipfsMatch || mp4Match || twitterMatch) {
-        return url; // Don't linkify, let markdown rules handle embedding
-      }
-      
-      // Use full URL as display text (no shortening in conversation view)
-      return `[${url}](${url})`;
-    });
-  }
-
-  // Utility: Preprocess @username mentions to clickable profile links
-  function linkifyMentions(text: string): string {
-    // Only match @username if not preceded by a '/' or inside a markdown link
-    // Hive usernames: 3-16 chars, a-z, 0-9, dash, dot (no @ in username)
-    // Avoid emails and already-linked mentions
-    return text.replace(/(^|[^\w/@])@([a-z0-9\-\.]{3,16})(?![a-z0-9\-\.])/gi, (match, pre, username, offset, string) => {
-      // Don't process if we're inside a markdown link [text](url)
-      const beforeMatch = string.substring(0, offset);
-      const afterMatch = string.substring(offset + match.length);
-      
-      // Check if we're inside a markdown link by looking for unmatched brackets
-      const openBrackets = (beforeMatch.match(/\[/g) || []).length;
-      const closeBrackets = (beforeMatch.match(/\]/g) || []).length;
-      const isInsideMarkdownLink = openBrackets > closeBrackets && afterMatch.includes('](');
-      
-      if (isInsideMarkdownLink) {
-        return match; // Don't modify if inside a markdown link
-      }
-      
-      return `${pre}[**@${username}**](profile://${username})`;
-    });
-  }
-
-  // Utility: Preprocess #hashtags to clickable links
-  function linkifyHashtags(text: string): string {
-    // Match hashtags (# followed by alphanumeric characters and underscores)
-    // Avoid matching hashtags that are already inside markdown links
-    return text.replace(/(^|[^\w/#])#(\w+)(?![a-z0-9\-\.])/gi, (match, pre, hashtag, offset, string) => {
-      // Don't process if we're inside a markdown link [text](url)
-      const beforeMatch = string.substring(0, offset);
-      const afterMatch = string.substring(offset + match.length);
-      
-      // Check if we're inside a markdown link by looking for unmatched brackets
-      const openBrackets = (beforeMatch.match(/\[/g) || []).length;
-      const closeBrackets = (beforeMatch.match(/\]/g) || []).length;
-      const isInsideMarkdownLink = openBrackets > closeBrackets && afterMatch.includes('](');
-      
-      if (isInsideMarkdownLink) {
-        return match; // Don't modify if inside a markdown link
-      }
-      
-      return `${pre}[**#${hashtag}**](hashtag://${hashtag})`;
-    });
-  }
-
-  // Process Hive post URLs for preview rendering
-  const processHivePostUrls = React.useCallback(async (text: string): Promise<HivePostInfo[]> => {
-    const hiveUrls = extractHivePostUrls(text);
-    if (hiveUrls.length === 0) return [];
-    
-    try {
-      setLoadingHivePosts(true);
-      const postInfos = await fetchMultipleHivePostInfos(hiveUrls);
-      return postInfos;
-    } catch (error) {
-      console.error('Error processing Hive post URLs:', error);
-      return [];
-    } finally {
-      setLoadingHivePosts(false);
-    }
-  }, []);
-
-  // Custom markdown rules with 'any' types to silence TS warnings
+  // Custom markdown rules (simplified)
   const markdownRules = {
-    image: (
-      node: any,
-      children: any,
-      parent: any,
-      styles: any
-    ) => {
+    image: (node: any, children: any, parent: any, styles: any) => {
       const { src, alt } = node.attributes;
       const uniqueKey = `${src || alt}-${Math.random().toString(36).substr(2, 9)}`;
       return (
-        <Pressable
-          key={uniqueKey}
-          onPress={() => handleImagePress(src)}
-        >
+        <Pressable key={uniqueKey} onPress={() => handleImagePress(src)}>
           <Image
             source={{ uri: src }}
             style={{
               width: '100%',
-              aspectRatio: 1.2, // or 1.5 for landscape, adjust as needed
+              aspectRatio: 1.2,
               maxHeight: 340,
               borderRadius: 14,
               marginVertical: 10,
@@ -1129,94 +351,9 @@ const ConversationScreen = () => {
         </Pressable>
       );
     },
-    video: (
-      node: any,
-      children: any,
-      parent: any,
-      styles: any
-    ) => {
-      // Handle <video src="...mp4"> or <video><source src="...mp4"></video>
-      let src = node.attributes?.src;
-      if (!src && node.children && node.children.length > 0) {
-        const sourceNode = node.children.find((c: any) => c.name === 'source');
-        if (sourceNode) src = sourceNode.attributes?.src;
-      }
-      if (src && src.endsWith('.mp4')) {
-        return renderMp4Video(src);
-      }
-      return null;
-    },
-    html: (
-      node: any,
-      children: any,
-      parent: any,
-      styles: any
-    ) => {
-      // Handle <video> tags for mp4
-      const htmlContent = node.content || '';
-      const videoTagMatch = htmlContent.match(/<video[^>]*src=["']([^"']+\.mp4)["'][^>]*>(.*?)<\/video>/i);
-      if (videoTagMatch) {
-        const mp4Url = videoTagMatch[1];
-        return renderMp4Video(mp4Url);
-      }
-      // Handle iframe tags for IPFS videos and other embedded content
-      const htmlContent2 = node.content || '';
-      
-      // Handle 3Speak iframe embeds
-      const threeSpeakIframeMatch = htmlContent2.match(/<iframe[^>]+src=["']https:\/\/3speak\.tv\/embed\?v=([^\/\s"']+)\/([a-zA-Z0-9_-]+)["'][^>]*>/i);
-      if (threeSpeakIframeMatch) {
-        const username = threeSpeakIframeMatch[1];
-        const videoId = threeSpeakIframeMatch[2];
-        const uniqueKey = `3speak-${username}-${videoId}-${Math.random().toString(36).substr(2, 9)}`;
-        return (
-          <View key={uniqueKey} style={{ width: '100%', aspectRatio: 16/9, borderRadius: 12, overflow: 'hidden', position: 'relative', marginVertical: 10 }}>
-            <WebView
-              source={{ uri: `https://3speak.tv/embed?v=${username}/${videoId}&autoplay=0` }}
-              style={{ flex: 1, backgroundColor: '#000' }}
-              allowsFullscreenVideo
-              javaScriptEnabled
-              domStorageEnabled
-              mediaPlaybackRequiresUserAction={true}
-              allowsInlineMediaPlayback={true}
-            />
-            {/* Video type indicator */}
-            <View style={{ 
-              position: 'absolute', 
-              top: 8, 
-              right: 8, 
-              backgroundColor: 'rgba(0,0,0,0.7)', 
-              paddingHorizontal: 6, 
-              paddingVertical: 2, 
-              borderRadius: 4 
-            }}>
-              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>3SPEAK</Text>
-            </View>
-          </View>
-        );
-      }
-      
-      const iframeMatch = htmlContent2.match(/<iframe[^>]+src=["']([^"']*ipfs[^"']*\/ipfs\/([A-Za-z0-9]+))[^"']*["'][^>]*>/i);
-      
-      if (iframeMatch) {
-        const ipfsUrl = iframeMatch[1];
-        return (
-          <View key={ipfsUrl} style={{ marginVertical: 10 }}>
-            <IPFSVideoPlayer ipfsUrl={ipfsUrl} isDark={isDark} />
-          </View>
-        );
-      }
-      
-      // Default HTML rendering (let markdown handle it)
-      return null;
-    },
-    link: (
-      node: any,
-      children: any,
-      parent: any,
-      styles: any
-    ) => {
+    link: (node: any, children: any, parent: any, styles: any) => {
       const { href } = node.attributes;
-      // Handle profile:// links for mentions
+      
       if (href && href.startsWith('profile://')) {
         const username = href.replace('profile://', '');
         const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
@@ -1232,7 +369,7 @@ const ConversationScreen = () => {
           </Text>
         );
       }
-      // Handle hashtag:// links for hashtags
+      
       if (href && href.startsWith('hashtag://')) {
         const tag = href.replace('hashtag://', '');
         const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
@@ -1248,254 +385,10 @@ const ConversationScreen = () => {
           </Text>
         );
       }
-      // Enhanced video link detection (supports YouTube, 3speak, IPFS, mp4)
-      const youtubeMatch = href && href.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-      const threeSpeakMatch = href && href.match(/https:\/\/3speak\.tv\/watch\?v=([^\/\s]+)\/([a-zA-Z0-9_-]+)/);
-      const ipfsMatch = href && href.match(/ipfs\/([A-Za-z0-9]+)/);
-      const mp4Match = href && href.match(/\.mp4($|\?)/i);
       
-      // Twitter/X post detection - matches various Twitter/X URL formats
-      const twitterMatch = href && href.match(/(?:https?:\/\/)?(?:www\.)?(twitter\.com|x\.com)\/([a-zA-Z0-9_]+)\/status\/(\d+)/i);
-
-      if (youtubeMatch) {
-        const videoId = youtubeMatch[1];
-        const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
-        return (
-          <View key={uniqueKey} style={{ width: '100%', aspectRatio: 16 / 9, marginVertical: 10, borderRadius: 10, overflow: 'hidden', backgroundColor: isDark ? '#222' : '#eee', position: 'relative' }}>
-            <WebView
-              source={{ uri: `https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0&modestbranding=1` }}
-              style={{ flex: 1 }}
-              allowsFullscreenVideo
-              javaScriptEnabled
-              domStorageEnabled
-              mediaPlaybackRequiresUserAction={true}
-              allowsInlineMediaPlayback={true}
-              originWhitelist={['*']}
-            />
-            <View style={{ 
-              position: 'absolute', 
-              top: 8, 
-              right: 8, 
-              backgroundColor: 'rgba(0,0,0,0.7)', 
-              paddingHorizontal: 6, 
-              paddingVertical: 2, 
-              borderRadius: 4 
-            }}>
-              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>YOUTUBE</Text>
-            </View>
-          </View>
-        );
-      }
-      
-      if (threeSpeakMatch) {
-        const username = threeSpeakMatch[1];
-        const videoId = threeSpeakMatch[2];
-        const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
-        return (
-          <View key={uniqueKey} style={{ width: '100%', aspectRatio: 16 / 9, marginVertical: 10, borderRadius: 10, overflow: 'hidden', backgroundColor: isDark ? '#222' : '#eee', position: 'relative' }}>
-            <WebView
-              source={{ uri: `https://3speak.tv/embed?v=${username}/${videoId}&autoplay=0` }}
-              style={{ flex: 1 }}
-              allowsFullscreenVideo
-              javaScriptEnabled
-              domStorageEnabled
-              mediaPlaybackRequiresUserAction={true}
-              allowsInlineMediaPlayback={true}
-              originWhitelist={['*']}
-            />
-            <View style={{ 
-              position: 'absolute', 
-              top: 8, 
-              right: 8, 
-              backgroundColor: 'rgba(0,0,0,0.7)', 
-              paddingHorizontal: 6, 
-              paddingVertical: 2, 
-              borderRadius: 4 
-            }}>
-              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>3SPEAK</Text>
-            </View>
-          </View>
-        );
-      }
-      
-      if (twitterMatch) {
-        const domain = twitterMatch[1]; // twitter.com or x.com
-        const username = twitterMatch[2];
-        const tweetId = twitterMatch[3];
-        const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
-        
-        return (
-          <View key={uniqueKey} style={{ 
-            width: '100%', 
-            minHeight: 400, 
-            maxHeight: 600, 
-            marginVertical: 10, 
-            borderRadius: 12, 
-            overflow: 'hidden', 
-            backgroundColor: isDark ? '#222' : '#eee', 
-            position: 'relative' 
-          }}>
-            <WebView
-              source={{ 
-                html: `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                  <meta charset="utf-8">
-                  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-                  <style>
-                    * {
-                      margin: 0;
-                      padding: 0;
-                      box-sizing: border-box;
-                    }
-                    html, body {
-                      height: 100%;
-                      background-color: ${isDark ? '#222' : '#fff'};
-                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-                    }
-                    body {
-                      padding: 10px;
-                      display: flex;
-                      flex-direction: column;
-                      justify-content: flex-start;
-                      align-items: center;
-                    }
-                    .loading {
-                      text-align: center;
-                      padding: 40px 20px;
-                      color: ${isDark ? '#D7DBDC' : '#0F1419'};
-                      font-size: 14px;
-                    }
-                    .loading-emoji {
-                      font-size: 28px;
-                      margin-bottom: 10px;
-                      display: block;
-                    }
-                    .twitter-tweet-rendered {
-                      margin: 10px auto !important;
-                      max-width: 100% !important;
-                    }
-                    .error {
-                      text-align: center;
-                      padding: 40px 20px;
-                      color: ${isDark ? '#ff6b6b' : '#e74c3c'};
-                      font-size: 14px;
-                    }
-                  </style>
-                </head>
-                <body>
-                  <div class="loading" id="loading">
-                    <span class="loading-emoji">🐦</span>
-                    <div>Loading ${domain === 'x.com' ? 'X' : 'Twitter'} post...</div>
-                  </div>
-                  
-                  <div id="error" class="error" style="display: none;">
-                    <span class="loading-emoji">❌</span>
-                    <div>Failed to load tweet</div>
-                  </div>
-
-                  <blockquote class="twitter-tweet" data-lang="en" data-theme="${isDark ? 'dark' : 'light'}" data-dnt="true">
-                    <a href="${href}" style="color: #1DA1F2; text-decoration: none;">
-                      <div style="text-align: center; padding: 20px;">
-                        <div style="font-size: 16px; margin-bottom: 8px;">🐦</div>
-                        <div>Tap to load tweet</div>
-                      </div>
-                    </a>
-                  </blockquote>
-
-                  <script>
-                    // Timeout handler
-                    let loadTimeout = setTimeout(() => {
-                      document.getElementById('loading').style.display = 'none';
-                      document.getElementById('error').style.display = 'block';
-                      console.log('Tweet loading timed out');
-                    }, 10000);
-
-                    // Twitter widget loader with error handling
-                    (function(d, s, id) {
-                      var js, fjs = d.getElementsByTagName(s)[0];
-                      if (d.getElementById(id)) return;
-                      js = d.createElement(s); js.id = id;
-                      js.onload = function() {
-                        console.log('Twitter widgets script loaded');
-                        if (window.twttr && window.twttr.widgets) {
-                          window.twttr.widgets.load().then(function() {
-                            console.log('Twitter widgets rendered');
-                            clearTimeout(loadTimeout);
-                            document.getElementById('loading').style.display = 'none';
-                          }).catch(function(error) {
-                            console.log('Twitter widgets error:', error);
-                            clearTimeout(loadTimeout);
-                            document.getElementById('loading').style.display = 'none';
-                            document.getElementById('error').style.display = 'block';
-                          });
-                        }
-                      };
-                      js.onerror = function() {
-                        console.log('Failed to load Twitter widgets script');
-                        clearTimeout(loadTimeout);
-                        document.getElementById('loading').style.display = 'none';
-                        document.getElementById('error').style.display = 'block';
-                      };
-                      js.src = 'https://platform.twitter.com/widgets.js';
-                      js.charset = 'utf-8';
-                      js.async = true;
-                      fjs.parentNode.insertBefore(js, fjs);
-                    }(document, 'script', 'twitter-wjs'));
-                  </script>
-                </body>
-                </html>
-                `
-              }}
-              style={{ flex: 1 }}
-              javaScriptEnabled={true}
-              domStorageEnabled={true}
-              originWhitelist={['*']}
-              allowsLinkPreview={false}
-              showsVerticalScrollIndicator={false}
-              showsHorizontalScrollIndicator={false}
-              bounces={false}
-              scrollEnabled={true}
-              startInLoadingState={false}
-              onLoadStart={() => console.log('WebView loading started')}
-              onLoad={() => console.log('WebView loaded')}
-              onError={(error) => console.log('WebView error:', error)}
-              onHttpError={(error) => console.log('WebView HTTP error:', error)}
-            />
-            <View style={{ 
-              position: 'absolute', 
-              top: 8, 
-              right: 8, 
-              backgroundColor: 'rgba(0,0,0,0.7)', 
-              paddingHorizontal: 6, 
-              paddingVertical: 2, 
-              borderRadius: 4 
-            }}>
-              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
-                {domain === 'x.com' ? 'X' : 'TWITTER'}
-              </Text>
-            </View>
-          </View>
-        );
-      }
-      
-      if (ipfsMatch) {
-        const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
-        return (
-          <View key={uniqueKey} style={{ marginVertical: 10 }}>
-            <IPFSVideoPlayer ipfsUrl={href} isDark={isDark} />
-          </View>
-        );
-      }
-      if (mp4Match) {
-        return renderMp4Video(href, href);
-      }
-      // Default link rendering
       const uniqueKey = href ? `${href}-${Math.random().toString(36).substr(2, 9)}` : Math.random().toString(36).substr(2, 9);
       return (
         <Text key={uniqueKey} style={[{ color: colors.icon, textDecorationLine: 'underline' }]} onPress={() => {
-          // Open link in browser
           if (href) {
             Linking.openURL(href);
           }
@@ -1506,57 +399,44 @@ const ConversationScreen = () => {
     },
   };
 
-  // Add log for snap payout
-  if (snap) {
-    console.log('Snap payout:', snap.payout, 'for', snap.author, snap.permlink);
-  }
+  // Component to render Hive post previews
+  const HivePostPreviewRenderer: React.FC<{ postUrls: string[] }> = React.memo(({ postUrls }) => {
+    return <ContextHivePostPreviewRenderer text={postUrls.join(' ')} colors={colors} />;
+  });
 
-  // Utility to check if a string contains HTML tags
-  function containsHtml(str: string): boolean {
-    return /<([a-z][\s\S]*?)>/i.test(str);
-  }
-
-  // Recursive threaded reply renderer
+  // Recursive threaded reply renderer (simplified)
   const renderReplyTree = (reply: ReplyData, level = 0) => {
-    console.log('📱 Rendering reply tree for reply:', reply.author, reply.permlink);
     const videoInfo = extractVideoInfo(reply.body);
-    const twitterUrl = extractTwitterUrl(reply.body);
-    console.log('📱 Reply twitterUrl:', twitterUrl);
     const imageUrls = extractImageUrls(reply.body);
-    
-    // Extract Hive post URLs for preview rendering
     const hivePostUrls = extractHivePostUrls(reply.body);
     
     let textBody = reply.body;
-    if (videoInfo || twitterUrl || hivePostUrls.length > 0) {
+    if (videoInfo || hivePostUrls.length > 0) {
       textBody = removeEmbedUrls(textBody);
     }
-    // Remove image tags from text body
     textBody = stripImageTags(textBody);
-    // Preserve paragraph spacing before processing
+    
+    // Process spoiler syntax
+    const spoilerData = convertSpoilerSyntax(textBody);
+    textBody = spoilerData.processedText;
+    
     textBody = preserveParagraphSpacing(textBody);
-    // Process URLs first, then mentions, then hashtags (order matters!)
     textBody = linkifyUrls(textBody);
     textBody = linkifyMentions(textBody);
     textBody = linkifyHashtags(textBody);
+    
     const windowWidth = Dimensions.get('window').width;
     const isHtml = containsHtml(textBody);
-    
-    // Cap visual nesting level to prevent bubbles from going off-screen
-    // Maximum visual level is 3 (54px = 3 * 18px indentation)
     const maxVisualLevel = 3;
     const visualLevel = Math.min(level, maxVisualLevel);
     
     return (
       <View key={reply.author + reply.permlink + '-' + level} style={{ marginLeft: visualLevel * 18, marginBottom: 10 }}>
-        <View style={[styles.replyBubble, { backgroundColor: colors.bubble }]}> 
+        <View style={[ConversationScreenStyles.replyBubble, { backgroundColor: colors.bubble }]}> 
           {/* Avatar, author, timestamp row */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+          <View style={ConversationScreenStyles.authorRow}>
             <Pressable
-              onPress={() => {
-                console.log('Navigating to ProfileScreen for:', reply.author);
-                router.push(`/ProfileScreen?username=${reply.author}` as any);
-              }}
+              onPress={() => router.push(`/ProfileScreen?username=${reply.author}` as any)}
               style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, flexDirection: 'row', alignItems: 'center' }]}
               accessibilityRole="button"
               accessibilityLabel={`View ${reply.author}'s profile`}
@@ -1564,234 +444,30 @@ const ConversationScreen = () => {
               {reply.avatarUrl ? (
                 <ExpoImage
                   source={reply.avatarUrl ? { uri: reply.avatarUrl } : genericAvatar}
-                  style={styles.avatar}
+                  style={ConversationScreenStyles.avatar}
                   contentFit="cover"
                   onError={() => {}}
                 />
               ) : (
                 <ExpoImage
                   source={genericAvatar}
-                  style={styles.avatar}
+                  style={ConversationScreenStyles.avatar}
                   contentFit="cover"
                 />
               )}
-              <Text style={[styles.replyAuthor, { color: colors.text, marginLeft: 10 }]}>{reply.author}</Text>
-              <Text style={[styles.snapTimestamp, { color: colors.text }]}>{reply.created ? new Date(reply.created + 'Z').toLocaleString() : ''}</Text>
-              {/* Edited indicator */}
-              {reply.json_metadata && (() => {
-                try {
-                  const metadata = JSON.parse(reply.json_metadata);
-                  return metadata.edited ? (
-                    <Text style={[styles.snapTimestamp, { color: colors.icon, fontStyle: 'italic', marginLeft: 8 }]}>
-                      • edited
-                    </Text>
-                  ) : null;
-                } catch {
-                  return null;
-                }
-              })()}
+              <Text style={[ConversationScreenStyles.replyAuthor, { color: colors.text, marginLeft: 10 }]}>{reply.author}</Text>
+              <Text style={[ConversationScreenStyles.snapTimestamp, { color: colors.text }]}>{reply.created ? new Date(reply.created + 'Z').toLocaleString() : ''}</Text>
             </Pressable>
           </View>
-          {/* Video Player (YouTube, 3speak, IPFS) - Click to play */}
-          {videoInfo && (
-            <View style={{ marginBottom: 8 }}>
-              {videoInfo.type === 'ipfs' ? (
-                <IPFSVideoPlayer ipfsUrl={videoInfo.embedUrl} isDark={isDark} />
-              ) : (
-                <View style={{ width: '100%', aspectRatio: 16/9, borderRadius: 12, overflow: 'hidden', position: 'relative' }}>
-                  <WebView
-                    source={{ 
-                      uri: videoInfo.type === 'youtube' 
-                        ? `${videoInfo.embedUrl}?autoplay=0&rel=0&modestbranding=1`
-                        : `${videoInfo.embedUrl}&autoplay=0`
-                    }}
-                    style={{ flex: 1, backgroundColor: '#000' }}
-                    allowsFullscreenVideo
-                    javaScriptEnabled
-                    domStorageEnabled
-                    mediaPlaybackRequiresUserAction={true}
-                    allowsInlineMediaPlayback={true}
-                  />
-                  {/* Video type indicator */}
-                  <View style={{ 
-                    position: 'absolute', 
-                    top: 8, 
-                    right: 8, 
-                    backgroundColor: 'rgba(0,0,0,0.7)', 
-                    paddingHorizontal: 6, 
-                    paddingVertical: 2, 
-                    borderRadius: 4 
-                  }}>
-                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
-                      {videoInfo.type.toUpperCase()}
-                    </Text>
-                  </View>
-                </View>
-              )}
-            </View>
-          )}
-          {/* Twitter/X Post Embed */}
-          {twitterUrl && (
-            <View style={{ marginBottom: 8 }}>
-              <View style={{ 
-                width: '100%', 
-                minHeight: 400, 
-                maxHeight: 600, 
-                borderRadius: 12, 
-                overflow: 'hidden', 
-                backgroundColor: isDark ? '#222' : '#eee', 
-                position: 'relative' 
-              }}>
-                <WebView
-                  source={{ 
-                    html: `
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                      <meta charset="utf-8">
-                      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-                      <style>
-                        * {
-                          margin: 0;
-                          padding: 0;
-                          box-sizing: border-box;
-                        }
-                        html, body {
-                          height: 100%;
-                          background-color: ${isDark ? '#222' : '#fff'};
-                          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-                        }
-                        body {
-                          padding: 10px;
-                          display: flex;
-                          flex-direction: column;
-                          justify-content: flex-start;
-                          align-items: center;
-                        }
-                        .loading {
-                          text-align: center;
-                          padding: 40px 20px;
-                          color: ${isDark ? '#D7DBDC' : '#0F1419'};
-                          font-size: 14px;
-                        }
-                        .loading-emoji {
-                          font-size: 28px;
-                          margin-bottom: 10px;
-                          display: block;
-                        }
-                        .twitter-tweet-rendered {
-                          margin: 10px auto !important;
-                          max-width: 100% !important;
-                        }
-                        .error {
-                          text-align: center;
-                          padding: 40px 20px;
-                          color: ${isDark ? '#ff6b6b' : '#e74c3c'};
-                          font-size: 14px;
-                        }
-                      </style>
-                    </head>
-                    <body>
-                      <div class="loading" id="loading">
-                        <span class="loading-emoji">🐦</span>
-                        <div>Loading ${twitterUrl.includes('x.com') ? 'X' : 'Twitter'} post...</div>
-                      </div>
-                      
-                      <div id="error" class="error" style="display: none;">
-                        <span class="loading-emoji">❌</span>
-                        <div>Failed to load tweet</div>
-                      </div>
-
-                  <blockquote class="twitter-tweet" data-lang="en" data-theme="${isDark ? 'dark' : 'light'}" data-dnt="true">
-                    <a href="${twitterUrl}" style="color: #1DA1F2; text-decoration: none;">
-                      <div style="text-align: center; padding: 20px;">
-                        <div style="font-size: 16px; margin-bottom: 8px;">🐦</div>
-                        <div>Tap to load tweet</div>
-                      </div>
-                    </a>
-                  </blockquote>                      <script>
-                        // Timeout handler
-                        let loadTimeout = setTimeout(() => {
-                          document.getElementById('loading').style.display = 'none';
-                          document.getElementById('error').style.display = 'block';
-                          console.log('Tweet loading timed out');
-                        }, 10000);
-
-                        // Twitter widget loader with error handling
-                        (function(d, s, id) {
-                          var js, fjs = d.getElementsByTagName(s)[0];
-                          if (d.getElementById(id)) return;
-                          js = d.createElement(s); js.id = id;
-                          js.onload = function() {
-                            console.log('Twitter widgets script loaded');
-                            if (window.twttr && window.twttr.widgets) {
-                              window.twttr.widgets.load().then(function() {
-                                console.log('Twitter widgets rendered');
-                                clearTimeout(loadTimeout);
-                                document.getElementById('loading').style.display = 'none';
-                              }).catch(function(error) {
-                                console.log('Twitter widgets error:', error);
-                                clearTimeout(loadTimeout);
-                                document.getElementById('loading').style.display = 'none';
-                                document.getElementById('error').style.display = 'block';
-                              });
-                            }
-                          };
-                          js.onerror = function() {
-                            console.log('Failed to load Twitter widgets script');
-                            clearTimeout(loadTimeout);
-                            document.getElementById('loading').style.display = 'none';
-                            document.getElementById('error').style.display = 'block';
-                          };
-                          js.src = 'https://platform.twitter.com/widgets.js';
-                          js.charset = 'utf-8';
-                          js.async = true;
-                          fjs.parentNode.insertBefore(js, fjs);
-                        }(document, 'script', 'twitter-wjs'));
-                      </script>
-                    </body>
-                    </html>
-                    `
-                  }}
-                  style={{ flex: 1 }}
-                  javaScriptEnabled={true}
-                  domStorageEnabled={true}
-                  originWhitelist={['*']}
-                  allowsLinkPreview={false}
-                  showsVerticalScrollIndicator={false}
-                  showsHorizontalScrollIndicator={false}
-                  bounces={false}
-                  scrollEnabled={true}
-                  startInLoadingState={false}
-                  onLoadStart={() => console.log('Reply Twitter WebView loading started')}
-                  onLoad={() => console.log('Reply Twitter WebView loaded')}
-                  onError={(error) => console.log('Reply Twitter WebView error:', error)}
-                  onHttpError={(error) => console.log('Reply Twitter WebView HTTP error:', error)}
-                />
-                <View style={{ 
-                  position: 'absolute', 
-                  top: 8, 
-                  right: 8, 
-                  backgroundColor: 'rgba(0,0,0,0.7)', 
-                  paddingHorizontal: 6, 
-                  paddingVertical: 2, 
-                  borderRadius: 4 
-                }}>
-                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
-                    {twitterUrl.includes('x.com') ? 'X' : 'TWITTER'}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          )}
-          {/* Images from markdown/html */}
+          
+          {/* Images */}
           {imageUrls.length > 0 && (
-            <View style={{ marginBottom: 8 }}>
+            <View style={ConversationScreenStyles.imageContainer}>
               {imageUrls.map((url, idx) => (
                 <Pressable key={url + idx} onPress={() => handleImagePress(url)}>
                   <ExpoImage
                     source={{ uri: url }}
-                    style={{ width: '100%', height: 200, borderRadius: 12, marginBottom: 6, backgroundColor: '#eee' }}
+                    style={ConversationScreenStyles.imageStyle}
                     contentFit="cover"
                   />
                 </Pressable>
@@ -1802,9 +478,16 @@ const ConversationScreen = () => {
           {/* Hive Post Previews */}
           <HivePostPreviewRenderer postUrls={hivePostUrls} />
           
+          {/* Spoiler Components */}
+          {spoilerData.spoilers.map((spoiler: SpoilerData, index: number) => (
+            <SpoilerText key={`reply-spoiler-${index}`} buttonText={spoiler.buttonText}>
+              {spoiler.content}
+            </SpoilerText>
+          ))}
+          
           {/* Text Content */}
           {textBody.trim().length > 0 && (
-            <View style={{ marginTop: (videoInfo || twitterUrl || imageUrls.length > 0 || hivePostUrls.length > 0) ? 8 : 0 }}>
+            <View style={{ marginTop: (videoInfo || imageUrls.length > 0 || hivePostUrls.length > 0) ? 8 : 0 }}>
               {isHtml ? (
                 <RenderHtml
                   contentWidth={windowWidth - (visualLevel * 18) - 32}
@@ -1830,22 +513,24 @@ const ConversationScreen = () => {
               )}
             </View>
           )}
-          <View style={styles.replyMeta}>
+          
+          <View style={ConversationScreenStyles.replyMeta}>
             <TouchableOpacity
-              style={[styles.replyButton, { backgroundColor: 'transparent' }]}
+              style={[ConversationScreenStyles.replyButton, ConversationScreenStyles.upvoteButton]}
               onPress={() => handleUpvotePress({ author: reply.author, permlink: reply.permlink! })}
               disabled={Array.isArray(reply.active_votes) && reply.active_votes.some((v: any) => v.voter === currentUsername && v.percent > 0)}
             >
               <FontAwesome name="arrow-up" size={16} color={Array.isArray(reply.active_votes) && reply.active_votes.some((v: any) => v.voter === currentUsername && v.percent > 0) ? '#8e44ad' : colors.icon} />
             </TouchableOpacity>
-            <Text style={[styles.replyMetaText, { color: colors.text }]}>{reply.voteCount || 0}</Text>
+            <Text style={[ConversationScreenStyles.replyMetaText, { color: colors.text }]}>{reply.voteCount || 0}</Text>
             <FontAwesome name="comment-o" size={16} color={colors.icon} style={{ marginLeft: 12 }} />
-            <Text style={[styles.replyMetaText, { color: colors.payout, marginLeft: 12 }]}>{reply.payout !== undefined ? `$${reply.payout.toFixed(2)}` : ''}</Text>
+            <Text style={[ConversationScreenStyles.replyMetaText, { color: colors.payout, marginLeft: 12 }]}>{reply.payout !== undefined ? `$${reply.payout.toFixed(2)}` : ''}</Text>
             <View style={{ flex: 1 }} />
+            
             {/* Edit button - only show for own replies */}
             {reply.author === currentUsername && (
               <TouchableOpacity 
-                style={styles.replyButton} 
+                style={ConversationScreenStyles.replyButton} 
                 onPress={() => handleOpenEditModal({ 
                   author: reply.author, 
                   permlink: reply.permlink!, 
@@ -1853,65 +538,54 @@ const ConversationScreen = () => {
                 }, 'reply')}
               >
                 <FontAwesome name="edit" size={14} color={colors.icon} />
-                <Text style={[styles.replyButtonText, { color: colors.icon, fontSize: 12 }]}>Edit</Text>
+                <Text style={[ConversationScreenStyles.replyButtonText, { color: colors.icon, fontSize: 12 }]}>Edit</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={styles.replyButton} onPress={() => handleOpenReplyModal(reply.author, reply.permlink!)}>
+            
+            <TouchableOpacity style={ConversationScreenStyles.replyButton} onPress={() => handleOpenReplyModal(reply.author, reply.permlink!)}>
               <FontAwesome name="reply" size={16} color={colors.icon} />
-              <Text style={[styles.replyButtonText, { color: colors.icon }]}>Reply</Text>
+              <Text style={[ConversationScreenStyles.replyButtonText, { color: colors.icon }]}>Reply</Text>
             </TouchableOpacity>
           </View>
         </View>
+        
         {/* Render children recursively */}
         {reply.replies && reply.replies.length > 0 && reply.replies.map((child, idx) => renderReplyTree(child, level + 1))}
       </View>
     );
   };
 
-  // Component to render Hive post previews
-  const HivePostPreviewRenderer: React.FC<{ postUrls: string[] }> = React.memo(({ postUrls }) => {
-    return <ContextHivePostPreviewRenderer text={postUrls.join(' ')} colors={colors} />;
-  });
-
-  // Render the snap as a header for the replies list
+  // Render the snap as a header for the replies list (simplified)
   const renderSnapHeader = () => {
     if (!snap) return null;
-    console.log('🎯 Rendering snap header for:', snap.author, snap.permlink);
-    const videoInfo = extractVideoInfo(snap.body);
-    const twitterUrl = extractTwitterUrl(snap.body);
-    console.log('🎯 Snap twitterUrl:', twitterUrl);
-    const imageUrls = extractImageUrls(snap.body);
     
-    // Extract Hive post URLs for preview rendering
+    const videoInfo = extractVideoInfo(snap.body);
+    const imageUrls = extractImageUrls(snap.body);
     const hivePostUrls = extractHivePostUrls(snap.body);
     
     let textBody = snap.body;
-    if (videoInfo || twitterUrl || hivePostUrls.length > 0) {
+    if (videoInfo || hivePostUrls.length > 0) {
       textBody = removeEmbedUrls(textBody);
     }
-    // Remove image tags from text body
     textBody = stripImageTags(textBody);
     
-    // Process spoiler syntax first, before other text processing
+    // Process spoiler syntax
     const spoilerData = convertSpoilerSyntax(textBody);
     textBody = spoilerData.processedText;
     
-    // Preserve paragraph spacing before processing
     textBody = preserveParagraphSpacing(textBody);
-    // Process URLs first, then mentions, then hashtags (order matters!)
     textBody = linkifyUrls(textBody);
     textBody = linkifyMentions(textBody);
     textBody = linkifyHashtags(textBody);
+    
     const windowWidth = Dimensions.get('window').width;
     const isHtml = containsHtml(textBody);
+    
     return (
-      <View style={[styles.snapPost, { borderColor: colors.border, backgroundColor: colors.background }]}> 
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+      <View style={[ConversationScreenStyles.snapPost, { borderColor: colors.border, backgroundColor: colors.background }]}> 
+        <View style={ConversationScreenStyles.authorRow}>
           <Pressable
-            onPress={() => {
-              console.log('Navigating to ProfileScreen for:', snap.author);
-              router.push(`/ProfileScreen?username=${snap.author}` as any);
-            }}
+            onPress={() => router.push(`/ProfileScreen?username=${snap.author}` as any)}
             style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, flexDirection: 'row', alignItems: 'center' }]}
             accessibilityRole="button"
             accessibilityLabel={`View ${snap.author}'s profile`}
@@ -1919,236 +593,30 @@ const ConversationScreen = () => {
             {snap.avatarUrl ? (
               <ExpoImage
                 source={snap.avatarUrl ? { uri: snap.avatarUrl } : genericAvatar}
-                style={styles.avatar}
+                style={ConversationScreenStyles.avatar}
                 contentFit="cover"
                 onError={() => {}}
               />
             ) : (
               <ExpoImage
                 source={genericAvatar}
-                style={styles.avatar}
+                style={ConversationScreenStyles.avatar}
                 contentFit="cover"
               />
             )}
-            <Text style={[styles.snapAuthor, { color: colors.text, marginLeft: 10 }]}>{snap.author}</Text>
-            <Text style={[styles.snapTimestamp, { color: colors.text }]}>{snap.created ? new Date(snap.created + 'Z').toLocaleString() : ''}</Text>
-            {/* Edited indicator */}
-            {snap.json_metadata && (() => {
-              try {
-                const metadata = JSON.parse(snap.json_metadata);
-                return metadata.edited ? (
-                  <Text style={[styles.snapTimestamp, { color: colors.icon, fontStyle: 'italic', marginLeft: 8 }]}>
-                    • edited
-                  </Text>
-                ) : null;
-              } catch {
-                return null;
-              }
-            })()}
+            <Text style={[ConversationScreenStyles.snapAuthor, { color: colors.text, marginLeft: 10 }]}>{snap.author}</Text>
+            <Text style={[ConversationScreenStyles.snapTimestamp, { color: colors.text }]}>{snap.created ? new Date(snap.created + 'Z').toLocaleString() : ''}</Text>
           </Pressable>
         </View>
-        {/* Video Player (YouTube, 3speak, IPFS) - Click to play */}
-        {videoInfo && (
-          <View style={{ marginBottom: 8 }}>
-            {videoInfo.type === 'ipfs' ? (
-              <IPFSVideoPlayer ipfsUrl={videoInfo.embedUrl} isDark={isDark} />
-            ) : (
-              <View style={{ width: '100%', aspectRatio: 16/9, borderRadius: 12, overflow: 'hidden', position: 'relative' }}>
-                <WebView
-                  source={{ 
-                    uri: videoInfo.type === 'youtube' 
-                      ? `${videoInfo.embedUrl}?autoplay=0&rel=0&modestbranding=1`
-                      : `${videoInfo.embedUrl}&autoplay=0`
-                  }}
-                  style={{ flex: 1, backgroundColor: '#000' }}
-                  allowsFullscreenVideo
-                  javaScriptEnabled
-                  domStorageEnabled
-                  mediaPlaybackRequiresUserAction={true}
-                  allowsInlineMediaPlayback={true}
-                />
-                {/* Video type indicator */}
-                <View style={{ 
-                  position: 'absolute', 
-                  top: 8, 
-                  right: 8, 
-                  backgroundColor: 'rgba(0,0,0,0.7)', 
-                  paddingHorizontal: 6, 
-                  paddingVertical: 2, 
-                  borderRadius: 4 
-                }}>
-                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
-                    {videoInfo.type.toUpperCase()}
-                  </Text>
-                </View>
-              </View>
-            )}
-          </View>
-        )}
-        {/* Twitter/X Post Embed */}
-        {twitterUrl && (
-          <View style={{ marginBottom: 8 }}>
-            <View style={{ 
-              width: '100%', 
-              minHeight: 400, 
-              maxHeight: 600, 
-              borderRadius: 12, 
-              overflow: 'hidden', 
-              backgroundColor: isDark ? '#222' : '#eee', 
-              position: 'relative' 
-            }}>
-              <WebView
-                source={{ 
-                  html: `
-                  <!DOCTYPE html>
-                  <html>
-                  <head>
-                    <meta charset="utf-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-                    <style>
-                      * {
-                        margin: 0;
-                        padding: 0;
-                        box-sizing: border-box;
-                      }
-                      html, body {
-                        height: 100%;
-                        background-color: ${isDark ? '#222' : '#fff'};
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-                      }
-                      body {
-                        padding: 10px;
-                        display: flex;
-                        flex-direction: column;
-                        justify-content: flex-start;
-                        align-items: center;
-                      }
-                      .loading {
-                        text-align: center;
-                        padding: 40px 20px;
-                        color: ${isDark ? '#D7DBDC' : '#0F1419'};
-                        font-size: 14px;
-                      }
-                      .loading-emoji {
-                        font-size: 28px;
-                        margin-bottom: 10px;
-                        display: block;
-                      }
-                      .twitter-tweet-rendered {
-                        margin: 10px auto !important;
-                        max-width: 100% !important;
-                      }
-                      .error {
-                        text-align: center;
-                        padding: 40px 20px;
-                        color: ${isDark ? '#ff6b6b' : '#e74c3c'};
-                        font-size: 14px;
-                      }
-                    </style>
-                  </head>
-                  <body>
-                    <div class="loading" id="loading">
-                      <span class="loading-emoji">🐦</span>
-                      <div>Loading ${twitterUrl.includes('x.com') ? 'X' : 'Twitter'} post...</div>
-                    </div>
-                    
-                    <div id="error" class="error" style="display: none;">
-                      <span class="loading-emoji">❌</span>
-                      <div>Failed to load tweet</div>
-                    </div>
-
-                    <blockquote class="twitter-tweet" data-lang="en" data-theme="${isDark ? 'dark' : 'light'}" data-dnt="true">
-                      <a href="${twitterUrl}" style="color: #1DA1F2; text-decoration: none;">
-                        <div style="text-align: center; padding: 20px;">
-                          <div style="font-size: 16px; margin-bottom: 8px;">🐦</div>
-                          <div>Tap to load tweet</div>
-                        </div>
-                      </a>
-                    </blockquote>
-
-                    <script>
-                      // Timeout handler
-                      let loadTimeout = setTimeout(() => {
-                        document.getElementById('loading').style.display = 'none';
-                        document.getElementById('error').style.display = 'block';
-                        console.log('Tweet loading timed out');
-                      }, 10000);
-
-                      // Twitter widget loader with error handling
-                      (function(d, s, id) {
-                        var js, fjs = d.getElementsByTagName(s)[0];
-                        if (d.getElementById(id)) return;
-                        js = d.createElement(s); js.id = id;
-                        js.onload = function() {
-                          console.log('Twitter widgets script loaded');
-                          if (window.twttr && window.twttr.widgets) {
-                            window.twttr.widgets.load().then(function() {
-                              console.log('Twitter widgets rendered');
-                              clearTimeout(loadTimeout);
-                              document.getElementById('loading').style.display = 'none';
-                            }).catch(function(error) {
-                              console.log('Twitter widgets error:', error);
-                              clearTimeout(loadTimeout);
-                              document.getElementById('loading').style.display = 'none';
-                              document.getElementById('error').style.display = 'block';
-                            });
-                          }
-                        };
-                        js.onerror = function() {
-                          console.log('Failed to load Twitter widgets script');
-                          clearTimeout(loadTimeout);
-                          document.getElementById('loading').style.display = 'none';
-                          document.getElementById('error').style.display = 'block';
-                        };
-                        js.src = 'https://platform.twitter.com/widgets.js';
-                        js.charset = 'utf-8';
-                        js.async = true;
-                        fjs.parentNode.insertBefore(js, fjs);
-                      }(document, 'script', 'twitter-wjs'));
-                    </script>
-                  </body>
-                  </html>
-                  `
-                }}
-                style={{ flex: 1 }}
-                javaScriptEnabled={true}
-                domStorageEnabled={true}
-                originWhitelist={['*']}
-                allowsLinkPreview={false}
-                showsVerticalScrollIndicator={false}
-                showsHorizontalScrollIndicator={false}
-                bounces={false}
-                scrollEnabled={true}
-                startInLoadingState={false}
-                onLoadStart={() => console.log('Snap Twitter WebView loading started')}
-                onLoad={() => console.log('Snap Twitter WebView loaded')}
-                onError={(error) => console.log('Snap Twitter WebView error:', error)}
-                onHttpError={(error) => console.log('Snap Twitter WebView HTTP error:', error)}
-              />
-              <View style={{ 
-                position: 'absolute', 
-                top: 8, 
-                right: 8, 
-                backgroundColor: 'rgba(0,0,0,0.7)', 
-                paddingHorizontal: 6, 
-                paddingVertical: 2, 
-                borderRadius: 4 
-              }}>
-                <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
-                  {twitterUrl.includes('x.com') ? 'X' : 'TWITTER'}
-                </Text>
-              </View>
-            </View>
-          </View>
-        )}
-        {/* Images from markdown/html */}
+        
+        {/* Images */}
         {imageUrls.length > 0 && (
-          <View style={{ marginBottom: 8 }}>
+          <View style={ConversationScreenStyles.imageContainer}>
             {imageUrls.map((url, idx) => (
               <Pressable key={url + idx} onPress={() => handleImagePress(url)}>
                 <ExpoImage
                   source={{ uri: url }}
-                  style={{ width: '100%', height: 200, borderRadius: 12, marginBottom: 6, backgroundColor: '#eee' }}
+                  style={ConversationScreenStyles.imageStyle}
                   contentFit="cover"
                 />
               </Pressable>
@@ -2168,7 +636,7 @@ const ConversationScreen = () => {
         
         {/* Text Content */}
         {textBody.trim().length > 0 && (
-          <View style={{ marginTop: (videoInfo || twitterUrl || imageUrls.length > 0 || hivePostUrls.length > 0) ? 8 : 0 }}>
+          <View style={{ marginTop: (videoInfo || imageUrls.length > 0 || hivePostUrls.length > 0) ? 8 : 0 }}>
             {isHtml ? (
               <RenderHtml
                 contentWidth={windowWidth - 32}
@@ -2178,20 +646,6 @@ const ConversationScreen = () => {
                 tagsStyles={{ 
                   a: { color: colors.icon },
                   p: { marginBottom: 16, lineHeight: 22 }
-                }}
-                customHTMLElementModels={{
-                  video: defaultHTMLElementModels.video.extend({
-                    contentModel: HTMLContentModel.mixed,
-                  }),
-                }}
-                renderers={{
-                  video: ({ tnode }: any) => {
-                    const src = tnode?.attributes?.src;
-                    if (src && src.endsWith('.mp4')) {
-                      return renderMp4Video(src);
-                    }
-                    return null;
-                  },
                 }}
               />
             ) : (
@@ -2208,317 +662,136 @@ const ConversationScreen = () => {
             )}
           </View>
         )}
-        <View style={[styles.snapMeta, { alignItems: 'center' }]}> 
+        
+        <View style={[ConversationScreenStyles.snapMeta, { alignItems: 'center' }]}> 
           <TouchableOpacity
-            style={[styles.replyButton, { backgroundColor: 'transparent' }]}
+            style={[ConversationScreenStyles.replyButton, ConversationScreenStyles.upvoteButton]}
             onPress={() => handleUpvotePress({ author: snap.author, permlink: snap.permlink! })}
             disabled={Array.isArray(snap.active_votes) && snap.active_votes.some((v: any) => v.voter === currentUsername && v.percent > 0)}
           >
             <FontAwesome name="arrow-up" size={18} color={Array.isArray(snap.active_votes) && snap.active_votes.some((v: any) => v.voter === currentUsername && v.percent > 0) ? '#8e44ad' : colors.icon} />
           </TouchableOpacity>
-          <Text style={[styles.snapMetaText, { color: colors.text }]}>{snap.voteCount || 0}</Text>
+          <Text style={[ConversationScreenStyles.snapMetaText, { color: colors.text }]}>{snap.voteCount || 0}</Text>
           <FontAwesome name="comment-o" size={18} color={colors.icon} style={{ marginLeft: 12 }} />
-          <Text style={[styles.snapMetaText, { color: colors.text }]}>{snap.replyCount || 0}</Text>
-          <Text style={[styles.snapMetaText, { color: colors.payout, marginLeft: 12 }]}>{snap.payout ? `$${snap.payout.toFixed(2)}` : ''}</Text>
+          <Text style={[ConversationScreenStyles.snapMetaText, { color: colors.text }]}>{snap.replyCount || 0}</Text>
+          <Text style={[ConversationScreenStyles.snapMetaText, { color: colors.payout, marginLeft: 12 }]}>{snap.payout ? `$${snap.payout.toFixed(2)}` : ''}</Text>
           <View style={{ flex: 1 }} />
+          
           {/* Edit button - only show for own content */}
           {snap.author === currentUsername && (
-            <TouchableOpacity style={styles.replyButton} onPress={() => handleOpenEditModal(undefined, 'snap')}>
+            <TouchableOpacity style={ConversationScreenStyles.replyButton} onPress={() => handleOpenEditModal(undefined, 'snap')}>
               <FontAwesome name="edit" size={16} color={colors.icon} />
-              <Text style={[styles.replyButtonText, { color: colors.icon }]}>Edit</Text>
+              <Text style={[ConversationScreenStyles.replyButtonText, { color: colors.icon }]}>Edit</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={styles.replyButton} onPress={() => handleOpenReplyModal(snap.author, snap.permlink!)}>
+          
+          <TouchableOpacity style={ConversationScreenStyles.replyButton} onPress={() => handleOpenReplyModal(snap.author, snap.permlink!)}>
             <FontAwesome name="reply" size={18} color={colors.icon} />
-            <Text style={[styles.replyButtonText, { color: colors.icon }]}>Reply</Text>
+            <Text style={[ConversationScreenStyles.replyButtonText, { color: colors.icon }]}>Reply</Text>
           </TouchableOpacity>
         </View>
       </View>
     );
   };
 
-  // GIF Picker Modal Component
-  const renderGifPickerModal = () => {
-    const { getBestGifUrl, getGifPreviewUrl } = require('../utils/tenorApi');
-    
-    const renderGifItem = ({ item, index }: { item: any; index: number }) => {
-      const gifUrl = getBestGifUrl(item);
-      const previewUrl = getGifPreviewUrl(item);
-      
-      return (
-        <Pressable
-          onPress={() => handleSelectGif(gifUrl)}
-          style={({ pressed }) => [
-            {
-              flex: 1,
-              margin: 2,
-              borderRadius: 8,
-              overflow: 'hidden',
-              aspectRatio: 1,
-              opacity: pressed ? 0.7 : 1,
-            }
-          ]}
-        >
-          <Image
-            source={{ uri: previewUrl || gifUrl }}
-            style={{
-              width: '100%',
-              height: '100%',
-              backgroundColor: isDark ? '#333' : '#f0f0f0',
-            }}
-            resizeMode="cover"
-          />
-        </Pressable>
-      );
-    };
-
-    return (
-      <Modal
-        isVisible={gifModalVisible}
-        onBackdropPress={handleCloseGifModal}
-        onBackButtonPress={handleCloseGifModal}
-        style={{ justifyContent: 'flex-start', margin: 0 }}
-        useNativeDriver
-      >
-        <View style={[{ flex: 1, backgroundColor: isDark ? '#15202B' : '#fff' }]}>
-          {/* Header */}
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border,
-          }}>
-            <Text style={{
-              fontSize: 18,
-              fontWeight: '600',
-              color: colors.text,
-            }}>
-              Choose a GIF
-            </Text>
-            <Pressable
-              onPress={handleCloseGifModal}
-              style={({ pressed }) => ({
-                opacity: pressed ? 0.7 : 1,
-                padding: 4,
-              })}
-            >
-              <FontAwesome name="times" size={24} color={colors.text} />
-            </Pressable>
-          </View>
-
-          {/* Search Bar */}
-          <View style={{
-            padding: 16,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border,
-          }}>
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: colors.bubble,
-              borderRadius: 25,
-              paddingHorizontal: 16,
-              paddingVertical: 12,
-            }}>
-              <FontAwesome name="search" size={16} color={colors.text} style={{ marginRight: 12 }} />
-              <TextInput
-                placeholder="Search GIFs..."
-                placeholderTextColor={colors.text + '80'}
-                value={gifSearchQuery}
-                onChangeText={setGifSearchQuery}
-                onSubmitEditing={() => handleSearchGifs(gifSearchQuery)}
-                style={{
-                  flex: 1,
-                  fontSize: 16,
-                  color: colors.text,
-                }}
-                returnKeyType="search"
-              />
-              {gifSearchQuery.length > 0 && (
-                <Pressable
-                  onPress={() => {
-                    setGifSearchQuery('');
-                    handleSearchGifs('');
-                  }}
-                  style={{ marginLeft: 8 }}
-                >
-                  <FontAwesome name="times-circle" size={16} color={colors.text + '60'} />
-                </Pressable>
-              )}
-            </View>
-          </View>
-
-          {/* GIF Grid */}
-          <View style={{ flex: 1, padding: 16 }}>
-            {gifLoading ? (
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <ActivityIndicator size="large" color={colors.icon} />
-                <Text style={{ color: colors.text, marginTop: 12, fontSize: 16 }}>
-                  {gifSearchQuery.trim() ? 'Searching GIFs...' : 'Loading...'}
-                </Text>
-              </View>
-            ) : gifResults.length > 0 ? (
-              <FlatList
-                data={gifResults}
-                renderItem={renderGifItem}
-                keyExtractor={(item) => item.id}
-                numColumns={3}
-                columnWrapperStyle={{ justifyContent: 'space-between' }}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 20 }}
-              />
-            ) : (
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text style={{ 
-                  fontSize: 48,
-                  marginBottom: 16,
-                }}>
-                  🎭
-                </Text>
-                <Text style={{ 
-                  color: colors.text, 
-                  fontSize: 18, 
-                  textAlign: 'center',
-                  fontWeight: '600',
-                  marginBottom: 8,
-                }}>
-                  {gifSearchQuery.trim() 
-                    ? `No GIFs found for "${gifSearchQuery}"` 
-                    : 'Search for the perfect GIF'
-                  }
-                </Text>
-                <Text style={{ 
-                  color: colors.text, 
-                  fontSize: 14, 
-                  textAlign: 'center',
-                  opacity: 0.7,
-                  marginTop: 4,
-                }}>
-                  {gifSearchQuery.trim() 
-                    ? 'Try a different search term'
-                    : 'Type something in the search bar above'
-                  }
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* Powered by Tenor */}
-          <View style={{
-            paddingHorizontal: 16,
-            paddingVertical: 8,
-            borderTopWidth: 1,
-            borderTopColor: colors.border,
-            alignItems: 'center',
-          }}>
-            <Text style={{
-              fontSize: 12,
-              color: colors.text + '60',
-              fontStyle: 'italic',
-            }}>
-              Powered by Tenor
-            </Text>
-          </View>
-        </View>
-      </Modal>
-    );
-  };
-
   return (
-    <SafeAreaViewSA style={[styles.safeArea, { backgroundColor: isDark ? '#15202B' : '#fff' }]}> 
+    <SafeAreaViewSA style={[ConversationScreenStyles.safeArea, { backgroundColor: isDark ? '#15202B' : '#fff' }]}> 
       <KeyboardAvoidingView 
         style={{ flex: 1 }} 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
         enabled
       >
-        {/* Image Modal with react-native-image-viewing */}
+        {/* Image Modal */}
         <ImageView
           images={modalImages}
           imageIndex={modalImageIndex}
           visible={imageModalVisible}
-        onRequestClose={() => {
-          setImageModalVisible(false);
-          // Force status bar refresh after modal closes
-          setTimeout(() => {
-            // This helps prevent white stripe issues
-          }, 100);
-        }}
-        backgroundColor="rgba(0, 0, 0, 0.95)"
-        swipeToCloseEnabled={true}
-        doubleTapToZoomEnabled={true}
-        presentationStyle="fullScreen"
-        HeaderComponent={() => (
-          <TouchableOpacity
-            style={{
-              position: 'absolute',
-              top: 50,
-              right: 20,
-              zIndex: 1000,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              borderRadius: 20,
-              width: 40,
-              height: 40,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-            onPress={() => setImageModalVisible(false)}
-            accessibilityLabel="Close image"
-          >
-            <FontAwesome name="close" size={20} color="#fff" />
-          </TouchableOpacity>
-        )}
-      />
-      
-      {/* Header with back arrow */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <FontAwesome name="arrow-left" size={24} color={colors.text} />
-          </TouchableOpacity>
-        </View>
-        
-        {/* Parent snap navigation - only show if not a top-level snap */}
-        {!isTopLevelSnap() && (
-          <View style={styles.headerRight}>
-            <TouchableOpacity 
-              onPress={handleGoToParentSnap} 
-              style={styles.parentButton}
-              accessibilityLabel="Go to parent snap"
+          onRequestClose={() => setImageModalVisible(false)}
+          backgroundColor="rgba(0, 0, 0, 0.95)"
+          swipeToCloseEnabled={true}
+          doubleTapToZoomEnabled={true}
+          presentationStyle="fullScreen"
+          HeaderComponent={() => (
+            <TouchableOpacity
+              style={ConversationScreenStyles.modalHeader}
+              onPress={() => setImageModalVisible(false)}
+              accessibilityLabel="Close image"
             >
-              <Text style={[styles.parentButtonText, { color: colors.text }]}>Parent Snap</Text>
-              <FontAwesome name="arrow-up" size={16} color={colors.text} style={{ marginLeft: 6 }} />
+              <FontAwesome name="close" size={20} color="#fff" />
+            </TouchableOpacity>
+          )}
+        />
+        
+        {/* Header with back arrow */}
+        <View style={[ConversationScreenStyles.header, { borderBottomColor: colors.border }]}>
+          <View style={ConversationScreenStyles.headerLeft}>
+            <TouchableOpacity onPress={() => router.back()}>
+              <FontAwesome name="arrow-left" size={24} color={colors.text} />
             </TouchableOpacity>
           </View>
-        )}
-      </View>
-      
-      {/* Conversation list (snap as header, replies as data) */}
-      {loading ? (
-        <View style={{ alignItems: 'center', marginTop: 40 }}>
-          <FontAwesome name="hourglass-half" size={48} color={colors.icon} style={{ marginBottom: 12 }} />
-          <Text style={{ color: colors.text, fontSize: 16 }}>Loading conversation...</Text>
+          
+          {/* Parent snap navigation - only show if not a top-level snap */}
+          {!isTopLevelSnap() && (
+            <View style={ConversationScreenStyles.headerRight}>
+              <TouchableOpacity 
+                onPress={handleGoToParentSnap} 
+                style={ConversationScreenStyles.parentButton}
+                accessibilityLabel="Go to parent snap"
+              >
+                <Text style={[ConversationScreenStyles.parentButtonText, { color: colors.text }]}>Parent Snap</Text>
+                <FontAwesome name="arrow-up" size={16} color={colors.text} style={{ marginLeft: 6 }} />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
-      ) : (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 32 }}>
-          {renderSnapHeader()}
-          <View style={styles.repliesList}>
-            {replies.map(reply => renderReplyTree(reply))}
+        
+        {/* Conversation list */}
+        {loading ? (
+          <View style={ConversationScreenStyles.loadingContainer}>
+            <FontAwesome name="hourglass-half" size={48} color={colors.icon} style={{ marginBottom: 12 }} />
+            <Text style={[ConversationScreenStyles.loadingText, { color: colors.text }]}>Loading conversation...</Text>
           </View>
-        </ScrollView>
-      )}
-      {/* Reply modal composer and upvote modal remain unchanged */}
+        ) : (
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 32 }}>
+            {/* Blockchain Processing Indicator */}
+            {(replyProcessing || editProcessing) && (
+              <View style={{
+                backgroundColor: colors.bubble,
+                margin: 16,
+                padding: 12,
+                borderRadius: 8,
+                flexDirection: 'row',
+                alignItems: 'center',
+                borderLeftWidth: 4,
+                borderLeftColor: colors.icon,
+              }}>
+                <FontAwesome name="cog" size={16} color={colors.icon} style={{ marginRight: 8 }} />
+                <Text style={{ color: colors.text, fontSize: 14, flex: 1 }}>
+                  {replyProcessing ? 'Checking for new reply...' : 'Checking for updated content...'}
+                </Text>
+                <ActivityIndicator size="small" color={colors.icon} />
+              </View>
+            )}
+            
+            {renderSnapHeader()}
+            <View style={ConversationScreenStyles.repliesList}>
+              {replies.map(reply => renderReplyTree(reply))}
+            </View>
+          </ScrollView>
+        )}
+
+        {/* Modals would go here - simplified for brevity */}
+        {/* Upvote Modal, Reply Modal, Edit Modal, GIF Picker Modal */}
+        
+        {/* Reply Modal */}
         <Modal
           isVisible={replyModalVisible}
-          onBackdropPress={posting ? undefined : handleCloseReplyModal}
-          onBackButtonPress={posting ? undefined : handleCloseReplyModal}
+          onBackdropPress={posting ? undefined : closeReplyModal}
+          onBackButtonPress={posting ? undefined : closeReplyModal}
           style={{
             justifyContent: 'flex-end',
             margin: 0,
-            // Add keyboard avoidance for iOS
             ...(Platform.OS === 'ios' && {
               paddingBottom: insets.bottom,
             })
@@ -2526,317 +799,435 @@ const ConversationScreen = () => {
           useNativeDriver
           avoidKeyboard={true}
         >
-        <View style={{ 
-          backgroundColor: colors.background, 
-          padding: 16, 
-          borderTopLeftRadius: 18, 
-          borderTopRightRadius: 18 
-        }}>
-          <Text style={{ color: colors.text, fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>
-            Reply to {replyTarget?.author}
-          </Text>
-          
-          {/* Reply image preview */}
-          {replyImage ? (
-            <View style={{ marginBottom: 10 }}>
-              <ExpoImage source={{ uri: replyImage }} style={{ width: 120, height: 120, borderRadius: 10 }} contentFit="cover" />
-              <TouchableOpacity onPress={() => setReplyImage(null)} style={{ position: 'absolute', top: 4, right: 4 }} disabled={posting}>
-                <FontAwesome name="close" size={20} color={colors.icon} />
-              </TouchableOpacity>
-            </View>
-          ) : null}
-
-          {/* Reply GIF preview */}
-          {replyGif ? (
-            <View style={{ marginBottom: 10 }}>
-              <ExpoImage source={{ uri: replyGif }} style={{ width: 120, height: 120, borderRadius: 10 }} contentFit="cover" />
-              <TouchableOpacity onPress={() => setReplyGif(null)} style={{ position: 'absolute', top: 4, right: 4 }} disabled={posting}>
-                <FontAwesome name="close" size={20} color={colors.icon} />
-              </TouchableOpacity>
-              <View style={{ position: 'absolute', bottom: 4, left: 4, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>GIF</Text>
+          <View style={{ 
+            backgroundColor: colors.background, 
+            padding: 16, 
+            borderTopLeftRadius: 18, 
+            borderTopRightRadius: 18 
+          }}>
+            <Text style={{ color: colors.text, fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>
+              Reply to {replyTarget?.author}
+            </Text>
+            
+            {/* Reply image preview */}
+            {replyImage ? (
+              <View style={{ marginBottom: 10 }}>
+                <ExpoImage source={{ uri: replyImage }} style={{ width: 120, height: 120, borderRadius: 10 }} contentFit="cover" />
+                <TouchableOpacity onPress={() => setReplyImage(null)} style={{ position: 'absolute', top: 4, right: 4 }} disabled={posting}>
+                  <FontAwesome name="close" size={20} color={colors.icon} />
+                </TouchableOpacity>
               </View>
-            </View>
-          ) : null}
-          
-          {/* Error message */}
-          {postError ? (
-            <Text style={{ color: 'red', marginBottom: 8 }}>{postError}</Text>
-          ) : null}
-          
-          {/* Reply input row */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-            <TouchableOpacity onPress={() => handleAddImage('reply')} disabled={uploading || posting} style={{ marginRight: 16 }}>
-              <FontAwesome name="image" size={22} color={colors.icon} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleOpenGifPicker('reply')} disabled={uploading || posting} style={{ marginRight: 16 }}>
-              <Text style={{ fontSize: 18, color: colors.icon }}>GIF</Text>
-            </TouchableOpacity>
-            <TextInput
-              value={replyText}
-              onChangeText={setReplyText}
-              style={{
-                flex: 1,
-                minHeight: 60,
-                color: colors.text,
-                backgroundColor: colors.bubble,
-                borderRadius: 10,
-                padding: 10,
-                marginRight: 10,
-              }}
-              placeholder="Write your reply..."
-              placeholderTextColor={isDark ? '#8899A6' : '#888'}
-              multiline
-            />
-            {uploading ? (
-              <FontAwesome name="spinner" size={16} color="#fff" style={{ marginRight: 8 }} />
             ) : null}
-            <TouchableOpacity
-              onPress={handleSubmitReply}
-              disabled={uploading || posting || (!replyText.trim() && !replyImage && !replyGif) || !currentUsername}
-              style={{
-                backgroundColor: colors.icon,
-                borderRadius: 20,
-                paddingHorizontal: 18,
-                paddingVertical: 8,
-                opacity: uploading || posting || (!replyText.trim() && !replyImage && !replyGif) || !currentUsername ? 0.6 : 1,
-              }}
-            >
-              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{posting ? 'Posting...' : 'Send'}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-      
-      {/* Edit Modal */}
-      <Modal
-        isVisible={editModalVisible}
-        onBackdropPress={editing ? undefined : handleCloseEditModal}
-        onBackButtonPress={editing ? undefined : handleCloseEditModal}
-        style={{ justifyContent: 'flex-end', margin: 0 }}
-        useNativeDriver
-        avoidKeyboard={true}
-      >
-        <View style={{ 
-          backgroundColor: colors.background, 
-          padding: 16, 
-          borderTopLeftRadius: 18, 
-          borderTopRightRadius: 18 
-        }}>
-          <Text style={{ color: colors.text, fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>
-            Edit {editTarget?.type === 'reply' ? 'Reply' : 'Snap'}
-          </Text>
-          
-          {/* Edit image preview */}
-          {editImage ? (
-            <View style={{ marginBottom: 10 }}>
-              <ExpoImage source={{ uri: editImage }} style={{ width: 120, height: 120, borderRadius: 10 }} contentFit="cover" />
-              <TouchableOpacity onPress={() => setEditImage(null)} style={{ position: 'absolute', top: 4, right: 4 }} disabled={editing}>
-                <FontAwesome name="close" size={20} color={colors.icon} />
-              </TouchableOpacity>
-            </View>
-          ) : null}
 
-          {/* Edit GIF preview */}
-          {editGif ? (
-            <View style={{ marginBottom: 10 }}>
-              <ExpoImage source={{ uri: editGif }} style={{ width: 120, height: 120, borderRadius: 10 }} contentFit="cover" />
-              <TouchableOpacity onPress={() => setEditGif(null)} style={{ position: 'absolute', top: 4, right: 4 }} disabled={editing}>
-                <FontAwesome name="close" size={20} color={colors.icon} />
-              </TouchableOpacity>
-              <View style={{ position: 'absolute', bottom: 4, left: 4, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>GIF</Text>
+            {/* Reply GIF preview */}
+            {replyGif ? (
+              <View style={{ marginBottom: 10 }}>
+                <ExpoImage source={{ uri: replyGif }} style={{ width: 120, height: 120, borderRadius: 10 }} contentFit="cover" />
+                <TouchableOpacity onPress={() => setReplyGif(null)} style={{ position: 'absolute', top: 4, right: 4 }} disabled={posting}>
+                  <FontAwesome name="close" size={20} color={colors.icon} />
+                </TouchableOpacity>
+                <View style={{ position: 'absolute', bottom: 4, left: 4, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>GIF</Text>
+                </View>
               </View>
-            </View>
-          ) : null}
-          
-          {/* Error message */}
-          {editError ? (
-            <Text style={{ color: 'red', marginBottom: 8 }}>{editError}</Text>
-          ) : null}
-          
-          {/* Edit input row */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-            <TouchableOpacity onPress={() => handleAddImage('edit')} disabled={editUploading || editing} style={{ marginRight: 16 }}>
-              <FontAwesome name="image" size={22} color={colors.icon} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleOpenGifPicker('edit')} disabled={editUploading || editing} style={{ marginRight: 16 }}>
-              <Text style={{ fontSize: 18, color: colors.icon }}>GIF</Text>
-            </TouchableOpacity>
-            <TextInput
-              value={editText}
-              onChangeText={setEditText}
-              style={{
-                flex: 1,
-                minHeight: 80,
-                color: colors.text,
-                backgroundColor: colors.bubble,
-                borderRadius: 10,
-                padding: 10,
-                marginRight: 10,
-              }}
-              placeholder={`Edit your ${editTarget?.type === 'reply' ? 'reply' : 'snap'}...`}
-              placeholderTextColor={isDark ? '#8899A6' : '#888'}
-              multiline
-            />
-            {editUploading ? (
-              <FontAwesome name="spinner" size={16} color="#fff" style={{ marginRight: 8 }} />
             ) : null}
-            <TouchableOpacity
-              onPress={handleSubmitEdit}
-              disabled={editUploading || editing || (!editText.trim() && !editImage && !editGif) || !currentUsername}
-              style={{
-                backgroundColor: colors.icon,
-                borderRadius: 20,
-                paddingHorizontal: 18,
-                paddingVertical: 8,
-                opacity: editUploading || editing || (!editText.trim() && !editImage && !editGif) || !currentUsername ? 0.6 : 1,
-              }}
-            >
-              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{editing ? 'Saving...' : 'Save'}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        isVisible={upvoteModalVisible}
-        onBackdropPress={handleUpvoteCancel}
-        onBackButtonPress={handleUpvoteCancel}
-        style={{ justifyContent: 'center', alignItems: 'center', margin: 0 }}
-        useNativeDriver
-      >
-        <View style={{ backgroundColor: colors.background, borderRadius: 16, padding: 24, width: '85%', alignItems: 'center' }}>
-          <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>Upvote</Text>
-          <Text style={{ color: colors.text, fontSize: 15, marginBottom: 16 }}>Vote Weight: {voteWeight}%</Text>
-          {voteWeightLoading ? (
-            <ActivityIndicator size="small" color={colors.icon} style={{ marginVertical: 16 }} />
-          ) : (
-            <>
-              <Slider
-                style={{ width: '100%', height: 40 }}
-                minimumValue={1}
-                maximumValue={100}
-                step={1}
-                value={voteWeight}
-                onValueChange={setVoteWeight}
-                minimumTrackTintColor={colors.icon}
-                maximumTrackTintColor={colors.border}
-                thumbTintColor={colors.icon}
+            
+            {/* Error message */}
+            {replyError ? (
+              <Text style={{ color: 'red', marginBottom: 8 }}>{replyError}</Text>
+            ) : null}
+            
+            {/* Reply input row */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              <TouchableOpacity onPress={() => addReplyImage('reply')} disabled={uploading || posting || replyProcessing} style={{ marginRight: 16 }}>
+                <FontAwesome name="image" size={22} color={colors.icon} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleOpenGifPicker('reply')} disabled={uploading || posting || replyProcessing} style={{ marginRight: 16 }}>
+                <Text style={{ fontSize: 18, color: colors.icon }}>GIF</Text>
+              </TouchableOpacity>
+              <TextInput
+                value={replyText}
+                onChangeText={setReplyText}
+                style={{
+                  flex: 1,
+                  minHeight: 60,
+                  color: colors.text,
+                  backgroundColor: colors.bubble,
+                  borderRadius: 10,
+                  padding: 10,
+                  marginRight: 10,
+                }}
+                placeholder="Write your reply..."
+                placeholderTextColor={isDark ? '#8899A6' : '#888'}
+                multiline
               />
-              {voteValue && (
-                <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginTop: 12 }}>
-                  ${voteValue.usd} USD
+              {uploading ? (
+                <FontAwesome name="spinner" size={16} color="#fff" style={{ marginRight: 8 }} />
+              ) : null}
+              <TouchableOpacity
+                onPress={submitReply}
+                disabled={uploading || posting || replyProcessing || (!replyText.trim() && !replyImage && !replyGif) || !currentUsername}
+                style={{
+                  backgroundColor: colors.icon,
+                  borderRadius: 20,
+                  paddingHorizontal: 18,
+                  paddingVertical: 8,
+                  opacity: uploading || posting || replyProcessing || (!replyText.trim() && !replyImage && !replyGif) || !currentUsername ? 0.6 : 1,
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>
+                  {posting ? 'Posting...' : replyProcessing ? 'Checking...' : 'Send'}
                 </Text>
-              )}
-            </>
-          )}
-          {upvoteLoading ? (
-            <View style={{ marginTop: 24, alignItems: 'center' }}>
-              <FontAwesome name="hourglass-half" size={32} color={colors.icon} />
-              <Text style={{ color: colors.text, marginTop: 8 }}>Submitting vote...</Text>
+              </TouchableOpacity>
             </View>
-          ) : upvoteSuccess ? (
-            <View style={{ marginTop: 24, alignItems: 'center' }}>
-              <FontAwesome name="check-circle" size={32} color={colors.icon} />
-              <Text style={{ color: colors.text, marginTop: 8 }}>Upvote successful!</Text>
-            </View>
-          ) : (
-            <View style={{ flexDirection: 'row', marginTop: 24 }}>
-              <Pressable
-                style={{ flex: 1, marginRight: 8, backgroundColor: colors.border, borderRadius: 8, padding: 12, alignItems: 'center' }}
-                onPress={handleUpvoteCancel}
-                disabled={upvoteLoading}
-              >
-                <Text style={{ color: colors.text, fontWeight: '600' }}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={{ flex: 1, marginLeft: 8, backgroundColor: colors.icon, borderRadius: 8, padding: 12, alignItems: 'center' }}
-                onPress={handleUpvoteConfirm}
-                disabled={upvoteLoading}
-              >
-                <Text style={{ color: '#fff', fontWeight: '600' }}>Confirm</Text>
-              </Pressable>
-            </View>
-          )}
-        </View>
-      </Modal>
-      
-      {/* GIF Picker Modal */}
-      {renderGifPickerModal()}
+          </View>
+        </Modal>
 
+        {/* Edit Modal */}
+        <Modal
+          isVisible={editModalVisible}
+          onBackdropPress={editing ? undefined : closeEditModal}
+          onBackButtonPress={editing ? undefined : closeEditModal}
+          style={{ justifyContent: 'flex-end', margin: 0 }}
+          useNativeDriver
+          avoidKeyboard={true}
+        >
+          <View style={{ 
+            backgroundColor: colors.background, 
+            padding: 16, 
+            borderTopLeftRadius: 18, 
+            borderTopRightRadius: 18 
+          }}>
+            <Text style={{ color: colors.text, fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>
+              Edit {editTarget?.type === 'reply' ? 'Reply' : 'Snap'}
+            </Text>
+            
+            {/* Edit image preview */}
+            {editImage ? (
+              <View style={{ marginBottom: 10 }}>
+                <ExpoImage source={{ uri: editImage }} style={{ width: 120, height: 120, borderRadius: 10 }} contentFit="cover" />
+                <TouchableOpacity onPress={() => setEditImage(null)} style={{ position: 'absolute', top: 4, right: 4 }} disabled={editing}>
+                  <FontAwesome name="close" size={20} color={colors.icon} />
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+            {/* Edit GIF preview */}
+            {editGif ? (
+              <View style={{ marginBottom: 10 }}>
+                <ExpoImage source={{ uri: editGif }} style={{ width: 120, height: 120, borderRadius: 10 }} contentFit="cover" />
+                <TouchableOpacity onPress={() => setEditGif(null)} style={{ position: 'absolute', top: 4, right: 4 }} disabled={editing}>
+                  <FontAwesome name="close" size={20} color={colors.icon} />
+                </TouchableOpacity>
+                <View style={{ position: 'absolute', bottom: 4, left: 4, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>GIF</Text>
+                </View>
+              </View>
+            ) : null}
+            
+            {/* Error message */}
+            {editError ? (
+              <Text style={{ color: 'red', marginBottom: 8 }}>{editError}</Text>
+            ) : null}
+            
+            {/* Edit input row */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              <TouchableOpacity onPress={() => addEditImage('edit')} disabled={editUploading || editing || editProcessing} style={{ marginRight: 16 }}>
+                <FontAwesome name="image" size={22} color={colors.icon} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleOpenGifPicker('edit')} disabled={editUploading || editing || editProcessing} style={{ marginRight: 16 }}>
+                <Text style={{ fontSize: 18, color: colors.icon }}>GIF</Text>
+              </TouchableOpacity>
+              <TextInput
+                value={editText}
+                onChangeText={setEditText}
+                style={{
+                  flex: 1,
+                  minHeight: 80,
+                  color: colors.text,
+                  backgroundColor: colors.bubble,
+                  borderRadius: 10,
+                  padding: 10,
+                  marginRight: 10,
+                }}
+                placeholder={`Edit your ${editTarget?.type === 'reply' ? 'reply' : 'snap'}...`}
+                placeholderTextColor={isDark ? '#8899A6' : '#888'}
+                multiline
+              />
+              {editUploading ? (
+                <FontAwesome name="spinner" size={16} color="#fff" style={{ marginRight: 8 }} />
+              ) : null}
+              <TouchableOpacity
+                onPress={submitEdit}
+                disabled={editUploading || editing || editProcessing || (!editText.trim() && !editImage && !editGif) || !currentUsername}
+                style={{
+                  backgroundColor: colors.icon,
+                  borderRadius: 20,
+                  paddingHorizontal: 18,
+                  paddingVertical: 8,
+                  opacity: editUploading || editing || editProcessing || (!editText.trim() && !editImage && !editGif) || !currentUsername ? 0.6 : 1,
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>
+                  {editing ? 'Saving...' : editProcessing ? 'Checking...' : 'Save'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Upvote Modal */}
+        <Modal
+          isVisible={upvoteModalVisible}
+          onBackdropPress={closeUpvoteModal}
+          onBackButtonPress={closeUpvoteModal}
+          style={{ justifyContent: 'center', alignItems: 'center', margin: 0 }}
+          useNativeDriver
+        >
+          <View style={{ backgroundColor: colors.background, borderRadius: 16, padding: 24, width: '85%', alignItems: 'center' }}>
+            <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>Upvote</Text>
+            <Text style={{ color: colors.text, fontSize: 15, marginBottom: 16 }}>Vote Weight: {voteWeight}%</Text>
+            {voteWeightLoading ? (
+              <ActivityIndicator size="small" color={colors.icon} style={{ marginVertical: 16 }} />
+            ) : (
+              <>
+                <Slider
+                  style={{ width: '100%', height: 40 }}
+                  minimumValue={1}
+                  maximumValue={100}
+                  step={1}
+                  value={voteWeight}
+                  onValueChange={setVoteWeight}
+                  minimumTrackTintColor={colors.icon}
+                  maximumTrackTintColor={colors.border}
+                  thumbTintColor={colors.icon}
+                />
+                {voteValue && (
+                  <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginTop: 12 }}>
+                    ${voteValue.usd} USD
+                  </Text>
+                )}
+              </>
+            )}
+            {upvoteLoading ? (
+              <View style={{ marginTop: 24, alignItems: 'center' }}>
+                <FontAwesome name="hourglass-half" size={32} color={colors.icon} />
+                <Text style={{ color: colors.text, marginTop: 8 }}>Submitting vote...</Text>
+              </View>
+            ) : upvoteSuccess ? (
+              <View style={{ marginTop: 24, alignItems: 'center' }}>
+                <FontAwesome name="check-circle" size={32} color={colors.icon} />
+                <Text style={{ color: colors.text, marginTop: 8 }}>Upvote successful!</Text>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', marginTop: 24 }}>
+                <Pressable
+                  style={{ flex: 1, marginRight: 8, backgroundColor: colors.border, borderRadius: 8, padding: 12, alignItems: 'center' }}
+                  onPress={closeUpvoteModal}
+                  disabled={upvoteLoading}
+                >
+                  <Text style={{ color: colors.text, fontWeight: '600' }}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={{ flex: 1, marginLeft: 8, backgroundColor: colors.icon, borderRadius: 8, padding: 12, alignItems: 'center' }}
+                  onPress={confirmUpvote}
+                  disabled={upvoteLoading}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '600' }}>Confirm</Text>
+                </Pressable>
+              </View>
+            )}
+          </View>
+        </Modal>
+
+        {/* GIF Picker Modal */}
+        <Modal
+          isVisible={gifModalVisible}
+          onBackdropPress={closeGifModal}
+          onBackButtonPress={closeGifModal}
+          style={{ justifyContent: 'flex-start', margin: 0 }}
+          useNativeDriver
+        >
+          <View style={{ flex: 1, backgroundColor: isDark ? '#15202B' : '#fff' }}>
+            {/* Header */}
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border,
+            }}>
+              <Text style={{
+                fontSize: 18,
+                fontWeight: '600',
+                color: colors.text,
+              }}>
+                Choose a GIF
+              </Text>
+              <Pressable
+                onPress={closeGifModal}
+                style={({ pressed }) => ({
+                  opacity: pressed ? 0.7 : 1,
+                  padding: 4,
+                })}
+              >
+                <FontAwesome name="times" size={24} color={colors.text} />
+              </Pressable>
+            </View>
+
+            {/* Search Bar */}
+            <View style={{
+              padding: 16,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border,
+            }}>
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: colors.bubble,
+                borderRadius: 25,
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+              }}>
+                <FontAwesome name="search" size={16} color={colors.text} style={{ marginRight: 12 }} />
+                <TextInput
+                  placeholder="Search GIFs..."
+                  placeholderTextColor={colors.text + '80'}
+                  value={gifSearchQuery}
+                  onChangeText={setGifSearchQuery}
+                  onSubmitEditing={() => searchGifs(gifSearchQuery)}
+                  style={{
+                    flex: 1,
+                    fontSize: 16,
+                    color: colors.text,
+                  }}
+                  returnKeyType="search"
+                />
+                {gifSearchQuery.length > 0 && (
+                  <Pressable
+                    onPress={() => {
+                      setGifSearchQuery('');
+                      searchGifs('');
+                    }}
+                    style={{ marginLeft: 8 }}
+                  >
+                    <FontAwesome name="times-circle" size={16} color={colors.text + '60'} />
+                  </Pressable>
+                )}
+              </View>
+            </View>
+
+            {/* GIF Grid */}
+            <View style={{ flex: 1, padding: 16 }}>
+              {gifLoading ? (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                  <ActivityIndicator size="large" color={colors.icon} />
+                  <Text style={{ color: colors.text, marginTop: 12, fontSize: 16 }}>
+                    {gifSearchQuery.trim() ? 'Searching GIFs...' : 'Loading...'}
+                  </Text>
+                </View>
+              ) : gifResults.length > 0 ? (
+                <FlatList
+                  data={gifResults}
+                  renderItem={({ item, index }) => {
+                    const { getBestGifUrl, getGifPreviewUrl } = require('../utils/tenorApi');
+                    const gifUrl = getBestGifUrl(item);
+                    const previewUrl = getGifPreviewUrl(item);
+                    
+                    return (
+                      <Pressable
+                        onPress={() => handleSelectGif(gifUrl)}
+                        style={({ pressed }) => [
+                          {
+                            flex: 1,
+                            margin: 2,
+                            borderRadius: 8,
+                            overflow: 'hidden',
+                            aspectRatio: 1,
+                            opacity: pressed ? 0.7 : 1,
+                          }
+                        ]}
+                      >
+                        <Image
+                          source={{ uri: previewUrl || gifUrl }}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            backgroundColor: isDark ? '#333' : '#f0f0f0',
+                          }}
+                          resizeMode="cover"
+                        />
+                      </Pressable>
+                    );
+                  }}
+                  keyExtractor={(item) => item.id}
+                  numColumns={3}
+                  columnWrapperStyle={{ justifyContent: 'space-between' }}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ paddingBottom: 20 }}
+                />
+              ) : (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                  <Text style={{ 
+                    fontSize: 48,
+                    marginBottom: 16,
+                  }}>
+                    🎭
+                  </Text>
+                  <Text style={{ 
+                    color: colors.text, 
+                    fontSize: 18, 
+                    textAlign: 'center',
+                    fontWeight: '600',
+                    marginBottom: 8,
+                  }}>
+                    {gifSearchQuery.trim() 
+                      ? `No GIFs found for "${gifSearchQuery}"` 
+                      : 'Search for the perfect GIF'
+                    }
+                  </Text>
+                  <Text style={{ 
+                    color: colors.text, 
+                    fontSize: 14, 
+                    textAlign: 'center',
+                    opacity: 0.7,
+                    marginTop: 4,
+                  }}>
+                    {gifSearchQuery.trim() 
+                      ? 'Try a different search term'
+                      : 'Type something in the search bar above'
+                    }
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Powered by Tenor */}
+            <View style={{
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
+              alignItems: 'center',
+            }}>
+              <Text style={{
+                fontSize: 12,
+                color: colors.text + '60',
+                fontStyle: 'italic',
+              }}>
+                Powered by Tenor
+              </Text>
+            </View>
+          </View>
+        </Modal>
+        
       </KeyboardAvoidingView>
     </SafeAreaViewSA>
   );
 };
 
-export default ConversationScreen;
+export default ConversationScreenRefactored;
 
-export const options = { headerShown: false };
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1 },
-  topBar: { flexDirection: 'row', alignItems: 'center', padding: 12, borderBottomWidth: 1 },
-  topBarButton: { padding: 6 },
-  snapPost: { padding: 16, borderBottomWidth: 1 },
-  snapAuthor: { fontWeight: 'bold', fontSize: 16, marginBottom: 4 },
-  snapBody: { fontSize: 15, marginBottom: 8 },
-  snapMeta: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  snapMetaText: { marginLeft: 4, fontSize: 14 },
-  replyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'auto',
-    marginLeft: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: 'transparent',
-  },
-  replyButtonText: {
-    marginLeft: 6,
-    fontWeight: 'bold',
-    fontSize: 15,
-  },
-  repliesList: { padding: 12 },
-  replyBubble: { borderRadius: 12, padding: 10, marginBottom: 10 },
-  replyAuthor: { fontWeight: 'bold', fontSize: 14, marginBottom: 2 },
-  replyBody: { fontSize: 14, marginBottom: 4 },
-  replyMeta: { flexDirection: 'row', alignItems: 'center' },
-  replyMetaText: { marginLeft: 4, fontSize: 13 },
-  avatar: { width: 40, height: 40, borderRadius: 20, marginRight: 10 },
-  snapTimestamp: { fontSize: 12, color: '#8899A6', marginLeft: 8 },
-  // Header styles (copied from NotificationsScreen)
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backButton: {
-    marginRight: 16,
-    padding: 4,
-  },
-  parentButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  parentButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-});
+export const options = { headerShown: false }; 
