@@ -8,7 +8,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
-import { invalidateAvatarCache } from './FeedScreen';
+import genericAvatar from '../assets/images/generic-avatar.png';
 
 // Profile data interface
 interface ProfileData {

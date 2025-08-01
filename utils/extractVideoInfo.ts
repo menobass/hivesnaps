@@ -9,11 +9,12 @@
  */
 
 export interface VideoInfo {
-  type: 'youtube' | '3speak' | 'ipfs';
+  type: 'youtube' | '3speak' | 'ipfs' | 'twitter';
   id?: string;
   username?: string;
   videoId?: string;
   ipfsHash?: string;
+  tweetId?: string;
   embedUrl: string;
   originalUrl: string;
 }
@@ -78,6 +79,23 @@ export function extractVideoInfo(text: string): VideoInfo | null {
       ipfsHash: ipfsDirectMatch[2],
       embedUrl: ipfsDirectMatch[1],
       originalUrl: ipfsDirectMatch[0]
+    };
+  }
+
+  // Twitter/X status detection (embed URLs)
+  const twitterMatch = text.match(/(?:https?:\/\/)?(?:www\.)?(twitter\.com|x\.com)\/([a-zA-Z0-9_]+)\/status\/(\d+)/);
+  if (twitterMatch) {
+    const domain = twitterMatch[1]; // This captures 'twitter.com' or 'x.com'
+    const username = twitterMatch[2]; // This captures the username
+    const tweetId = twitterMatch[3]; // This captures the tweet ID
+    const originalUrl = `https://${domain}/${username}/status/${tweetId}`;
+    
+    return {
+      type: 'twitter',
+      username: username,
+      tweetId: tweetId,
+      embedUrl: `https://platform.twitter.com/embed/Tweet.html?id=${tweetId}`,
+      originalUrl: originalUrl
     };
   }
 
