@@ -19,18 +19,11 @@ import * as SecureStore from 'expo-secure-store';
 import Modal from 'react-native-modal';
 
 import {
-  fetchNotifications,
-  parseNotification,
   formatNotificationTime,
   isActionableNotification,
-  markAsRead,
-  markAllAsRead,
-  getUnreadCount,
-  sortNotifications,
-  getDefaultNotificationSettings,
-  filterNotificationsBySettings,
   type ParsedNotification,
 } from '../utils/notifications';
+import { useNotifications } from '../hooks/useNotifications';
 
 interface NotificationItemProps {
   notification: ParsedNotification;
@@ -128,12 +121,21 @@ const NotificationsScreen = () => {
   const isDark = colorScheme === 'dark';
   const router = useRouter();
 
-  const [notifications, setNotifications] = useState<ParsedNotification[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
   const [settingsVisible, setSettingsVisible] = useState(false);
-  const [settings, setSettings] = useState(getDefaultNotificationSettings());
+  
+  // Use the notifications hook which handles settings persistence
+  const {
+    notifications,
+    unreadCount,
+    loading,
+    refreshing,
+    settings,
+    refresh,
+    markAsRead,
+    markAllAsRead,
+    updateSettings,
+  } = useNotifications(currentUsername);
 
 
 
@@ -161,64 +163,7 @@ const NotificationsScreen = () => {
     loadUsername();
   }, []);
 
-  // Load notifications when username is available
-  useEffect(() => {
-    if (currentUsername) {
-      loadNotifications();
-    }
-  }, [currentUsername]);
-
-  const loadNotifications = async (isRefresh = false) => {
-    if (!currentUsername) return;
-
-    if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-
-    try {
-      const rawNotifications = await fetchNotifications(currentUsername, 50);
-      const parsed = rawNotifications.map(parseNotification);
-      
-      // Load read status from local storage
-      const readNotifications = await loadReadStatus();
-      const withReadStatus = parsed.map(notification => ({
-        ...notification,
-        read: readNotifications.includes(notification.id),
-      }));
-
-      // Filter by settings and sort chronologically
-      const filtered = filterNotificationsBySettings(withReadStatus, settings);
-      const sorted = sortNotifications(filtered, 'chronological');
-
-      setNotifications(sorted);
-    } catch (error) {
-      console.error('Error loading notifications:', error);
-      Alert.alert('Error', 'Failed to load notifications');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  const loadReadStatus = async (): Promise<number[]> => {
-    try {
-      const readStatus = await SecureStore.getItemAsync('notification_read_status');
-      return readStatus ? JSON.parse(readStatus) : [];
-    } catch (error) {
-      console.error('Error loading read status:', error);
-      return [];
-    }
-  };
-
-  const saveReadStatus = async (readIds: number[]) => {
-    try {
-      await SecureStore.setItemAsync('notification_read_status', JSON.stringify(readIds));
-    } catch (error) {
-      console.error('Error saving read status:', error);
-    }
-  };
+  // The useNotifications hook handles loading notifications when username changes
 
   const handleNotificationPress = (notification: ParsedNotification) => {
     if (isActionableNotification(notification) && notification.targetContent) {
@@ -234,26 +179,16 @@ const NotificationsScreen = () => {
   };
 
   const handleMarkAsRead = useCallback(async (notificationId: number) => {
-    const updated = markAsRead(notifications, notificationId);
-    setNotifications(updated);
-    
-    const readIds = updated.filter(n => n.read).map(n => n.id);
-    await saveReadStatus(readIds);
-  }, [notifications]);
+    await markAsRead(notificationId);
+  }, [markAsRead]);
 
   const handleMarkAllAsRead = useCallback(async () => {
-    const updated = markAllAsRead(notifications);
-    setNotifications(updated);
-    
-    const readIds = updated.map(n => n.id);
-    await saveReadStatus(readIds);
-  }, [notifications]);
+    await markAllAsRead();
+  }, [markAllAsRead]);
 
   const handleRefresh = () => {
-    loadNotifications(true);
+    refresh();
   };
-
-  const unreadCount = getUnreadCount(notifications);
 
   const renderNotification = ({ item }: { item: ParsedNotification }) => (
     <NotificationItem
@@ -330,7 +265,7 @@ const NotificationsScreen = () => {
               </View>
               <Switch
                 value={settings[key as keyof typeof settings] as boolean}
-                onValueChange={(value) => setSettings(prev => ({ ...prev, [key]: value }))}
+                onValueChange={(value) => updateSettings({ [key]: value })}
                 trackColor={{ false: colors.border, true: colors.buttonBackground + '50' }}
                 thumbColor={colors.buttonBackground}
               />
@@ -342,7 +277,8 @@ const NotificationsScreen = () => {
           style={[styles.saveButton, { backgroundColor: colors.buttonBackground }]}
           onPress={() => {
             setSettingsVisible(false);
-            loadNotifications(); // Reload with new settings
+            // Settings are automatically saved when toggled, so just refresh
+            refresh();
           }}
         >
           <Text style={styles.saveButtonText}>Save Settings</Text>
