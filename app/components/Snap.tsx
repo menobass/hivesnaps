@@ -13,6 +13,9 @@ import RenderHtml from 'react-native-render-html';
 import { Video, ResizeMode } from 'expo-av';
 import { convertSpoilerSyntax, type SpoilerData } from '../../utils/spoilerParser';
 import SpoilerText from './SpoilerText';
+import TwitterEmbed from './TwitterEmbed';
+import YouTubeEmbed from './YouTubeEmbed';
+import ThreeSpeakEmbed from './ThreeSpeakEmbed';
 
 const twitterColors = {
   light: {
@@ -148,6 +151,21 @@ const markdownRules = {
     styles: any
   ) => {
     const { src, alt } = node.attributes;
+    
+    // Only process actual image URLs, ignore hashtag/profile links
+    if (!src || src.startsWith('hashtag://') || src.startsWith('profile://')) {
+      return null;
+    }
+    
+    // Check if it's actually an image URL
+    const isImageUrl = /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i.test(src) || 
+                      src.startsWith('data:image/') ||
+                      src.includes('image');
+    
+    if (!isImageUrl) {
+      return null;
+    }
+    
     const uniqueKey = `${src || alt}-${Math.random().toString(36).substr(2, 9)}`;
     return (
       <Pressable
@@ -323,11 +341,11 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
   const upvoteColor = hasUpvoted ? '#8e44ad' : colors.icon; // purple if upvoted
   const imageUrls = extractImageUrls(body);
   const rawImageUrls = extractRawImageUrls(body);
-  const videoInfo = extractVideoInfo(body);
+  const embeddedContent = extractVideoInfo(body); // Renamed from videoInfo to be more accurate
   
-  // Remove video URLs and image URLs from text body if present
+  // Remove embedded content URLs and image URLs from text body if present
   let textBody = stripImageTags(body);
-  if (videoInfo) {
+  if (embeddedContent) {
     textBody = removeVideoUrls(textBody);
   }
   if (rawImageUrls.length > 0) {
@@ -392,42 +410,18 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
           <Text style={[styles.timestamp, { color: colors.text }]}>{new Date(created + 'Z').toLocaleString()}</Text>    
         </View>
       )}
-      {/* Video Player (YouTube, 3speak, IPFS) - Click to play */}
-      {videoInfo && (
+      {/* Embedded Content (Videos, Twitter posts, etc.) */}
+      {embeddedContent && (
         <View style={{ marginBottom: 8 }}>
-          {videoInfo.type === 'ipfs' ? (
-            <IPFSVideoPlayer ipfsUrl={videoInfo.embedUrl} isDark={isDark} />
-          ) : (
-            <View style={{ width: '100%', aspectRatio: 16/9, borderRadius: 12, overflow: 'hidden', position: 'relative' }}>
-              <WebView
-                source={{ 
-                  uri: videoInfo.type === 'youtube' 
-                    ? `${videoInfo.embedUrl}?autoplay=0&rel=0&modestbranding=1`
-                    : `${videoInfo.embedUrl}&autoplay=0`
-                }}
-                style={{ flex: 1, backgroundColor: '#000' }}
-                allowsFullscreenVideo
-                javaScriptEnabled
-                domStorageEnabled
-                mediaPlaybackRequiresUserAction={true}
-                allowsInlineMediaPlayback={true}
-              />
-              {/* Video type indicator */}
-              <View style={{ 
-                position: 'absolute', 
-                top: 8, 
-                right: 8, 
-                backgroundColor: 'rgba(0,0,0,0.7)', 
-                paddingHorizontal: 6, 
-                paddingVertical: 2, 
-                borderRadius: 4 
-              }}>
-                <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
-                  {videoInfo.type.toUpperCase()}
-                </Text>
-              </View>
-            </View>
-          )}
+          {embeddedContent.type === 'ipfs' ? (
+            <IPFSVideoPlayer ipfsUrl={embeddedContent.embedUrl} isDark={isDark} />
+          ) : embeddedContent.type === 'twitter' ? (
+            <TwitterEmbed embedUrl={embeddedContent.embedUrl} isDark={isDark} />
+          ) : embeddedContent.type === 'youtube' ? (
+            <YouTubeEmbed embedUrl={embeddedContent.embedUrl} isDark={isDark} />
+          ) : embeddedContent.type === '3speak' ? (
+            <ThreeSpeakEmbed embedUrl={embeddedContent.embedUrl} isDark={isDark} />
+          ) : null}
         </View>
       )}
       {/* Images from markdown/html */}

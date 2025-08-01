@@ -1,34 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Client } from '@hiveio/dhive';
-
-// Types for a Snap (feed item)
-export interface SnapData {
-  author: string;
-  avatarUrl?: string;
-  body: string;
-  created: string;
-  voteCount?: number;
-  replyCount?: number;
-  payout?: number;
-  permlink?: string;
-  hasUpvoted?: boolean;
-  active_votes?: any[];
-}
-
-export type FeedType = 'newest' | 'following' | 'trending' | 'my' | 'hashtag';
-
-interface UseFeedDataOptions {
-  feedType: FeedType;
-  hashtag?: string;
-  username?: string; // For 'my' or 'following' feeds
-}
-
-interface UseFeedDataResult {
-  snaps: SnapData[];
-  loading: boolean;
-  error: string | null;
-  refresh: () => void;
-}
+import * as SecureStore from 'expo-secure-store';
+import { calculateVoteValue } from '../utils/calculateVoteValue';
+import { getHivePriceUSD } from '../utils/getHivePrice';
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -37,197 +11,261 @@ const HIVE_NODES = [
 ];
 const client = new Client(HIVE_NODES);
 
-/**
- * useFeedData - Custom hook to fetch and manage feed data for various feed types (newest, trending, following, my, hashtag).
- * Keeps logic modular and reusable for FeedScreen, HashtagScreen, etc.
- *
- * @param options { feedType, hashtag, username }
- * @returns { snaps, loading, error, refresh }
- */
-export function useFeedData(options: UseFeedDataOptions): UseFeedDataResult {
-  // TODO: Implement feed fetching, avatar enhancement, and error handling logic here.
-  // This is a scaffold for safe incremental refactor.
-  const [snaps, setSnaps] = useState<SnapData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+// Define a Snap type for Hive posts/comments
+export interface Snap {
+  author: string;
+  permlink: string;
+  parent_author: string;
+  parent_permlink: string;
+  body: string;
+  created: string;
+  json_metadata?: string;
+  posting_json_metadata?: string;
+  avatarUrl?: string;
+  [key: string]: any;
+}
 
-  // In-memory avatar/profile cache for this session (per hook instance)
-  const avatarProfileCache = useRef<Record<string, string | undefined>>({});
+export type FeedFilter = 'following' | 'newest' | 'trending' | 'my';
 
-  // Helper: Enhance snaps with avatar/profile info
-  const enhanceSnapsWithAvatar = async (snaps: SnapData[]): Promise<SnapData[]> => {
-    // Collect all unique authors not already cached
-    const authorsToFetch = Array.from(new Set(snaps.map(s => s.author))).filter(a => !(a in avatarProfileCache.current));
-    let accountsArr: any[] = [];
-    if (authorsToFetch.length > 0) {
-      try {
-        accountsArr = await client.database.call('get_accounts', [authorsToFetch]);
-      } catch (e) {
-        accountsArr = [];
-      }
-      // Update cache with fetched avatars
-      for (const acc of accountsArr) {
-        let meta = acc.posting_json_metadata;
-        if (!meta || meta === '{}') {
-          meta = acc.json_metadata;
-        }
-        if (meta) {
-          let profile;
-          try {
-            profile = JSON.parse(meta).profile;
-          } catch (e) {
-            profile = undefined;
-          }
-          if (profile && profile.profile_image) {
-            avatarProfileCache.current[acc.name] = profile.profile_image;
-          } else {
-            avatarProfileCache.current[acc.name] = undefined;
-          }
-        } else {
-          avatarProfileCache.current[acc.name] = undefined;
-        }
-      }
-    }
-    // Attach avatarUrl to each snap
-    return snaps.map(snap => ({ ...snap, avatarUrl: avatarProfileCache.current[snap.author] }));
+interface FeedState {
+  snaps: Snap[];
+  loading: boolean;
+  error: string | null;
+  hasMore: boolean;
+}
+
+interface UseFeedDataReturn extends FeedState {
+  fetchSnaps: (filter: FeedFilter, useCache?: boolean) => Promise<void>;
+  refreshSnaps: (filter: FeedFilter) => Promise<void>;
+  loadMoreSnaps: (filter: FeedFilter) => Promise<void>;
+  clearError: () => void;
+}
+
+export const useFeedData = (username: string | null): UseFeedDataReturn => {
+  const [state, setState] = useState<FeedState>({
+    snaps: [],
+    loading: false,
+    error: null,
+    hasMore: true,
+  });
+
+  const [snapsCache, setSnapsCache] = useState<Record<string, Snap[]>>({});
+  const [lastFetchTime, setLastFetchTime] = useState<Record<string, number>>({});
+  const [avatarCache, setAvatarCache] = useState<Record<string, { url: string; timestamp: number }>>({});
+
+  // Cache management - 5 minute cache
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+  const isCacheValid = (filterKey: string) => {
+    const lastFetch = lastFetchTime[filterKey];
+    return lastFetch && (Date.now() - lastFetch) < CACHE_DURATION;
   };
 
-  // Main feed fetcher
-  const fetchFeed = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      let rawSnaps: any[] = [];
-      // Fetch based on feed type
-      if (options.feedType === 'newest') {
-        // Get latest posts tagged with 'hivesnaps'
-        const res = await fetch('https://api.hive.blog', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            method: 'condenser_api.get_discussions_by_created',
-            params: [{ tag: 'hivesnaps', limit: 40 }],
-            id: 1,
-          }),
-        });
-        const data = await res.json();
-        rawSnaps = data.result || [];
-      } else if (options.feedType === 'trending') {
-        const res = await fetch('https://api.hive.blog', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            method: 'condenser_api.get_discussions_by_trending',
-            params: [{ tag: 'hivesnaps', limit: 40 }],
-            id: 1,
-          }),
-        });
-        const data = await res.json();
-        rawSnaps = data.result || [];
-      } else if (options.feedType === 'following' && options.username) {
-        // Get posts from followed authors
-        // 1. Get following list
-        const followingRes = await fetch('https://api.hive.blog', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            method: 'condenser_api.get_following',
-            params: [options.username, '', 'blog', 100],
-            id: 1,
-          }),
-        });
-        const followingData = await followingRes.json();
-        const following = (followingData.result || []).map((f: any) => f.following);
-        if (following.length === 0) {
-          setSnaps([]);
-          setLoading(false);
-          return;
+  const getCachedSnaps = (filterKey: string) => {
+    if (isCacheValid(filterKey) && snapsCache[filterKey]) {
+      return snapsCache[filterKey];
+    }
+    return null;
+  };
+
+  const setCachedSnaps = (filterKey: string, snaps: Snap[]) => {
+    setSnapsCache(prev => ({ ...prev, [filterKey]: snaps }));
+    setLastFetchTime(prev => ({ ...prev, [filterKey]: Date.now() }));
+  };
+
+  // Enhanced avatar fetching with time-based caching
+  const enhanceSnapsWithAvatar = async (snaps: Snap[]) => {
+    const authors = Array.from(new Set(snaps.map(s => s.author)));
+    const now = Date.now();
+    const AVATAR_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+    const uncachedAuthors = authors.filter(author => {
+      const cached = avatarCache[author];
+      return !cached || (now - cached.timestamp) > AVATAR_CACHE_DURATION;
+    });
+
+    if (uncachedAuthors.length > 0) {
+      try {
+        const accounts = await client.database.getAccounts(uncachedAuthors);
+        for (const acc of accounts) {
+          let meta = null;
+          if (acc.posting_json_metadata) {
+            try {
+              meta = JSON.parse(acc.posting_json_metadata);
+            } catch { }
+          }
+          if ((!meta || !meta.profile || !meta.profile.profile_image) && acc.json_metadata) {
+            try {
+              meta = JSON.parse(acc.json_metadata);
+            } catch { }
+          }
+          const url = meta && meta.profile && meta.profile.profile_image
+            ? meta.profile.profile_image.replace(/[\\/]+$/, '')
+            : '';
+          setAvatarCache(prev => ({ ...prev, [acc.name]: { url, timestamp: now } }));
         }
-        // 2. Get posts for each followed author (parallel, then flatten)
-        const postsArr = await Promise.all(
-          following.map(async (author: string) => {
-            const res = await fetch('https://api.hive.blog', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                jsonrpc: '2.0',
-                method: 'condenser_api.get_discussions_by_blog',
-                params: [{ tag: author, limit: 10 }],
-                id: 1,
-              }),
-            });
-            const data = await res.json();
-            return data.result || [];
-          })
-        );
-        rawSnaps = postsArr.flat();
-      } else if (options.feedType === 'my' && options.username) {
-        // Get posts by the user
-        const res = await fetch('https://api.hive.blog', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            method: 'condenser_api.get_discussions_by_author',
-            params: [options.username, 'hivesnaps', 40],
-            id: 1,
-          }),
-        });
-        const data = await res.json();
-        rawSnaps = data.result || [];
-      } else if (options.feedType === 'hashtag' && options.hashtag) {
-        // Get posts by hashtag (tag)
-        const res = await fetch('https://api.hive.blog', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            method: 'condenser_api.get_discussions_by_created',
-            params: [{ tag: options.hashtag, limit: 40 }],
-            id: 1,
-          }),
-        });
-        const data = await res.json();
-        rawSnaps = data.result || [];
-      } else {
-        setSnaps([]);
-        setLoading(false);
+      } catch (e) {
+        console.log('Error fetching accounts for avatars:', e);
+      }
+    }
+
+    return snaps.map(snap => ({
+      ...snap,
+      avatarUrl: avatarCache[snap.author]?.url || ''
+    }));
+  };
+
+  const fetchSnaps = useCallback(async (filter: FeedFilter, useCache = true) => {
+    const cacheKey = filter === 'my' ? `my-${username}` : filter;
+
+    // Check cache first
+    if (useCache) {
+      const cachedSnaps = getCachedSnaps(cacheKey);
+      if (cachedSnaps) {
+        console.log('Using cached snaps for', filter, 'feed');
+        setState(prev => ({ ...prev, snaps: cachedSnaps, loading: false }));
         return;
       }
-
-      // Map to SnapData type
-      const mappedSnaps: SnapData[] = rawSnaps.map((post: any) => ({
-        author: post.author,
-        body: post.body,
-        created: post.created,
-        voteCount: post.net_votes,
-        replyCount: post.children,
-        payout: parseFloat(post.pending_payout_value ? post.pending_payout_value.replace(' HBD', '') : '0'),
-        permlink: post.permlink,
-        active_votes: post.active_votes,
-      }));
-
-      // Enhance with avatar/profile info
-      const enhanced = await enhanceSnapsWithAvatar(mappedSnaps);
-      setSnaps(enhanced);
-    } catch (e: any) {
-      setError(e.message || 'Failed to fetch feed.');
-      setSnaps([]);
-    } finally {
-      setLoading(false);
     }
-  }, [options.feedType, options.hashtag, options.username]);
 
-  useEffect(() => {
-    fetchFeed();
-  }, [fetchFeed]);
+    setState(prev => ({ ...prev, loading: true, error: null }));
 
-  const refresh = useCallback(() => {
-    fetchFeed();
-  }, [fetchFeed]);
+    try {
+      let allSnaps: Snap[] = [];
 
-  return { snaps, loading, error, refresh };
-}
+      if (filter === 'newest') {
+        const discussions = await client.database.call('get_discussions_by_blog', [{
+          tag: 'peak.snaps',
+          limit: 3
+        }]);
+
+        const snapPromises = discussions.map(async (post: any) => {
+          try {
+            const replies: Snap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
+            return replies;
+          } catch (err) {
+            console.log('Error fetching replies for post:', post.permlink, err);
+            return [];
+          }
+        });
+
+        const snapResults = await Promise.all(snapPromises);
+        allSnaps = snapResults.flat();
+        allSnaps.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
+      } else if (filter === 'following' && username) {
+        const followingResult = await client.call('condenser_api', 'get_following', [username, '', 'blog', 100]);
+        const following = Array.isArray(followingResult)
+          ? followingResult.map((f: any) => f.following)
+          : (followingResult && followingResult.following) ? followingResult.following : [];
+
+        const containerPosts = await client.database.call('get_discussions_by_blog', [{ tag: 'peak.snaps', limit: 3 }]);
+
+        const snapPromises = containerPosts.map(async (post: any) => {
+          try {
+            const replies: Snap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
+            return replies.filter((reply) => following.includes(reply.author));
+          } catch (err) {
+            console.log('Error fetching replies for post:', post.permlink, err);
+            return [];
+          }
+        });
+
+        const snapResults = await Promise.all(snapPromises);
+        allSnaps = snapResults.flat();
+        allSnaps.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
+      } else if (filter === 'trending') {
+        const discussions = await client.database.call('get_discussions_by_blog', [{
+          tag: 'peak.snaps',
+          limit: 3
+        }]);
+
+        const snapPromises = discussions.map(async (post: any) => {
+          try {
+            const replies: Snap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
+            return replies;
+          } catch (err) {
+            console.log('Error fetching replies for post:', post.permlink, err);
+            return [];
+          }
+        });
+
+        const snapResults = await Promise.all(snapPromises);
+        allSnaps = snapResults.flat();
+
+        allSnaps.sort((a, b) => {
+          const payoutA =
+            parseFloat(a.pending_payout_value ? a.pending_payout_value.replace(' HBD', '') : '0') +
+            parseFloat(a.total_payout_value ? a.total_payout_value.replace(' HBD', '') : '0') +
+            parseFloat(a.curator_payout_value ? a.curator_payout_value.replace(' HBD', '') : '0');
+          const payoutB =
+            parseFloat(b.pending_payout_value ? b.pending_payout_value.replace(' HBD', '') : '0') +
+            parseFloat(b.total_payout_value ? b.total_payout_value.replace(' HBD', '') : '0') +
+            parseFloat(b.curator_payout_value ? b.curator_payout_value.replace(' HBD', '') : '0');
+          return payoutB - payoutA;
+        });
+      } else if (filter === 'my' && username) {
+        const discussions = await client.database.call('get_discussions_by_blog', [{
+          tag: 'peak.snaps',
+          limit: 3
+        }]);
+
+        if (discussions && discussions.length > 0) {
+          const snapPromises = discussions.map(async (post: any) => {
+            try {
+              const replies: Snap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
+              return replies.filter((reply) => reply.author === username);
+            } catch (err) {
+              console.log('Error fetching replies for post:', post.permlink, err);
+              return [];
+            }
+          });
+
+          const snapResults = await Promise.all(snapPromises);
+          allSnaps = snapResults.flat();
+          allSnaps.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
+        }
+      }
+
+      const limitedSnaps = allSnaps.slice(0, 50);
+      const enhanced = await enhanceSnapsWithAvatar(limitedSnaps);
+      
+      setState(prev => ({ 
+        ...prev, 
+        snaps: enhanced, 
+        loading: false, 
+        hasMore: enhanced.length === 50 
+      }));
+      
+      setCachedSnaps(cacheKey, enhanced);
+      console.log('Fetched and cached snaps for', filter, ':', enhanced.length);
+    } catch (err) {
+      console.log('Error fetching snaps:', err);
+      setState(prev => ({ 
+        ...prev, 
+        loading: false, 
+        error: err instanceof Error ? err.message : 'Failed to fetch snaps' 
+      }));
+    }
+  }, [username, avatarCache]);
+
+  const refreshSnaps = useCallback(async (filter: FeedFilter) => {
+    await fetchSnaps(filter, false); // Force refresh without cache
+  }, [fetchSnaps]);
+
+  const loadMoreSnaps = useCallback(async (filter: FeedFilter) => {
+    // Implementation for pagination would go here
+    // For now, we'll just refresh
+    await refreshSnaps(filter);
+  }, [refreshSnaps]);
+
+  const clearError = useCallback(() => {
+    setState(prev => ({ ...prev, error: null }));
+  }, []);
+
+  return {
+    ...state,
+    fetchSnaps,
+    refreshSnaps,
+    loadMoreSnaps,
+    clearError,
+  };
+};
