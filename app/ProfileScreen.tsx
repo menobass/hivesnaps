@@ -1052,10 +1052,7 @@ const ProfileScreen = () => {
       
       // Clear sensitive data immediately
       setActiveKeyInput('');
-      
-      // Invalidate avatar cache for this user across all feeds
-      invalidateAvatarCache(currentUsername);
-      
+            
       // Clear any cached avatar data and refresh profile
       setTimeout(async () => {
         setActiveKeyModalVisible(false);
