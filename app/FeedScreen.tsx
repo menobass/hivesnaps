@@ -295,7 +295,7 @@ const FeedScreenRefactored = () => {
       </Modal>
 
       {/* Top bar */}
-      <SafeAreaView style={[styles.safeArea, { paddingTop: insets.top }]} edges={['top']}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
         <View style={styles.topBar}>
           <View style={{ flexDirection: 'row', alignItems: 'center', position: 'relative' }}>
             <Pressable
