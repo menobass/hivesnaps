@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, useColorScheme, Pressable, Linking } from 'react-native';
 import { WebView } from 'react-native-webview';
 
@@ -7,12 +7,89 @@ interface TwitterEmbedProps {
   isDark?: boolean;
 }
 
+// Cache for Twitter embed HTML
+const twitterEmbedCache = new Map<string, string>();
+
 const TwitterEmbed: React.FC<TwitterEmbedProps> = ({ embedUrl, isDark }) => {
   const colorScheme = useColorScheme();
   const themeIsDark = isDark ?? (colorScheme === 'dark');
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [isCentered, setIsCentered] = useState(false);
+  const webViewRef = useRef<WebView>(null);
 
   const handleMessage = (event: any) => {
-    console.log('TwitterEmbed WebView message:', event.nativeEvent.data);
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      console.log('TwitterEmbed message received:', data);
+      
+      switch (data.type) {
+        case 'twitter-loaded':
+          setIsLoaded(true);
+          // Send centering command
+          sendCenteringCommand();
+          break;
+        case 'centering-complete':
+          setIsCentered(true);
+          // Cache the centered HTML if needed
+          if (data.html) {
+            twitterEmbedCache.set(embedUrl, data.html);
+          }
+          break;
+        case 'error':
+          console.warn('TwitterEmbed error:', data.message);
+          break;
+      }
+    } catch (e) {
+      console.warn('Failed to parse TwitterEmbed message:', e);
+    }
+  };
+
+  const sendCenteringCommand = () => {
+    // Send a safe command to center content without DOM manipulation
+    const safeCenteringScript = `
+      (function() {
+        try {
+          // Use CSS-only centering approach
+          const style = document.createElement('style');
+          style.textContent = \`
+            body {
+              display: flex !important;
+              justify-content: center !important;
+              align-items: center !important;
+              min-height: 100vh !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              text-align: center !important;
+            }
+            iframe {
+              margin: 0 auto !important;
+              display: block !important;
+              max-width: 100% !important;
+            }
+            .twitter-tweet, [data-testid="tweet"] {
+              margin: 0 auto !important;
+              display: block !important;
+              text-align: center !important;
+            }
+          \`;
+          document.head.appendChild(style);
+          
+          // Notify React Native that centering is complete
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'centering-complete',
+            success: true
+          }));
+        } catch (error) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'error',
+            message: 'Centering failed: ' + error.message
+          }));
+        }
+      })();
+      true;
+    `;
+    
+    webViewRef.current?.injectJavaScript(safeCenteringScript);
   };
 
   const handleTap = () => {
@@ -30,9 +107,42 @@ const TwitterEmbed: React.FC<TwitterEmbedProps> = ({ embedUrl, isDark }) => {
     }
   };
 
+  // Check if we have cached HTML
+  const cachedHtml = twitterEmbedCache.get(embedUrl);
+  
+  if (cachedHtml && isCentered) {
+    // Use cached HTML to avoid reloading
+    return (
+      <Pressable onPress={handleTap} style={styles.container}>
+        <WebView
+          ref={webViewRef}
+          source={{ html: cachedHtml }}
+          style={styles.webView}
+          allowsFullscreenVideo
+          javaScriptEnabled
+          domStorageEnabled
+          mediaPlaybackRequiresUserAction={true}
+          allowsInlineMediaPlayback={true}
+          onMessage={handleMessage}
+          onShouldStartLoadWithRequest={(request) => {
+            // Block all navigation when using cached HTML
+            return false;
+          }}
+        />
+        {/* Twitter type indicator */}
+        <View style={[styles.indicator, { backgroundColor: 'rgba(0,0,0,0.7)' }]}>
+          <Text style={[styles.indicatorText, { color: '#fff' }]}>
+            𝕏
+          </Text>
+        </View>
+      </Pressable>
+    );
+  }
+
   return (
     <Pressable onPress={handleTap} style={styles.container}>
       <WebView
+        ref={webViewRef}
         source={{ uri: embedUrl }}
         style={styles.webView}
         allowsFullscreenVideo
@@ -41,6 +151,16 @@ const TwitterEmbed: React.FC<TwitterEmbedProps> = ({ embedUrl, isDark }) => {
         mediaPlaybackRequiresUserAction={true}
         allowsInlineMediaPlayback={true}
         onMessage={handleMessage}
+        onLoadEnd={() => {
+          // Send message to notify that Twitter embed has loaded
+          webViewRef.current?.injectJavaScript(`
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'twitter-loaded',
+              url: '${embedUrl}'
+            }));
+            true;
+          `);
+        }}
         onShouldStartLoadWithRequest={(request) => {
           // Allow the initial embed URL to load
           if (request.url === embedUrl) {
@@ -49,34 +169,6 @@ const TwitterEmbed: React.FC<TwitterEmbedProps> = ({ embedUrl, isDark }) => {
           // Block all other navigation to prevent login prompts
           return false;
         }}
-        injectedJavaScript={`
-          // Try a completely different approach - inject a wrapper div
-          setTimeout(() => {
-            console.log('TwitterEmbed: Starting wrapper approach');
-            
-            // Create a wrapper div that centers everything
-            const wrapper = document.createElement('div');
-            wrapper.id = 'twitter-embed-wrapper';
-            wrapper.style.cssText = 'display: flex !important; justify-content: center !important; align-items: center !important; width: 100% !important; height: 100vh !important; margin: 0 !important; padding: 0 !important;';
-            
-            // Move all body content into the wrapper
-            const bodyContent = document.body.innerHTML;
-            document.body.innerHTML = '';
-            document.body.appendChild(wrapper);
-            wrapper.innerHTML = bodyContent;
-            
-            // Also try to center any iframes specifically
-            const iframes = document.querySelectorAll('iframe');
-            iframes.forEach(iframe => {
-              iframe.style.cssText = 'margin: 0 auto !important; display: block !important; max-width: 100% !important;';
-            });
-            
-            // Send message back to React Native
-            window.ReactNativeWebView.postMessage('TwitterEmbed: Wrapper centering complete');
-            console.log('TwitterEmbed: Wrapper centering complete');
-          }, 3000);
-          true;
-        `}
       />
       {/* Twitter type indicator */}
       <View style={[styles.indicator, { backgroundColor: 'rgba(0,0,0,0.7)' }]}>
