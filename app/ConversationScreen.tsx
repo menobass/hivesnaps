@@ -32,6 +32,7 @@ import { ContextHivePostPreviewRenderer } from '../components/ContextHivePostPre
 import { HivePostPreview } from '../components/HivePostPreview';
 import { convertSpoilerSyntax, SpoilerData } from '../utils/spoilerParser';
 import SpoilerText from './components/SpoilerText';
+import TwitterEmbed from './components/TwitterEmbed';
 
 // Custom hooks for business logic
 import { useUserAuth } from '../hooks/useUserAuth';
@@ -327,10 +328,42 @@ const ConversationScreenRefactored = () => {
     </View>
   );
 
+  // Extract and render Twitter/X posts
+  const extractAndRenderTwitterPosts = (content: string) => {
+    const videoInfo = extractVideoInfo(content);
+    
+    if (videoInfo && videoInfo.type === 'twitter') {
+      console.log('🐦 Rendering Twitter post with WebView:', videoInfo);
+      
+      return (
+        <View key={`twitter-${videoInfo.tweetId}`} style={{ marginBottom: 8 }}>
+          <TwitterEmbed embedUrl={videoInfo.embedUrl} isDark={isDark} />
+        </View>
+      );
+    }
+    
+    return null;
+  };
+
   // Custom markdown rules (simplified)
   const markdownRules = {
     image: (node: any, children: any, parent: any, styles: any) => {
       const { src, alt } = node.attributes;
+      
+      // Only process actual image URLs, ignore hashtag/profile links
+      if (!src || src.startsWith('hashtag://') || src.startsWith('profile://')) {
+        return null;
+      }
+      
+      // Check if it's actually an image URL
+      const isImageUrl = /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i.test(src) || 
+                        src.startsWith('data:image/') ||
+                        src.includes('image');
+      
+      if (!isImageUrl) {
+        return null;
+      }
+      
       const uniqueKey = `${src || alt}-${Math.random().toString(36).substr(2, 9)}`;
       return (
         <Pressable key={uniqueKey} onPress={() => handleImagePress(src)}>
@@ -414,6 +447,11 @@ const ConversationScreenRefactored = () => {
     if (videoInfo || hivePostUrls.length > 0) {
       textBody = removeEmbedUrls(textBody);
     }
+    // Check for Twitter posts and remove URLs if found
+    const twitterPosts = extractAndRenderTwitterPosts(reply.body);
+    if (twitterPosts) {
+      textBody = removeTwitterUrls(textBody);
+    }
     textBody = stripImageTags(textBody);
     
     // Process spoiler syntax
@@ -477,6 +515,9 @@ const ConversationScreenRefactored = () => {
           
           {/* Hive Post Previews */}
           <HivePostPreviewRenderer postUrls={hivePostUrls} />
+          
+          {/* Twitter/X Posts */}
+          {extractAndRenderTwitterPosts(reply.body)}
           
           {/* Spoiler Components */}
           {spoilerData.spoilers.map((spoiler: SpoilerData, index: number) => (
@@ -567,6 +608,11 @@ const ConversationScreenRefactored = () => {
     if (videoInfo || hivePostUrls.length > 0) {
       textBody = removeEmbedUrls(textBody);
     }
+    // Check for Twitter posts and remove URLs if found
+    const twitterPosts = extractAndRenderTwitterPosts(snap.body);
+    if (twitterPosts) {
+      textBody = removeTwitterUrls(textBody);
+    }
     textBody = stripImageTags(textBody);
     
     // Process spoiler syntax
@@ -626,6 +672,9 @@ const ConversationScreenRefactored = () => {
         
         {/* Hive Post Previews */}
         <HivePostPreviewRenderer postUrls={hivePostUrls} />
+        
+        {/* Twitter/X Posts */}
+        {extractAndRenderTwitterPosts(snap.body)}
         
         {/* Spoiler Components */}
         {spoilerData.spoilers.map((spoiler: SpoilerData, index: number) => (
