@@ -44,11 +44,6 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
   // Parse as UTC and let JS handle local conversion
   const localDate = typeof rawTimestamp === 'string' ? new Date(rawTimestamp + 'Z') : new Date(rawTimestamp);
   const translatedTimestamp = formatNotificationTime(localDate.toISOString());
-  // Log both to console for inspection
-  console.log(`Notification ID: ${notification.id}`);
-  console.log(`Raw timestamp:`, rawTimestamp);
-  console.log(`Local date:`, localDate);
-  console.log(`Translated timestamp:`, translatedTimestamp);
 
   const handlePress = () => {
     if (!notification.read) {
@@ -69,7 +64,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
         },
       ]}
       onPress={handlePress}
-      disabled={!isActionableNotification(notification)}
+      disabled={!isActionableNotification(notification) && notification.type !== 'follow'}
     >
       <View style={styles.notificationHeader}>
         <View style={[styles.iconContainer, { backgroundColor: notification.color + '20' }]}>
@@ -96,10 +91,6 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
           <View style={styles.notificationBottom}>
             <Text style={[styles.timeText, { color: isDark ? '#8899A6' : '#657786' }]}>
               {translatedTimestamp}
-            </Text>
-            {/* Debug: show raw timestamp in UI for now */}
-            <Text style={[styles.timeText, { color: '#E74C3C', fontSize: 11 }]}>
-              {String(rawTimestamp)}
             </Text>
             {notification.amount && (
               <Text style={[styles.amountText, { color: '#17BF63' }]}>
@@ -166,8 +157,19 @@ const NotificationsScreen = () => {
   // The useNotifications hook handles loading notifications when username changes
 
   const handleNotificationPress = (notification: ParsedNotification) => {
+    // Handle follower notifications - navigate to the follower's profile
+    if (notification.type === 'follow' && notification.actionUser) {
+      router.push({
+        pathname: '/ProfileScreen',
+        params: {
+          username: notification.actionUser,
+        },
+      });
+      return;
+    }
+    
+    // Handle other actionable notifications - navigate to post/comment
     if (isActionableNotification(notification) && notification.targetContent) {
-      // Navigate to the post/comment
       router.push({
         pathname: '/ConversationScreen',
         params: {
