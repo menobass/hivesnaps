@@ -10,6 +10,38 @@ import * as ImagePicker from 'expo-image-picker';
 import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
 import genericAvatar from '../assets/images/generic-avatar.png';
 
+// Reusable Avatar Component with Error Handling
+interface AvatarProps {
+  avatarUrl?: string;
+  size: number;
+  onError?: () => void;
+}
+
+const AvatarWithFallback = ({ avatarUrl, size, onError }: AvatarProps) => {
+  const handleError = () => {
+    if (onError) {
+      onError();
+    }
+  };
+
+  if (avatarUrl) {
+    return (
+      <Image 
+        source={{ uri: avatarUrl }} 
+        style={{ width: size, height: size, borderRadius: size / 2 }}
+        onError={handleError}
+      />
+    );
+  }
+
+  return (
+    <Image 
+      source={genericAvatar} 
+      style={{ width: size, height: size, borderRadius: size / 2 }} 
+    />
+  );
+};
+
 // Profile data interface
 interface ProfileData {
   username: string;
@@ -80,6 +112,11 @@ const ProfileScreen = () => {
   const isDark = colorScheme === 'dark';
   const router = useRouter();
   const params = useLocalSearchParams();
+  
+  // Helper function to handle avatar loading errors
+  const handleAvatarError = () => {
+    setProfile(prev => prev ? { ...prev, avatarUrl: undefined } : null);
+  };
   
   // Get username from params
   const username = params.username as string | undefined;
@@ -1103,13 +1140,11 @@ const ProfileScreen = () => {
             
             {/* Avatar */}
             <View style={styles.avatarContainer}>
-              {profile.avatarUrl ? (
-                <Image source={{ uri: profile.avatarUrl }} style={styles.largeAvatar} />
-              ) : (
-                <View style={[styles.largeAvatar, styles.defaultAvatar, { backgroundColor: colors.bubble }]}>
-                  <FontAwesome name="user" size={60} color={colors.icon} />
-                </View>
-              )}
+              <AvatarWithFallback 
+                avatarUrl={profile.avatarUrl}
+                size={120}
+                onError={handleAvatarError}
+              />
             </View>
 
             {/* Edit Profile Image Button (Only for own profile) */}
@@ -1494,13 +1529,11 @@ const ProfileScreen = () => {
               {/* Current Avatar */}
               <View style={{ alignItems: 'center', flex: 1 }}>
                 <Text style={{ color: colors.text, fontSize: 14, marginBottom: 8 }}>Current</Text>
-                {profile?.avatarUrl ? (
-                  <Image source={{ uri: profile.avatarUrl }} style={{ width: 80, height: 80, borderRadius: 40 }} />
-                ) : (
-                  <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: colors.bubble, justifyContent: 'center', alignItems: 'center' }}>
-                    <FontAwesome name="user" size={40} color={colors.icon} />
-                  </View>
-                )}
+                <AvatarWithFallback 
+                  avatarUrl={profile?.avatarUrl}
+                  size={80}
+                  onError={handleAvatarError}
+                />
               </View>
               
               {/* Arrow */}
@@ -1670,13 +1703,11 @@ const ProfileScreen = () => {
                 {/* Current Avatar */}
                 <View style={{ alignItems: 'center', flex: 1 }}>
                   <Text style={{ color: colors.text, fontSize: 12, marginBottom: 4 }}>Current</Text>
-                  {profile?.avatarUrl ? (
-                    <Image source={{ uri: profile.avatarUrl }} style={{ width: 50, height: 50, borderRadius: 25 }} />
-                  ) : (
-                    <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: colors.bubble, justifyContent: 'center', alignItems: 'center' }}>
-                      <FontAwesome name="user" size={25} color={colors.icon} />
-                    </View>
-                  )}
+                  <AvatarWithFallback 
+                    avatarUrl={profile?.avatarUrl}
+                    size={50}
+                    onError={handleAvatarError}
+                  />
                 </View>
                 
                 {/* Arrow */}
@@ -1791,15 +1822,6 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     marginBottom: 16,
-  },
-  largeAvatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-  },
-  defaultAvatar: {
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   editAvatarButton: {
     flexDirection: 'row',
