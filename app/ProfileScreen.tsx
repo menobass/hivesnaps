@@ -1,83 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { SafeAreaView as SafeAreaViewSA } from 'react-native-safe-area-context';
-import { View, Text, StyleSheet, TouchableOpacity, useColorScheme, Image, ScrollView, Modal, Pressable, Platform, ActivityIndicator, TextInput, KeyboardAvoidingView } from 'react-native';
+import { View, Text, TouchableOpacity, useColorScheme, Image, ScrollView, Modal, Pressable, Platform, ActivityIndicator, TextInput, KeyboardAvoidingView } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Client, PrivateKey } from '@hiveio/dhive';
-import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
-import * as ImagePicker from 'expo-image-picker';
-import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
+import { createProfileScreenStyles } from '../styles/ProfileScreenStyles';
+import Slider from '@react-native-community/slider';
 import genericAvatar from '../assets/images/generic-avatar.png';
 import Snap from './components/Snap';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import Slider from '@react-native-community/slider';
-import { calculateVoteValue } from '../utils/calculateVoteValue';
+import UpvoteModal from '../components/UpvoteModal';
 
-// Profile data interface
-interface ProfileData {
-  username: string;
-  avatarUrl?: string;
-  reputation: number;
-  hivePower: number;
-  hbd: number;
-  displayName?: string;
-  about?: string;
-  location?: string;
-  website?: string;
-  followingCount?: number;
-  followersCount?: number;
-  // Unclaimed rewards
-  unclaimedHive?: number;
-  unclaimedHbd?: number;
-  unclaimedVests?: number;
-}
-
-// User snap interface for profile bubbles
-interface UserSnap {
-  author: string;
-  permlink: string;
-  parent_author: string;
-  parent_permlink: string;
-  body: string;
-  created: string;
-  net_votes?: number;
-  children?: number;
-  pending_payout_value?: string;
-  total_payout_value?: string;
-  active_votes?: any[];
-  [key: string]: any;
-}
-
-const HIVE_NODES = [
-  'https://api.hive.blog',
-  'https://api.deathwing.me',
-  'https://api.openhive.network',
-];
-const client = new Client(HIVE_NODES);
-
-// Helper function to convert VESTS to Hive Power
-const vestsToHp = (vests: number, totalVestingFundHive: any, totalVestingShares: any): number => {
-  // Handle both string and Asset types from global props
-  const totalVestingFundHiveStr = typeof totalVestingFundHive === 'string' 
-    ? totalVestingFundHive 
-    : totalVestingFundHive.toString();
-  const totalVestingSharesStr = typeof totalVestingShares === 'string' 
-    ? totalVestingShares 
-    : totalVestingShares.toString();
-    
-  const totalVestingFundHiveNum = parseFloat(totalVestingFundHiveStr.replace(' HIVE', ''));
-  const totalVestingSharesNum = parseFloat(totalVestingSharesStr.replace(' VESTS', ''));
-  
-  if (totalVestingSharesNum === 0) {
-    return 0;
-  }
-  
-  const hivePerVests = totalVestingFundHiveNum / totalVestingSharesNum;
-  const hp = vests * hivePerVests;
-  
-  return hp;
-};
+// Import custom hooks
+import { useProfileData } from '../hooks/useProfileData';
+import { useFollowManagement } from '../hooks/useFollowManagement';
+import { useUserSnaps } from '../hooks/useUserSnaps';
+import { useAvatarManagement } from '../hooks/useAvatarManagement';
+import { useRewardsManagement } from '../hooks/useRewardsManagement';
+import { useUserAuth } from '../hooks/useUserAuth';
+import { useUpvote } from '../hooks/useUpvote';
+import { useHiveData } from '../hooks/useHiveData';
 
 const ProfileScreen = () => {
   const colorScheme = useColorScheme() || 'light';
@@ -85,47 +26,85 @@ const ProfileScreen = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   
+  // Debug the params object
+  console.log('ProfileScreen params:', params);
+  console.log('ProfileScreen params.username:', params.username);
+  console.log('ProfileScreen params type:', typeof params.username);
+  
   // Get username from params
   const username = params.username as string | undefined;
   
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [currentUsername, setCurrentUsername] = useState<string | null>(null);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [followLoading, setFollowLoading] = useState(false);
-  const [muteLoading, setMuteLoading] = useState(false);
-  const [claimLoading, setClaimLoading] = useState(false);
-  const [globalProps, setGlobalProps] = useState<any>(null);
-  // User snaps state
-  const [userSnaps, setUserSnaps] = useState<UserSnap[]>([]);
-  const [snapsLoading, setSnapsLoading] = useState(false);
-  const [snapsError, setSnapsError] = useState<string | null>(null);
-  const [snapsLoaded, setSnapsLoaded] = useState(false);
-  const [displayedSnapsCount, setDisplayedSnapsCount] = useState(10); // Show 10 initially
-  const [loadMoreLoading, setLoadMoreLoading] = useState(false);
+  // Use custom hooks
+  const { currentUsername, handleLogout } = useUserAuth();
   
-  // Upvote modal state
-  const [upvoteModalVisible, setUpvoteModalVisible] = useState(false);
-  const [upvoteTarget, setUpvoteTarget] = useState<{ author: string; permlink: string } | null>(null);
-  const [voteWeight, setVoteWeight] = useState(100);
-  const [voteWeightLoading, setVoteWeightLoading] = useState(false);
-  const [upvoteLoading, setUpvoteLoading] = useState(false);
-  const [upvoteSuccess, setUpvoteSuccess] = useState(false);
-  const [voteValue, setVoteValue] = useState<{ hbd: string, usd: string } | null>(null);
-  const [rewardFund, setRewardFund] = useState<any | null>(null);
-  const [hivePrice, setHivePrice] = useState(1);
+  // Define isOwnProfile early to avoid undefined issues
+  const isOwnProfile = currentUsername === username;
+  const { profile, loading, globalProps, refetch: refetchProfile } = useProfileData(username);
   
-  // Profile image update state
-  const [editAvatarModalVisible, setEditAvatarModalVisible] = useState(false);
-  const [newAvatarImage, setNewAvatarImage] = useState<string | null>(null);
-  const [avatarUploading, setAvatarUploading] = useState(false);
-  const [avatarUpdateLoading, setAvatarUpdateLoading] = useState(false);
-  const [avatarUpdateSuccess, setAvatarUpdateSuccess] = useState(false);
-  // Active key modal state (second step)
-  const [activeKeyModalVisible, setActiveKeyModalVisible] = useState(false);
-  const [activeKeyInput, setActiveKeyInput] = useState('');
+  // Debug logging
+  console.log('ProfileScreen Debug:', {
+    username,
+    currentUsername,
+    isOwnProfile,
+    profile,
+    loading
+  });
+  const { hivePrice, rewardFund } = useHiveData();
+  const { 
+    isFollowing, 
+    isMuted, 
+    followLoading, 
+    muteLoading, 
+    handleFollow, 
+    handleUnfollow, 
+    handleMute, 
+    handleUnmute 
+  } = useFollowManagement(currentUsername, username);
+  const {
+    userSnaps,
+    snapsLoading,
+    snapsError,
+    snapsLoaded,
+    displayedSnapsCount,
+    loadMoreLoading,
+    fetchUserSnaps,
+    loadMoreSnaps,
+    convertUserSnapToSnapProps,
+    updateSnap,
+  } = useUserSnaps(username);
+  const {
+    editAvatarModalVisible,
+    newAvatarImage,
+    avatarUploading,
+    avatarUpdateLoading,
+    avatarUpdateSuccess,
+    activeKeyModalVisible,
+    activeKeyInput,
+    setActiveKeyInput,
+    handleEditAvatarPress,
+    handleSelectNewAvatar,
+    handleNextStep,
+    handleUpdateAvatar,
+    closeModals,
+  } = useAvatarManagement(currentUsername);
+  const { claimLoading, handleClaimRewards } = useRewardsManagement(currentUsername, profile, isOwnProfile);
+  const {
+    upvoteModalVisible,
+    voteWeight,
+    voteWeightLoading,
+    upvoteLoading,
+    upvoteSuccess,
+    voteValue,
+    openUpvoteModal,
+    closeUpvoteModal,
+    confirmUpvote,
+    setVoteWeight,
+  } = useUpvote(currentUsername, globalProps, rewardFund, hivePrice, updateSnap);
 
+  // Initialize styles
+  const styles = createProfileScreenStyles(isDark);
+  
+  // Colors for JSX elements (using the same theme as styles)
   const colors = {
     background: isDark ? '#15202B' : '#fff',
     text: isDark ? '#D7DBDC' : '#0F1419',
@@ -141,398 +120,30 @@ const ProfileScreen = () => {
     unfollowButton: '#8B9DC3',
   };
 
-  // Load current user credentials
-  useEffect(() => {
-    const loadCredentials = async () => {
-      try {
-        const storedUsername = await SecureStore.getItemAsync('hive_username');
-        setCurrentUsername(storedUsername);
-      } catch (e) {
-        console.error('Error loading credentials:', e);
-      }
-    };
-    loadCredentials();
-  }, []);
-
-  // Initialize reward fund and hive price
-  useEffect(() => {
-    const initializeUpvoteData = async () => {
-      try {
-        // Fetch reward fund
-        const fund = await client.database.call('get_reward_fund', ['post']);
-        setRewardFund(fund);
-        
-        // Fetch hive price
-        const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=hive&vs_currencies=usd');
-        const data = await response.json();
-        setHivePrice(data.hive?.usd || 1);
-      } catch (error) {
-        console.log('Error initializing upvote data:', error);
-        setHivePrice(1);
-      }
-    };
-    initializeUpvoteData();
-  }, []);
-
-  // Fetch profile data (simplified approach for follow counts)
-  // Updated to use Ecency's exact calculation methods for reputation and Hive Power
-  const fetchProfileData = async () => {
-    if (!username) return;
+  // Helper function to convert VESTS to Hive Power (needed for UI display)
+  const vestsToHp = (vests: number, totalVestingFundHive: any, totalVestingShares: any): number => {
+    const totalVestingFundHiveStr = typeof totalVestingFundHive === 'string' 
+      ? totalVestingFundHive 
+      : totalVestingFundHive.toString();
+    const totalVestingSharesStr = typeof totalVestingShares === 'string' 
+      ? totalVestingShares 
+      : totalVestingShares.toString();
+      
+    const totalVestingFundHiveNum = parseFloat(totalVestingFundHiveStr.replace(' HIVE', ''));
+    const totalVestingSharesNum = parseFloat(totalVestingSharesStr.replace(' VESTS', ''));
     
-    setLoading(true);
-    try {
-      // Try multiple methods to get account data
-      console.log('Fetching account data for:', username);
-      
-      // Method 1: dhive get_accounts
-      const accounts = await client.database.call('get_accounts', [[username]]);
-      if (!accounts || !accounts[0]) {
-        throw new Error('Account not found');
-      }
-      
-      const account = accounts[0];
-      
-      // Method 2: Fetch reputation using techcoderx.com API (much more reliable!)
-      let reputation = 25; // fallback
-      try {
-        console.log('Fetching reputation from techcoderx.com API for:', username);
-        const reputationResponse = await fetch(`https://techcoderx.com/reputation-api/accounts/${username}/reputation`);
-        if (reputationResponse.ok) {
-          const reputationText = await reputationResponse.text();
-          const reputationNumber = parseInt(reputationText.trim(), 10);
-          if (!isNaN(reputationNumber)) {
-            reputation = reputationNumber;
-            console.log('Successfully fetched reputation from API:', reputation);
-          } else {
-            console.log('Invalid reputation response from API:', reputationText);
-          }
-        } else {
-          console.log('Failed to fetch reputation from API, status:', reputationResponse.status);
-        }
-      } catch (reputationError) {
-        console.log('Error fetching reputation from API:', reputationError);
-      }
-      
-      // 🔍 DEBUG: Log the raw account data
-      console.log(`\n=== PROFILE DEBUG for @${username} ===`);
-      console.log('Raw account object keys:', Object.keys(account));
-      console.log('FULL ACCOUNT OBJECT:', JSON.stringify(account, null, 2));
-      console.log('Raw reputation:', account.reputation);
-      console.log('Raw reputation type:', typeof account.reputation);
-      
-      // Try alternative reputation field names
-      console.log('account.rep:', account.rep);
-      console.log('account.reputation_score:', account.reputation_score);
-      console.log('account.user_reputation:', account.user_reputation);
-      
-      console.log('Raw balance:', account.balance);
-      console.log('Raw HBD balance:', account.hbd_balance);
-      console.log('Raw vesting_shares:', account.vesting_shares);
-      console.log('Raw delegated_vesting_shares:', account.delegated_vesting_shares);
-      console.log('Raw received_vesting_shares:', account.received_vesting_shares);
-      console.log('Following count:', account.following_count);
-      console.log('Follower count:', account.follower_count);
-      
-      // Fetch global dynamic properties for HP calculation
-      const fetchedGlobalProps = await client.database.getDynamicGlobalProperties();
-      setGlobalProps(fetchedGlobalProps);
-      console.log('Global props total_vesting_fund_hive:', fetchedGlobalProps.total_vesting_fund_hive);
-      console.log('Global props total_vesting_shares:', fetchedGlobalProps.total_vesting_shares);
-      console.log('Global props type check - total_vesting_fund_hive:', typeof fetchedGlobalProps.total_vesting_fund_hive);
-      console.log('Global props type check - total_vesting_shares:', typeof fetchedGlobalProps.total_vesting_shares);
-      
-      // Parse profile metadata
-      let profileMeta: any = {};
-      try {
-        const metaString = account.posting_json_metadata || account.json_metadata;
-        if (metaString) {
-          profileMeta = JSON.parse(metaString).profile || {};
-        }
-      } catch (e) {
-        console.log('Error parsing profile metadata:', e);
-      }
-      
-      // Parse balances
-      const hiveBalance = parseFloat(account.balance.replace(' HIVE', ''));
-      const hbdBalance = parseFloat(account.hbd_balance.replace(' HBD', ''));
-      
-      console.log('Parsed HIVE balance:', hiveBalance);
-      console.log('Parsed HBD balance:', hbdBalance);
-      
-      // More accurate Hive Power calculation
-      const vestingShares = parseFloat(account.vesting_shares.replace(' VESTS', ''));
-      const delegatedVests = parseFloat(account.delegated_vesting_shares.replace(' VESTS', ''));
-      const receivedVests = parseFloat(account.received_vesting_shares.replace(' VESTS', ''));
-      const effectiveVests = vestingShares - delegatedVests + receivedVests;
-      
-      console.log('Parsed vesting_shares:', vestingShares);
-      console.log('Parsed delegated_vesting_shares:', delegatedVests);
-      console.log('Parsed received_vesting_shares:', receivedVests);
-      console.log('Calculated effective_vests:', effectiveVests);
-      
-      // Calculate Hive Power using Ecency's exact vestsToHp method
-      const hivePower = vestsToHp(effectiveVests, fetchedGlobalProps.total_vesting_fund_hive, fetchedGlobalProps.total_vesting_shares);
-      
-      console.log('Calculated Hive Power using Ecency method:', hivePower);
-
-      // Parse unclaimed rewards
-      const unclaimedHive = parseFloat((account.reward_hive_balance || '0.000 HIVE').replace(' HIVE', ''));
-      const unclaimedHbd = parseFloat((account.reward_hbd_balance || '0.000 HBD').replace(' HBD', ''));
-      const unclaimedVests = parseFloat((account.reward_vesting_balance || '0.000000 VESTS').replace(' VESTS', ''));
-      
-      console.log('Unclaimed HIVE:', unclaimedHive);
-      console.log('Unclaimed HBD:', unclaimedHbd);
-      console.log('Unclaimed VESTS:', unclaimedVests);
-
-      // Set profile with account object counts first (non-blocking)
-      setProfile({
-        username: account.name,
-        avatarUrl: profileMeta.profile_image,
-        reputation: reputation, // Direct from API - no need for rounding!
-        hivePower: Math.round(hivePower * 100) / 100,
-        hbd: Math.round(hbdBalance * 100) / 100,
-        displayName: profileMeta.name,
-        about: profileMeta.about,
-        location: profileMeta.location,
-        website: profileMeta.website,
-        followingCount: account.following_count || 0,
-        followersCount: account.follower_count || 0,
-        unclaimedHive,
-        unclaimedHbd,
-        unclaimedVests,
-      });
-
-      // Fetch accurate follow counts using the proper API
-      try {
-        const followCount = await client.database.call('get_follow_count', [username]);
-        console.log('Follow count API result:', followCount);
-        
-        // Update profile with accurate follow counts
-        setProfile(prev => ({
-          ...prev!,
-          followingCount: followCount.following_count || 0,
-          followersCount: followCount.follower_count || 0,
-        }));
-        
-        console.log('Updated follow counts:', { 
-          following: followCount.following_count || 0, 
-          followers: followCount.follower_count || 0 
-        });
-      } catch (e) {
-        console.log('Error fetching follow counts:', e);
-        // Keep the counts from account object as fallback
-      }
-
-      console.log('Follow counts from account object:', { 
-        following: account.following_count || 0, 
-        followers: account.follower_count || 0 
-      });
-      
-      console.log('=== FINAL CALCULATED VALUES ===');
-      console.log('Final reputation:', reputation);
-      console.log('Final Hive Power:', Math.round(hivePower * 100) / 100);
-      console.log('Final HBD:', Math.round(hbdBalance * 100) / 100);
-      console.log('===============================\n');
-
-      // Check follow status after setting profile data (only for other users' profiles)
-      if (currentUsername && username !== currentUsername) {
-        await checkFollowStatus();
-      }
-      
-    } catch (e) {
-      console.error('Error fetching profile:', e);
-    } finally {
-      setLoading(false);
+    if (totalVestingSharesNum === 0) {
+      return 0;
     }
-  };
-
-  useEffect(() => {
-    if (username && currentUsername && username !== currentUsername) {
-      fetchProfileData();
-    } else if (username && username === currentUsername) {
-      // For own profile, just fetch data without follow status
-      fetchProfileData();
-    }
-  }, [username, currentUsername]);
-
-  // Check if current user is following/muting the profile user
-  const checkFollowStatus = async () => {
-    if (!currentUsername || !username || currentUsername === username) return;
     
-    try {
-      console.log(`🔍 Checking follow status: ${currentUsername} -> ${username}`);
-      
-      // Check following status - get all users that currentUsername follows
-      // Parameters: [follower, startFollowing, followType, limit]
-      const following = await client.call('condenser_api', 'get_following', [currentUsername, '', 'blog', 1000]);
-      console.log(`📊 Following API returned ${following?.length || 0} results`);
-      
-      // Check if the target username is in the list of people we follow
-      const isCurrentlyFollowing = Array.isArray(following) && 
-        following.some((f: any) => {
-          const matches = f.following === username && f.what?.includes('blog');
-          if (matches) {
-            console.log(`✅ Found follow relationship: ${f.following} with what: ${f.what}`);
-          }
-          return matches;
-        });
-      
-      console.log(`🎯 Follow status result: ${isCurrentlyFollowing ? 'FOLLOWING' : 'NOT FOLLOWING'}`);
-      setIsFollowing(isCurrentlyFollowing);
-
-      // Check mute status - get all users that currentUsername ignores
-      const ignoring = await client.call('condenser_api', 'get_following', [currentUsername, '', 'ignore', 1000]);
-      console.log(`🔇 Ignoring API returned ${ignoring?.length || 0} results`);
-      
-      const isCurrentlyMuting = Array.isArray(ignoring) && 
-        ignoring.some((f: any) => {
-          const matches = f.following === username && f.what?.includes('ignore');
-          if (matches) {
-            console.log(`🔇 Found mute relationship: ${f.following} with what: ${f.what}`);
-          }
-          return matches;
-        });
-      
-      console.log(`🔇 Mute status result: ${isCurrentlyMuting ? 'MUTED' : 'NOT MUTED'}`);
-      setIsMuted(isCurrentlyMuting);
-      
-    } catch (error) {
-      console.log('Error checking follow/mute status:', error);
-      // Reset to default states on error
-      setIsFollowing(false);
-      setIsMuted(false);
-    }
-  };
-
-  // Fetch user's recent snaps from Hive blockchain
-  const fetchUserSnaps = async () => {
-    if (!username) return;
+    const hivePerVests = totalVestingFundHiveNum / totalVestingSharesNum;
+    const hp = vests * hivePerVests;
     
-    setSnapsLoading(true);
-    setSnapsError(null);
-    
-    try {
-      console.log('Fetching recent snaps for user:', username);
-      
-      // Get latest posts by @peak.snaps (container account) - increased limit for more snaps
-      const discussions = await client.database.call('get_discussions_by_blog', [{
-        tag: 'peak.snaps',
-        limit: 20 // Increased to get more potential snaps
-      }]);
-      
-      let userSnapsFound: UserSnap[] = [];
-      
-      // Search through all container posts for user's snaps
-      for (const post of discussions) {
-        try {
-          const replies: UserSnap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
-          
-          // Filter replies to only those by the profile user
-          const userReplies = replies.filter((reply) => reply.author === username);
-          userSnapsFound = userSnapsFound.concat(userReplies);
-        } catch (replyError) {
-          console.log('Error fetching replies for post:', post.permlink, replyError);
-        }
-      }
-      
-      // Sort by created date descending (newest first)
-      userSnapsFound.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
-      
-      // Keep more snaps for load more functionality
-      const limitedSnaps = userSnapsFound.slice(0, 50);
-      
-      setUserSnaps(limitedSnaps);
-      setSnapsLoaded(true);
-      setDisplayedSnapsCount(10); // Reset to initial display count
-      console.log(`Found ${limitedSnaps.length} recent snaps for @${username}`);
-      
-    } catch (error) {
-      console.error('Error fetching user snaps:', error);
-      setSnapsError('Failed to load recent snaps');
-    } finally {
-      setSnapsLoading(false);
-    }
-  };
-
-  // Load more snaps function
-  const loadMoreSnaps = async () => {
-    setLoadMoreLoading(true);
-    
-    // Simulate loading time for better UX
-    setTimeout(() => {
-      const currentCount = displayedSnapsCount;
-      const newCount = Math.min(currentCount + 10, userSnaps.length);
-      setDisplayedSnapsCount(newCount);
-      setLoadMoreLoading(false);
-    }, 500);
-  };
-
-  // Handle upvote for profile snap bubbles
-  const handleSnapUpvote = async (snap: UserSnap) => {
-    if (!currentUsername) return;
-    
-    try {
-      // Haptic feedback for user interaction
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      
-      // Get posting key from secure storage
-      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
-      if (!postingKeyStr) {
-        throw new Error('No posting key found. Please log in again.');
-      }
-      const postingKey = PrivateKey.fromString(postingKeyStr);
-
-      // Use 100% vote weight (10000)
-      const weight = 10000;
-
-      // Broadcast vote
-      await client.broadcast.vote(
-        {
-          voter: currentUsername,
-          author: snap.author,
-          permlink: snap.permlink,
-          weight,
-        },
-        postingKey
-      );
-
-      // Update the local snap data to reflect the vote
-      setUserSnaps(prev => prev.map(s => 
-        s.permlink === snap.permlink 
-          ? { 
-              ...s, 
-              net_votes: (s.net_votes || 0) + 1,
-              active_votes: [...(s.active_votes || []), { voter: currentUsername, percent: weight }]
-            }
-          : s
-      ));
-
-      // Success haptic feedback
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
-      console.log('Successfully upvoted snap:', snap.permlink);
-    } catch (error) {
-      // Error haptic feedback
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      console.error('Error upvoting snap:', error);
-      alert('Failed to upvote: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    }
-  };
-
-  // Handle reply to profile snap bubble
-  const handleSnapReply = (snap: UserSnap) => {
-    // Navigate to conversation screen for this snap
-    router.push({ 
-      pathname: '/ConversationScreen', 
-      params: { 
-        author: snap.author, 
-        permlink: snap.permlink 
-      } 
-    });
+    return hp;
   };
 
   // Handle snap bubble press (navigate to conversation)
-  const handleSnapPress = (snap: UserSnap) => {
+  const handleSnapPress = (snap: any) => {
     router.push({ 
       pathname: '/ConversationScreen', 
       params: { 
@@ -542,423 +153,15 @@ const ProfileScreen = () => {
     });
   };
 
-  // Extract text content from snap body (removing images and formatting)
-  const extractSnapText = (body: string): string => {
-    // Remove images
-    let text = body.replace(/!\[.*?\]\(.*?\)/g, '');
-    // Remove markdown links but keep the text
-    text = text.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
-    // Remove URLs
-    text = text.replace(/https?:\/\/[^\s]+/g, '');
-    // Remove extra whitespace
-    text = text.replace(/\s+/g, ' ').trim();
-    
-    // If no text remains, return a fallback
-    if (!text) {
-      return 'Snap contains media or links';
-    }
-    
-    // Limit length
-    return text.length > 120 ? text.substring(0, 120) + '...' : text;
-  };
-
-  // Check if current user has upvoted a snap
-  const hasUserUpvoted = (snap: UserSnap): boolean => {
-    if (!currentUsername || !snap.active_votes) return false;
-    return snap.active_votes.some((vote: any) => vote.voter === currentUsername && vote.percent > 0);
-  };
-
-  // Helper function to convert UserSnap to format expected by Snap component
-  const convertUserSnapToSnapProps = (userSnap: UserSnap) => {
-    // Calculate payout from pending_payout_value and total_payout_value
-    const pendingPayout = parseFloat((userSnap.pending_payout_value || '0.000 HBD').replace(' HBD', ''));
-    const totalPayout = parseFloat((userSnap.total_payout_value || '0.000 HBD').replace(' HBD', ''));
-    const payout = pendingPayout + totalPayout;
-
-    return {
-      author: userSnap.author,
-      avatarUrl: '', // Will be populated by Snap component's own avatar fetching
-      body: userSnap.body,
-      created: userSnap.created,
-      voteCount: userSnap.net_votes || 0,
-      replyCount: userSnap.children || 0,
-      payout: payout,
-      permlink: userSnap.permlink,
-      hasUpvoted: hasUserUpvoted(userSnap),
-    };
-  };
-
-  // Handle upvote for Snap component integration (opens modal)
-  const handleSnapUpvoteFromComponent = async (target: { author: string; permlink: string }) => {
-    setUpvoteTarget(target);
-    setVoteWeightLoading(true);
-    
-    try {
-      // Load last used vote weight if available
-      const val = await AsyncStorage.getItem('hivesnaps_vote_weight');
-      const weight = val !== null ? Number(val) : 100;
-      setVoteWeight(weight);
-      
-      // Calculate vote value if possible
-      let accountObj = null;
-      if (currentUsername) {
-        const accounts = await client.database.getAccounts([currentUsername]);
-        accountObj = accounts && accounts[0] ? accounts[0] : null;
-      }
-      
-      if (accountObj && globalProps && rewardFund) {
-        const calcValue = calculateVoteValue(accountObj, globalProps, rewardFund, weight, hivePrice);
-        setVoteValue(calcValue);
-      } else {
-        setVoteValue(null);
-      }
-    } catch (error) {
-      console.log('Error setting up upvote modal:', error);
-      setVoteWeight(100);
-      setVoteValue(null);
-    } finally {
-      setVoteWeightLoading(false);
-      setUpvoteModalVisible(true);
-    }
-  };
-
-  // Close upvote modal
-  const closeUpvoteModal = () => {
-    setUpvoteModalVisible(false);
-    setUpvoteTarget(null);
-    setVoteValue(null);
-    setUpvoteSuccess(false);
-  };
-
-  // Confirm upvote
-  const confirmUpvote = async () => {
-    if (!upvoteTarget || !currentUsername) return;
-    
-    setUpvoteLoading(true);
-    setUpvoteSuccess(false);
-    
-    try {
-      // Haptic feedback for user interaction
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      
-      // Get posting key from secure storage
-      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
-      if (!postingKeyStr) {
-        throw new Error('No posting key found. Please log in again.');
-      }
-      const postingKey = PrivateKey.fromString(postingKeyStr);
-
-      // Convert weight (1-100% slider maps to 1-10000 dhive weight)
-      let weight = Math.round(voteWeight * 100);
-      if (weight > 10000) weight = 10000;
-      if (weight < 1) weight = 1;
-
-      // Broadcast vote
-      await client.broadcast.vote(
-        {
-          voter: currentUsername,
-          author: upvoteTarget.author,
-          permlink: upvoteTarget.permlink,
-          weight,
-        },
-        postingKey
-      );
-
-      // Persist the vote weight after successful vote
-      await AsyncStorage.setItem('hivesnaps_vote_weight', String(voteWeight));
-
-      // Update the local snap data to reflect the vote
-      setUserSnaps(prev => prev.map(s => 
-        s.permlink === upvoteTarget.permlink && s.author === upvoteTarget.author
-          ? { 
-              ...s, 
-              net_votes: (s.net_votes || 0) + 1,
-              active_votes: [...(s.active_votes || []), { voter: currentUsername, percent: weight }]
-            }
-          : s
-      ));
-
-      // Success haptic feedback
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
-      setUpvoteLoading(false);
-      setUpvoteSuccess(true);
-      
-      console.log('Successfully upvoted snap:', upvoteTarget.permlink);
-      
-      // Close modal after showing success
-      setTimeout(() => {
-        closeUpvoteModal();
-      }, 1500);
-      
-    } catch (error) {
-      setUpvoteLoading(false);
-      setUpvoteSuccess(false);
-      // Error haptic feedback
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      console.error('Error upvoting snap:', error);
-      alert('Failed to upvote: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    }
-  };
-
-  // Update vote weight and recalculate value
-  const updateVoteWeight = async (newWeight: number) => {
-    setVoteWeight(newWeight);
-    
-    // Recalculate vote value with new weight
-    if (currentUsername && globalProps && rewardFund) {
-      try {
-        const accounts = await client.database.getAccounts([currentUsername]);
-        const accountObj = accounts && accounts[0] ? accounts[0] : null;
-        
-        if (accountObj) {
-          const calcValue = calculateVoteValue(accountObj, globalProps, rewardFund, newWeight, hivePrice);
-          setVoteValue(calcValue);
-        }
-      } catch (error) {
-        console.log('Error updating vote value:', error);
-      }
-    }
-  };
-
-  // Action handlers
-  const handleFollow = async () => {
-    if (!currentUsername || !username || followLoading) return;
-    
-    setFollowLoading(true);
-    try {
-      // Get posting key from secure storage
-      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
-      if (!postingKeyStr) {
-        throw new Error('No posting key found. Please log in again.');
-      }
-      const postingKey = PrivateKey.fromString(postingKeyStr);
-
-      // Create follow operation
-      const followOp = [
-        'follow',
-        {
-          follower: currentUsername,
-          following: username,
-          what: ['blog'] // Follow their blog posts
-        }
-      ];
-
-      // Broadcast the follow operation
-      await client.broadcast.json(
-        {
-          required_auths: [],
-          required_posting_auths: [currentUsername],
-          id: 'follow',
-          json: JSON.stringify(followOp)
-        },
-        postingKey
-      );
-
-      setIsFollowing(true);
-      console.log('Successfully followed:', username);
-    } catch (error) {
-      console.log('Error following user:', error);
-      alert('Failed to follow user: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    } finally {
-      setFollowLoading(false);
-    }
-  };
-
-  const handleUnfollow = async () => {
-    if (!currentUsername || !username || followLoading) return;
-    
-    setFollowLoading(true);
-    try {
-      // Get posting key from secure storage
-      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
-      if (!postingKeyStr) {
-        throw new Error('No posting key found. Please log in again.');
-      }
-      const postingKey = PrivateKey.fromString(postingKeyStr);
-
-      // Create unfollow operation
-      const unfollowOp = [
-        'follow',
-        {
-          follower: currentUsername,
-          following: username,
-          what: [] // Empty array means unfollow
-        }
-      ];
-
-      // Broadcast the unfollow operation
-      await client.broadcast.json(
-        {
-          required_auths: [],
-          required_posting_auths: [currentUsername],
-          id: 'follow',
-          json: JSON.stringify(unfollowOp)
-        },
-        postingKey
-      );
-
-      setIsFollowing(false);
-      console.log('Successfully unfollowed:', username);
-    } catch (error) {
-      console.log('Error unfollowing user:', error);
-      alert('Failed to unfollow user: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    } finally {
-      setFollowLoading(false);
-    }
-  };
-
-  const handleMute = async () => {
-    if (!currentUsername || !username || muteLoading) return;
-    
-    setMuteLoading(true);
-    try {
-      // Get posting key from secure storage
-      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
-      if (!postingKeyStr) {
-        throw new Error('No posting key found. Please log in again.');
-      }
-      const postingKey = PrivateKey.fromString(postingKeyStr);
-
-      // Create mute operation
-      const muteOp = [
-        'follow',
-        {
-          follower: currentUsername,
-          following: username,
-          what: ['ignore'] // Mute/ignore user
-        }
-      ];
-
-      // Broadcast the mute operation
-      await client.broadcast.json(
-        {
-          required_auths: [],
-          required_posting_auths: [currentUsername],
-          id: 'follow',
-          json: JSON.stringify(muteOp)
-        },
-        postingKey
-      );
-
-      setIsMuted(true);
-      console.log('Successfully muted:', username);
-    } catch (error) {
-      console.log('Error muting user:', error);
-      alert('Failed to mute user: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    } finally {
-      setMuteLoading(false);
-    }
-  };
-
-  const handleUnmute = async () => {
-    if (!currentUsername || !username || muteLoading) return;
-    
-    setMuteLoading(true);
-    try {
-      // Get posting key from secure storage
-      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
-      if (!postingKeyStr) {
-        throw new Error('No posting key found. Please log in again.');
-      }
-      const postingKey = PrivateKey.fromString(postingKeyStr);
-
-      // Create unmute operation (same as unfollow - empty array)
-      const unmuteOp = [
-        'follow',
-        {
-          follower: currentUsername,
-          following: username,
-          what: [] // Empty array removes all follow relationships including mute
-        }
-      ];
-
-      // Broadcast the unmute operation
-      await client.broadcast.json(
-        {
-          required_auths: [],
-          required_posting_auths: [currentUsername],
-          id: 'follow',
-          json: JSON.stringify(unmuteOp)
-        },
-        postingKey
-      );
-
-      setIsMuted(false);
-      console.log('Successfully unmuted:', username);
-    } catch (error) {
-      console.log('Error unmuting user:', error);
-      alert('Failed to unmute user: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    } finally {
-      setMuteLoading(false);
-    }
-  };
-
-  const handleClaimRewards = async () => {
-    if (!profile || !currentUsername || !isOwnProfile) return;
-    
-    const { unclaimedHive = 0, unclaimedHbd = 0, unclaimedVests = 0 } = profile;
-    
-    // Check if there are any rewards to claim
-    if (unclaimedHive === 0 && unclaimedHbd === 0 && unclaimedVests === 0) {
-      return;
-    }
-    
-    setClaimLoading(true);
-    
-    try {
-      // Get posting key from secure storage
-      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
-      if (!postingKeyStr) {
-        throw new Error('No posting key found. Please log in again.');
-      }
-      const postingKey = PrivateKey.fromString(postingKeyStr);
-
-      // Format reward balances for the claim operation
-      const rewardHiveBalance = `${unclaimedHive.toFixed(3)} HIVE`;
-      const rewardHbdBalance = `${unclaimedHbd.toFixed(3)} HBD`;
-      const rewardVestingBalance = `${unclaimedVests.toFixed(6)} VESTS`;
-
-      console.log('Claiming rewards:', {
-        rewardHiveBalance,
-        rewardHbdBalance, 
-        rewardVestingBalance
-      });
-
-      // Broadcast the claim_reward_balance operation
-      await client.broadcast.sendOperations([
-        ['claim_reward_balance', {
-          account: currentUsername,
-          reward_hive: rewardHiveBalance,
-          reward_hbd: rewardHbdBalance,
-          reward_vests: rewardVestingBalance,
-        }]
-      ], postingKey);
-
-      console.log('Rewards claimed successfully!');
-      
-      // Refresh profile data to show updated balances and clear unclaimed rewards
-      setTimeout(() => {
-        fetchProfileData();
-      }, 3000); // Wait 3 seconds for blockchain confirmation
-      
-    } catch (error) {
-      console.error('Error claiming rewards:', error);
-      alert('Failed to claim rewards: ' + (error instanceof Error ? error.message : JSON.stringify(error)));
-    } finally {
-      setClaimLoading(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await SecureStore.deleteItemAsync('hive_username');
-      await SecureStore.deleteItemAsync('hive_posting_key');
-      // Navigate back to login screen
-      router.replace('/');
-    } catch (err) {
-      alert('Logout failed: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
-    }
+  // Handle reply to profile snap bubble
+  const handleSnapReply = (snap: any) => {
+    router.push({ 
+      pathname: '/ConversationScreen', 
+      params: { 
+        author: snap.author, 
+        permlink: snap.permlink 
+      } 
+    });
   };
 
   const handleBack = () => {
@@ -967,9 +170,9 @@ const ProfileScreen = () => {
 
   if (!username) {
     return (
-      <SafeAreaViewSA style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <SafeAreaViewSA style={styles.safeArea}>
         <View style={styles.errorContainer}>
-          <Text style={[styles.errorText, { color: colors.text }]}>
+          <Text style={styles.errorText}>
             Error: No username provided
           </Text>
         </View>
@@ -977,326 +180,21 @@ const ProfileScreen = () => {
     );
   }
 
-  // Avatar update functions
-  const handleEditAvatarPress = () => {
-    setNewAvatarImage(null);
-    setAvatarUpdateSuccess(false);
-    setActiveKeyInput(''); // Clear active key input
-    setEditAvatarModalVisible(true);
-  };
-
-  const handleSelectNewAvatar = async () => {
-    try {
-      // Show action sheet to choose between camera and gallery
-      let pickType: 'camera' | 'gallery' | 'cancel';
-      
-      if (Platform.OS === 'ios') {
-        pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(resolve => {
-          import('react-native').then(({ ActionSheetIOS }) => {
-            ActionSheetIOS.showActionSheetWithOptions(
-              {
-                options: ['Cancel', 'Take Photo', 'Choose from Gallery'],
-                cancelButtonIndex: 0,
-              },
-              buttonIndex => {
-                if (buttonIndex === 0) resolve('cancel');
-                else if (buttonIndex === 1) resolve('camera');
-                else if (buttonIndex === 2) resolve('gallery');
-              }
-            );
-          });
-        });
-      } else {
-        pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(resolve => {
-          import('react-native').then(({ Alert }) => {
-            Alert.alert(
-              'Select Avatar Image',
-              'Choose an option',
-              [
-                { text: 'Take Photo', onPress: () => resolve('camera') },
-                { text: 'Choose from Gallery', onPress: () => resolve('gallery') },
-                { text: 'Cancel', style: 'cancel', onPress: () => resolve('cancel') },
-              ],
-              { cancelable: true }
-            );
-          });
-        });
-      }
-      
-      if (pickType === 'cancel') return;
-      
-      // Enhanced permission handling with better error messages
-      let result;
-      if (pickType === 'camera') {
-        // Check current permission status first
-        const currentPermission = await ImagePicker.getCameraPermissionsAsync();
-        let finalStatus = currentPermission.status;
-        
-        if (finalStatus !== 'granted') {
-          // Request permission if not granted
-          const requestPermission = await ImagePicker.requestCameraPermissionsAsync();
-          finalStatus = requestPermission.status;
-        }
-        
-        if (finalStatus !== 'granted') {
-          import('react-native').then(({ Alert }) => {
-            Alert.alert(
-              'Camera Permission Required',
-              'HiveSnaps needs camera access to take photos. Please enable camera permissions in your device settings.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Open Settings', onPress: () => {
-                  if (Platform.OS === 'ios') {
-                    import('expo-linking').then(({ default: Linking }) => {
-                      Linking.openURL('app-settings:');
-                    });
-                  } else {
-                    import('expo-intent-launcher').then(({ default: IntentLauncher }) => {
-                      IntentLauncher.startActivityAsync(
-                        IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS,
-                        { data: 'package:com.anonymous.hivesnaps' }
-                      );
-                    }).catch(() => {
-                      // Fallback for older Android versions
-                      import('expo-linking').then(({ default: Linking }) => {
-                        Linking.openURL('app-settings:');
-                      });
-                    });
-                  }
-                }}
-              ]
-            );
-          });
-          return;
-        }
-        
-        result = await ImagePicker.launchCameraAsync({
-          allowsEditing: true,
-          quality: 0.8,
-          aspect: [1, 1], // Square aspect ratio for avatar
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        });
-      } else {
-        // Media library permission handling
-        const currentPermission = await ImagePicker.getMediaLibraryPermissionsAsync();
-        let finalStatus = currentPermission.status;
-        
-        if (finalStatus !== 'granted') {
-          const requestPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          finalStatus = requestPermission.status;
-        }
-        
-        if (finalStatus !== 'granted') {
-          import('react-native').then(({ Alert }) => {
-            Alert.alert(
-              'Photo Library Permission Required',
-              'HiveSnaps needs photo library access to select images. Please enable photo permissions in your device settings.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Open Settings', onPress: () => {
-                  if (Platform.OS === 'ios') {
-                    import('expo-linking').then(({ default: Linking }) => {
-                      Linking.openURL('app-settings:');
-                    });
-                  } else {
-                    import('expo-intent-launcher').then(({ default: IntentLauncher }) => {
-                      IntentLauncher.startActivityAsync(
-                        IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS,
-                        { data: 'package:com.anonymous.hivesnaps' }
-                      );
-                    }).catch(() => {
-                      // Fallback for older Android versions
-                      import('expo-linking').then(({ default: Linking }) => {
-                        Linking.openURL('app-settings:');
-                      });
-                    });
-                  }
-                }}
-              ]
-            );
-          });
-          return;
-        }
-        
-        result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          quality: 0.8,
-          aspect: [1, 1], // Square aspect ratio for avatar
-        });
-      }
-      
-      if (!result || result.canceled || !result.assets || !result.assets[0]) return;
-      
-      const asset = result.assets[0];
-      setAvatarUploading(true);
-      
-      try {
-        const fileToUpload = {
-          uri: asset.uri,
-          name: `avatar-${currentUsername}-${Date.now()}.jpg`,
-          type: 'image/jpeg',
-        };
-        const cloudinaryUrl = await uploadImageToCloudinaryFixed(fileToUpload);
-        setNewAvatarImage(cloudinaryUrl);
-      } catch (err) {
-        console.error('Image upload error:', err);
-        const errorMessage = err instanceof Error ? err.message : 'Unknown upload error';
-        import('react-native').then(({ Alert }) => {
-          Alert.alert(
-            'Upload Failed',
-            `Avatar upload failed: ${errorMessage}`,
-            [{ text: 'OK' }]
-          );
-        });
-      } finally {
-        setAvatarUploading(false);
-      }
-    } catch (err) {
-      console.error('Image picker error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      import('react-native').then(({ Alert }) => {
-        Alert.alert(
-          'Error',
-          `Failed to pick image: ${errorMessage}`,
-          [{ text: 'OK' }]
-        );
-      });
-      setAvatarUploading(false);
-    }
-  };
-
-  const handleNextStep = () => {
-    // Move to active key input modal
-    setEditAvatarModalVisible(false);
-    setActiveKeyModalVisible(true);
-  };
-
-  const handleUpdateAvatar = async () => {
-    if (!newAvatarImage || !currentUsername || !activeKeyInput.trim()) return;
-    
-    setAvatarUpdateLoading(true);
-    setAvatarUpdateSuccess(false);
-    
-    try {
-      // Validate and create active key
-      let activeKey;
-      try {
-        const keyStr = activeKeyInput.trim();
-        // Basic validation: should start with 5 and be roughly the right length
-        if (!keyStr.startsWith('5') || keyStr.length < 50) {
-          throw new Error('Invalid key format');
-        }
-        activeKey = PrivateKey.fromString(keyStr);
-      } catch (err) {
-        throw new Error('Invalid active key format. Please check your key and try again.');
-      }
-      
-      // Get current account data to preserve existing metadata
-      const accounts = await client.database.getAccounts([currentUsername]);
-      if (!accounts || !accounts[0]) throw new Error('Account not found');
-      
-      const account = accounts[0];
-      
-      // Parse existing metadata and preserve it
-      let postingMeta = {};
-      let jsonMeta = {};
-      
-      // Parse posting_json_metadata
-      if (account.posting_json_metadata) {
-        try {
-          postingMeta = JSON.parse(account.posting_json_metadata);
-        } catch (err) {
-          console.log('Error parsing existing posting_json_metadata:', err);
-        }
-      }
-      
-      // Parse json_metadata  
-      if (account.json_metadata) {
-        try {
-          jsonMeta = JSON.parse(account.json_metadata);
-        } catch (err) {
-          console.log('Error parsing existing json_metadata:', err);
-        }
-      }
-      
-      // Update profile image in both metadata objects
-      const updatedPostingMeta = {
-        ...postingMeta,
-        profile: {
-          ...(postingMeta as any)?.profile,
-          profile_image: newAvatarImage,
-        },
-      };
-      
-      const updatedJsonMeta = {
-        ...jsonMeta,
-        profile: {
-          ...(jsonMeta as any)?.profile,
-          profile_image: newAvatarImage,
-        },
-      };
-      
-      // Broadcast account update2 - required for posting_json_metadata support
-      const operation = [
-        'account_update2',
-        {
-          account: currentUsername,
-          memo_key: account.memo_key,
-          json_metadata: JSON.stringify(updatedJsonMeta),
-          posting_json_metadata: JSON.stringify(updatedPostingMeta),
-          extensions: [], // Required field for account_update2
-        }
-      ] as const;
-      
-      await client.broadcast.sendOperations([operation], activeKey);
-      
-      setAvatarUpdateLoading(false);
-      setAvatarUpdateSuccess(true);
-      
-      // Clear sensitive data immediately
-      setActiveKeyInput('');
-      
-      
-
-      // Clear any cached avatar data and refresh profile
-      setTimeout(async () => {
-        setActiveKeyModalVisible(false);
-        setEditAvatarModalVisible(false);
-        setNewAvatarImage(null);
-        setAvatarUpdateSuccess(false);
-        
-        // Refresh profile data to show new avatar
-        await fetchProfileData();
-      }, 2000);
-      
-    } catch (err) {
-      setAvatarUpdateLoading(false);
-      setAvatarUpdateSuccess(false);
-      // Clear sensitive data on error too
-      setActiveKeyInput('');
-      const errorMsg = err instanceof Error ? err.message : JSON.stringify(err);
-      alert('Failed to update profile image: ' + errorMsg);
-    }
-  };
-
-  const isOwnProfile = currentUsername === username;
-
   return (
-    <SafeAreaViewSA style={[styles.safeArea, { backgroundColor: colors.background }]}>
+    <SafeAreaViewSA style={styles.safeArea}>
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+      <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <FontAwesome name="arrow-left" size={20} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Profile</Text>
+        <Text style={styles.headerTitle}>Profile</Text>
         <View style={styles.headerSpacer} />
       </View>
 
       {loading ? (
         <View style={styles.loadingContainer}>
           <FontAwesome name="hourglass-half" size={48} color={colors.icon} style={{ marginBottom: 12 }} />
-          <Text style={[styles.loadingText, { color: colors.text }]}>Loading profile...</Text>
+          <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
       ) : profile ? (
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -1589,7 +487,7 @@ const ProfileScreen = () => {
                     <View style={styles.verticalFeedContainer}>
                       {/* Display snaps using the existing Snap component */}
                       {userSnaps.slice(0, displayedSnapsCount).map((userSnap, index) => {
-                        const snapProps = convertUserSnapToSnapProps(userSnap);
+                        const snapProps = convertUserSnapToSnapProps(userSnap, currentUsername);
                         
                         return (
                           <Snap
@@ -1603,7 +501,7 @@ const ProfileScreen = () => {
                             payout={snapProps.payout}
                             permlink={snapProps.permlink}
                             hasUpvoted={snapProps.hasUpvoted}
-                            onUpvotePress={handleSnapUpvoteFromComponent}
+                            onUpvotePress={(snap) => openUpvoteModal({ author: snap.author, permlink: snap.permlink, snap })}
                             onSpeechBubblePress={() => handleSnapReply(userSnap)}
                             onContentPress={() => handleSnapPress(userSnap)}
                             showAuthor={true} // Show author for consistency with other feeds
@@ -1671,7 +569,7 @@ const ProfileScreen = () => {
         visible={editAvatarModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setEditAvatarModalVisible(false)}
+        onRequestClose={closeModals}
       >
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }}>
           <View style={{ backgroundColor: colors.background, borderRadius: 16, padding: 24, width: '90%', alignItems: 'center' }}>
@@ -1755,11 +653,7 @@ const ProfileScreen = () => {
               <View style={{ flexDirection: 'row', marginTop: 8 }}>
                 <Pressable
                   style={{ flex: 1, marginRight: 8, backgroundColor: colors.buttonInactive, borderRadius: 8, padding: 12, alignItems: 'center' }}
-                  onPress={() => {
-                    setEditAvatarModalVisible(false);
-                    setNewAvatarImage(null);
-                    setActiveKeyInput(''); // Clear active key on cancel
-                  }}
+                  onPress={closeModals}
                   disabled={avatarUpdateLoading || avatarUploading}
                 >
                   <Text style={{ color: colors.text, fontWeight: '600' }}>Cancel</Text>
@@ -1794,10 +688,7 @@ const ProfileScreen = () => {
         visible={activeKeyModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => {
-          setActiveKeyModalVisible(false);
-          setActiveKeyInput('');
-        }}
+        onRequestClose={closeModals}
       >
         <KeyboardAvoidingView 
           style={{ flex: 1 }} 
@@ -1904,9 +795,8 @@ const ProfileScreen = () => {
                       alignItems: 'center' 
                     }}
                     onPress={() => {
-                      setActiveKeyModalVisible(false);
-                      setActiveKeyInput('');
-                      setEditAvatarModalVisible(true); // Go back to first modal
+                      closeModals();
+                      handleEditAvatarPress(); // Go back to first modal
                     }}
                     disabled={avatarUpdateLoading}
                   >
@@ -1939,71 +829,18 @@ const ProfileScreen = () => {
       </Modal>
       
       {/* Upvote Modal */}
-      <Modal
+      <UpvoteModal
         visible={upvoteModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={closeUpvoteModal}
-      >
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }}>
-          <View style={{ backgroundColor: colors.background, borderRadius: 16, padding: 24, width: '85%', alignItems: 'center' }}>
-            <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>Upvote Snap</Text>
-            <Text style={{ color: colors.text, fontSize: 15, marginBottom: 16 }}>Vote Weight: {voteWeight}%</Text>
-            
-            {voteWeightLoading ? (
-              <ActivityIndicator size="small" color={colors.button} style={{ marginVertical: 16 }} />
-            ) : (
-              <>
-                <Slider
-                  style={{ width: '100%', height: 40 }}
-                  minimumValue={1}
-                  maximumValue={100}
-                  step={1}
-                  value={voteWeight}
-                  onValueChange={updateVoteWeight}
-                  minimumTrackTintColor={colors.button}
-                  maximumTrackTintColor={colors.buttonInactive}
-                  thumbTintColor={colors.button}
-                />
-                {voteValue !== null && (
-                  <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginTop: 12 }}>
-                    ${voteValue.usd} USD
-                  </Text>
-                )}
-              </>
-            )}
-            
-            {upvoteLoading ? (
-              <View style={{ marginTop: 24, alignItems: 'center' }}>
-                <FontAwesome name="hourglass-half" size={32} color={colors.icon} />
-                <Text style={{ color: colors.text, marginTop: 8 }}>Submitting vote...</Text>
-              </View>
-            ) : upvoteSuccess ? (
-              <View style={{ marginTop: 24, alignItems: 'center' }}>
-                <FontAwesome name="check-circle" size={32} color={colors.button} />
-                <Text style={{ color: colors.text, marginTop: 8 }}>Upvote successful!</Text>
-              </View>
-            ) : (
-              <View style={{ flexDirection: 'row', marginTop: 24 }}>
-                <Pressable
-                  style={{ flex: 1, marginRight: 8, backgroundColor: colors.buttonInactive, borderRadius: 8, padding: 12, alignItems: 'center' }}
-                  onPress={closeUpvoteModal}
-                  disabled={upvoteLoading}
-                >
-                  <Text style={{ color: colors.text, fontWeight: '600' }}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  style={{ flex: 1, marginLeft: 8, backgroundColor: colors.button, borderRadius: 8, padding: 12, alignItems: 'center' }}
-                  onPress={confirmUpvote}
-                  disabled={upvoteLoading}
-                >
-                  <Text style={{ color: colors.buttonText, fontWeight: '600' }}>Confirm</Text>
-                </Pressable>
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
+        voteWeight={voteWeight}
+        voteValue={voteValue}
+        voteWeightLoading={voteWeightLoading}
+        upvoteLoading={upvoteLoading}
+        upvoteSuccess={upvoteSuccess}
+        onClose={closeUpvoteModal}
+        onConfirm={confirmUpvote}
+        onVoteWeightChange={setVoteWeight}
+        colors={colors}
+      />
     </SafeAreaViewSA>
   );
 };
@@ -2011,321 +848,3 @@ const ProfileScreen = () => {
 export default ProfileScreen;
 
 export const options = { headerShown: false };
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    padding: 8,
-    marginRight: 8,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    flex: 1,
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 36, // Same width as back button to center title
-  },
-  content: {
-    flex: 1,
-  },
-  profileSection: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  username: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  avatarContainer: {
-    marginBottom: 16,
-  },
-  largeAvatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-  },
-  defaultAvatar: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  editAvatarButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  editAvatarText: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginLeft: 6,
-  },
-  displayName: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  socialStats: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 40,
-    marginBottom: 20,
-  },
-  socialStatItem: {
-    alignItems: 'center',
-  },
-  socialStatNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  socialStatLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    opacity: 0.7,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    gap: 8,
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  aboutSection: {
-    marginBottom: 20,
-    width: '100%',
-  },
-  aboutText: {
-    fontSize: 15,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  statsSection: {
-    width: '100%',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
-  },
-  statItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  statLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  additionalInfo: {
-    width: '100%',
-    gap: 12,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  infoText: {
-    fontSize: 15,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    fontSize: 16,
-  },
-  unclaimedSection: {
-    width: '100%',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-  },
-  unclaimedTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  unclaimedRewards: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 16,
-  },
-  unclaimedText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  claimButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 25,
-    gap: 8,
-  },
-  claimButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  logoutSection: {
-    width: '100%',
-    marginTop: 20,
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 25,
-    gap: 8,
-    width: '100%',
-  },
-  logoutButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  // Snaps section styles
-  snapsSection: {
-    width: '100%',
-    marginTop: 20,
-  },
-  snapsSectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  snapsSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-    position: 'relative',
-  },
-  refreshButton: {
-    position: 'absolute',
-    right: 0,
-    padding: 8,
-  },
-  snapsLoadingContainer: {
-    alignItems: 'center',
-    padding: 40,
-  },
-  snapsLoadingText: {
-    marginTop: 8,
-    fontSize: 14,
-  },
-  snapsErrorContainer: {
-    alignItems: 'center',
-    padding: 40,
-  },
-  snapsErrorText: {
-    marginTop: 8,
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  snapsEmptyContainer: {
-    alignItems: 'center',
-    padding: 40,
-  },
-  snapsEmptyText: {
-    marginTop: 12,
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  // Vertical feed styles (replacing horizontal bubble styles)
-  verticalFeedContainer: {
-    marginTop: 16,
-  },
-  // Load More button styles
-  loadMoreButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
-    gap: 8,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  loadMoreButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  // Load snaps button styles
-  loadSnapsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
-    gap: 8,
-    marginBottom: 20,
-  },
-  loadSnapsButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  retryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginTop: 12,
-  },
-  retryButtonText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-});

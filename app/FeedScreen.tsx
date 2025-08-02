@@ -19,6 +19,7 @@ import { useNotifications } from '../hooks/useNotifications';
 import Snap from './components/Snap';
 import NotificationBadge from './components/NotificationBadge';
 import Slider from '@react-native-community/slider';
+import UpvoteModal from '../components/UpvoteModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -63,14 +64,16 @@ const FeedScreenRefactored = () => {
 
   // Custom hooks for business logic
   const {
-    username,
-    avatarUrl,
-    hasUnclaimedRewards,
-    votingPower,
-    vpLoading,
-    loading: userLoading,
-    logout
+    currentUsername: username,
+    handleLogout: logout
   } = useUserAuth();
+  
+  // TODO: These properties need to be moved to separate hooks
+  const avatarUrl = null; // TODO: Get from profile hook
+  const hasUnclaimedRewards = false; // TODO: Get from profile hook
+  const votingPower = null; // TODO: Get from voting power hook
+  const vpLoading = false; // TODO: Get from voting power hook
+  const userLoading = false; // TODO: Get from profile hook
 
   const {
     snaps,
@@ -231,78 +234,32 @@ const FeedScreenRefactored = () => {
   return (
     <View style={styles.container}>
       {/* Upvote Modal */}
-      <Modal
+      <UpvoteModal
         visible={upvoteModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={closeUpvoteModal}
-      >
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }}>
-          <View style={{ backgroundColor: colors.background, borderRadius: 16, padding: 24, width: '85%', alignItems: 'center' }}>
-            <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>Upvote Snap</Text>
-            <Text style={{ color: colors.text, fontSize: 15, marginBottom: 16 }}>Vote Weight: {voteWeight}%</Text>
-            
-            {voteWeightLoading ? (
-              <ActivityIndicator size="small" color={colors.button} style={{ marginVertical: 16 }} />
-            ) : (
-              <>
-                <Slider
-                  style={{ width: '100%', height: 40 }}
-                  minimumValue={1}
-                  maximumValue={100}
-                  step={1}
-                  value={voteWeight}
-                  onValueChange={setVoteWeight}
-                  minimumTrackTintColor={colors.button}
-                  maximumTrackTintColor={colors.buttonInactive}
-                  thumbTintColor={colors.button}
-                />
-                {voteValue !== null && (
-                  <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginTop: 12 }}>
-                    ${voteValue.usd} USD
-                  </Text>
-                )}
-              </>
-            )}
-            
-            {upvoteLoading ? (
-              <View style={{ marginTop: 24, alignItems: 'center' }}>
-                <FontAwesome name="hourglass-half" size={32} color={colors.icon} />
-                <Text style={{ color: colors.text, marginTop: 8 }}>Submitting vote...</Text>
-              </View>
-            ) : upvoteSuccess ? (
-              <View style={{ marginTop: 24, alignItems: 'center' }}>
-                <FontAwesome name="check-circle" size={32} color={colors.button} />
-                <Text style={{ color: colors.text, marginTop: 8 }}>Upvote successful!</Text>
-              </View>
-            ) : (
-              <View style={{ flexDirection: 'row', marginTop: 24 }}>
-                <Pressable
-                  style={{ flex: 1, marginRight: 8, backgroundColor: colors.buttonInactive, borderRadius: 8, padding: 12, alignItems: 'center' }}
-                  onPress={closeUpvoteModal}
-                  disabled={upvoteLoading}
-                >
-                  <Text style={{ color: colors.text, fontWeight: '600' }}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  style={{ flex: 1, marginLeft: 8, backgroundColor: colors.button, borderRadius: 8, padding: 12, alignItems: 'center' }}
-                  onPress={confirmUpvote}
-                  disabled={upvoteLoading}
-                >
-                  <Text style={{ color: colors.buttonText, fontWeight: '600' }}>Confirm</Text>
-                </Pressable>
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
+        voteWeight={voteWeight}
+        voteValue={voteValue}
+        voteWeightLoading={voteWeightLoading}
+        upvoteLoading={upvoteLoading}
+        upvoteSuccess={upvoteSuccess}
+        onClose={closeUpvoteModal}
+        onConfirm={confirmUpvote}
+        onVoteWeightChange={setVoteWeight}
+        colors={colors}
+      />
 
       {/* Top bar */}
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <View style={styles.topBar}>
           <View style={{ flexDirection: 'row', alignItems: 'center', position: 'relative' }}>
             <Pressable
-              onPress={() => router.push(`/ProfileScreen?username=${username}` as any)}
+              onPress={() => {
+                if (username) {
+                  console.log('Navigating to profile for username:', username);
+                  router.push(`/ProfileScreen?username=${username}` as any);
+                } else {
+                  console.log('Cannot navigate to profile: username is undefined');
+                }
+              }}
               style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, flexDirection: 'row', alignItems: 'center' }]}
               accessibilityRole="button"
               accessibilityLabel={`View your profile`}
