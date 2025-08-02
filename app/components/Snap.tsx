@@ -1,17 +1,36 @@
 import React, { useState } from 'react';
-import { View, Text, Image, StyleSheet, useColorScheme, Linking, Pressable, Modal, TouchableOpacity, Dimensions } from 'react-native';
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  useColorScheme,
+  Linking,
+  Pressable,
+  Modal,
+  TouchableOpacity,
+  Dimensions,
+} from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { extractImageUrls } from '../../utils/extractImageUrls';
 import { uploadImageToCloudinaryFixed } from '../../utils/cloudinaryImageUploadFixed';
 import { stripImageTags } from '../../utils/stripImageTags';
-import { extractVideoInfo, removeVideoUrls, removeEmbedUrls, extractYouTubeId } from '../../utils/extractVideoInfo';
+import {
+  extractVideoInfo,
+  removeVideoUrls,
+  removeEmbedUrls,
+  extractYouTubeId,
+} from '../../utils/extractVideoInfo';
 import { extractExternalLinks } from '../../utils/extractExternalLinks';
 import IPFSVideoPlayer from './IPFSVideoPlayer';
 import { WebView } from 'react-native-webview';
 import Markdown from 'react-native-markdown-display';
 import RenderHtml from 'react-native-render-html';
 import { Video, ResizeMode } from 'expo-av';
-import { convertSpoilerSyntax, type SpoilerData } from '../../utils/spoilerParser';
+import {
+  convertSpoilerSyntax,
+  type SpoilerData,
+} from '../../utils/spoilerParser';
 import SpoilerText from './SpoilerText';
 import TwitterEmbed from './TwitterEmbed';
 import YouTubeEmbed from './YouTubeEmbed';
@@ -58,7 +77,8 @@ interface SnapProps {
 // Utility to extract raw image URLs from text (not in markdown or html)
 function extractRawImageUrls(text: string): string[] {
   // Match URLs ending with image extensions, not inside markdown or html tags
-  const regex = /(?:^|\s)(https?:\/\/(?:[\w.-]+)\/(?:[\w\-./%]+)\.(?:jpg|jpeg|png|gif|webp|bmp|svg))(?:\s|$)/gi;
+  const regex =
+    /(?:^|\s)(https?:\/\/(?:[\w.-]+)\/(?:[\w\-./%]+)\.(?:jpg|jpeg|png|gif|webp|bmp|svg))(?:\s|$)/gi;
   const matches = [];
   let match;
   while ((match = regex.exec(text)) !== null) {
@@ -69,12 +89,24 @@ function extractRawImageUrls(text: string): string[] {
 
 // Utility to remove raw image URLs from text
 function removeRawImageUrls(text: string): string {
-  return text.replace(/(?:^|\s)(https?:\/\/(?:[\w.-]+)\/(?:[\w\-./%]+)\.(?:jpg|jpeg|png|gif|webp|bmp|svg))(?:\s|$)/gi, ' ').replace(/\s{2,}/g, ' ').trim();
+  return text
+    .replace(
+      /(?:^|\s)(https?:\/\/(?:[\w.-]+)\/(?:[\w\-./%]+)\.(?:jpg|jpeg|png|gif|webp|bmp|svg))(?:\s|$)/gi,
+      ' '
+    )
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
 const removeYouTubeUrl = (text: string): string => {
   // Remove all YouTube links (youtube.com/watch?v=, youtu.be/, youtube.com/shorts/, etc.)
-  return text.replace(/(?:https?:\/\/(?:www\.)?)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)[\w-]{11}(\S*)?/gi, '').replace(/\s{2,}/g, ' ').trim();
+  return text
+    .replace(
+      /(?:https?:\/\/(?:www\.)?)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)[\w-]{11}(\S*)?/gi,
+      ''
+    )
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 };
 
 // Utility to check if a string contains HTML tags
@@ -88,41 +120,49 @@ function linkifyMentions(text: string): string {
   // Negative lookbehind for '/': (?<!/)
   // Hive usernames: 3-16 chars, a-z, 0-9, dash, dot (no @ in username)
   // Avoid emails and already-linked mentions
-  return text.replace(/(^|[^\w/@])@([a-z0-9\-\.]{3,16})(?![a-z0-9\-\.])/gi, (match, pre, username, offset, string) => {
-    // Don't process if we're inside a markdown link [text](url)
-    const beforeMatch = string.substring(0, offset);
-    const afterMatch = string.substring(offset + match.length);
-    
-    // Check if we're inside a markdown link by looking for unmatched brackets
-    const openBrackets = (beforeMatch.match(/\[/g) || []).length;
-    const closeBrackets = (beforeMatch.match(/\]/g) || []).length;
-    const isInsideMarkdownLink = openBrackets > closeBrackets && afterMatch.includes('](');
-    
-    if (isInsideMarkdownLink) {
-      return match; // Don't modify if inside a markdown link
+  return text.replace(
+    /(^|[^\w/@])@([a-z0-9\-\.]{3,16})(?![a-z0-9\-\.])/gi,
+    (match, pre, username, offset, string) => {
+      // Don't process if we're inside a markdown link [text](url)
+      const beforeMatch = string.substring(0, offset);
+      const afterMatch = string.substring(offset + match.length);
+
+      // Check if we're inside a markdown link by looking for unmatched brackets
+      const openBrackets = (beforeMatch.match(/\[/g) || []).length;
+      const closeBrackets = (beforeMatch.match(/\]/g) || []).length;
+      const isInsideMarkdownLink =
+        openBrackets > closeBrackets && afterMatch.includes('](');
+
+      if (isInsideMarkdownLink) {
+        return match; // Don't modify if inside a markdown link
+      }
+
+      return `${pre}[**@${username}**](profile://${username})`;
     }
-    
-    return `${pre}[**@${username}**](profile://${username})`;
-  });
+  );
 }
 
 // Utility: Preprocess raw URLs to clickable markdown links (if not already linked)
 function linkifyUrls(text: string): string {
   // Regex for URLs (http/https) - includes @ character for Hive frontend URLs
-  return text.replace(/(https?:\/\/[\w.-]+(?:\/[\w\-./?%&=+#@]*)?)/gi, (url) => {
+  return text.replace(/(https?:\/\/[\w.-]+(?:\/[\w\-./?%&=+#@]*)?)/gi, url => {
     // If already inside a markdown or html link, skip
     if (/\]\([^)]+\)$/.test(url) || /href=/.test(url)) return url;
-    
+
     // Skip URLs that should be handled as embedded media (YouTube, 3Speak, IPFS, MP4)
-    const youtubeMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-    const threeSpeakMatch = url.match(/https:\/\/3speak\.tv\/watch\?v=([^\/\s]+)\/([a-zA-Z0-9_-]+)/);
+    const youtubeMatch = url.match(
+      /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/
+    );
+    const threeSpeakMatch = url.match(
+      /https:\/\/3speak\.tv\/watch\?v=([^\/\s]+)\/([a-zA-Z0-9_-]+)/
+    );
     const ipfsMatch = url.match(/ipfs\/([A-Za-z0-9]+)/);
     const mp4Match = url.match(/\.mp4($|\?)/i);
-    
+
     if (youtubeMatch || threeSpeakMatch || ipfsMatch || mp4Match) {
       return url; // Don't linkify, let markdown rules handle video embedding
     }
-    
+
     // Do NOT shorten display for long URLs; use full URL as display
     return `[${url}](${url})`;
   });
@@ -130,7 +170,17 @@ function linkifyUrls(text: string): string {
 
 // Helper: Render mp4 video using expo-av Video
 const renderMp4Video = (uri: string, key?: string | number) => (
-  <View key={key || uri} style={{ width: '100%', aspectRatio: 16 / 9, marginVertical: 10, borderRadius: 12, overflow: 'hidden', backgroundColor: '#eee' }}>
+  <View
+    key={key || uri}
+    style={{
+      width: '100%',
+      aspectRatio: 16 / 9,
+      marginVertical: 10,
+      borderRadius: 12,
+      overflow: 'hidden',
+      backgroundColor: '#eee',
+    }}
+  >
     <Video
       source={{ uri }}
       useNativeControls
@@ -144,28 +194,24 @@ const renderMp4Video = (uri: string, key?: string | number) => (
 
 // Custom markdown rules for mp4 and video support
 const markdownRules = {
-  image: (
-    node: any,
-    children: any,
-    parent: any,
-    styles: any
-  ) => {
+  image: (node: any, children: any, parent: any, styles: any) => {
     const { src, alt } = node.attributes;
-    
+
     // Only process actual image URLs, ignore hashtag/profile links
     if (!src || src.startsWith('hashtag://') || src.startsWith('profile://')) {
       return null;
     }
-    
+
     // Check if it's actually an image URL
-    const isImageUrl = /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i.test(src) || 
-                      src.startsWith('data:image/') ||
-                      src.includes('image');
-    
+    const isImageUrl =
+      /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i.test(src) ||
+      src.startsWith('data:image/') ||
+      src.includes('image');
+
     if (!isImageUrl) {
       return null;
     }
-    
+
     const uniqueKey = `${src || alt}-${Math.random().toString(36).substr(2, 9)}`;
     return (
       <Pressable
@@ -188,18 +234,13 @@ const markdownRules = {
             alignSelf: 'center',
             backgroundColor: '#eee',
           }}
-          resizeMode="cover"
+          resizeMode='cover'
           accessibilityLabel={alt || 'image'}
         />
       </Pressable>
     );
   },
-  link: (
-    node: any,
-    children: any,
-    parent: any,
-    styles: any
-  ) => {
+  link: (node: any, children: any, parent: any, styles: any) => {
     const { href } = node.attributes;
     const mp4Match = href && href.match(/\.mp4($|\?)/i);
     if (mp4Match) {
@@ -219,10 +260,18 @@ const markdownRules = {
             if (typeof handler === 'function') handler(username);
           }}
           style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-          accessibilityRole="link"
+          accessibilityRole='link'
           accessibilityLabel={`View @${username}'s profile`}
         >
-          <Text style={{ color: twitterColors.light.icon, fontWeight: 'bold', textDecorationLine: 'underline' }}>{children}</Text>
+          <Text
+            style={{
+              color: twitterColors.light.icon,
+              fontWeight: 'bold',
+              textDecorationLine: 'underline',
+            }}
+          >
+            {children}
+          </Text>
         </Pressable>
       );
     }
@@ -240,19 +289,26 @@ const markdownRules = {
             if (typeof handler === 'function') handler(tag);
           }}
           style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-          accessibilityRole="link"
+          accessibilityRole='link'
           accessibilityLabel={`View #${tag} hashtag`}
         >
-          <Text style={{ color: '#1DA1F2', textDecorationLine: 'underline' }}>{children}</Text>
+          <Text style={{ color: '#1DA1F2', textDecorationLine: 'underline' }}>
+            {children}
+          </Text>
         </Pressable>
       );
     }
     // Default: open external link
-    const uniqueKey = href ? `${href}-${Math.random().toString(36).substr(2, 9)}` : Math.random().toString(36).substr(2, 9);
+    const uniqueKey = href
+      ? `${href}-${Math.random().toString(36).substr(2, 9)}`
+      : Math.random().toString(36).substr(2, 9);
     return (
       <Text
         key={uniqueKey}
-        style={{ color: twitterColors.light.icon, textDecorationLine: 'underline' }}
+        style={{
+          color: twitterColors.light.icon,
+          textDecorationLine: 'underline',
+        }}
         onPress={() => {
           if (href) Linking.openURL(href);
         }}
@@ -261,31 +317,42 @@ const markdownRules = {
       </Text>
     );
   },
-  html: (
-    node: any,
-    children: any,
-    parent: any,
-    styles: any
-  ) => {
+  html: (node: any, children: any, parent: any, styles: any) => {
     const htmlContent = node.content || '';
-    
+
     // Handle <video> tags for mp4
-    const videoTagMatch = htmlContent.match(/<video[^>]*src=["']([^"']+\.mp4)["'][^>]*>(.*?)<\/video>/i);
+    const videoTagMatch = htmlContent.match(
+      /<video[^>]*src=["']([^"']+\.mp4)["'][^>]*>(.*?)<\/video>/i
+    );
     if (videoTagMatch) {
       const mp4Url = videoTagMatch[1];
       return renderMp4Video(mp4Url, mp4Url);
     }
-    
+
     // Handle 3Speak iframe embeds
-    const threeSpeakIframeMatch = htmlContent.match(/<iframe[^>]+src=["']https:\/\/3speak\.tv\/embed\?v=([^\/\s"']+)\/([a-zA-Z0-9_-]+)["'][^>]*>/i);
+    const threeSpeakIframeMatch = htmlContent.match(
+      /<iframe[^>]+src=["']https:\/\/3speak\.tv\/embed\?v=([^\/\s"']+)\/([a-zA-Z0-9_-]+)["'][^>]*>/i
+    );
     if (threeSpeakIframeMatch) {
       const username = threeSpeakIframeMatch[1];
       const videoId = threeSpeakIframeMatch[2];
       const uniqueKey = `3speak-${username}-${videoId}-${Math.random().toString(36).substr(2, 9)}`;
       return (
-        <View key={uniqueKey} style={{ width: '100%', aspectRatio: 16/9, borderRadius: 12, overflow: 'hidden', position: 'relative', marginVertical: 10 }}>
+        <View
+          key={uniqueKey}
+          style={{
+            width: '100%',
+            aspectRatio: 16 / 9,
+            borderRadius: 12,
+            overflow: 'hidden',
+            position: 'relative',
+            marginVertical: 10,
+          }}
+        >
           <WebView
-            source={{ uri: `https://3speak.tv/embed?v=${username}/${videoId}&autoplay=0` }}
+            source={{
+              uri: `https://3speak.tv/embed?v=${username}/${videoId}&autoplay=0`,
+            }}
             style={{ flex: 1, backgroundColor: '#000' }}
             allowsFullscreenVideo
             javaScriptEnabled
@@ -294,23 +361,29 @@ const markdownRules = {
             allowsInlineMediaPlayback={true}
           />
           {/* Video type indicator */}
-          <View style={{ 
-            position: 'absolute', 
-            top: 8, 
-            right: 8, 
-            backgroundColor: 'rgba(0,0,0,0.7)', 
-            paddingHorizontal: 6, 
-            paddingVertical: 2, 
-            borderRadius: 4 
-          }}>
-            <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>3SPEAK</Text>
+          <View
+            style={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              backgroundColor: 'rgba(0,0,0,0.7)',
+              paddingHorizontal: 6,
+              paddingVertical: 2,
+              borderRadius: 4,
+            }}
+          >
+            <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+              3SPEAK
+            </Text>
           </View>
         </View>
       );
     }
-    
+
     // Handle IPFS iframe embeds
-    const ipfsIframeMatch = htmlContent.match(/<iframe[^>]+src=["']([^"']*\/ipfs\/([A-Za-z0-9]+)[^"']*?)["'][^>]*>/i);
+    const ipfsIframeMatch = htmlContent.match(
+      /<iframe[^>]+src=["']([^"']*\/ipfs\/([A-Za-z0-9]+)[^"']*?)["'][^>]*>/i
+    );
     if (ipfsIframeMatch) {
       const ipfsUrl = ipfsIframeMatch[1];
       const uniqueKey = `ipfs-${ipfsIframeMatch[2]}-${Math.random().toString(36).substr(2, 9)}`;
@@ -320,14 +393,31 @@ const markdownRules = {
         </View>
       );
     }
-    
+
     // Default HTML rendering (let markdown handle it)
     return null;
   },
   // ...existing code...
 };
 
-const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount = 0, replyCount = 0, payout = 0, onUpvotePress, permlink, hasUpvoted = false, onSpeechBubblePress, onUserPress, onContentPress, onImagePress, showAuthor = false, onHashtagPress }) => {
+const Snap: React.FC<SnapProps> = ({
+  author,
+  avatarUrl,
+  body,
+  created,
+  voteCount = 0,
+  replyCount = 0,
+  payout = 0,
+  onUpvotePress,
+  permlink,
+  hasUpvoted = false,
+  onSpeechBubblePress,
+  onUserPress,
+  onContentPress,
+  onImagePress,
+  showAuthor = false,
+  onHashtagPress,
+}) => {
   // Process hashtags in text, converting them to clickable markdown links
   function processHashtags(text: string): string {
     return text.replace(/(#\w+)/g, (match, hashtag) => {
@@ -342,7 +432,7 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
   const imageUrls = extractImageUrls(body);
   const rawImageUrls = extractRawImageUrls(body);
   const embeddedContent = extractVideoInfo(body); // Renamed from videoInfo to be more accurate
-  
+
   // Remove embedded content URLs and image URLs from text body if present
   let textBody = stripImageTags(body);
   if (embeddedContent) {
@@ -351,11 +441,11 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
   if (rawImageUrls.length > 0) {
     textBody = removeRawImageUrls(textBody);
   }
-  
+
   // Process spoiler syntax first, before other text processing
   const spoilerData = convertSpoilerSyntax(textBody);
   textBody = spoilerData.processedText;
-  
+
   // Add: linkify URLs first, then mentions, then hashtags (order matters!)
   textBody = linkifyUrls(textBody);
   textBody = linkifyMentions(textBody);
@@ -371,24 +461,37 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
   (globalThis as any)._snapOnHashtagPress = onHashtagPress;
 
   return (
-    <View style={[styles.bubble, { backgroundColor: colors.bubble, borderColor: colors.border, width: '100%', alignSelf: 'stretch' }]}> 
+    <View
+      style={[
+        styles.bubble,
+        {
+          backgroundColor: colors.bubble,
+          borderColor: colors.border,
+          width: '100%',
+          alignSelf: 'stretch',
+        },
+      ]}
+    >
       {/* Image Modal */}
       <Modal
         visible={modalVisible}
         transparent
-        animationType="fade"
+        animationType='fade'
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
-              <FontAwesome name="close" size={28} color="#fff" />
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setModalVisible(false)}
+            >
+              <FontAwesome name='close' size={28} color='#fff' />
             </TouchableOpacity>
             {modalImageUrl && (
               <Image
                 source={{ uri: modalImageUrl }}
                 style={styles.fullImage}
-                resizeMode="contain"
+                resizeMode='contain'
               />
             )}
           </View>
@@ -399,28 +502,51 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
         <View style={styles.topRow}>
           <Pressable
             onPress={() => onUserPress && onUserPress(author)}
-            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, flexDirection: 'row', alignItems: 'center' }]}
+            style={({ pressed }) => [
+              {
+                opacity: pressed ? 0.7 : 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+              },
+            ]}
             disabled={!onUserPress}
-            accessibilityRole="button"
+            accessibilityRole='button'
             accessibilityLabel={`View ${author}'s profile`}
           >
-            <Image source={avatarUrl ? { uri: avatarUrl } : require('../../assets/images/generic-avatar.png')} style={styles.avatar} />       
-            <Text style={[styles.username, { color: colors.text }]}>{author}</Text>
+            <Image
+              source={
+                avatarUrl
+                  ? { uri: avatarUrl }
+                  : require('../../assets/images/generic-avatar.png')
+              }
+              style={styles.avatar}
+            />
+            <Text style={[styles.username, { color: colors.text }]}>
+              {author}
+            </Text>
           </Pressable>
-          <Text style={[styles.timestamp, { color: colors.text }]}>{new Date(created + 'Z').toLocaleString()}</Text>    
+          <Text style={[styles.timestamp, { color: colors.text }]}>
+            {new Date(created + 'Z').toLocaleString()}
+          </Text>
         </View>
       )}
       {/* Embedded Content (Videos, Twitter posts, etc.) */}
       {embeddedContent && (
         <View style={{ marginBottom: 8 }}>
           {embeddedContent.type === 'ipfs' ? (
-            <IPFSVideoPlayer ipfsUrl={embeddedContent.embedUrl} isDark={isDark} />
+            <IPFSVideoPlayer
+              ipfsUrl={embeddedContent.embedUrl}
+              isDark={isDark}
+            />
           ) : embeddedContent.type === 'twitter' ? (
             <TwitterEmbed embedUrl={embeddedContent.embedUrl} isDark={isDark} />
           ) : embeddedContent.type === 'youtube' ? (
             <YouTubeEmbed embedUrl={embeddedContent.embedUrl} isDark={isDark} />
           ) : embeddedContent.type === '3speak' ? (
-            <ThreeSpeakEmbed embedUrl={embeddedContent.embedUrl} isDark={isDark} />
+            <ThreeSpeakEmbed
+              embedUrl={embeddedContent.embedUrl}
+              isDark={isDark}
+            />
           ) : null}
         </View>
       )}
@@ -428,18 +554,27 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
       {imageUrls.length > 0 && (
         <View style={{ marginBottom: 8 }}>
           {imageUrls.map((url, idx) => (
-            <Pressable key={url + idx} onPress={() => {
-              if (onImagePress) {
-                onImagePress(url);
-              } else {
-                setModalImageUrl(url);
-                setModalVisible(true);
-              }
-            }}>
+            <Pressable
+              key={url + idx}
+              onPress={() => {
+                if (onImagePress) {
+                  onImagePress(url);
+                } else {
+                  setModalImageUrl(url);
+                  setModalVisible(true);
+                }
+              }}
+            >
               <Image
                 source={{ uri: url }}
-                style={{ width: '100%', height: 200, borderRadius: 12, marginBottom: 6, backgroundColor: '#eee' }}
-                resizeMode="cover"
+                style={{
+                  width: '100%',
+                  height: 200,
+                  borderRadius: 12,
+                  marginBottom: 6,
+                  backgroundColor: '#eee',
+                }}
+                resizeMode='cover'
               />
             </Pressable>
           ))}
@@ -449,136 +584,188 @@ const Snap: React.FC<SnapProps> = ({ author, avatarUrl, body, created, voteCount
       {rawImageUrls.length > 0 && (
         <View style={{ marginBottom: 8 }}>
           {rawImageUrls.map((url, idx) => (
-            <Pressable key={url + idx} onPress={() => {
-              if (onImagePress) {
-                onImagePress(url);
-              } else {
-                setModalImageUrl(url);
-                setModalVisible(true);
-              }
-            }}>
+            <Pressable
+              key={url + idx}
+              onPress={() => {
+                if (onImagePress) {
+                  onImagePress(url);
+                } else {
+                  setModalImageUrl(url);
+                  setModalVisible(true);
+                }
+              }}
+            >
               <Image
                 source={{ uri: url }}
-                style={{ width: '100%', height: 200, borderRadius: 12, marginBottom: 6, backgroundColor: '#eee' }}
-                resizeMode="cover"
+                style={{
+                  width: '100%',
+                  height: 200,
+                  borderRadius: 12,
+                  marginBottom: 6,
+                  backgroundColor: '#eee',
+                }}
+                resizeMode='cover'
               />
             </Pressable>
           ))}
         </View>
       )}
-      
+
       {/* Spoiler Components */}
       {spoilerData.spoilers.map((spoiler: SpoilerData, index: number) => (
         <SpoilerText key={`spoiler-${index}`} buttonText={spoiler.buttonText}>
           {spoiler.content}
         </SpoilerText>
       ))}
-      
+
       {/* Body */}
-      {cleanTextBody.length > 0 && (() => {
-        const windowWidth = Dimensions.get('window').width;
-        const isHtml = containsHtml(cleanTextBody);
-        if (onContentPress) {
-          return (
-            <Pressable
-              onPress={onContentPress}
-              style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
-              accessibilityRole="button"
-              accessibilityLabel="View conversation"
-            >
-              {isHtml ? (
-                <RenderHtml
-                  contentWidth={windowWidth - 32}
-                  source={{ html: cleanTextBody }}
-                  baseStyle={{ color: colors.text, fontSize: 15, marginBottom: 8 }}
-                  enableExperimentalMarginCollapsing
-                  tagsStyles={{ a: { color: colors.icon } }}
-                  renderers={{
-                    video: (props: any) => {
-                      const src = props?.tnode?.attributes?.src;
-                      const TDefaultRenderer = props?.TDefaultRenderer;
-                      if (src && src.endsWith('.mp4')) {
-                        return renderMp4Video(src);
-                      }
-                      return TDefaultRenderer ? <TDefaultRenderer {...props} /> : null;
-                    },
-                  }}
-                />
-              ) : (
-                <Markdown
-                  style={{
-                    body: { color: colors.text, fontSize: 15, marginBottom: 8 },
-                    link: { color: colors.icon },
-                  }}
-                  rules={markdownRules}
-                >
-                  {cleanTextBody}
-                </Markdown>
-              )}
-            </Pressable>
-          );
-        } else {
-          return isHtml ? (
-            <RenderHtml
-              contentWidth={windowWidth - 32}
-              source={{ html: cleanTextBody }}
-              baseStyle={{ color: colors.text, fontSize: 15, marginBottom: 8 }}
-              enableExperimentalMarginCollapsing
-              tagsStyles={{ a: { color: colors.icon } }}
-              renderers={{
-                video: (props: any) => {
-                  const src = props?.tnode?.attributes?.src;
-                  const TDefaultRenderer = props?.TDefaultRenderer;
-                  if (src && src.endsWith('.mp4')) {
-                    return renderMp4Video(src);
-                  }
-                  return TDefaultRenderer ? <TDefaultRenderer {...props} /> : null;
-                },
-              }}
-            />
-          ) : (
-            <Markdown
-              style={{
-                body: { color: colors.text, fontSize: 15, marginBottom: 8 },
-                link: { color: colors.icon },
-              }}
-              rules={markdownRules}
-            >
-              {cleanTextBody}
-            </Markdown>
-          );
-        }
-      })()}
+      {cleanTextBody.length > 0 &&
+        (() => {
+          const windowWidth = Dimensions.get('window').width;
+          const isHtml = containsHtml(cleanTextBody);
+          if (onContentPress) {
+            return (
+              <Pressable
+                onPress={onContentPress}
+                style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+                accessibilityRole='button'
+                accessibilityLabel='View conversation'
+              >
+                {isHtml ? (
+                  <RenderHtml
+                    contentWidth={windowWidth - 32}
+                    source={{ html: cleanTextBody }}
+                    baseStyle={{
+                      color: colors.text,
+                      fontSize: 15,
+                      marginBottom: 8,
+                    }}
+                    enableExperimentalMarginCollapsing
+                    tagsStyles={{ a: { color: colors.icon } }}
+                    renderers={{
+                      video: (props: any) => {
+                        const src = props?.tnode?.attributes?.src;
+                        const TDefaultRenderer = props?.TDefaultRenderer;
+                        if (src && src.endsWith('.mp4')) {
+                          return renderMp4Video(src);
+                        }
+                        return TDefaultRenderer ? (
+                          <TDefaultRenderer {...props} />
+                        ) : null;
+                      },
+                    }}
+                  />
+                ) : (
+                  <Markdown
+                    style={{
+                      body: {
+                        color: colors.text,
+                        fontSize: 15,
+                        marginBottom: 8,
+                      },
+                      link: { color: colors.icon },
+                    }}
+                    rules={markdownRules}
+                  >
+                    {cleanTextBody}
+                  </Markdown>
+                )}
+              </Pressable>
+            );
+          } else {
+            return isHtml ? (
+              <RenderHtml
+                contentWidth={windowWidth - 32}
+                source={{ html: cleanTextBody }}
+                baseStyle={{
+                  color: colors.text,
+                  fontSize: 15,
+                  marginBottom: 8,
+                }}
+                enableExperimentalMarginCollapsing
+                tagsStyles={{ a: { color: colors.icon } }}
+                renderers={{
+                  video: (props: any) => {
+                    const src = props?.tnode?.attributes?.src;
+                    const TDefaultRenderer = props?.TDefaultRenderer;
+                    if (src && src.endsWith('.mp4')) {
+                      return renderMp4Video(src);
+                    }
+                    return TDefaultRenderer ? (
+                      <TDefaultRenderer {...props} />
+                    ) : null;
+                  },
+                }}
+              />
+            ) : (
+              <Markdown
+                style={{
+                  body: { color: colors.text, fontSize: 15, marginBottom: 8 },
+                  link: { color: colors.icon },
+                }}
+                rules={markdownRules}
+              >
+                {cleanTextBody}
+              </Markdown>
+            );
+          }
+        })()}
       {/* VoteReplyBar - only upvote icon is interactive */}
       <View style={styles.voteBar}>
         {onUpvotePress && permlink ? (
           <Pressable
             onPress={() => onUpvotePress({ author, permlink })}
             style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-            accessibilityRole="button"
-            accessibilityLabel="Upvote this snap"
+            accessibilityRole='button'
+            accessibilityLabel='Upvote this snap'
           >
-            <FontAwesome name="arrow-up" size={18} color={upvoteColor} style={styles.icon} />
+            <FontAwesome
+              name='arrow-up'
+              size={18}
+              color={upvoteColor}
+              style={styles.icon}
+            />
           </Pressable>
         ) : (
-          <FontAwesome name="arrow-up" size={18} color={upvoteColor} style={styles.icon} />
+          <FontAwesome
+            name='arrow-up'
+            size={18}
+            color={upvoteColor}
+            style={styles.icon}
+          />
         )}
-        <Text style={[styles.voteCount, { color: colors.text }]}>{voteCount}</Text>
+        <Text style={[styles.voteCount, { color: colors.text }]}>
+          {voteCount}
+        </Text>
         {onSpeechBubblePress ? (
           <Pressable
             onPress={onSpeechBubblePress}
             style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-            accessibilityRole="button"
-            accessibilityLabel="View conversation"
+            accessibilityRole='button'
+            accessibilityLabel='View conversation'
           >
-            <FontAwesome name="comment-o" size={18} color={colors.icon} style={styles.icon} />
+            <FontAwesome
+              name='comment-o'
+              size={18}
+              color={colors.icon}
+              style={styles.icon}
+            />
           </Pressable>
         ) : (
-          <FontAwesome name="comment-o" size={18} color={colors.icon} style={styles.icon} />
+          <FontAwesome
+            name='comment-o'
+            size={18}
+            color={colors.icon}
+            style={styles.icon}
+          />
         )}
-        <Text style={[styles.replyCount, { color: colors.text }]}>{replyCount}</Text>
+        <Text style={[styles.replyCount, { color: colors.text }]}>
+          {replyCount}
+        </Text>
         <View style={{ flex: 1 }} />
-        <Text style={[styles.payout, { color: colors.payout }]}>${payout.toFixed(2)}</Text>
+        <Text style={[styles.payout, { color: colors.payout }]}>
+          ${payout.toFixed(2)}
+        </Text>
       </View>
     </View>
   );

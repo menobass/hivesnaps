@@ -19,6 +19,7 @@ export interface VoteValue {
 export interface UpvoteTarget {
   author: string;
   permlink: string;
+  snap?: any; // Full snap data for optimistic updates
 }
 
 interface UseUpvoteReturn {
@@ -30,20 +31,26 @@ interface UseUpvoteReturn {
   upvoteLoading: boolean;
   upvoteSuccess: boolean;
   voteWeightLoading: boolean;
-  
+
   // Actions
   openUpvoteModal: (target: UpvoteTarget) => Promise<void>;
   closeUpvoteModal: () => void;
   setVoteWeight: (weight: number) => void;
   confirmUpvote: () => Promise<void>;
-  updateSnapsOptimistically: (snaps: any[], target: UpvoteTarget, voteWeight: number, voteValue: VoteValue | null) => any[];
+  updateSnapsOptimistically: (
+    snaps: any[],
+    target: UpvoteTarget,
+    voteWeight: number,
+    voteValue: VoteValue | null
+  ) => any[];
 }
 
 export const useUpvote = (
   username: string | null,
   globalProps: any,
   rewardFund: any,
-  hivePrice: number
+  hivePrice: number,
+  updateSnap?: (author: string, permlink: string, updates: any) => void
 ): UseUpvoteReturn => {
   const [upvoteModalVisible, setUpvoteModalVisible] = useState(false);
   const [upvoteTarget, setUpvoteTarget] = useState<UpvoteTarget | null>(null);
@@ -53,54 +60,69 @@ export const useUpvote = (
   const [upvoteSuccess, setUpvoteSuccess] = useState(false);
   const [voteWeightLoading, setVoteWeightLoading] = useState(false);
 
-  const openUpvoteModal = useCallback(async (target: UpvoteTarget) => {
-    setUpvoteTarget(target);
-    setVoteWeightLoading(true);
-    
-    try {
-      // Get stored vote weight
-      const val = await AsyncStorage.getItem('hivesnaps_vote_weight');
-      const weight = val !== null ? Number(val) : 100;
-      setVoteWeight(weight);
-      
-      // Fetch account object for vote value calculation
-      let accountObj = null;
-      if (username) {
-        const accounts = await client.database.getAccounts([username]);
-        accountObj = accounts && accounts[0] ? accounts[0] : null;
+  const openUpvoteModal = useCallback(
+    async (target: UpvoteTarget) => {
+      setUpvoteTarget(target);
+      setVoteWeightLoading(true);
+
+      try {
+        // Get stored vote weight
+        const val = await AsyncStorage.getItem('hivesnaps_vote_weight');
+        const weight = val !== null ? Number(val) : 100;
+        setVoteWeight(weight);
+
+        // Fetch account object for vote value calculation
+        let accountObj = null;
+        if (username) {
+          const accounts = await client.database.getAccounts([username]);
+          accountObj = accounts && accounts[0] ? accounts[0] : null;
+        }
+
+        // Calculate initial vote value
+        if (accountObj && globalProps && rewardFund) {
+          console.log('[VoteValueDebug] accountObj:', accountObj);
+          console.log('[VoteValueDebug] globalProps:', globalProps);
+          console.log('[VoteValueDebug] rewardFund:', rewardFund);
+          console.log('[VoteValueDebug] hivePrice:', hivePrice);
+          const calcValue = calculateVoteValue(
+            accountObj,
+            globalProps,
+            rewardFund,
+            weight,
+            hivePrice
+          );
+          console.log('[VoteValueDebug] calculateVoteValue result:', calcValue);
+          setVoteValue(calcValue);
+        } else {
+          setVoteValue(null);
+        }
+      } catch (err) {
+        setVoteWeight(100);
+        // Try to calculate vote value with default weight
+        let accountObj = null;
+        if (username) {
+          const accounts = await client.database.getAccounts([username]);
+          accountObj = accounts && accounts[0] ? accounts[0] : null;
+        }
+        if (accountObj && globalProps && rewardFund) {
+          const calcValue = calculateVoteValue(
+            accountObj,
+            globalProps,
+            rewardFund,
+            100,
+            hivePrice
+          );
+          setVoteValue(calcValue);
+        } else {
+          setVoteValue(null);
+        }
       }
-      
-      // Calculate initial vote value
-      if (accountObj && globalProps && rewardFund) {
-        console.log('[VoteValueDebug] accountObj:', accountObj);
-        console.log('[VoteValueDebug] globalProps:', globalProps);
-        console.log('[VoteValueDebug] rewardFund:', rewardFund);
-        console.log('[VoteValueDebug] hivePrice:', hivePrice);
-        const calcValue = calculateVoteValue(accountObj, globalProps, rewardFund, weight, hivePrice);
-        console.log('[VoteValueDebug] calculateVoteValue result:', calcValue);
-        setVoteValue(calcValue);
-      } else {
-        setVoteValue(null);
-      }
-    } catch (err) {
-      setVoteWeight(100);
-      // Try to calculate vote value with default weight
-      let accountObj = null;
-      if (username) {
-        const accounts = await client.database.getAccounts([username]);
-        accountObj = accounts && accounts[0] ? accounts[0] : null;
-      }
-      if (accountObj && globalProps && rewardFund) {
-        const calcValue = calculateVoteValue(accountObj, globalProps, rewardFund, 100, hivePrice);
-        setVoteValue(calcValue);
-      } else {
-        setVoteValue(null);
-      }
-    }
-    
-    setVoteWeightLoading(false);
-    setUpvoteModalVisible(true);
-  }, [username, globalProps, rewardFund, hivePrice]);
+
+      setVoteWeightLoading(false);
+      setUpvoteModalVisible(true);
+    },
+    [username, globalProps, rewardFund, hivePrice]
+  );
 
   const closeUpvoteModal = useCallback(() => {
     setUpvoteModalVisible(false);
@@ -111,14 +133,15 @@ export const useUpvote = (
 
   const confirmUpvote = useCallback(async () => {
     if (!upvoteTarget || !username) return;
-    
+
     setUpvoteLoading(true);
     setUpvoteSuccess(false);
-    
+
     try {
       // Retrieve posting key from secure store
       const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
-      if (!postingKeyStr) throw new Error('No posting key found. Please log in again.');
+      if (!postingKeyStr)
+        throw new Error('No posting key found. Please log in again.');
       const postingKey = PrivateKey.fromString(postingKeyStr);
 
       // Ecency-style weight: 1-100% slider maps to -10000 to 10000 (positive for upvote)
@@ -142,7 +165,27 @@ export const useUpvote = (
 
       setUpvoteLoading(false);
       setUpvoteSuccess(true);
-      
+
+      // Update the snap optimistically if updateSnap function is provided
+      if (updateSnap && upvoteTarget && upvoteTarget.snap) {
+        const estimatedValueIncrease = voteValue
+          ? parseFloat(voteValue.usd)
+          : 0;
+        const currentVotes = upvoteTarget.snap.net_votes || 0;
+        const currentPayout = parseFloat(
+          upvoteTarget.snap.pending_payout_value?.replace(' HBD', '') || '0'
+        );
+
+        updateSnap(upvoteTarget.author, upvoteTarget.permlink, {
+          net_votes: currentVotes + 1,
+          pending_payout_value: `${(currentPayout + estimatedValueIncrease).toFixed(3)} HBD`,
+          active_votes: [
+            ...(upvoteTarget.snap.active_votes || []),
+            { voter: username, percent: voteWeight, rshares: voteWeight * 100 },
+          ],
+        });
+      }
+
       // Close modal after showing success
       setTimeout(() => {
         setUpvoteModalVisible(false);
@@ -158,28 +201,31 @@ export const useUpvote = (
     }
   }, [upvoteTarget, username, voteWeight]);
 
-  const updateSnapsOptimistically = useCallback((
-    snaps: any[], 
-    target: UpvoteTarget, 
-    weight: number, 
-    value: VoteValue | null
-  ) => {
-    const estimatedValueIncrease = value ? parseFloat(value.usd) : 0;
-    
-    return snaps.map(snap =>
-      snap.author === target.author && snap.permlink === target.permlink
-        ? {
-          ...snap,
-          voteCount: (snap.voteCount || 0) + 1,
-          payout: (snap.payout || 0) + estimatedValueIncrease,
-          active_votes: [
-            ...(snap.active_votes || []),
-            { voter: username, percent: weight, rshares: weight * 100 }
-          ]
-        }
-        : snap
-    );
-  }, [username]);
+  const updateSnapsOptimistically = useCallback(
+    (
+      snaps: any[],
+      target: UpvoteTarget,
+      weight: number,
+      value: VoteValue | null
+    ) => {
+      const estimatedValueIncrease = value ? parseFloat(value.usd) : 0;
+
+      return snaps.map(snap =>
+        snap.author === target.author && snap.permlink === target.permlink
+          ? {
+              ...snap,
+              voteCount: (snap.voteCount || 0) + 1,
+              payout: (snap.payout || 0) + estimatedValueIncrease,
+              active_votes: [
+                ...(snap.active_votes || []),
+                { voter: username, percent: weight, rshares: weight * 100 },
+              ],
+            }
+          : snap
+      );
+    },
+    [username]
+  );
 
   return {
     // State
@@ -190,7 +236,7 @@ export const useUpvote = (
     upvoteLoading,
     upvoteSuccess,
     voteWeightLoading,
-    
+
     // Actions
     openUpvoteModal,
     closeUpvoteModal,
@@ -198,4 +244,4 @@ export const useUpvote = (
     confirmUpvote,
     updateSnapsOptimistically,
   };
-}; 
+};

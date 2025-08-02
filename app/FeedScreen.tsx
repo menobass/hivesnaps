@@ -77,7 +77,8 @@ const FeedScreenRefactored = () => {
     loading: feedLoading,
     error: feedError,
     fetchSnaps,
-    refreshSnaps
+    refreshSnaps,
+    updateSnap
   } = useFeedData(username);
 
   const {
@@ -99,7 +100,7 @@ const FeedScreenRefactored = () => {
     setVoteWeight,
     confirmUpvote,
     updateSnapsOptimistically
-  } = useUpvote(username, globalProps, rewardFund, hivePrice);
+  } = useUpvote(username, globalProps, rewardFund, hivePrice, updateSnap);
 
   const {
     query: searchQuery,
@@ -150,7 +151,9 @@ const FeedScreenRefactored = () => {
 
   // Handle upvote press
   const handleUpvotePress = async ({ author, permlink }: { author: string; permlink: string }) => {
-    await openUpvoteModal({ author, permlink });
+    // Find the snap data to pass for optimistic updates
+    const snap = snaps.find(s => s.author === author && s.permlink === permlink);
+    await openUpvoteModal({ author, permlink, snap });
   };
 
   // Handle image press

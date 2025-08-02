@@ -39,6 +39,11 @@ interface UseFeedDataReturn extends FeedState {
   refreshSnaps: (filter: FeedFilter) => Promise<void>;
   loadMoreSnaps: (filter: FeedFilter) => Promise<void>;
   clearError: () => void;
+  updateSnap: (
+    author: string,
+    permlink: string,
+    updates: Partial<Snap>
+  ) => void;
 }
 
 export const useFeedData = (username: string | null): UseFeedDataReturn => {
@@ -50,14 +55,18 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
   });
 
   const [snapsCache, setSnapsCache] = useState<Record<string, Snap[]>>({});
-  const [lastFetchTime, setLastFetchTime] = useState<Record<string, number>>({});
-  const [avatarCache, setAvatarCache] = useState<Record<string, { url: string; timestamp: number }>>({});
+  const [lastFetchTime, setLastFetchTime] = useState<Record<string, number>>(
+    {}
+  );
+  const [avatarCache, setAvatarCache] = useState<
+    Record<string, { url: string; timestamp: number }>
+  >({});
 
   // Cache management - 5 minute cache
   const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
   const isCacheValid = (filterKey: string) => {
     const lastFetch = lastFetchTime[filterKey];
-    return lastFetch && (Date.now() - lastFetch) < CACHE_DURATION;
+    return lastFetch && Date.now() - lastFetch < CACHE_DURATION;
   };
 
   const getCachedSnaps = (filterKey: string) => {
@@ -80,7 +89,7 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
 
     const uncachedAuthors = authors.filter(author => {
       const cached = avatarCache[author];
-      return !cached || (now - cached.timestamp) > AVATAR_CACHE_DURATION;
+      return !cached || now - cached.timestamp > AVATAR_CACHE_DURATION;
     });
 
     if (uncachedAuthors.length > 0) {
@@ -91,17 +100,24 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
           if (acc.posting_json_metadata) {
             try {
               meta = JSON.parse(acc.posting_json_metadata);
-            } catch { }
+            } catch {}
           }
-          if ((!meta || !meta.profile || !meta.profile.profile_image) && acc.json_metadata) {
+          if (
+            (!meta || !meta.profile || !meta.profile.profile_image) &&
+            acc.json_metadata
+          ) {
             try {
               meta = JSON.parse(acc.json_metadata);
-            } catch { }
+            } catch {}
           }
-          const url = meta && meta.profile && meta.profile.profile_image
-            ? meta.profile.profile_image.replace(/[\\/]+$/, '')
-            : '';
-          setAvatarCache(prev => ({ ...prev, [acc.name]: { url, timestamp: now } }));
+          const url =
+            meta && meta.profile && meta.profile.profile_image
+              ? meta.profile.profile_image.replace(/[\\/]+$/, '')
+              : '';
+          setAvatarCache(prev => ({
+            ...prev,
+            [acc.name]: { url, timestamp: now },
+          }));
         }
       } catch (e) {
         console.log('Error fetching accounts for avatars:', e);
@@ -110,156 +126,284 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
 
     return snaps.map(snap => ({
       ...snap,
-      avatarUrl: avatarCache[snap.author]?.url || ''
+      avatarUrl: avatarCache[snap.author]?.url || '',
     }));
   };
 
-  const fetchSnaps = useCallback(async (filter: FeedFilter, useCache = true) => {
-    const cacheKey = filter === 'my' ? `my-${username}` : filter;
+  const fetchSnaps = useCallback(
+    async (filter: FeedFilter, useCache = true) => {
+      const cacheKey = filter === 'my' ? `my-${username}` : filter;
 
-    // Check cache first
-    if (useCache) {
-      const cachedSnaps = getCachedSnaps(cacheKey);
-      if (cachedSnaps) {
-        console.log('Using cached snaps for', filter, 'feed');
-        setState(prev => ({ ...prev, snaps: cachedSnaps, loading: false }));
-        return;
+      // Check cache first
+      if (useCache) {
+        const cachedSnaps = getCachedSnaps(cacheKey);
+        if (cachedSnaps) {
+          console.log('Using cached snaps for', filter, 'feed');
+          setState(prev => ({ ...prev, snaps: cachedSnaps, loading: false }));
+          return;
+        }
       }
-    }
 
-    setState(prev => ({ ...prev, loading: true, error: null }));
+      setState(prev => ({ ...prev, loading: true, error: null }));
 
-    try {
-      let allSnaps: Snap[] = [];
+      try {
+        let allSnaps: Snap[] = [];
 
-      if (filter === 'newest') {
-        const discussions = await client.database.call('get_discussions_by_blog', [{
-          tag: 'peak.snaps',
-          limit: 3
-        }]);
+        if (filter === 'newest') {
+          const discussions = await client.database.call(
+            'get_discussions_by_blog',
+            [
+              {
+                tag: 'peak.snaps',
+                limit: 3,
+              },
+            ]
+          );
 
-        const snapPromises = discussions.map(async (post: any) => {
-          try {
-            const replies: Snap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
-            return replies;
-          } catch (err) {
-            console.log('Error fetching replies for post:', post.permlink, err);
-            return [];
-          }
-        });
-
-        const snapResults = await Promise.all(snapPromises);
-        allSnaps = snapResults.flat();
-        allSnaps.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
-      } else if (filter === 'following' && username) {
-        const followingResult = await client.call('condenser_api', 'get_following', [username, '', 'blog', 100]);
-        const following = Array.isArray(followingResult)
-          ? followingResult.map((f: any) => f.following)
-          : (followingResult && followingResult.following) ? followingResult.following : [];
-
-        const containerPosts = await client.database.call('get_discussions_by_blog', [{ tag: 'peak.snaps', limit: 3 }]);
-
-        const snapPromises = containerPosts.map(async (post: any) => {
-          try {
-            const replies: Snap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
-            return replies.filter((reply) => following.includes(reply.author));
-          } catch (err) {
-            console.log('Error fetching replies for post:', post.permlink, err);
-            return [];
-          }
-        });
-
-        const snapResults = await Promise.all(snapPromises);
-        allSnaps = snapResults.flat();
-        allSnaps.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
-      } else if (filter === 'trending') {
-        const discussions = await client.database.call('get_discussions_by_blog', [{
-          tag: 'peak.snaps',
-          limit: 3
-        }]);
-
-        const snapPromises = discussions.map(async (post: any) => {
-          try {
-            const replies: Snap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
-            return replies;
-          } catch (err) {
-            console.log('Error fetching replies for post:', post.permlink, err);
-            return [];
-          }
-        });
-
-        const snapResults = await Promise.all(snapPromises);
-        allSnaps = snapResults.flat();
-
-        allSnaps.sort((a, b) => {
-          const payoutA =
-            parseFloat(a.pending_payout_value ? a.pending_payout_value.replace(' HBD', '') : '0') +
-            parseFloat(a.total_payout_value ? a.total_payout_value.replace(' HBD', '') : '0') +
-            parseFloat(a.curator_payout_value ? a.curator_payout_value.replace(' HBD', '') : '0');
-          const payoutB =
-            parseFloat(b.pending_payout_value ? b.pending_payout_value.replace(' HBD', '') : '0') +
-            parseFloat(b.total_payout_value ? b.total_payout_value.replace(' HBD', '') : '0') +
-            parseFloat(b.curator_payout_value ? b.curator_payout_value.replace(' HBD', '') : '0');
-          return payoutB - payoutA;
-        });
-      } else if (filter === 'my' && username) {
-        const discussions = await client.database.call('get_discussions_by_blog', [{
-          tag: 'peak.snaps',
-          limit: 3
-        }]);
-
-        if (discussions && discussions.length > 0) {
           const snapPromises = discussions.map(async (post: any) => {
             try {
-              const replies: Snap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
-              return replies.filter((reply) => reply.author === username);
+              const replies: Snap[] = await client.database.call(
+                'get_content_replies',
+                [post.author, post.permlink]
+              );
+              return replies;
             } catch (err) {
-              console.log('Error fetching replies for post:', post.permlink, err);
+              console.log(
+                'Error fetching replies for post:',
+                post.permlink,
+                err
+              );
               return [];
             }
           });
 
           const snapResults = await Promise.all(snapPromises);
           allSnaps = snapResults.flat();
-          allSnaps.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
+          allSnaps.sort(
+            (a, b) =>
+              new Date(b.created).getTime() - new Date(a.created).getTime()
+          );
+        } else if (filter === 'following' && username) {
+          const followingResult = await client.call(
+            'condenser_api',
+            'get_following',
+            [username, '', 'blog', 100]
+          );
+          const following = Array.isArray(followingResult)
+            ? followingResult.map((f: any) => f.following)
+            : followingResult && followingResult.following
+              ? followingResult.following
+              : [];
+
+          const containerPosts = await client.database.call(
+            'get_discussions_by_blog',
+            [{ tag: 'peak.snaps', limit: 3 }]
+          );
+
+          const snapPromises = containerPosts.map(async (post: any) => {
+            try {
+              const replies: Snap[] = await client.database.call(
+                'get_content_replies',
+                [post.author, post.permlink]
+              );
+              return replies.filter(reply => following.includes(reply.author));
+            } catch (err) {
+              console.log(
+                'Error fetching replies for post:',
+                post.permlink,
+                err
+              );
+              return [];
+            }
+          });
+
+          const snapResults = await Promise.all(snapPromises);
+          allSnaps = snapResults.flat();
+          allSnaps.sort(
+            (a, b) =>
+              new Date(b.created).getTime() - new Date(a.created).getTime()
+          );
+        } else if (filter === 'trending') {
+          const discussions = await client.database.call(
+            'get_discussions_by_blog',
+            [
+              {
+                tag: 'peak.snaps',
+                limit: 3,
+              },
+            ]
+          );
+
+          const snapPromises = discussions.map(async (post: any) => {
+            try {
+              const replies: Snap[] = await client.database.call(
+                'get_content_replies',
+                [post.author, post.permlink]
+              );
+              return replies;
+            } catch (err) {
+              console.log(
+                'Error fetching replies for post:',
+                post.permlink,
+                err
+              );
+              return [];
+            }
+          });
+
+          const snapResults = await Promise.all(snapPromises);
+          allSnaps = snapResults.flat();
+
+          allSnaps.sort((a, b) => {
+            const payoutA =
+              parseFloat(
+                a.pending_payout_value
+                  ? a.pending_payout_value.replace(' HBD', '')
+                  : '0'
+              ) +
+              parseFloat(
+                a.total_payout_value
+                  ? a.total_payout_value.replace(' HBD', '')
+                  : '0'
+              ) +
+              parseFloat(
+                a.curator_payout_value
+                  ? a.curator_payout_value.replace(' HBD', '')
+                  : '0'
+              );
+            const payoutB =
+              parseFloat(
+                b.pending_payout_value
+                  ? b.pending_payout_value.replace(' HBD', '')
+                  : '0'
+              ) +
+              parseFloat(
+                b.total_payout_value
+                  ? b.total_payout_value.replace(' HBD', '')
+                  : '0'
+              ) +
+              parseFloat(
+                b.curator_payout_value
+                  ? b.curator_payout_value.replace(' HBD', '')
+                  : '0'
+              );
+            return payoutB - payoutA;
+          });
+        } else if (filter === 'my' && username) {
+          const discussions = await client.database.call(
+            'get_discussions_by_blog',
+            [
+              {
+                tag: 'peak.snaps',
+                limit: 3,
+              },
+            ]
+          );
+
+          if (discussions && discussions.length > 0) {
+            const snapPromises = discussions.map(async (post: any) => {
+              try {
+                const replies: Snap[] = await client.database.call(
+                  'get_content_replies',
+                  [post.author, post.permlink]
+                );
+                return replies.filter(reply => reply.author === username);
+              } catch (err) {
+                console.log(
+                  'Error fetching replies for post:',
+                  post.permlink,
+                  err
+                );
+                return [];
+              }
+            });
+
+            const snapResults = await Promise.all(snapPromises);
+            allSnaps = snapResults.flat();
+            allSnaps.sort(
+              (a, b) =>
+                new Date(b.created).getTime() - new Date(a.created).getTime()
+            );
+          }
         }
+
+        const limitedSnaps = allSnaps.slice(0, 50);
+        const enhanced = await enhanceSnapsWithAvatar(limitedSnaps);
+
+        setState(prev => ({
+          ...prev,
+          snaps: enhanced,
+          loading: false,
+          hasMore: enhanced.length === 50,
+        }));
+
+        setCachedSnaps(cacheKey, enhanced);
+        console.log(
+          'Fetched and cached snaps for',
+          filter,
+          ':',
+          enhanced.length
+        );
+      } catch (err) {
+        console.log('Error fetching snaps:', err);
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          error: err instanceof Error ? err.message : 'Failed to fetch snaps',
+        }));
       }
+    },
+    [username, avatarCache]
+  );
 
-      const limitedSnaps = allSnaps.slice(0, 50);
-      const enhanced = await enhanceSnapsWithAvatar(limitedSnaps);
-      
-      setState(prev => ({ 
-        ...prev, 
-        snaps: enhanced, 
-        loading: false, 
-        hasMore: enhanced.length === 50 
-      }));
-      
-      setCachedSnaps(cacheKey, enhanced);
-      console.log('Fetched and cached snaps for', filter, ':', enhanced.length);
-    } catch (err) {
-      console.log('Error fetching snaps:', err);
-      setState(prev => ({ 
-        ...prev, 
-        loading: false, 
-        error: err instanceof Error ? err.message : 'Failed to fetch snaps' 
-      }));
-    }
-  }, [username, avatarCache]);
+  const refreshSnaps = useCallback(
+    async (filter: FeedFilter) => {
+      await fetchSnaps(filter, false); // Force refresh without cache
+    },
+    [fetchSnaps]
+  );
 
-  const refreshSnaps = useCallback(async (filter: FeedFilter) => {
-    await fetchSnaps(filter, false); // Force refresh without cache
-  }, [fetchSnaps]);
-
-  const loadMoreSnaps = useCallback(async (filter: FeedFilter) => {
-    // Implementation for pagination would go here
-    // For now, we'll just refresh
-    await refreshSnaps(filter);
-  }, [refreshSnaps]);
+  const loadMoreSnaps = useCallback(
+    async (filter: FeedFilter) => {
+      // Implementation for pagination would go here
+      // For now, we'll just refresh
+      await refreshSnaps(filter);
+    },
+    [refreshSnaps]
+  );
 
   const clearError = useCallback(() => {
     setState(prev => ({ ...prev, error: null }));
   }, []);
+
+  const updateSnap = useCallback(
+    (author: string, permlink: string, updates: Partial<Snap>) => {
+      setState(prev => ({
+        ...prev,
+        snaps: prev.snaps.map(snap =>
+          snap.author === author && snap.permlink === permlink
+            ? { ...snap, ...updates }
+            : snap
+        ),
+      }));
+
+      // Also update the cache
+      setSnapsCache(prev => {
+        const updatedCache = { ...prev };
+        Object.keys(updatedCache).forEach(filterKey => {
+          if (updatedCache[filterKey]) {
+            updatedCache[filterKey] = updatedCache[filterKey].map(snap =>
+              snap.author === author && snap.permlink === permlink
+                ? { ...snap, ...updates }
+                : snap
+            );
+          }
+        });
+        return updatedCache;
+      });
+    },
+    []
+  );
 
   return {
     ...state,
@@ -267,5 +411,6 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
     refreshSnaps,
     loadMoreSnaps,
     clearError,
+    updateSnap,
   };
 };
