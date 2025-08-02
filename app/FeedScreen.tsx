@@ -1,7 +1,27 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, Image, useColorScheme, Dimensions, ActivityIndicator, FlatList, Modal, Pressable, Platform, TextInput, ScrollView, BackHandler, ToastAndroid, KeyboardAvoidingView } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Image,
+  useColorScheme,
+  Dimensions,
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  Pressable,
+  Platform,
+  TextInput,
+  ScrollView,
+  BackHandler,
+  ToastAndroid,
+  KeyboardAvoidingView,
+} from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import ImageView from 'react-native-image-viewing';
@@ -14,6 +34,8 @@ import { useUpvote } from '../hooks/useUpvote';
 import { useSearch } from '../hooks/useSearch';
 import { useHiveData } from '../hooks/useHiveData';
 import { useNotifications } from '../hooks/useNotifications';
+import { useVotingPower } from '../hooks/useVotingPower';
+import { useUserProfile } from '../hooks/useUserProfile';
 
 // Components
 import Snap from './components/Snap';
@@ -50,11 +72,17 @@ const FeedScreenRefactored = () => {
 
   // Theme colors
   const colors = {
-    background: isDark ? twitterColors.dark.background : twitterColors.light.background,
+    background: isDark
+      ? twitterColors.dark.background
+      : twitterColors.light.background,
     text: isDark ? twitterColors.dark.text : twitterColors.light.text,
     button: isDark ? twitterColors.dark.button : twitterColors.light.button,
-    buttonText: isDark ? twitterColors.dark.buttonText : twitterColors.light.buttonText,
-    buttonInactive: isDark ? twitterColors.dark.buttonInactive : twitterColors.light.buttonInactive,
+    buttonText: isDark
+      ? twitterColors.dark.buttonText
+      : twitterColors.light.buttonText,
+    buttonInactive: isDark
+      ? twitterColors.dark.buttonInactive
+      : twitterColors.light.buttonInactive,
     icon: isDark ? twitterColors.dark.icon : twitterColors.light.icon,
     bubble: isDark ? '#192734' : '#f0f0f0',
   };
@@ -63,17 +91,16 @@ const FeedScreenRefactored = () => {
   const styles = createFeedScreenStyles(colors, isDark);
 
   // Custom hooks for business logic
+  const { currentUsername: username, handleLogout: logout } = useUserAuth();
+
+  // User profile and voting power data
   const {
-    currentUsername: username,
-    handleLogout: logout
-  } = useUserAuth();
-  
-  // TODO: These properties need to be moved to separate hooks
-  const avatarUrl = null; // TODO: Get from profile hook
-  const hasUnclaimedRewards = false; // TODO: Get from profile hook
-  const votingPower = null; // TODO: Get from voting power hook
-  const vpLoading = false; // TODO: Get from voting power hook
-  const userLoading = false; // TODO: Get from profile hook
+    avatarUrl,
+    hasUnclaimedRewards,
+    loading: userLoading,
+  } = useUserProfile(username);
+
+  const { votingPower, loading: vpLoading } = useVotingPower(username);
 
   const {
     snaps,
@@ -81,14 +108,10 @@ const FeedScreenRefactored = () => {
     error: feedError,
     fetchSnaps,
     refreshSnaps,
-    updateSnap
+    updateSnap,
   } = useFeedData(username);
 
-  const {
-    hivePrice,
-    globalProps,
-    rewardFund
-  } = useHiveData();
+  const { hivePrice, globalProps, rewardFund } = useHiveData();
 
   const {
     upvoteModalVisible,
@@ -102,7 +125,7 @@ const FeedScreenRefactored = () => {
     closeUpvoteModal,
     setVoteWeight,
     confirmUpvote,
-    updateSnapsOptimistically
+    updateSnapsOptimistically,
   } = useUpvote(username, globalProps, rewardFund, hivePrice, updateSnap);
 
   const {
@@ -120,7 +143,7 @@ const FeedScreenRefactored = () => {
     saveToRecentHashtags,
     removeRecentSearch,
     removeRecentHashtag,
-    loadRecentSearches
+    loadRecentSearches,
   } = useSearch();
 
   const { unreadCount } = useNotifications(username || null);
@@ -153,9 +176,17 @@ const FeedScreenRefactored = () => {
   };
 
   // Handle upvote press
-  const handleUpvotePress = async ({ author, permlink }: { author: string; permlink: string }) => {
+  const handleUpvotePress = async ({
+    author,
+    permlink,
+  }: {
+    author: string;
+    permlink: string;
+  }) => {
     // Find the snap data to pass for optimistic updates
-    const snap = snaps.find(s => s.author === author && s.permlink === permlink);
+    const snap = snaps.find(
+      s => s.author === author && s.permlink === permlink
+    );
     await openUpvoteModal({ author, permlink, snap });
   };
 
@@ -178,12 +209,16 @@ const FeedScreenRefactored = () => {
     if (!searchTerm.trim()) return;
 
     if (searchType === 'content') {
-      const hashtag = searchTerm.startsWith('#') ? searchTerm.slice(1) : searchTerm;
+      const hashtag = searchTerm.startsWith('#')
+        ? searchTerm.slice(1)
+        : searchTerm;
       const cleanHashtag = hashtag.trim();
-      
+
       if (cleanHashtag) {
         await saveToRecentHashtags(cleanHashtag);
-        router.push(`/DiscoveryScreen?hashtag=${encodeURIComponent(cleanHashtag)}`);
+        router.push(
+          `/DiscoveryScreen?hashtag=${encodeURIComponent(cleanHashtag)}`
+        );
         setIsSearchModalVisible(false);
         clearSearch();
       }
@@ -199,14 +234,17 @@ const FeedScreenRefactored = () => {
       const backAction = () => {
         const now = Date.now();
 
-        if (exitTimestamp && (now - exitTimestamp) < 2000) {
+        if (exitTimestamp && now - exitTimestamp < 2000) {
           logout();
           return true;
         } else {
           setExitTimestamp(now);
 
           if (Platform.OS === 'android') {
-            ToastAndroid.show('Press back again to log out', ToastAndroid.SHORT);
+            ToastAndroid.show(
+              'Press back again to log out',
+              ToastAndroid.SHORT
+            );
           }
 
           setTimeout(() => {
@@ -217,7 +255,10 @@ const FeedScreenRefactored = () => {
         }
       };
 
-      const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+      const backHandler = BackHandler.addEventListener(
+        'hardwareBackPress',
+        backAction
+      );
       return () => backHandler.remove();
     }, [exitTimestamp, logout])
   );
@@ -227,9 +268,11 @@ const FeedScreenRefactored = () => {
     itemVisiblePercentThreshold: 60,
   };
 
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
-    // Track visible items if needed
-  }).current;
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: any[] }) => {
+      // Track visible items if needed
+    }
+  ).current;
 
   return (
     <View style={styles.container}>
@@ -250,63 +293,122 @@ const FeedScreenRefactored = () => {
       {/* Top bar */}
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <View style={styles.topBar}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', position: 'relative' }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              position: 'relative',
+            }}
+          >
             <Pressable
               onPress={() => {
                 if (username) {
                   console.log('Navigating to profile for username:', username);
                   router.push(`/ProfileScreen?username=${username}` as any);
                 } else {
-                  console.log('Cannot navigate to profile: username is undefined');
+                  console.log(
+                    'Cannot navigate to profile: username is undefined'
+                  );
                 }
               }}
-              style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, flexDirection: 'row', alignItems: 'center' }]}
-              accessibilityRole="button"
+              style={({ pressed }) => [
+                {
+                  opacity: pressed ? 0.7 : 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                },
+              ]}
+              accessibilityRole='button'
               accessibilityLabel={`View your profile`}
             >
               {userLoading ? (
-                <ActivityIndicator size="small" color={colors.text} style={styles.avatar} />
+                <ActivityIndicator
+                  size='small'
+                  color={colors.text}
+                  style={styles.avatar}
+                />
               ) : (
                 <View style={{ position: 'relative' }}>
                   <Image
-                    source={avatarUrl ? { uri: avatarUrl } : require('../assets/images/generic-avatar.png')}
+                    source={
+                      avatarUrl
+                        ? { uri: avatarUrl }
+                        : require('../assets/images/generic-avatar.png')
+                    }
                     style={styles.avatar}
                   />
                   {hasUnclaimedRewards && (
-                    <View style={[styles.rewardIndicator, {
-                      position: 'absolute',
-                      top: -2,
-                      right: -2,
-                      backgroundColor: '#FFD700',
-                      borderWidth: 1,
-                      borderColor: colors.background
-                    }]}>
-                      <FontAwesome name="dollar" size={8} color="#FFF" />
+                    <View
+                      style={[
+                        styles.rewardIndicator,
+                        {
+                          position: 'absolute',
+                          top: -2,
+                          right: -2,
+                          backgroundColor: '#FFD700',
+                          borderWidth: 1,
+                          borderColor: colors.background,
+                        },
+                      ]}
+                    >
+                      <FontAwesome name='dollar' size={8} color='#FFF' />
                     </View>
                   )}
                 </View>
               )}
-              <Text style={[styles.username, { color: colors.text }]}>{username}</Text>
+              <Text style={[styles.username, { color: colors.text }]}>
+                {username}
+              </Text>
             </Pressable>
-            
-            {username && (
-              vpLoading ? (
-                <ActivityIndicator size="small" color={colors.button} style={{ marginLeft: 8 }} />
+
+            {username &&
+              (vpLoading ? (
+                <ActivityIndicator
+                  size='small'
+                  color={colors.button}
+                  style={{ marginLeft: 8 }}
+                />
               ) : (
                 <Pressable
                   onPress={() => setVpInfoModalVisible(true)}
-                  style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', marginLeft: 8, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: pressed ? colors.buttonInactive : 'transparent' }]}
-                  accessibilityLabel="Show Voting Power info"
-                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    {
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      marginLeft: 8,
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 8,
+                      backgroundColor: pressed
+                        ? colors.buttonInactive
+                        : 'transparent',
+                    },
+                  ]}
+                  accessibilityLabel='Show Voting Power info'
+                  accessibilityRole='button'
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Text style={{ color: colors.button, fontSize: 14, fontWeight: 'bold' }}>
-                    VP: {votingPower !== null ? (votingPower / 100).toFixed(2) : '--'}%
+                  <Text
+                    style={{
+                      color: colors.button,
+                      fontSize: 14,
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    VP:{' '}
+                    {votingPower !== null
+                      ? (votingPower / 100).toFixed(2)
+                      : '--'}
+                    %
                   </Text>
-                  <FontAwesome name="question-circle" size={18} color={colors.button} style={{ marginLeft: 6 }} />
+                  <FontAwesome
+                    name='question-circle'
+                    size={18}
+                    color={colors.button}
+                    style={{ marginLeft: 6 }}
+                  />
                 </Pressable>
-              )
-            )}
+              ))}
           </View>
         </View>
 
@@ -314,25 +416,73 @@ const FeedScreenRefactored = () => {
         <Modal
           visible={vpInfoModalVisible}
           transparent
-          animationType="fade"
+          animationType='fade'
           onRequestClose={() => setVpInfoModalVisible(false)}
         >
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }}>
-            <View style={{ backgroundColor: colors.background, borderRadius: 16, padding: 24, width: '85%', alignItems: 'center' }}>
-              <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>What is Voting Power (VP)?</Text>
-              <Text style={{ color: colors.text, fontSize: 15, marginBottom: 18, textAlign: 'left' }}>
-                Voting Power (VP) is a measure of your ability to upvote posts and comments on the Hive blockchain. The higher your VP, the more influence your votes have.{"\n\n"}
-                - VP decreases each time you upvote.{"\n"}
-                - VP regenerates automatically over time (about 20% per day).{"\n"}
-                - Keeping your VP high means your votes have more impact.{"\n\n"}
-                You can see your current VP in the top bar. After upvoting, your VP will drop slightly and recharge over time.
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: 'rgba(0,0,0,0.4)',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: colors.background,
+                borderRadius: 16,
+                padding: 24,
+                width: '85%',
+                alignItems: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  color: colors.text,
+                  fontSize: 18,
+                  fontWeight: 'bold',
+                  marginBottom: 12,
+                }}
+              >
+                What is Voting Power (VP)?
+              </Text>
+              <Text
+                style={{
+                  color: colors.text,
+                  fontSize: 15,
+                  marginBottom: 18,
+                  textAlign: 'left',
+                }}
+              >
+                Voting Power (VP) is a measure of your ability to upvote posts
+                and comments on the Hive blockchain. The higher your VP, the
+                more influence your votes have.{'\n\n'}- VP decreases each time
+                you upvote.{'\n'}- VP regenerates automatically over time (about
+                20% per day).{'\n'}- Keeping your VP high means your votes have
+                more impact.{'\n\n'}
+                You can see your current VP in the top bar. After upvoting, your
+                VP will drop slightly and recharge over time.
               </Text>
               <Pressable
-                style={{ backgroundColor: colors.button, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 24, marginTop: 8 }}
+                style={{
+                  backgroundColor: colors.button,
+                  borderRadius: 8,
+                  paddingVertical: 10,
+                  paddingHorizontal: 24,
+                  marginTop: 8,
+                }}
                 onPress={() => setVpInfoModalVisible(false)}
-                accessibilityLabel="Close Voting Power info"
+                accessibilityLabel='Close Voting Power info'
               >
-                <Text style={{ color: colors.buttonText, fontWeight: '600', fontSize: 16 }}>Close</Text>
+                <Text
+                  style={{
+                    color: colors.buttonText,
+                    fontWeight: '600',
+                    fontSize: 16,
+                  }}
+                >
+                  Close
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -340,26 +490,28 @@ const FeedScreenRefactored = () => {
 
         {/* Slogan row */}
         <View style={styles.sloganRow}>
-          <Text style={[styles.slogan, { color: colors.text }]}>What's snappening today?</Text>
+          <Text style={[styles.slogan, { color: colors.text }]}>
+            What's snappening today?
+          </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity
               style={[styles.searchBtn, { marginRight: 12 }]}
               onPress={() => setIsSearchModalVisible(true)}
-              accessibilityLabel="Search posts and users"
+              accessibilityLabel='Search posts and users'
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <FontAwesome name="search" size={22} color={colors.icon} />
+              <FontAwesome name='search' size={22} color={colors.icon} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.bellBtn}
               onPress={() => router.push('/NotificationsScreen')}
             >
               <View style={{ position: 'relative' }}>
-                <FontAwesome name="bell" size={22} color={colors.icon} />
+                <FontAwesome name='bell' size={22} color={colors.icon} />
                 <NotificationBadge
                   count={unreadCount}
-                  size="small"
-                  color="#FF3B30"
+                  size='small'
+                  color='#FF3B30'
                   visible={unreadCount > 0}
                 />
               </View>
@@ -379,17 +531,20 @@ const FeedScreenRefactored = () => {
               { key: 'following', label: 'Following', icon: 'users' },
               { key: 'newest', label: 'Newest', icon: 'clock-o' },
               { key: 'trending', label: 'Trending', icon: 'fire' },
-              { key: 'my', label: 'My Snaps', icon: 'user' }
+              { key: 'my', label: 'My Snaps', icon: 'user' },
             ].map((filter, index) => (
               <TouchableOpacity
                 key={filter.key}
                 style={[
                   styles.filterBtnScrollable,
                   {
-                    backgroundColor: activeFilter === filter.key ? colors.button : colors.buttonInactive,
+                    backgroundColor:
+                      activeFilter === filter.key
+                        ? colors.button
+                        : colors.buttonInactive,
                     marginLeft: index === 0 ? 0 : 8,
-                    marginRight: index === 3 ? 0 : 0
-                  }
+                    marginRight: index === 3 ? 0 : 0,
+                  },
                 ]}
                 onPress={() => handleFilterPress(filter.key as FeedFilter)}
                 activeOpacity={0.7}
@@ -397,13 +552,24 @@ const FeedScreenRefactored = () => {
                 <FontAwesome
                   name={filter.icon as any}
                   size={16}
-                  color={activeFilter === filter.key ? colors.buttonText : colors.text}
+                  color={
+                    activeFilter === filter.key
+                      ? colors.buttonText
+                      : colors.text
+                  }
                   style={{ marginRight: 6 }}
                 />
-                <Text style={[
-                  styles.filterTextScrollable,
-                  { color: activeFilter === filter.key ? colors.buttonText : colors.text }
-                ]}>
+                <Text
+                  style={[
+                    styles.filterTextScrollable,
+                    {
+                      color:
+                        activeFilter === filter.key
+                          ? colors.buttonText
+                          : colors.text,
+                    },
+                  ]}
+                >
                   {filter.label}
                 </Text>
               </TouchableOpacity>
@@ -416,16 +582,28 @@ const FeedScreenRefactored = () => {
       <View style={styles.feedContainer}>
         {feedLoading ? (
           <View style={{ alignItems: 'center', marginTop: 40 }}>
-            <FontAwesome name="hourglass-half" size={48} color={colors.icon} style={{ marginBottom: 12, transform: [{ rotate: `${(Date.now() % 3600) / 10}deg` }] }} />
-            <Text style={{ color: colors.text, fontSize: 16 }}>Loading snaps...</Text>
+            <FontAwesome
+              name='hourglass-half'
+              size={48}
+              color={colors.icon}
+              style={{
+                marginBottom: 12,
+                transform: [{ rotate: `${(Date.now() % 3600) / 10}deg` }],
+              }}
+            />
+            <Text style={{ color: colors.text, fontSize: 16 }}>
+              Loading snaps...
+            </Text>
           </View>
         ) : snaps.length === 0 ? (
-          <Text style={{ color: colors.text, marginTop: 24 }}>No snaps to display.</Text>
+          <Text style={{ color: colors.text, marginTop: 24 }}>
+            No snaps to display.
+          </Text>
         ) : (
           <FlatList
             ref={flatListRef}
             data={snaps}
-            keyExtractor={(item) => item.author + '-' + item.permlink}
+            keyExtractor={item => item.author + '-' + item.permlink}
             renderItem={({ item }) => (
               <Snap
                 author={item.author}
@@ -434,23 +612,46 @@ const FeedScreenRefactored = () => {
                 created={item.created}
                 voteCount={item.net_votes || 0}
                 replyCount={item.children || 0}
-                payout={parseFloat(item.pending_payout_value ? item.pending_payout_value.replace(' HBD', '') : '0')}
+                payout={parseFloat(
+                  item.pending_payout_value
+                    ? item.pending_payout_value.replace(' HBD', '')
+                    : '0'
+                )}
                 permlink={item.permlink}
-                onUpvotePress={() => handleUpvotePress({ author: item.author, permlink: item.permlink })}
-                hasUpvoted={Array.isArray(item.active_votes) && item.active_votes.some((v: any) => v.voter === username && v.percent > 0)}
+                onUpvotePress={() =>
+                  handleUpvotePress({
+                    author: item.author,
+                    permlink: item.permlink,
+                  })
+                }
+                hasUpvoted={
+                  Array.isArray(item.active_votes) &&
+                  item.active_votes.some(
+                    (v: any) => v.voter === username && v.percent > 0
+                  )
+                }
                 onSpeechBubblePress={() => {
-                  router.push({ pathname: '/ConversationScreen', params: { author: item.author, permlink: item.permlink } });
+                  router.push({
+                    pathname: '/ConversationScreen',
+                    params: { author: item.author, permlink: item.permlink },
+                  });
                 }}
                 onContentPress={() => {
-                  router.push({ pathname: '/ConversationScreen', params: { author: item.author, permlink: item.permlink } });
+                  router.push({
+                    pathname: '/ConversationScreen',
+                    params: { author: item.author, permlink: item.permlink },
+                  });
                 }}
-                onUserPress={(username) => {
+                onUserPress={username => {
                   router.push(`/ProfileScreen?username=${username}` as any);
                 }}
                 onImagePress={handleImagePress}
                 showAuthor
                 onHashtagPress={tag => {
-                  router.push({ pathname: '/DiscoveryScreen', params: { hashtag: tag } });
+                  router.push({
+                    pathname: '/DiscoveryScreen',
+                    params: { hashtag: tag },
+                  });
                 }}
               />
             )}
@@ -461,7 +662,10 @@ const FeedScreenRefactored = () => {
               await refreshSnaps(activeFilter);
             }}
             onScrollToIndexFailed={({ index }) => {
-              flatListRef.current?.scrollToOffset({ offset: Math.max(0, index - 2) * 220, animated: true });
+              flatListRef.current?.scrollToOffset({
+                offset: Math.max(0, index - 2) * 220,
+                animated: true,
+              });
             }}
             viewabilityConfig={viewabilityConfig}
             onViewableItemsChanged={onViewableItemsChanged}
@@ -482,7 +686,7 @@ const FeedScreenRefactored = () => {
         ]}
         activeOpacity={0.8}
         onPress={() => router.push('/ComposeScreen' as any)}
-        accessibilityLabel="Create new snap"
+        accessibilityLabel='Create new snap'
       >
         <Text style={styles.fabIcon}>+</Text>
       </TouchableOpacity>
@@ -495,10 +699,10 @@ const FeedScreenRefactored = () => {
         onRequestClose={() => {
           setImageModalVisible(false);
         }}
-        backgroundColor="rgba(0, 0, 0, 0.95)"
+        backgroundColor='rgba(0, 0, 0, 0.95)'
         swipeToCloseEnabled={true}
         doubleTapToZoomEnabled={true}
-        presentationStyle="fullScreen"
+        presentationStyle='fullScreen'
         HeaderComponent={() => (
           <TouchableOpacity
             style={{
@@ -514,9 +718,9 @@ const FeedScreenRefactored = () => {
               alignItems: 'center',
             }}
             onPress={() => setImageModalVisible(false)}
-            accessibilityLabel="Close image"
+            accessibilityLabel='Close image'
           >
-            <FontAwesome name="close" size={20} color="#fff" />
+            <FontAwesome name='close' size={20} color='#fff' />
           </TouchableOpacity>
         )}
       />
@@ -524,7 +728,7 @@ const FeedScreenRefactored = () => {
       {/* Search Modal */}
       <Modal
         visible={isSearchModalVisible}
-        animationType="slide"
+        animationType='slide'
         transparent={true}
         onRequestClose={() => setIsSearchModalVisible(false)}
       >
@@ -548,19 +752,31 @@ const FeedScreenRefactored = () => {
             <View style={styles.searchInputContainer}>
               <TextInput
                 style={styles.searchInput}
-                placeholder={searchType === 'content' ? "Search hashtags like photography, crypto..." : "Search users..."}
+                placeholder={
+                  searchType === 'content'
+                    ? 'Search hashtags like photography, crypto...'
+                    : 'Search users...'
+                }
                 placeholderTextColor={colors.text + '60'}
-                value={searchType === 'content' && searchQuery && !searchQuery.startsWith('#') ? `#${searchQuery}` : searchQuery}
-                onChangeText={(text) => {
+                value={
+                  searchType === 'content' &&
+                  searchQuery &&
+                  !searchQuery.startsWith('#')
+                    ? `#${searchQuery}`
+                    : searchQuery
+                }
+                onChangeText={text => {
                   if (searchType === 'content') {
-                    const cleanText = text.startsWith('#') ? text.slice(1) : text;
+                    const cleanText = text.startsWith('#')
+                      ? text.slice(1)
+                      : text;
                     setSearchQuery(cleanText);
                   } else {
                     setSearchQuery(text);
                   }
                 }}
                 onSubmitEditing={() => handleSearchSubmit()}
-                returnKeyType="search"
+                returnKeyType='search'
                 autoFocus
               />
             </View>
@@ -570,7 +786,7 @@ const FeedScreenRefactored = () => {
               <TouchableOpacity
                 style={[
                   styles.searchFilterBtn,
-                  searchType === 'users' && styles.searchFilterBtnActive
+                  searchType === 'users' && styles.searchFilterBtnActive,
                 ]}
                 onPress={() => {
                   setSearchType('users');
@@ -580,7 +796,7 @@ const FeedScreenRefactored = () => {
                 <Text
                   style={[
                     styles.searchFilterText,
-                    searchType === 'users' && styles.searchFilterTextActive
+                    searchType === 'users' && styles.searchFilterTextActive,
                   ]}
                 >
                   Users
@@ -589,7 +805,7 @@ const FeedScreenRefactored = () => {
               <TouchableOpacity
                 style={[
                   styles.searchFilterBtn,
-                  searchType === 'content' && styles.searchFilterBtnActive
+                  searchType === 'content' && styles.searchFilterBtnActive,
                 ]}
                 onPress={() => {
                   setSearchType('content');
@@ -599,7 +815,7 @@ const FeedScreenRefactored = () => {
                 <Text
                   style={[
                     styles.searchFilterText,
-                    searchType === 'content' && styles.searchFilterTextActive
+                    searchType === 'content' && styles.searchFilterTextActive,
                   ]}
                 >
                   Content
@@ -609,56 +825,82 @@ const FeedScreenRefactored = () => {
 
             <ScrollView style={styles.searchContent}>
               {/* Recent Searches - Users */}
-              {!searchQuery && searchType === 'users' && recentSearches.length > 0 && (
-                <View style={styles.recentSearchesSection}>
-                  <Text style={styles.recentSearchesTitle}>Recent User Searches</Text>
-                  {recentSearches.map((search, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={styles.recentSearchItem}
-                      onPress={() => {
-                        setSearchQuery(search);
-                        handleSearchSubmit(search);
-                      }}
-                    >
-                      <FontAwesome name="user" size={14} color={colors.icon} style={{ marginRight: 8 }} />
-                      <Text style={styles.recentSearchText}>{search}</Text>
+              {!searchQuery &&
+                searchType === 'users' &&
+                recentSearches.length > 0 && (
+                  <View style={styles.recentSearchesSection}>
+                    <Text style={styles.recentSearchesTitle}>
+                      Recent User Searches
+                    </Text>
+                    {recentSearches.map((search, index) => (
                       <TouchableOpacity
-                        style={styles.clearRecentBtn}
-                        onPress={() => removeRecentSearch(search)}
+                        key={index}
+                        style={styles.recentSearchItem}
+                        onPress={() => {
+                          setSearchQuery(search);
+                          handleSearchSubmit(search);
+                        }}
                       >
-                        <Text style={{ color: colors.text + '60', fontSize: 12 }}>✕</Text>
+                        <FontAwesome
+                          name='user'
+                          size={14}
+                          color={colors.icon}
+                          style={{ marginRight: 8 }}
+                        />
+                        <Text style={styles.recentSearchText}>{search}</Text>
+                        <TouchableOpacity
+                          style={styles.clearRecentBtn}
+                          onPress={() => removeRecentSearch(search)}
+                        >
+                          <Text
+                            style={{ color: colors.text + '60', fontSize: 12 }}
+                          >
+                            ✕
+                          </Text>
+                        </TouchableOpacity>
                       </TouchableOpacity>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+                    ))}
+                  </View>
+                )}
 
               {/* Recent Hashtags - Content */}
-              {!searchQuery && searchType === 'content' && recentHashtags.length > 0 && (
-                <View style={styles.recentSearchesSection}>
-                  <Text style={styles.recentSearchesTitle}>Recent Hashtags</Text>
-                  {recentHashtags.map((hashtag, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={styles.recentSearchItem}
-                      onPress={() => {
-                        setSearchQuery(hashtag);
-                        handleSearchSubmit(hashtag);
-                      }}
-                    >
-                      <FontAwesome name="hashtag" size={14} color={colors.icon} style={{ marginRight: 8 }} />
-                      <Text style={styles.recentSearchText}>#{hashtag}</Text>
+              {!searchQuery &&
+                searchType === 'content' &&
+                recentHashtags.length > 0 && (
+                  <View style={styles.recentSearchesSection}>
+                    <Text style={styles.recentSearchesTitle}>
+                      Recent Hashtags
+                    </Text>
+                    {recentHashtags.map((hashtag, index) => (
                       <TouchableOpacity
-                        style={styles.clearRecentBtn}
-                        onPress={() => removeRecentHashtag(hashtag)}
+                        key={index}
+                        style={styles.recentSearchItem}
+                        onPress={() => {
+                          setSearchQuery(hashtag);
+                          handleSearchSubmit(hashtag);
+                        }}
                       >
-                        <Text style={{ color: colors.text + '60', fontSize: 12 }}>✕</Text>
+                        <FontAwesome
+                          name='hashtag'
+                          size={14}
+                          color={colors.icon}
+                          style={{ marginRight: 8 }}
+                        />
+                        <Text style={styles.recentSearchText}>#{hashtag}</Text>
+                        <TouchableOpacity
+                          style={styles.clearRecentBtn}
+                          onPress={() => removeRecentHashtag(hashtag)}
+                        >
+                          <Text
+                            style={{ color: colors.text + '60', fontSize: 12 }}
+                          >
+                            ✕
+                          </Text>
+                        </TouchableOpacity>
                       </TouchableOpacity>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+                    ))}
+                  </View>
+                )}
 
               {/* Search Results */}
               {searchQuery && searchType === 'users' && (
@@ -667,7 +909,7 @@ const FeedScreenRefactored = () => {
 
                   {searchLoading ? (
                     <View style={styles.searchLoadingContainer}>
-                      <ActivityIndicator size="large" color={colors.button} />
+                      <ActivityIndicator size='large' color={colors.button} />
                       <Text style={styles.searchLoadingText}>Searching...</Text>
                     </View>
                   ) : searchResults.users.length === 0 ? (
@@ -682,26 +924,35 @@ const FeedScreenRefactored = () => {
                         key={index}
                         style={styles.searchResultItem}
                         onPress={() => {
-                          router.push(`/ProfileScreen?username=${result.name}` as any);
+                          router.push(
+                            `/ProfileScreen?username=${result.name}` as any
+                          );
                           setIsSearchModalVisible(false);
                         }}
                       >
                         <Image
                           source={{
-                            uri: result.avatarUrl || `https://images.hive.blog/u/${result.name}/avatar`
+                            uri:
+                              result.avatarUrl ||
+                              `https://images.hive.blog/u/${result.name}/avatar`,
                           }}
                           style={styles.searchResultAvatar}
                         />
                         <View style={styles.searchResultInfo}>
-                          <Text style={styles.searchResultUsername}>@{result.name}</Text>
+                          <Text style={styles.searchResultUsername}>
+                            @{result.name}
+                          </Text>
                           <Text style={styles.searchResultMeta}>
-                            {result.displayName && result.displayName !== result.name ? result.displayName : ''}
+                            {result.displayName &&
+                            result.displayName !== result.name
+                              ? result.displayName
+                              : ''}
                           </Text>
                           {result.about && (
                             <Text
                               style={styles.searchResultContent}
                               numberOfLines={1}
-                              ellipsizeMode="tail"
+                              ellipsizeMode='tail'
                             >
                               {result.about}
                             </Text>
@@ -718,11 +969,21 @@ const FeedScreenRefactored = () => {
                 <View style={styles.searchResults}>
                   <Text style={styles.searchResultsTitle}>Content Search</Text>
                   <View style={styles.searchEmptyContainer}>
-                    <FontAwesome name="hashtag" size={32} color={colors.icon} style={{ marginBottom: 8 }} />
+                    <FontAwesome
+                      name='hashtag'
+                      size={32}
+                      color={colors.icon}
+                      style={{ marginBottom: 8 }}
+                    />
                     <Text style={styles.searchEmptyText}>
                       Searching for #{searchQuery}...
                     </Text>
-                    <Text style={[styles.searchEmptyText, { fontSize: 14, opacity: 0.7, marginTop: 8 }]}>
+                    <Text
+                      style={[
+                        styles.searchEmptyText,
+                        { fontSize: 14, opacity: 0.7, marginTop: 8 },
+                      ]}
+                    >
                       This will open the Discovery screen with your hashtag
                     </Text>
                   </View>
@@ -736,4 +997,4 @@ const FeedScreenRefactored = () => {
   );
 };
 
-export default FeedScreenRefactored; 
+export default FeedScreenRefactored;
