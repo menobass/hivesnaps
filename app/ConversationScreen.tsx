@@ -33,6 +33,7 @@ import { HivePostPreview } from '../components/HivePostPreview';
 import { convertSpoilerSyntax, SpoilerData } from '../utils/spoilerParser';
 import SpoilerText from './components/SpoilerText';
 import TwitterEmbed from './components/TwitterEmbed';
+import UpvoteModal from '../components/UpvoteModal';
 
 // Custom hooks for business logic
 import { useUserAuth } from '../hooks/useUserAuth';
@@ -55,7 +56,7 @@ const ConversationScreenRefactored = () => {
   const permlink = params.permlink as string | undefined;
 
   // Custom hooks for business logic
-  const { username: currentUsername } = useUserAuth();
+  const { currentUsername } = useUserAuth();
   
   const {
     snap,
@@ -179,6 +180,7 @@ const ConversationScreenRefactored = () => {
     icon: '#1DA1F2',
     payout: '#17BF63',
     button: '#1DA1F2',
+    buttonText: '#FFFFFF',
     buttonInactive: isDark ? '#22303C' : '#E1E8ED',
   };
 
@@ -1028,68 +1030,18 @@ const ConversationScreenRefactored = () => {
         </Modal>
 
         {/* Upvote Modal */}
-        <Modal
-          isVisible={upvoteModalVisible}
-          onBackdropPress={closeUpvoteModal}
-          onBackButtonPress={closeUpvoteModal}
-          style={{ justifyContent: 'center', alignItems: 'center', margin: 0 }}
-          useNativeDriver
-        >
-          <View style={{ backgroundColor: colors.background, borderRadius: 16, padding: 24, width: '85%', alignItems: 'center' }}>
-            <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>Upvote</Text>
-            <Text style={{ color: colors.text, fontSize: 15, marginBottom: 16 }}>Vote Weight: {voteWeight}%</Text>
-            {voteWeightLoading ? (
-              <ActivityIndicator size="small" color={colors.icon} style={{ marginVertical: 16 }} />
-            ) : (
-              <>
-                <Slider
-                  style={{ width: '100%', height: 40 }}
-                  minimumValue={1}
-                  maximumValue={100}
-                  step={1}
-                  value={voteWeight}
-                  onValueChange={setVoteWeight}
-                  minimumTrackTintColor={colors.icon}
-                  maximumTrackTintColor={colors.border}
-                  thumbTintColor={colors.icon}
-                />
-                {voteValue && (
-                  <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginTop: 12 }}>
-                    ${voteValue.usd} USD
-                  </Text>
-                )}
-              </>
-            )}
-            {upvoteLoading ? (
-              <View style={{ marginTop: 24, alignItems: 'center' }}>
-                <FontAwesome name="hourglass-half" size={32} color={colors.icon} />
-                <Text style={{ color: colors.text, marginTop: 8 }}>Submitting vote...</Text>
-              </View>
-            ) : upvoteSuccess ? (
-              <View style={{ marginTop: 24, alignItems: 'center' }}>
-                <FontAwesome name="check-circle" size={32} color={colors.icon} />
-                <Text style={{ color: colors.text, marginTop: 8 }}>Upvote successful!</Text>
-              </View>
-            ) : (
-              <View style={{ flexDirection: 'row', marginTop: 24 }}>
-                <Pressable
-                  style={{ flex: 1, marginRight: 8, backgroundColor: colors.border, borderRadius: 8, padding: 12, alignItems: 'center' }}
-                  onPress={closeUpvoteModal}
-                  disabled={upvoteLoading}
-                >
-                  <Text style={{ color: colors.text, fontWeight: '600' }}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  style={{ flex: 1, marginLeft: 8, backgroundColor: colors.icon, borderRadius: 8, padding: 12, alignItems: 'center' }}
-                  onPress={confirmUpvote}
-                  disabled={upvoteLoading}
-                >
-                  <Text style={{ color: '#fff', fontWeight: '600' }}>Confirm</Text>
-                </Pressable>
-              </View>
-            )}
-          </View>
-        </Modal>
+        <UpvoteModal
+          visible={upvoteModalVisible}
+          voteWeight={voteWeight}
+          voteValue={voteValue}
+          voteWeightLoading={voteWeightLoading}
+          upvoteLoading={upvoteLoading}
+          upvoteSuccess={upvoteSuccess}
+          onClose={closeUpvoteModal}
+          onConfirm={confirmUpvote}
+          onVoteWeightChange={setVoteWeight}
+          colors={colors}
+        />
 
         {/* GIF Picker Modal */}
         <Modal

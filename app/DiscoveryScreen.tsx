@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Snap from './components/Snap';
 import { Client } from '@hiveio/dhive';
+import UpvoteModal from '../components/UpvoteModal';
 
 // Use local twitterColors definition (copied from FeedScreen)
 const twitterColors = {
@@ -319,99 +320,33 @@ const DiscoveryScreen = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
-      {/* Upvote Modal (copied/adapted from FeedScreen) */}
-      <Modal
+      {/* Upvote Modal */}
+      <UpvoteModal
         visible={upvoteModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={handleUpvoteCancel}
-      >
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }}>
-          <View style={{ backgroundColor: colors.background, borderRadius: 16, padding: 24, width: '85%', alignItems: 'center' }}>
-            <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>Upvote Snap</Text>
-            <Text style={{ color: colors.text, fontSize: 15, marginBottom: 16 }}>Vote Weight: {voteWeight}%</Text>
-            {voteWeightLoading ? (
-              <ActivityIndicator size="small" color={colors.button} style={{ marginVertical: 16 }} />
-            ) : (
-              <>
-                <Slider
-                  style={{ width: '100%', height: 40 }}
-                  minimumValue={1}
-                  maximumValue={100}
-                  step={1}
-                  value={voteWeight}
-                  onValueChange={async val => {
-                    setVoteWeight(val);
-                    // Live update vote value
-                    let accountObj = null;
-                    if (username) {
-                      const accounts = await client.database.getAccounts([username]);
-                      accountObj = accounts && accounts[0] ? accounts[0] : null;
-                    }
-                    if (accountObj && globalProps && rewardFund) {
-                      const calcValue = calculateVoteValue(accountObj, globalProps, rewardFund, val, hivePrice);
-                      setVoteValue(calcValue);
-                    } else {
-                      setVoteValue(null);
-                    }
-                  }}
-                  onSlidingComplete={async val => {
-                    setVoteWeight(val);
-                    // Live update vote value
-                    let accountObj = null;
-                    if (username) {
-                      const accounts = await client.database.getAccounts([username]);
-                      accountObj = accounts && accounts[0] ? accounts[0] : null;
-                    }
-                    if (accountObj && globalProps && rewardFund) {
-                      const calcValue = calculateVoteValue(accountObj, globalProps, rewardFund, val, hivePrice);
-                      setVoteValue(calcValue);
-                    } else {
-                      setVoteValue(null);
-                    }
-                  }}
-                  minimumTrackTintColor={colors.button}
-                  maximumTrackTintColor={colors.buttonInactive}
-                  thumbTintColor={colors.button}
-                />
-                {/* Show only USD value below slider, live update */}
-                {voteValue !== null && (
-                  <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginTop: 12 }}>
-                    ${voteValue.usd} USD
-                  </Text>
-                )}
-              </>
-            )}
-            {upvoteLoading ? (
-              <View style={{ marginTop: 24, alignItems: 'center' }}>
-                <ActivityIndicator size="large" color={colors.icon} />
-                <Text style={{ color: colors.text, marginTop: 8 }}>Submitting vote...</Text>
-              </View>
-            ) : upvoteSuccess ? (
-              <View style={{ marginTop: 24, alignItems: 'center' }}>
-                <Text style={{ color: colors.button, fontSize: 18, fontWeight: 'bold' }}>Upvote successful!</Text>
-              </View>
-            ) : (
-              <View style={{ flexDirection: 'row', marginTop: 24 }}>
-                <Pressable
-                  style={{ flex: 1, marginRight: 8, backgroundColor: colors.buttonInactive, borderRadius: 8, padding: 12, alignItems: 'center' }}
-                  onPress={handleUpvoteCancel}
-                  disabled={upvoteLoading}
-                >
-                  <Text style={{ color: colors.text, fontWeight: '600' }}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  style={{ flex: 1, marginLeft: 8, backgroundColor: colors.button, borderRadius: 8, padding: 12, alignItems: 'center' }}
-                  onPress={handleUpvoteConfirm}
-                  disabled={upvoteLoading}
-                >
-                  <Text style={{ color: colors.buttonText, fontWeight: '600' }}>Confirm</Text>
-                </Pressable>
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
+        voteWeight={voteWeight}
+        voteValue={voteValue}
+        voteWeightLoading={voteWeightLoading}
+        upvoteLoading={upvoteLoading}
+        upvoteSuccess={upvoteSuccess}
+        onClose={handleUpvoteCancel}
+        onConfirm={handleUpvoteConfirm}
+        onVoteWeightChange={async (val) => {
+          setVoteWeight(val);
+          // Live update vote value
+          let accountObj = null;
+          if (username) {
+            const accounts = await client.database.getAccounts([username]);
+            accountObj = accounts && accounts[0] ? accounts[0] : null;
+          }
+          if (accountObj && globalProps && rewardFund) {
+            const calcValue = calculateVoteValue(accountObj, globalProps, rewardFund, val, hivePrice);
+            setVoteValue(calcValue);
+          } else {
+            setVoteValue(null);
+          }
+        }}
+        colors={colors}
+      />
       
       {/* Header with back arrow */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
