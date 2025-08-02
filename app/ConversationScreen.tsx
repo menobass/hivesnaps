@@ -537,7 +537,8 @@ const ConversationScreenRefactored = () => {
                   enableExperimentalMarginCollapsing
                   tagsStyles={{ 
                     a: { color: colors.icon },
-                    p: { marginBottom: 12, lineHeight: 20 }
+                    p: { marginBottom: 12, lineHeight: 20 },
+                    u: { textDecorationLine: 'underline' }
                   }}
                 />
               ) : (
@@ -694,7 +695,8 @@ const ConversationScreenRefactored = () => {
                 enableExperimentalMarginCollapsing
                 tagsStyles={{ 
                   a: { color: colors.icon },
-                  p: { marginBottom: 16, lineHeight: 22 }
+                  p: { marginBottom: 16, lineHeight: 22 },
+                  u: { textDecorationLine: 'underline' }
                 }}
               />
             ) : (
