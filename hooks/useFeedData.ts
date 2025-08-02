@@ -81,55 +81,72 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
     setLastFetchTime(prev => ({ ...prev, [filterKey]: Date.now() }));
   };
 
-  // Enhanced avatar fetching with time-based caching
-  const enhanceSnapsWithAvatar = async (snaps: Snap[]) => {
-    const authors = Array.from(new Set(snaps.map(s => s.author)));
-    const now = Date.now();
-    const AVATAR_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+  // Optimized avatar fetching with batch processing and better caching
+  const enhanceSnapsWithAvatar = useCallback(
+    async (snaps: Snap[]) => {
+      const authors = Array.from(new Set(snaps.map(s => s.author)));
+      const now = Date.now();
+      const AVATAR_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes (increased from 5)
 
-    const uncachedAuthors = authors.filter(author => {
-      const cached = avatarCache[author];
-      return !cached || now - cached.timestamp > AVATAR_CACHE_DURATION;
-    });
+      const uncachedAuthors = authors.filter(author => {
+        const cached = avatarCache[author];
+        return !cached || now - cached.timestamp > AVATAR_CACHE_DURATION;
+      });
 
-    if (uncachedAuthors.length > 0) {
-      try {
-        const accounts = await client.database.getAccounts(uncachedAuthors);
-        for (const acc of accounts) {
-          let meta = null;
-          if (acc.posting_json_metadata) {
-            try {
-              meta = JSON.parse(acc.posting_json_metadata);
-            } catch {}
+      if (uncachedAuthors.length > 0) {
+        try {
+          // Batch process accounts in chunks to avoid overwhelming the API
+          const CHUNK_SIZE = 20;
+          const chunks = [];
+          for (let i = 0; i < uncachedAuthors.length; i += CHUNK_SIZE) {
+            chunks.push(uncachedAuthors.slice(i, i + CHUNK_SIZE));
           }
-          if (
-            (!meta || !meta.profile || !meta.profile.profile_image) &&
-            acc.json_metadata
-          ) {
+
+          for (const chunk of chunks) {
             try {
-              meta = JSON.parse(acc.json_metadata);
-            } catch {}
+              const accounts = await client.database.getAccounts(chunk);
+              for (const acc of accounts) {
+                let meta = null;
+                if (acc.posting_json_metadata) {
+                  try {
+                    meta = JSON.parse(acc.posting_json_metadata);
+                  } catch {}
+                }
+                if (
+                  (!meta || !meta.profile || !meta.profile.profile_image) &&
+                  acc.json_metadata
+                ) {
+                  try {
+                    meta = JSON.parse(acc.json_metadata);
+                  } catch {}
+                }
+                const url =
+                  meta && meta.profile && meta.profile.profile_image
+                    ? meta.profile.profile_image.replace(/[\\/]+$/, '')
+                    : '';
+                setAvatarCache(prev => ({
+                  ...prev,
+                  [acc.name]: { url, timestamp: now },
+                }));
+              }
+            } catch (chunkError) {
+              console.log('Error fetching chunk of accounts:', chunkError);
+            }
           }
-          const url =
-            meta && meta.profile && meta.profile.profile_image
-              ? meta.profile.profile_image.replace(/[\\/]+$/, '')
-              : '';
-          setAvatarCache(prev => ({
-            ...prev,
-            [acc.name]: { url, timestamp: now },
-          }));
+        } catch (e) {
+          console.log('Error fetching accounts for avatars:', e);
         }
-      } catch (e) {
-        console.log('Error fetching accounts for avatars:', e);
       }
-    }
 
-    return snaps.map(snap => ({
-      ...snap,
-      avatarUrl: avatarCache[snap.author]?.url || '',
-    }));
-  };
+      return snaps.map(snap => ({
+        ...snap,
+        avatarUrl: avatarCache[snap.author]?.url || '',
+      }));
+    },
+    [avatarCache]
+  );
 
+  // Optimized fetch snaps with better parallel processing
   const fetchSnaps = useCallback(
     async (filter: FeedFilter, useCache = true) => {
       const cacheKey = filter === 'my' ? `my-${username}` : filter;
@@ -150,16 +167,18 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
         let allSnaps: Snap[] = [];
 
         if (filter === 'newest') {
+          // Get more container posts for better coverage
           const discussions = await client.database.call(
             'get_discussions_by_blog',
             [
               {
                 tag: 'peak.snaps',
-                limit: 3,
+                limit: 5, // Increased from 3 to 5
               },
             ]
           );
 
+          // Fetch all replies in parallel with better error handling
           const snapPromises = discussions.map(async (post: any) => {
             try {
               const replies: Snap[] = await client.database.call(
@@ -177,28 +196,38 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
             }
           });
 
-          const snapResults = await Promise.all(snapPromises);
-          allSnaps = snapResults.flat();
+          const snapResults = await Promise.allSettled(snapPromises);
+          allSnaps = snapResults
+            .filter(
+              (result): result is PromiseFulfilledResult<Snap[]> =>
+                result.status === 'fulfilled'
+            )
+            .map(result => result.value)
+            .flat();
+
           allSnaps.sort(
             (a, b) =>
               new Date(b.created).getTime() - new Date(a.created).getTime()
           );
         } else if (filter === 'following' && username) {
-          const followingResult = await client.call(
-            'condenser_api',
-            'get_following',
-            [username, '', 'blog', 100]
-          );
+          // Optimized following feed with parallel processing
+          const [followingResult, containerPosts] = await Promise.all([
+            client.call('condenser_api', 'get_following', [
+              username,
+              '',
+              'blog',
+              100,
+            ]),
+            client.database.call('get_discussions_by_blog', [
+              { tag: 'peak.snaps', limit: 5 },
+            ]),
+          ]);
+
           const following = Array.isArray(followingResult)
             ? followingResult.map((f: any) => f.following)
             : followingResult && followingResult.following
               ? followingResult.following
               : [];
-
-          const containerPosts = await client.database.call(
-            'get_discussions_by_blog',
-            [{ tag: 'peak.snaps', limit: 3 }]
-          );
 
           const snapPromises = containerPosts.map(async (post: any) => {
             try {
@@ -217,8 +246,15 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
             }
           });
 
-          const snapResults = await Promise.all(snapPromises);
-          allSnaps = snapResults.flat();
+          const snapResults = await Promise.allSettled(snapPromises);
+          allSnaps = snapResults
+            .filter(
+              (result): result is PromiseFulfilledResult<Snap[]> =>
+                result.status === 'fulfilled'
+            )
+            .map(result => result.value)
+            .flat();
+
           allSnaps.sort(
             (a, b) =>
               new Date(b.created).getTime() - new Date(a.created).getTime()
@@ -229,7 +265,7 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
             [
               {
                 tag: 'peak.snaps',
-                limit: 3,
+                limit: 5, // Increased from 3 to 5
               },
             ]
           );
@@ -251,8 +287,14 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
             }
           });
 
-          const snapResults = await Promise.all(snapPromises);
-          allSnaps = snapResults.flat();
+          const snapResults = await Promise.allSettled(snapPromises);
+          allSnaps = snapResults
+            .filter(
+              (result): result is PromiseFulfilledResult<Snap[]> =>
+                result.status === 'fulfilled'
+            )
+            .map(result => result.value)
+            .flat();
 
           allSnaps.sort((a, b) => {
             const payoutA =
@@ -295,7 +337,7 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
             [
               {
                 tag: 'peak.snaps',
-                limit: 3,
+                limit: 5, // Increased from 3 to 5
               },
             ]
           );
@@ -318,8 +360,15 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
               }
             });
 
-            const snapResults = await Promise.all(snapPromises);
-            allSnaps = snapResults.flat();
+            const snapResults = await Promise.allSettled(snapPromises);
+            allSnaps = snapResults
+              .filter(
+                (result): result is PromiseFulfilledResult<Snap[]> =>
+                  result.status === 'fulfilled'
+              )
+              .map(result => result.value)
+              .flat();
+
             allSnaps.sort(
               (a, b) =>
                 new Date(b.created).getTime() - new Date(a.created).getTime()
@@ -353,7 +402,7 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
         }));
       }
     },
-    [username, avatarCache]
+    [username, avatarCache, enhanceSnapsWithAvatar]
   );
 
   const refreshSnaps = useCallback(
