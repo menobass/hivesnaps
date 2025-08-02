@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Client } from '@hiveio/dhive';
 
 // User snap interface for profile bubbles
@@ -24,6 +24,13 @@ const HIVE_NODES = [
 ];
 const client = new Client(HIVE_NODES);
 
+// Cache for user snaps to avoid refetching
+const userSnapsCache = new Map<
+  string,
+  { snaps: UserSnap[]; timestamp: number }
+>();
+const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes cache
+
 export const useUserSnaps = (username: string | undefined) => {
   const [userSnaps, setUserSnaps] = useState<UserSnap[]>([]);
   const [snapsLoading, setSnapsLoading] = useState(false);
@@ -32,71 +39,113 @@ export const useUserSnaps = (username: string | undefined) => {
   const [displayedSnapsCount, setDisplayedSnapsCount] = useState(10); // Show 10 initially
   const [loadMoreLoading, setLoadMoreLoading] = useState(false);
 
-  // Fetch user's recent snaps from Hive blockchain
-  const fetchUserSnaps = async () => {
+  // Check cache for user snaps
+  const getCachedUserSnaps = (username: string): UserSnap[] | null => {
+    const cached = userSnapsCache.get(username);
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      return cached.snaps;
+    }
+    return null;
+  };
+
+  // Set cache for user snaps
+  const setCachedUserSnaps = (username: string, snaps: UserSnap[]) => {
+    userSnapsCache.set(username, { snaps, timestamp: Date.now() });
+  };
+
+  // Optimized fetch user's recent snaps from Hive blockchain
+  const fetchUserSnaps = useCallback(async () => {
     if (!username) return;
-    
+
+    // Check cache first
+    const cachedSnaps = getCachedUserSnaps(username);
+    if (cachedSnaps) {
+      console.log('Using cached user snaps for:', username);
+      setUserSnaps(cachedSnaps);
+      setSnapsLoaded(true);
+      setDisplayedSnapsCount(10);
+      return;
+    }
+
     setSnapsLoading(true);
     setSnapsError(null);
-    
+
     try {
       console.log('Fetching recent snaps for user:', username);
-      
-      // Get latest posts by @peak.snaps (container account) - increased limit for more snaps
-      const discussions = await client.database.call('get_discussions_by_blog', [{
-        tag: 'peak.snaps',
-        limit: 20 // Increased to get more potential snaps
-      }]);
-      
-      let userSnapsFound: UserSnap[] = [];
-      
-      // Search through all container posts for user's snaps
-      for (const post of discussions) {
+
+      // Get latest posts by @peak.snaps (container account) - optimized to get more posts in parallel
+      const discussions = await client.database.call(
+        'get_discussions_by_blog',
+        [
+          {
+            tag: 'peak.snaps',
+            limit: 5, // Increased to get more container posts
+          },
+        ]
+      );
+
+      // Fetch all replies in parallel instead of sequentially
+      const replyPromises = discussions.map(async post => {
         try {
-          const replies: UserSnap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
-          
-          // Filter replies to only those by the profile user
-          const userReplies = replies.filter((reply) => reply.author === username);
-          userSnapsFound = userSnapsFound.concat(userReplies);
+          const replies: UserSnap[] = await client.database.call(
+            'get_content_replies',
+            [post.author, post.permlink]
+          );
+          return replies.filter(reply => reply.author === username);
         } catch (replyError) {
-          console.log('Error fetching replies for post:', post.permlink, replyError);
+          console.log(
+            'Error fetching replies for post:',
+            post.permlink,
+            replyError
+          );
+          return [];
         }
-      }
-      
+      });
+
+      // Wait for all reply requests to complete
+      const replyResults = await Promise.all(replyPromises);
+
+      // Combine all user snaps from all container posts
+      let userSnapsFound: UserSnap[] = replyResults.flat();
+
       // Sort by created date descending (newest first)
-      userSnapsFound.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
-      
+      userSnapsFound.sort(
+        (a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()
+      );
+
       // Keep more snaps for load more functionality
       const limitedSnaps = userSnapsFound.slice(0, 50);
-      
+
+      // Cache the results
+      setCachedUserSnaps(username, limitedSnaps);
+
       setUserSnaps(limitedSnaps);
       setSnapsLoaded(true);
       setDisplayedSnapsCount(10); // Reset to initial display count
       console.log(`Found ${limitedSnaps.length} recent snaps for @${username}`);
-      
     } catch (error) {
       console.error('Error fetching user snaps:', error);
       setSnapsError('Failed to load recent snaps');
     } finally {
       setSnapsLoading(false);
     }
-  };
+  }, [username]);
 
   // Load more snaps function
-  const loadMoreSnaps = async () => {
+  const loadMoreSnaps = useCallback(async () => {
     setLoadMoreLoading(true);
-    
+
     // Simulate loading time for better UX
     setTimeout(() => {
       const currentCount = displayedSnapsCount;
       const newCount = Math.min(currentCount + 10, userSnaps.length);
       setDisplayedSnapsCount(newCount);
       setLoadMoreLoading(false);
-    }, 500);
-  };
+    }, 300); // Reduced from 500ms to 300ms
+  }, [displayedSnapsCount, userSnaps.length]);
 
   // Extract text content from snap body (removing images and formatting)
-  const extractSnapText = (body: string): string => {
+  const extractSnapText = useCallback((body: string): string => {
     // Remove images
     let text = body.replace(/!\[.*?\]\(.*?\)/g, '');
     // Remove markdown links but keep the text
@@ -105,52 +154,78 @@ export const useUserSnaps = (username: string | undefined) => {
     text = text.replace(/https?:\/\/[^\s]+/g, '');
     // Remove extra whitespace
     text = text.replace(/\s+/g, ' ').trim();
-    
+
     // If no text remains, return a fallback
     if (!text) {
       return 'Snap contains media or links';
     }
-    
+
     // Limit length
     return text.length > 120 ? text.substring(0, 120) + '...' : text;
-  };
+  }, []);
 
   // Check if current user has upvoted a snap
-  const hasUserUpvoted = (snap: UserSnap, currentUsername: string | null): boolean => {
-    if (!currentUsername || !snap.active_votes) return false;
-    return snap.active_votes.some((vote: any) => vote.voter === currentUsername && vote.percent > 0);
-  };
+  const hasUserUpvoted = useCallback(
+    (snap: UserSnap, currentUsername: string | null): boolean => {
+      if (!currentUsername || !snap.active_votes) return false;
+      return snap.active_votes.some(
+        (vote: any) => vote.voter === currentUsername && vote.percent > 0
+      );
+    },
+    []
+  );
 
   // Helper function to convert UserSnap to format expected by Snap component
-  const convertUserSnapToSnapProps = (userSnap: UserSnap, currentUsername: string | null) => {
-    // Calculate payout from pending_payout_value and total_payout_value
-    const pendingPayout = parseFloat((userSnap.pending_payout_value || '0.000 HBD').replace(' HBD', ''));
-    const totalPayout = parseFloat((userSnap.total_payout_value || '0.000 HBD').replace(' HBD', ''));
-    const payout = pendingPayout + totalPayout;
+  const convertUserSnapToSnapProps = useCallback(
+    (userSnap: UserSnap, currentUsername: string | null) => {
+      // Calculate payout from pending_payout_value and total_payout_value
+      const pendingPayout = parseFloat(
+        (userSnap.pending_payout_value || '0.000 HBD').replace(' HBD', '')
+      );
+      const totalPayout = parseFloat(
+        (userSnap.total_payout_value || '0.000 HBD').replace(' HBD', '')
+      );
+      const payout = pendingPayout + totalPayout;
 
-    return {
-      author: userSnap.author,
-      avatarUrl: '', // Will be populated by Snap component's own avatar fetching
-      body: userSnap.body,
-      created: userSnap.created,
-      voteCount: userSnap.net_votes || 0,
-      replyCount: userSnap.children || 0,
-      payout: payout,
-      permlink: userSnap.permlink,
-      hasUpvoted: hasUserUpvoted(userSnap, currentUsername),
-    };
-  };
+      return {
+        author: userSnap.author,
+        avatarUrl: '', // Will be populated by Snap component's own avatar fetching
+        body: userSnap.body,
+        created: userSnap.created,
+        voteCount: userSnap.net_votes || 0,
+        replyCount: userSnap.children || 0,
+        payout: payout,
+        permlink: userSnap.permlink,
+        hasUpvoted: hasUserUpvoted(userSnap, currentUsername),
+      };
+    },
+    [hasUserUpvoted]
+  );
 
   // Update a specific snap optimistically (for upvotes, etc.)
-  const updateSnap = (author: string, permlink: string, updates: any) => {
-    setUserSnaps(prevSnaps => 
-      prevSnaps.map(snap => 
-        snap.author === author && snap.permlink === permlink
-          ? { ...snap, ...updates }
-          : snap
-      )
-    );
-  };
+  const updateSnap = useCallback(
+    (author: string, permlink: string, updates: any) => {
+      setUserSnaps(prevSnaps =>
+        prevSnaps.map(snap =>
+          snap.author === author && snap.permlink === permlink
+            ? { ...snap, ...updates }
+            : snap
+        )
+      );
+
+      // Also update cache
+      const cached = userSnapsCache.get(username || '');
+      if (cached) {
+        const updatedSnaps = cached.snaps.map(snap =>
+          snap.author === author && snap.permlink === permlink
+            ? { ...snap, ...updates }
+            : snap
+        );
+        setCachedUserSnaps(username || '', updatedSnaps);
+      }
+    },
+    [username]
+  );
 
   return {
     userSnaps,
@@ -166,4 +241,4 @@ export const useUserSnaps = (username: string | undefined) => {
     convertUserSnapToSnapProps,
     updateSnap,
   };
-}; 
+};
