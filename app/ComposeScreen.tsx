@@ -498,7 +498,7 @@ export default function ComposeScreen() {
   };
 
   const handleUnderline = () => {
-    insertMarkdown('__', '__', 'underlined text');
+    insertMarkdown('<u>', '</u>', 'underlined text');
   };
 
   const handleSpoiler = () => {
