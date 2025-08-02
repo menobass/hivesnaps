@@ -14,6 +14,7 @@ export interface UserSnap {
   pending_payout_value?: string;
   total_payout_value?: string;
   active_votes?: any[];
+  avatarUrl?: string; // Add avatar URL to the interface
   [key: string]: any;
 }
 
@@ -30,6 +31,10 @@ const userSnapsCache = new Map<
   { snaps: UserSnap[]; timestamp: number }
 >();
 const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes cache
+
+// Cache for avatar URLs to avoid refetching
+const avatarCache = new Map<string, { url: string; timestamp: number }>();
+const AVATAR_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes cache
 
 export const useUserSnaps = (username: string | undefined) => {
   const [userSnaps, setUserSnaps] = useState<UserSnap[]>([]);
@@ -52,6 +57,55 @@ export const useUserSnaps = (username: string | undefined) => {
   const setCachedUserSnaps = (username: string, snaps: UserSnap[]) => {
     userSnapsCache.set(username, { snaps, timestamp: Date.now() });
   };
+
+  // Fetch avatar URL for a user
+  const fetchAvatarUrl = useCallback(
+    async (author: string): Promise<string> => {
+      // Check avatar cache first
+      const cached = avatarCache.get(author);
+      if (cached && Date.now() - cached.timestamp < AVATAR_CACHE_DURATION) {
+        return cached.url;
+      }
+
+      try {
+        const accounts = await client.database.getAccounts([author]);
+        if (accounts && accounts.length > 0) {
+          const account = accounts[0];
+
+          // Extract avatar URL from metadata
+          let meta = null;
+          if (account.posting_json_metadata) {
+            try {
+              meta = JSON.parse(account.posting_json_metadata);
+            } catch {}
+          }
+          if (
+            (!meta || !meta.profile || !meta.profile.profile_image) &&
+            account.json_metadata
+          ) {
+            try {
+              meta = JSON.parse(account.json_metadata);
+            } catch {}
+          }
+
+          const avatarUrl =
+            meta && meta.profile && meta.profile.profile_image
+              ? meta.profile.profile_image.replace(/[\\/]+$/, '')
+              : '';
+
+          // Cache the avatar URL
+          avatarCache.set(author, { url: avatarUrl, timestamp: Date.now() });
+
+          return avatarUrl;
+        }
+      } catch (error) {
+        console.log('Error fetching avatar for', author, error);
+      }
+
+      return '';
+    },
+    []
+  );
 
   // Optimized fetch user's recent snaps from Hive blockchain
   const fetchUserSnaps = useCallback(async () => {
@@ -116,20 +170,30 @@ export const useUserSnaps = (username: string | undefined) => {
       // Keep more snaps for load more functionality
       const limitedSnaps = userSnapsFound.slice(0, 50);
 
-      // Cache the results
-      setCachedUserSnaps(username, limitedSnaps);
+      // Fetch avatar URLs for all snaps in parallel
+      const avatarPromises = limitedSnaps.map(async snap => {
+        const avatarUrl = await fetchAvatarUrl(snap.author);
+        return { ...snap, avatarUrl };
+      });
 
-      setUserSnaps(limitedSnaps);
+      const snapsWithAvatars = await Promise.all(avatarPromises);
+
+      // Cache the results
+      setCachedUserSnaps(username, snapsWithAvatars);
+
+      setUserSnaps(snapsWithAvatars);
       setSnapsLoaded(true);
       setDisplayedSnapsCount(10); // Reset to initial display count
-      console.log(`Found ${limitedSnaps.length} recent snaps for @${username}`);
+      console.log(
+        `Found ${snapsWithAvatars.length} recent snaps for @${username}`
+      );
     } catch (error) {
       console.error('Error fetching user snaps:', error);
       setSnapsError('Failed to load recent snaps');
     } finally {
       setSnapsLoading(false);
     }
-  }, [username]);
+  }, [username, fetchAvatarUrl]);
 
   // Load more snaps function
   const loadMoreSnaps = useCallback(async () => {
@@ -189,7 +253,7 @@ export const useUserSnaps = (username: string | undefined) => {
 
       return {
         author: userSnap.author,
-        avatarUrl: '', // Will be populated by Snap component's own avatar fetching
+        avatarUrl: userSnap.avatarUrl || '', // Use the fetched avatar URL
         body: userSnap.body,
         created: userSnap.created,
         voteCount: userSnap.net_votes || 0,
