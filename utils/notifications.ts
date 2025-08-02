@@ -114,10 +114,13 @@ export function parseNotification(notification: HiveNotification): ParsedNotific
       parsed.color = '#1DA1F2';
       parsed.actionText = 'Started following you';
       
-      // Extract follower from message like "@dave started following you"
-      const followMatch = notification.msg.match(/@(\w+) started following you/);
+      // Extract follower from message like "@dave followed you" or "@dave started following you"
+      const followMatch = notification.msg.match(/@(\w+) (?:followed|started following) you/);
       if (followMatch) {
         parsed.actionUser = followMatch[1];
+      } else if (notification.url && notification.url.startsWith('@')) {
+        // Fallback: extract username from URL field like "@ankapolo"
+        parsed.actionUser = notification.url.substring(1);
       }
       break;
 
