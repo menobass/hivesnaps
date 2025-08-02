@@ -9,38 +9,10 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
 import genericAvatar from '../assets/images/generic-avatar.png';
-
-// Reusable Avatar Component with Error Handling
-interface AvatarProps {
-  avatarUrl?: string;
-  size: number;
-  onError?: () => void;
-}
-
-const AvatarWithFallback = ({ avatarUrl, size, onError }: AvatarProps) => {
-  const handleError = () => {
-    if (onError) {
-      onError();
-    }
-  };
-
-  if (avatarUrl) {
-    return (
-      <Image 
-        source={{ uri: avatarUrl }} 
-        style={{ width: size, height: size, borderRadius: size / 2 }}
-        onError={handleError}
-      />
-    );
-  }
-
-  return (
-    <Image 
-      source={genericAvatar} 
-      style={{ width: size, height: size, borderRadius: size / 2 }} 
-    />
-  );
-};
+import Snap from './components/Snap';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Slider from '@react-native-community/slider';
+import { calculateVoteValue } from '../utils/calculateVoteValue';
 
 // Profile data interface
 interface ProfileData {
@@ -113,11 +85,6 @@ const ProfileScreen = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   
-  // Helper function to handle avatar loading errors
-  const handleAvatarError = () => {
-    setProfile(prev => prev ? { ...prev, avatarUrl: undefined } : null);
-  };
-  
   // Get username from params
   const username = params.username as string | undefined;
   
@@ -135,6 +102,19 @@ const ProfileScreen = () => {
   const [snapsLoading, setSnapsLoading] = useState(false);
   const [snapsError, setSnapsError] = useState<string | null>(null);
   const [snapsLoaded, setSnapsLoaded] = useState(false);
+  const [displayedSnapsCount, setDisplayedSnapsCount] = useState(10); // Show 10 initially
+  const [loadMoreLoading, setLoadMoreLoading] = useState(false);
+  
+  // Upvote modal state
+  const [upvoteModalVisible, setUpvoteModalVisible] = useState(false);
+  const [upvoteTarget, setUpvoteTarget] = useState<{ author: string; permlink: string } | null>(null);
+  const [voteWeight, setVoteWeight] = useState(100);
+  const [voteWeightLoading, setVoteWeightLoading] = useState(false);
+  const [upvoteLoading, setUpvoteLoading] = useState(false);
+  const [upvoteSuccess, setUpvoteSuccess] = useState(false);
+  const [voteValue, setVoteValue] = useState<{ hbd: string, usd: string } | null>(null);
+  const [rewardFund, setRewardFund] = useState<any | null>(null);
+  const [hivePrice, setHivePrice] = useState(1);
   
   // Profile image update state
   const [editAvatarModalVisible, setEditAvatarModalVisible] = useState(false);
@@ -172,6 +152,26 @@ const ProfileScreen = () => {
       }
     };
     loadCredentials();
+  }, []);
+
+  // Initialize reward fund and hive price
+  useEffect(() => {
+    const initializeUpvoteData = async () => {
+      try {
+        // Fetch reward fund
+        const fund = await client.database.call('get_reward_fund', ['post']);
+        setRewardFund(fund);
+        
+        // Fetch hive price
+        const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=hive&vs_currencies=usd');
+        const data = await response.json();
+        setHivePrice(data.hive?.usd || 1);
+      } catch (error) {
+        console.log('Error initializing upvote data:', error);
+        setHivePrice(1);
+      }
+    };
+    initializeUpvoteData();
   }, []);
 
   // Fetch profile data (simplified approach for follow counts)
@@ -414,10 +414,10 @@ const ProfileScreen = () => {
     try {
       console.log('Fetching recent snaps for user:', username);
       
-      // Get latest posts by @peak.snaps (container account)
+      // Get latest posts by @peak.snaps (container account) - increased limit for more snaps
       const discussions = await client.database.call('get_discussions_by_blog', [{
         tag: 'peak.snaps',
-        limit: 10
+        limit: 20 // Increased to get more potential snaps
       }]);
       
       let userSnapsFound: UserSnap[] = [];
@@ -438,11 +438,12 @@ const ProfileScreen = () => {
       // Sort by created date descending (newest first)
       userSnapsFound.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
       
-      // Limit to 20 most recent snaps
-      const limitedSnaps = userSnapsFound.slice(0, 20);
+      // Keep more snaps for load more functionality
+      const limitedSnaps = userSnapsFound.slice(0, 50);
       
       setUserSnaps(limitedSnaps);
       setSnapsLoaded(true);
+      setDisplayedSnapsCount(10); // Reset to initial display count
       console.log(`Found ${limitedSnaps.length} recent snaps for @${username}`);
       
     } catch (error) {
@@ -451,6 +452,19 @@ const ProfileScreen = () => {
     } finally {
       setSnapsLoading(false);
     }
+  };
+
+  // Load more snaps function
+  const loadMoreSnaps = async () => {
+    setLoadMoreLoading(true);
+    
+    // Simulate loading time for better UX
+    setTimeout(() => {
+      const currentCount = displayedSnapsCount;
+      const newCount = Math.min(currentCount + 10, userSnaps.length);
+      setDisplayedSnapsCount(newCount);
+      setLoadMoreLoading(false);
+    }, 500);
   };
 
   // Handle upvote for profile snap bubbles
@@ -552,6 +566,159 @@ const ProfileScreen = () => {
   const hasUserUpvoted = (snap: UserSnap): boolean => {
     if (!currentUsername || !snap.active_votes) return false;
     return snap.active_votes.some((vote: any) => vote.voter === currentUsername && vote.percent > 0);
+  };
+
+  // Helper function to convert UserSnap to format expected by Snap component
+  const convertUserSnapToSnapProps = (userSnap: UserSnap) => {
+    // Calculate payout from pending_payout_value and total_payout_value
+    const pendingPayout = parseFloat((userSnap.pending_payout_value || '0.000 HBD').replace(' HBD', ''));
+    const totalPayout = parseFloat((userSnap.total_payout_value || '0.000 HBD').replace(' HBD', ''));
+    const payout = pendingPayout + totalPayout;
+
+    return {
+      author: userSnap.author,
+      avatarUrl: '', // Will be populated by Snap component's own avatar fetching
+      body: userSnap.body,
+      created: userSnap.created,
+      voteCount: userSnap.net_votes || 0,
+      replyCount: userSnap.children || 0,
+      payout: payout,
+      permlink: userSnap.permlink,
+      hasUpvoted: hasUserUpvoted(userSnap),
+    };
+  };
+
+  // Handle upvote for Snap component integration (opens modal)
+  const handleSnapUpvoteFromComponent = async (target: { author: string; permlink: string }) => {
+    setUpvoteTarget(target);
+    setVoteWeightLoading(true);
+    
+    try {
+      // Load last used vote weight if available
+      const val = await AsyncStorage.getItem('hivesnaps_vote_weight');
+      const weight = val !== null ? Number(val) : 100;
+      setVoteWeight(weight);
+      
+      // Calculate vote value if possible
+      let accountObj = null;
+      if (currentUsername) {
+        const accounts = await client.database.getAccounts([currentUsername]);
+        accountObj = accounts && accounts[0] ? accounts[0] : null;
+      }
+      
+      if (accountObj && globalProps && rewardFund) {
+        const calcValue = calculateVoteValue(accountObj, globalProps, rewardFund, weight, hivePrice);
+        setVoteValue(calcValue);
+      } else {
+        setVoteValue(null);
+      }
+    } catch (error) {
+      console.log('Error setting up upvote modal:', error);
+      setVoteWeight(100);
+      setVoteValue(null);
+    } finally {
+      setVoteWeightLoading(false);
+      setUpvoteModalVisible(true);
+    }
+  };
+
+  // Close upvote modal
+  const closeUpvoteModal = () => {
+    setUpvoteModalVisible(false);
+    setUpvoteTarget(null);
+    setVoteValue(null);
+    setUpvoteSuccess(false);
+  };
+
+  // Confirm upvote
+  const confirmUpvote = async () => {
+    if (!upvoteTarget || !currentUsername) return;
+    
+    setUpvoteLoading(true);
+    setUpvoteSuccess(false);
+    
+    try {
+      // Haptic feedback for user interaction
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      
+      // Get posting key from secure storage
+      const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
+      if (!postingKeyStr) {
+        throw new Error('No posting key found. Please log in again.');
+      }
+      const postingKey = PrivateKey.fromString(postingKeyStr);
+
+      // Convert weight (1-100% slider maps to 1-10000 dhive weight)
+      let weight = Math.round(voteWeight * 100);
+      if (weight > 10000) weight = 10000;
+      if (weight < 1) weight = 1;
+
+      // Broadcast vote
+      await client.broadcast.vote(
+        {
+          voter: currentUsername,
+          author: upvoteTarget.author,
+          permlink: upvoteTarget.permlink,
+          weight,
+        },
+        postingKey
+      );
+
+      // Persist the vote weight after successful vote
+      await AsyncStorage.setItem('hivesnaps_vote_weight', String(voteWeight));
+
+      // Update the local snap data to reflect the vote
+      setUserSnaps(prev => prev.map(s => 
+        s.permlink === upvoteTarget.permlink && s.author === upvoteTarget.author
+          ? { 
+              ...s, 
+              net_votes: (s.net_votes || 0) + 1,
+              active_votes: [...(s.active_votes || []), { voter: currentUsername, percent: weight }]
+            }
+          : s
+      ));
+
+      // Success haptic feedback
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+      setUpvoteLoading(false);
+      setUpvoteSuccess(true);
+      
+      console.log('Successfully upvoted snap:', upvoteTarget.permlink);
+      
+      // Close modal after showing success
+      setTimeout(() => {
+        closeUpvoteModal();
+      }, 1500);
+      
+    } catch (error) {
+      setUpvoteLoading(false);
+      setUpvoteSuccess(false);
+      // Error haptic feedback
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      console.error('Error upvoting snap:', error);
+      alert('Failed to upvote: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+  };
+
+  // Update vote weight and recalculate value
+  const updateVoteWeight = async (newWeight: number) => {
+    setVoteWeight(newWeight);
+    
+    // Recalculate vote value with new weight
+    if (currentUsername && globalProps && rewardFund) {
+      try {
+        const accounts = await client.database.getAccounts([currentUsername]);
+        const accountObj = accounts && accounts[0] ? accounts[0] : null;
+        
+        if (accountObj) {
+          const calcValue = calculateVoteValue(accountObj, globalProps, rewardFund, newWeight, hivePrice);
+          setVoteValue(calcValue);
+        }
+      } catch (error) {
+        console.log('Error updating vote value:', error);
+      }
+    }
   };
 
   // Action handlers
@@ -1089,7 +1256,9 @@ const ProfileScreen = () => {
       
       // Clear sensitive data immediately
       setActiveKeyInput('');
-            
+      
+      
+
       // Clear any cached avatar data and refresh profile
       setTimeout(async () => {
         setActiveKeyModalVisible(false);
@@ -1140,11 +1309,13 @@ const ProfileScreen = () => {
             
             {/* Avatar */}
             <View style={styles.avatarContainer}>
-              <AvatarWithFallback 
-                avatarUrl={profile.avatarUrl}
-                size={120}
-                onError={handleAvatarError}
-              />
+              {profile.avatarUrl ? (
+                <Image source={{ uri: profile.avatarUrl }} style={styles.largeAvatar} />
+              ) : (
+                <View style={[styles.largeAvatar, styles.defaultAvatar, { backgroundColor: colors.bubble }]}>
+                  <FontAwesome name="user" size={60} color={colors.icon} />
+                </View>
+              )}
             </View>
 
             {/* Edit Profile Image Button (Only for own profile) */}
@@ -1415,73 +1586,57 @@ const ProfileScreen = () => {
                       </Text>
                     </View>
                   ) : (
-                    <ScrollView 
-                      horizontal 
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.snapsScrollContainer}
-                      style={styles.snapsScrollView}
-                    >
-                      {userSnaps.map((snap, index) => {
-                        const snapText = extractSnapText(snap.body);
-                        const hasUpvoted = hasUserUpvoted(snap);
-                        const voteCount = snap.net_votes || 0;
-                        const replyCount = snap.children || 0;
+                    <View style={styles.verticalFeedContainer}>
+                      {/* Display snaps using the existing Snap component */}
+                      {userSnaps.slice(0, displayedSnapsCount).map((userSnap, index) => {
+                        const snapProps = convertUserSnapToSnapProps(userSnap);
                         
                         return (
-                          <TouchableOpacity
-                            key={`${snap.author}-${snap.permlink}`}
-                            style={[styles.snapBubble, { backgroundColor: colors.bubble, borderColor: colors.border }]}
-                            onPress={() => handleSnapPress(snap)}
-                            activeOpacity={0.7}
-                          >
-                            <View style={styles.snapBubbleContent}>
-                              <Text style={[styles.snapBubbleText, { color: colors.text }]} numberOfLines={4}>
-                                {snapText}
-                              </Text>
-                              
-                              <View style={styles.snapBubbleActions}>
-                                <TouchableOpacity
-                                  style={styles.snapBubbleAction}
-                                  onPress={(e) => {
-                                    e.stopPropagation();
-                                    handleSnapUpvote(snap);
-                                  }}
-                                  disabled={!currentUsername}
-                                >
-                                  <FontAwesome 
-                                    name="heart" 
-                                    size={14} 
-                                    color={hasUpvoted ? '#E74C3C' : colors.buttonInactive} 
-                                  />
-                                  <Text style={[styles.snapBubbleActionText, { 
-                                    color: hasUpvoted ? '#E74C3C' : colors.buttonInactive
-                                  }]}>
-                                    {voteCount}
-                                  </Text>
-                                </TouchableOpacity>
-                                
-                                <TouchableOpacity
-                                  style={styles.snapBubbleAction}
-                                  onPress={(e) => {
-                                    e.stopPropagation();
-                                    handleSnapReply(snap);
-                                  }}
-                                >
-                                  <FontAwesome name="reply" size={14} color={colors.buttonInactive} />
-                                  <Text style={[styles.snapBubbleActionText, { color: colors.buttonInactive }]}>
-                                    {replyCount}
-                                  </Text>
-                                </TouchableOpacity>
-                              </View>
-                              
-                              <Text style={[styles.snapBubbleDate, { color: colors.buttonInactive }]}>
-                                {new Date(snap.created).toLocaleDateString()}
-                              </Text>
-                            </View>
-                          </TouchableOpacity>
+                          <Snap
+                            key={`${userSnap.author}-${userSnap.permlink}`}
+                            author={snapProps.author}
+                            avatarUrl={snapProps.avatarUrl}
+                            body={snapProps.body}
+                            created={snapProps.created}
+                            voteCount={snapProps.voteCount}
+                            replyCount={snapProps.replyCount}
+                            payout={snapProps.payout}
+                            permlink={snapProps.permlink}
+                            hasUpvoted={snapProps.hasUpvoted}
+                            onUpvotePress={handleSnapUpvoteFromComponent}
+                            onSpeechBubblePress={() => handleSnapReply(userSnap)}
+                            onContentPress={() => handleSnapPress(userSnap)}
+                            showAuthor={true} // Show author for consistency with other feeds
+                          />
                         );
                       })}
-                    </ScrollView>
+                      
+                      {/* Load More Button */}
+                      {displayedSnapsCount < userSnaps.length && (
+                        <TouchableOpacity 
+                          style={[styles.loadMoreButton, { backgroundColor: colors.buttonInactive }]}
+                          onPress={loadMoreSnaps}
+                          disabled={loadMoreLoading}
+                          activeOpacity={0.8}
+                        >
+                          {loadMoreLoading ? (
+                            <>
+                              <FontAwesome name="hourglass-half" size={16} color={colors.text} />
+                              <Text style={[styles.loadMoreButtonText, { color: colors.text }]}>
+                                Loading...
+                              </Text>
+                            </>
+                          ) : (
+                            <>
+                              <FontAwesome name="chevron-down" size={16} color={colors.text} />
+                              <Text style={[styles.loadMoreButtonText, { color: colors.text }]}>
+                                Load More ({userSnaps.length - displayedSnapsCount} remaining)
+                              </Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   )}
                 </>
               )}
@@ -1529,11 +1684,13 @@ const ProfileScreen = () => {
               {/* Current Avatar */}
               <View style={{ alignItems: 'center', flex: 1 }}>
                 <Text style={{ color: colors.text, fontSize: 14, marginBottom: 8 }}>Current</Text>
-                <AvatarWithFallback 
-                  avatarUrl={profile?.avatarUrl}
-                  size={80}
-                  onError={handleAvatarError}
-                />
+                {profile?.avatarUrl ? (
+                  <Image source={{ uri: profile.avatarUrl }} style={{ width: 80, height: 80, borderRadius: 40 }} />
+                ) : (
+                  <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: colors.bubble, justifyContent: 'center', alignItems: 'center' }}>
+                    <FontAwesome name="user" size={40} color={colors.icon} />
+                  </View>
+                )}
               </View>
               
               {/* Arrow */}
@@ -1703,11 +1860,13 @@ const ProfileScreen = () => {
                 {/* Current Avatar */}
                 <View style={{ alignItems: 'center', flex: 1 }}>
                   <Text style={{ color: colors.text, fontSize: 12, marginBottom: 4 }}>Current</Text>
-                  <AvatarWithFallback 
-                    avatarUrl={profile?.avatarUrl}
-                    size={50}
-                    onError={handleAvatarError}
-                  />
+                  {profile?.avatarUrl ? (
+                    <Image source={{ uri: profile.avatarUrl }} style={{ width: 50, height: 50, borderRadius: 25 }} />
+                  ) : (
+                    <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: colors.bubble, justifyContent: 'center', alignItems: 'center' }}>
+                      <FontAwesome name="user" size={25} color={colors.icon} />
+                    </View>
+                  )}
                 </View>
                 
                 {/* Arrow */}
@@ -1778,6 +1937,73 @@ const ProfileScreen = () => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      
+      {/* Upvote Modal */}
+      <Modal
+        visible={upvoteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeUpvoteModal}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: colors.background, borderRadius: 16, padding: 24, width: '85%', alignItems: 'center' }}>
+            <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>Upvote Snap</Text>
+            <Text style={{ color: colors.text, fontSize: 15, marginBottom: 16 }}>Vote Weight: {voteWeight}%</Text>
+            
+            {voteWeightLoading ? (
+              <ActivityIndicator size="small" color={colors.button} style={{ marginVertical: 16 }} />
+            ) : (
+              <>
+                <Slider
+                  style={{ width: '100%', height: 40 }}
+                  minimumValue={1}
+                  maximumValue={100}
+                  step={1}
+                  value={voteWeight}
+                  onValueChange={updateVoteWeight}
+                  minimumTrackTintColor={colors.button}
+                  maximumTrackTintColor={colors.buttonInactive}
+                  thumbTintColor={colors.button}
+                />
+                {voteValue !== null && (
+                  <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginTop: 12 }}>
+                    ${voteValue.usd} USD
+                  </Text>
+                )}
+              </>
+            )}
+            
+            {upvoteLoading ? (
+              <View style={{ marginTop: 24, alignItems: 'center' }}>
+                <FontAwesome name="hourglass-half" size={32} color={colors.icon} />
+                <Text style={{ color: colors.text, marginTop: 8 }}>Submitting vote...</Text>
+              </View>
+            ) : upvoteSuccess ? (
+              <View style={{ marginTop: 24, alignItems: 'center' }}>
+                <FontAwesome name="check-circle" size={32} color={colors.button} />
+                <Text style={{ color: colors.text, marginTop: 8 }}>Upvote successful!</Text>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', marginTop: 24 }}>
+                <Pressable
+                  style={{ flex: 1, marginRight: 8, backgroundColor: colors.buttonInactive, borderRadius: 8, padding: 12, alignItems: 'center' }}
+                  onPress={closeUpvoteModal}
+                  disabled={upvoteLoading}
+                >
+                  <Text style={{ color: colors.text, fontWeight: '600' }}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={{ flex: 1, marginLeft: 8, backgroundColor: colors.button, borderRadius: 8, padding: 12, alignItems: 'center' }}
+                  onPress={confirmUpvote}
+                  disabled={upvoteLoading}
+                >
+                  <Text style={{ color: colors.buttonText, fontWeight: '600' }}>Confirm</Text>
+                </Pressable>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaViewSA>
   );
 };
@@ -1822,6 +2048,15 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     marginBottom: 16,
+  },
+  largeAvatar: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+  },
+  defaultAvatar: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   editAvatarButton: {
     flexDirection: 'row',
@@ -2045,58 +2280,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
   },
-  snapsScrollView: {
-    marginHorizontal: -24, // Offset parent padding
+  // Vertical feed styles (replacing horizontal bubble styles)
+  verticalFeedContainer: {
+    marginTop: 16,
   },
-  snapsScrollContainer: {
-    paddingHorizontal: 24,
-    paddingRight: 24,
-  },
-  snapBubble: {
-    width: 180,
-    minHeight: 140,
-    maxHeight: 200,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginRight: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  snapBubbleContent: {
-    padding: 16,
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  snapBubbleText: {
-    fontSize: 14,
-    lineHeight: 18,
-    marginBottom: 12,
-    flex: 1,
-  },
-  snapBubbleActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  snapBubbleAction: {
+  // Load More button styles
+  loadMoreButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    gap: 8,
+    marginTop: 16,
+    marginBottom: 8,
   },
-  snapBubbleActionText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  snapBubbleDate: {
-    fontSize: 11,
-    textAlign: 'right',
+  loadMoreButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   // Load snaps button styles
   loadSnapsButton: {
