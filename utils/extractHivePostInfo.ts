@@ -4,6 +4,7 @@
  */
 
 import { Client } from '@hiveio/dhive';
+import { detectPostType, type PostInfo } from './postTypeDetector';
 
 const client = new Client([
   'https://api.hive.blog',
@@ -316,10 +317,34 @@ export async function fetchHivePostInfo(
     // Generate summary
     const summary = generateSummary(post.body);
 
+    // Smart title function - determines title based on post type
+    const getSmartTitle = (postData: any): string => {
+      // If it has a title, use it
+      if (postData.title && postData.title.trim()) {
+        return postData.title;
+      }
+      
+      // Use post type detection logic for untitled posts
+      const postInfo: PostInfo = {
+        author: postData.author,
+        permlink: postData.permlink,
+        title: postData.title,
+        body: postData.body,
+        json_metadata: postData.json_metadata,
+        parent_author: postData.parent_author,
+        parent_permlink: postData.parent_permlink,
+      };
+      
+      const postType = detectPostType(postInfo);
+      
+      // Return appropriate label based on type
+      return postType === 'snap' ? 'Resnap' : 'Untitled Post';
+    };
+
     return {
       author: post.author,
       permlink: post.permlink,
-      title: post.title || 'Untitled Post',
+      title: getSmartTitle(post),
       body: post.body,
       created: post.created,
       voteCount: post.net_votes || 0,
