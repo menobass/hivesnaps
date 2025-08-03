@@ -41,29 +41,33 @@ export function detectPostType(post: PostInfo): PostType {
         tags: metadata.tags,
         tagsCount: metadata.tags?.length || 0,
       });
-      
+
       // Check for snap-specific metadata
       if (metadata.app && metadata.app.includes('hivesnaps')) {
         console.log('[postTypeDetector] Detected snap by app metadata');
         return 'snap';
       }
-      
+
       // Check for snap-specific tags - be more specific
       if (metadata.tags && Array.isArray(metadata.tags)) {
         // Only detect as snap if it has the specific hivesnaps tag AND other snap indicators
         if (metadata.tags.includes('hivesnaps')) {
           // Additional check: only detect as snap if it also has other snap indicators
           // This prevents regular posts that happen to have 'hivesnaps' as a tag
-          const hasOtherSnapIndicators = 
+          const hasOtherSnapIndicators =
             (metadata.app && metadata.app.includes('hivesnaps')) ||
             (post.permlink && post.permlink.startsWith('snap-')) ||
-            (post.parent_author === 'peak.snaps');
-          
+            post.parent_author === 'peak.snaps';
+
           if (hasOtherSnapIndicators) {
-            console.log('[postTypeDetector] Detected snap by hivesnaps tag + other indicators');
+            console.log(
+              '[postTypeDetector] Detected snap by hivesnaps tag + other indicators'
+            );
             return 'snap';
           } else {
-            console.log('[postTypeDetector] Has hivesnaps tag but no other snap indicators - treating as regular post');
+            console.log(
+              '[postTypeDetector] Has hivesnaps tag but no other snap indicators - treating as regular post'
+            );
           }
         }
         // Don't detect as snap just because it has 'snap' in tags - that's too broad
@@ -98,13 +102,13 @@ export function detectPostType(post: PostInfo): PostType {
   // Check if it's a snap based on content patterns
   if (post.body) {
     const body = post.body.toLowerCase();
-    
+
     // Look for snap-specific content patterns - be more specific
     if (body.includes('#hivesnaps')) {
       console.log('[postTypeDetector] Detected snap by #hivesnaps hashtag');
       return 'snap';
     }
-    
+
     // Don't detect as snap just because it mentions 'snapie' or 'snap-' in content
     // This is too broad and catches regular posts that mention these words
     // Only detect if it has specific snap formatting or patterns
@@ -120,7 +124,7 @@ export function detectPostType(post: PostInfo): PostType {
  */
 export function getPostScreenRoute(post: PostInfo): string {
   const postType = detectPostType(post);
-  
+
   if (postType === 'snap') {
     return '/ConversationScreen';
   } else {
@@ -133,7 +137,7 @@ export function getPostScreenRoute(post: PostInfo): string {
  */
 export function getPostNavigationParams(post: PostInfo) {
   const route = getPostScreenRoute(post);
-  
+
   return {
     route,
     params: {
@@ -141,4 +145,4 @@ export function getPostNavigationParams(post: PostInfo) {
       permlink: post.permlink,
     },
   };
-} 
+}

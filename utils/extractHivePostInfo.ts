@@ -73,7 +73,7 @@ export function parseHivePostUrl(
 ): { author: string; permlink: string } | null {
   try {
     console.log('[extractHivePostInfo] parseHivePostUrl called with:', url);
-    
+
     // Remove protocol and www if present
     const cleanUrl = url.replace(/^https?:\/\/(?:www\.)?/, '');
 
@@ -82,7 +82,10 @@ export function parseHivePostUrl(
       /^(?:ecency\.com|peakd\.com|hive\.blog)\/(.+)$/
     );
     if (!pathMatch) {
-      console.log('[extractHivePostInfo] URL does not match expected domain pattern:', cleanUrl);
+      console.log(
+        '[extractHivePostInfo] URL does not match expected domain pattern:',
+        cleanUrl
+      );
       return null;
     }
 
@@ -104,30 +107,37 @@ export function parseHivePostUrl(
         console.log('[extractHivePostInfo] Rejecting short permlink:', {
           permlink,
           length: permlink.length,
-          url
+          url,
         });
         return null;
       }
 
       // Check if permlink looks like a valid post permlink (not just a category/page)
-      const validPermlinkPattern = /^[a-z0-9-]+(?:-\d{4}-\d{2}-\d{2}|-\d{10,}|-[a-z0-9-]{8,})$/;
+      const validPermlinkPattern =
+        /^[a-z0-9-]+(?:-\d{4}-\d{2}-\d{2}|-\d{10,}|-[a-z0-9-]{8,})$/;
       if (!validPermlinkPattern.test(permlink)) {
-        console.log('[extractHivePostInfo] Rejecting invalid permlink format:', {
-          permlink,
-          url
-        });
+        console.log(
+          '[extractHivePostInfo] Rejecting invalid permlink format:',
+          {
+            permlink,
+            url,
+          }
+        );
         return null;
       }
 
       console.log('[extractHivePostInfo] Successfully parsed URL:', {
         author,
         permlink,
-        url
+        url,
       });
       return { author, permlink };
     }
-    
-    console.log('[extractHivePostInfo] URL does not match author/permlink pattern:', path);
+
+    console.log(
+      '[extractHivePostInfo] URL does not match author/permlink pattern:',
+      path
+    );
     return null;
   } catch (error) {
     console.error('[extractHivePostInfo] Error parsing Hive post URL:', error);
@@ -261,7 +271,10 @@ export async function fetchHivePostInfo(
 
     // Validate parameters before making API call
     if (!author || !permlink || author.length < 3 || permlink.length < 5) {
-      console.warn('[extractHivePostInfo] Invalid parameters:', { author, permlink });
+      console.warn('[extractHivePostInfo] Invalid parameters:', {
+        author,
+        permlink,
+      });
       return null;
     }
 
@@ -327,16 +340,22 @@ export async function fetchHivePostInfo(
       originalUrl,
       errorMessage: error instanceof Error ? error.message : 'Unknown error',
     });
-    
+
     // Specific warning for "Invalid parameters" - likely malformed URL
-    if (error instanceof Error && error.message.includes('Invalid parameters')) {
-      console.warn('[extractHivePostInfo] Invalid parameters detected - likely malformed URL or non-existent post:', {
-        author,
-        permlink,
-        originalUrl,
-      });
+    if (
+      error instanceof Error &&
+      error.message.includes('Invalid parameters')
+    ) {
+      console.warn(
+        '[extractHivePostInfo] Invalid parameters detected - likely malformed URL or non-existent post:',
+        {
+          author,
+          permlink,
+          originalUrl,
+        }
+      );
     }
-    
+
     return null;
   }
 }
@@ -363,7 +382,11 @@ export async function fetchMultipleHivePostInfos(
 
         return await fetchHivePostInfo(parsed.author, parsed.permlink, url);
       } catch (error) {
-        console.error('[extractHivePostInfo] Error processing URL:', url, error);
+        console.error(
+          '[extractHivePostInfo] Error processing URL:',
+          url,
+          error
+        );
         return null;
       }
     })

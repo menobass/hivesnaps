@@ -5,13 +5,18 @@ interface SafeRenderHtmlProps extends Omit<RenderHTMLProps, 'key'> {
   key?: string | number;
 }
 
-const SafeRenderHtml: React.FC<SafeRenderHtmlProps> = (props) => {
+const SafeRenderHtml: React.FC<SafeRenderHtmlProps> = props => {
   // Suppress the specific warning about key prop spreading
   useEffect(() => {
     const originalWarn = console.warn;
     console.warn = (...args) => {
       const message = args[0];
-      if (typeof message === 'string' && message.includes('A props object containing a "key" prop is being spread into JSX')) {
+      if (
+        typeof message === 'string' &&
+        message.includes(
+          'A props object containing a "key" prop is being spread into JSX'
+        )
+      ) {
         return; // Suppress this specific warning
       }
       originalWarn.apply(console, args);
@@ -24,13 +29,8 @@ const SafeRenderHtml: React.FC<SafeRenderHtmlProps> = (props) => {
 
   // Extract key from props to pass it directly
   const { key, ...otherProps } = props;
-  
-  return (
-    <RenderHtml
-      key={key}
-      {...otherProps}
-    />
-  );
+
+  return <RenderHtml key={key} {...otherProps} />;
 };
 
-export default SafeRenderHtml; 
+export default SafeRenderHtml;

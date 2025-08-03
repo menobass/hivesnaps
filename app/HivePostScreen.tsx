@@ -50,14 +50,20 @@ interface HivePostData {
 }
 
 const HivePostScreen = () => {
-  const { author, permlink } = useLocalSearchParams<{ author: string; permlink: string }>();
+  const { author, permlink } = useLocalSearchParams<{
+    author: string;
+    permlink: string;
+  }>();
   const isDark = useColorScheme() === 'dark';
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { currentUsername } = useUserAuth();
   const { hivePrice, globalProps, rewardFund } = useHiveData();
 
-  console.log('[HivePostScreen] Component loaded with params:', { author, permlink });
+  console.log('[HivePostScreen] Component loaded with params:', {
+    author,
+    permlink,
+  });
 
   const [post, setPost] = useState<HivePostData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,8 +84,11 @@ const HivePostScreen = () => {
   } = useUpvote(currentUsername, globalProps, rewardFund, hivePrice);
 
   const fetchHivePost = useCallback(async () => {
-    console.log('[HivePostScreen] fetchHivePost called with:', { author, permlink });
-    
+    console.log('[HivePostScreen] fetchHivePost called with:', {
+      author,
+      permlink,
+    });
+
     if (!author || !permlink) {
       console.log('[HivePostScreen] Missing parameters');
       setError('Missing post parameters');
@@ -93,7 +102,10 @@ const HivePostScreen = () => {
 
       console.log('[HivePostScreen] Fetching post data from Hive...');
       // Fetch the post
-      const postData = await client.database.call('get_content', [author, permlink]);
+      const postData = await client.database.call('get_content', [
+        author,
+        permlink,
+      ]);
 
       if (!postData || !postData.author) {
         setError('Post not found');
@@ -104,9 +116,12 @@ const HivePostScreen = () => {
       // Fetch author avatar
       let avatarUrl: string | undefined = undefined;
       try {
-        const accounts = await client.database.call('get_accounts', [[postData.author]]);
+        const accounts = await client.database.call('get_accounts', [
+          [postData.author],
+        ]);
         if (accounts && accounts[0]) {
-          const metadata = accounts[0].posting_json_metadata || accounts[0].json_metadata;
+          const metadata =
+            accounts[0].posting_json_metadata || accounts[0].json_metadata;
           if (metadata) {
             try {
               const profile = JSON.parse(metadata).profile;
@@ -168,7 +183,7 @@ const HivePostScreen = () => {
 
   const handleUpvotePress = useCallback(() => {
     if (!post) return;
-    
+
     openUpvoteModal({
       author: post.author,
       permlink: post.permlink,
@@ -194,9 +209,13 @@ const HivePostScreen = () => {
   if (loading) {
     return (
       <SafeAreaViewSA style={{ flex: 1, backgroundColor: colors.background }}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.button} />
-          <Text style={{ color: colors.text, marginTop: 16 }}>Loading post...</Text>
+        <View
+          style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+        >
+          <ActivityIndicator size='large' color={colors.button} />
+          <Text style={{ color: colors.text, marginTop: 16 }}>
+            Loading post...
+          </Text>
         </View>
       </SafeAreaViewSA>
     );
@@ -205,9 +224,27 @@ const HivePostScreen = () => {
   if (error || !post) {
     return (
       <SafeAreaViewSA style={{ flex: 1, backgroundColor: colors.background }}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <FontAwesome name="exclamation-triangle" size={48} color={colors.icon} />
-          <Text style={{ color: colors.text, fontSize: 18, marginTop: 16, textAlign: 'center' }}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 20,
+          }}
+        >
+          <FontAwesome
+            name='exclamation-triangle'
+            size={48}
+            color={colors.icon}
+          />
+          <Text
+            style={{
+              color: colors.text,
+              fontSize: 18,
+              marginTop: 16,
+              textAlign: 'center',
+            }}
+          >
             {error || 'Post not found'}
           </Text>
           <TouchableOpacity
@@ -220,7 +257,9 @@ const HivePostScreen = () => {
               marginTop: 16,
             }}
           >
-            <Text style={{ color: colors.buttonText, fontWeight: '600' }}>Retry</Text>
+            <Text style={{ color: colors.buttonText, fontWeight: '600' }}>
+              Retry
+            </Text>
           </TouchableOpacity>
         </View>
       </SafeAreaViewSA>
@@ -244,7 +283,7 @@ const HivePostScreen = () => {
         }}
       >
         <TouchableOpacity onPress={() => router.back()}>
-          <FontAwesome name="arrow-left" size={24} color={colors.text} />
+          <FontAwesome name='arrow-left' size={24} color={colors.text} />
         </TouchableOpacity>
         <Text
           style={{
@@ -258,7 +297,7 @@ const HivePostScreen = () => {
           Hive Post
         </Text>
         <TouchableOpacity onPress={handleRefresh}>
-          <FontAwesome name="refresh" size={20} color={colors.icon} />
+          <FontAwesome name='refresh' size={20} color={colors.icon} />
         </TouchableOpacity>
       </View>
 
@@ -274,10 +313,12 @@ const HivePostScreen = () => {
           <ExpoImage
             source={post.avatarUrl ? { uri: post.avatarUrl } : genericAvatar}
             style={{ width: 48, height: 48, borderRadius: 24 }}
-            contentFit="cover"
+            contentFit='cover'
           />
           <View style={{ marginLeft: 12, flex: 1 }}>
-            <Text style={{ color: colors.text, fontSize: 16, fontWeight: '600' }}>
+            <Text
+              style={{ color: colors.text, fontSize: 16, fontWeight: '600' }}
+            >
               {post.author}
             </Text>
             <Text style={{ color: colors.icon, fontSize: 14 }}>
@@ -314,9 +355,24 @@ const HivePostScreen = () => {
               tagsStyles={{
                 a: { color: colors.button },
                 p: { marginBottom: 16 },
-                h1: { color: colors.text, fontSize: 24, fontWeight: 'bold', marginBottom: 16 },
-                h2: { color: colors.text, fontSize: 20, fontWeight: 'bold', marginBottom: 12 },
-                h3: { color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
+                h1: {
+                  color: colors.text,
+                  fontSize: 24,
+                  fontWeight: 'bold',
+                  marginBottom: 16,
+                },
+                h2: {
+                  color: colors.text,
+                  fontSize: 20,
+                  fontWeight: 'bold',
+                  marginBottom: 12,
+                },
+                h3: {
+                  color: colors.text,
+                  fontSize: 18,
+                  fontWeight: 'bold',
+                  marginBottom: 10,
+                },
               }}
             />
           ) : (
@@ -324,9 +380,24 @@ const HivePostScreen = () => {
               style={{
                 body: { color: colors.text, fontSize: 16, lineHeight: 24 },
                 paragraph: { marginBottom: 16 },
-                heading1: { color: colors.text, fontSize: 24, fontWeight: 'bold', marginBottom: 16 },
-                heading2: { color: colors.text, fontSize: 20, fontWeight: 'bold', marginBottom: 12 },
-                heading3: { color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
+                heading1: {
+                  color: colors.text,
+                  fontSize: 24,
+                  fontWeight: 'bold',
+                  marginBottom: 16,
+                },
+                heading2: {
+                  color: colors.text,
+                  fontSize: 20,
+                  fontWeight: 'bold',
+                  marginBottom: 12,
+                },
+                heading3: {
+                  color: colors.text,
+                  fontSize: 18,
+                  fontWeight: 'bold',
+                  marginBottom: 10,
+                },
                 link: { color: colors.button },
               }}
             >
@@ -337,7 +408,9 @@ const HivePostScreen = () => {
 
         {/* Tags */}
         {post.tags && post.tags.length > 0 && (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 20 }}>
+          <View
+            style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 20 }}
+          >
             {post.tags.slice(0, 5).map((tag, index) => (
               <View
                 key={index}
@@ -350,7 +423,9 @@ const HivePostScreen = () => {
                   marginBottom: 4,
                 }}
               >
-                <Text style={{ color: colors.buttonText, fontSize: 12 }}>#{tag}</Text>
+                <Text style={{ color: colors.buttonText, fontSize: 12 }}>
+                  #{tag}
+                </Text>
               </View>
             ))}
           </View>
@@ -370,19 +445,19 @@ const HivePostScreen = () => {
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity
               onPress={handleUpvotePress}
-              disabled={
-                post.active_votes?.some(
-                  (vote: any) => vote.voter === currentUsername && vote.percent > 0
-                )
-              }
+              disabled={post.active_votes?.some(
+                (vote: any) =>
+                  vote.voter === currentUsername && vote.percent > 0
+              )}
               style={{ marginRight: 16 }}
             >
               <FontAwesome
-                name="arrow-up"
+                name='arrow-up'
                 size={20}
                 color={
                   post.active_votes?.some(
-                    (vote: any) => vote.voter === currentUsername && vote.percent > 0
+                    (vote: any) =>
+                      vote.voter === currentUsername && vote.percent > 0
                   )
                     ? '#8e44ad'
                     : colors.icon
@@ -392,12 +467,19 @@ const HivePostScreen = () => {
             <Text style={{ color: colors.text, fontSize: 16, marginRight: 16 }}>
               {post.voteCount}
             </Text>
-            <FontAwesome name="comment-o" size={16} color={colors.icon} style={{ marginRight: 8 }} />
+            <FontAwesome
+              name='comment-o'
+              size={16}
+              color={colors.icon}
+              style={{ marginRight: 8 }}
+            />
             <Text style={{ color: colors.text, fontSize: 16, marginRight: 16 }}>
               {post.replyCount}
             </Text>
           </View>
-          <Text style={{ color: colors.payout, fontSize: 16, fontWeight: '600' }}>
+          <Text
+            style={{ color: colors.payout, fontSize: 16, fontWeight: '600' }}
+          >
             ${post.payout.toFixed(2)}
           </Text>
         </View>
@@ -429,4 +511,4 @@ const HivePostScreen = () => {
 
 export default HivePostScreen;
 
-export const options = { headerShown: false }; 
+export const options = { headerShown: false };

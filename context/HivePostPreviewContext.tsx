@@ -125,14 +125,20 @@ const HivePostPreviewProvider: React.FC<{ children: ReactNode }> = ({
       }
 
       // Create new loading promise with error handling
-      const loadingPromise = fetchMultipleHivePostInfos(validUrls).catch(error => {
-        console.error('[HivePostPreviewContext] Error fetching post previews:', {
-          error,
-          urls: validUrls,
-          errorMessage: error instanceof Error ? error.message : 'Unknown error',
-        });
-        return []; // Return empty array on error
-      });
+      const loadingPromise = fetchMultipleHivePostInfos(validUrls).catch(
+        error => {
+          console.error(
+            '[HivePostPreviewContext] Error fetching post previews:',
+            {
+              error,
+              urls: validUrls,
+              errorMessage:
+                error instanceof Error ? error.message : 'Unknown error',
+            }
+          );
+          return []; // Return empty array on error
+        }
+      );
 
       // Set cache entry with loading promise
       cache.set(cacheKey, {
@@ -153,7 +159,10 @@ const HivePostPreviewProvider: React.FC<{ children: ReactNode }> = ({
 
         return result;
       } catch (error) {
-        console.error('[HivePostPreviewContext] Error in loading promise:', error);
+        console.error(
+          '[HivePostPreviewContext] Error in loading promise:',
+          error
+        );
 
         // Remove loading state on error
         const currentEntry = cache.get(cacheKey);

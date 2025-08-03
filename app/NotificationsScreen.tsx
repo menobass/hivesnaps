@@ -196,7 +196,9 @@ const NotificationsScreen = () => {
 
     // Handle follower notifications - navigate to the follower's profile
     if (notification.type === 'follow' && notification.actionUser) {
-      console.log('[NotificationsScreen] Navigating to ProfileScreen for follow notification');
+      console.log(
+        '[NotificationsScreen] Navigating to ProfileScreen for follow notification'
+      );
       router.push({
         pathname: '/ProfileScreen',
         params: {
@@ -249,9 +251,11 @@ const NotificationsScreen = () => {
 
           const postType = detectPostType(postInfo);
           console.log('[NotificationsScreen] Post type detected:', postType);
-          
+
           if (postType === 'snap') {
-            console.log('[NotificationsScreen] Navigating to ConversationScreen (snap)');
+            console.log(
+              '[NotificationsScreen] Navigating to ConversationScreen (snap)'
+            );
             router.push({
               pathname: '/ConversationScreen',
               params: {
@@ -260,7 +264,9 @@ const NotificationsScreen = () => {
               },
             });
           } else {
-            console.log('[NotificationsScreen] Navigating to HivePostScreen (regular post)');
+            console.log(
+              '[NotificationsScreen] Navigating to HivePostScreen (regular post)'
+            );
             router.push({
               pathname: '/HivePostScreen',
               params: {
@@ -274,12 +280,15 @@ const NotificationsScreen = () => {
           // Show an error instead of navigating to a broken screen
           Alert.alert(
             'Post Not Found',
-            'The post you\'re trying to view could not be found. It may have been deleted or the link may be invalid.',
+            "The post you're trying to view could not be found. It may have been deleted or the link may be invalid.",
             [{ text: 'OK' }]
           );
         }
       } catch (error) {
-        console.error('[NotificationsScreen] Error fetching post data for navigation:', error);
+        console.error(
+          '[NotificationsScreen] Error fetching post data for navigation:',
+          error
+        );
         // Show an error instead of navigating to a broken screen
         Alert.alert(
           'Error Loading Post',
@@ -288,7 +297,9 @@ const NotificationsScreen = () => {
         );
       }
     } else {
-      console.log('[NotificationsScreen] Notification not actionable or missing target content');
+      console.log(
+        '[NotificationsScreen] Notification not actionable or missing target content'
+      );
     }
   };
 
