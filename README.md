@@ -200,4 +200,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **HiveSnaps** - _What's snappening today?_ 🚀
 
-Follow us: [@hivesnaps](https://hive.blog/@hivesnaps) | Join our community on [Discord](https://discord.gg/hivesnaps)
+Follow us: [@hivesnaps](https://hive.blog/@hivesnaps) | Join our community on [Discord](https://discord.gg/CgJP7t7nWy)
