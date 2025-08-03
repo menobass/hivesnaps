@@ -199,16 +199,20 @@ export const useUpvote = (
         console.log('[useUpvote] Update data:', updateData);
 
         // Determine if this is a reply or main snap
-        // Check for parent_author field or permlink pattern that starts with "re-"
+        // Check for parent_author field (but exclude 'peak.snaps' which is a container)
+        // or permlink pattern that starts with "re-"
         const isReply =
           (upvoteTarget.snap.parent_author &&
-            upvoteTarget.snap.parent_author !== '') ||
+            upvoteTarget.snap.parent_author !== '' &&
+            upvoteTarget.snap.parent_author !== 'peak.snaps') ||
           upvoteTarget.permlink.startsWith('re-');
         console.log(
           '[useUpvote] Is reply:',
           isReply,
           'permlink:',
-          upvoteTarget.permlink
+          upvoteTarget.permlink,
+          'parent_author:',
+          upvoteTarget.snap.parent_author
         );
 
         if (isReply && updateReply) {
