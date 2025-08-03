@@ -1,4 +1,17 @@
-import { StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, TextInput, Image, TouchableOpacity, useColorScheme, Dimensions, TouchableWithoutFeedback, Keyboard, ActivityIndicator } from 'react-native';
+import {
+  StyleSheet,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
+  TextInput,
+  Image,
+  TouchableOpacity,
+  useColorScheme,
+  Dimensions,
+  TouchableWithoutFeedback,
+  Keyboard,
+  ActivityIndicator,
+} from 'react-native';
 import { useState, useEffect } from 'react';
 import { Text, View } from '@/components/Themed';
 import { useRouter } from 'expo-router';
@@ -54,17 +67,20 @@ export default function LoginScreen() {
     const checkStoredCredentials = async () => {
       try {
         const storedUsername = await SecureStore.getItemAsync('hive_username');
-        const storedPostingKey = await SecureStore.getItemAsync('hive_posting_key');
-        
+        const storedPostingKey =
+          await SecureStore.getItemAsync('hive_posting_key');
+
         if (storedUsername && storedPostingKey) {
           // Validate stored credentials before auto-login
           const privKey = PrivateKey.from(storedPostingKey);
           const account = await client.database.getAccounts([storedUsername]);
-          
+
           if (account && account[0]) {
             const pubPosting = privKey.createPublic().toString();
-            const postingAuths = account[0].posting.key_auths.map(([key]) => key);
-            
+            const postingAuths = account[0].posting.key_auths.map(
+              ([key]) => key
+            );
+
             if (postingAuths.includes(pubPosting)) {
               // Valid credentials found, auto-navigate to feed
               router.push('/FeedScreen');
@@ -95,7 +111,8 @@ export default function LoginScreen() {
       if (!account || !account[0]) throw new Error('Account not found');
       const pubPosting = privKey.createPublic().toString();
       const postingAuths = account[0].posting.key_auths.map(([key]) => key);
-      if (!postingAuths.includes(pubPosting)) throw new Error('Invalid posting key');
+      if (!postingAuths.includes(pubPosting))
+        throw new Error('Invalid posting key');
       // Store key securely
       await SecureStore.setItemAsync('hive_username', username.trim());
       await SecureStore.setItemAsync('hive_posting_key', postingWif);
@@ -112,13 +129,25 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}> 
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: colors.background }]}
+    >
       {autoLoading ? (
         // Show loading screen during auto-login check
         <View style={[styles.flexContainer, styles.loadingContainer]}>
-          <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-          <ActivityIndicator size="large" color={colors.button} style={{ marginTop: 24 }} />
-          <Text style={[styles.loadingText, { color: colors.info }]}>Checking credentials...</Text>
+          <Image
+            source={require('../../assets/images/logo.png')}
+            style={styles.logo}
+            resizeMode='contain'
+          />
+          <ActivityIndicator
+            size='large'
+            color={colors.button}
+            style={{ marginTop: 24 }}
+          />
+          <Text style={[styles.loadingText, { color: colors.info }]}>
+            Checking credentials...
+          </Text>
         </View>
       ) : (
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -130,49 +159,104 @@ export default function LoginScreen() {
             <View style={styles.flexContainer}>
               <View style={styles.innerContainer}>
                 {/* App logo at the top */}
-                <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
+                <Image
+                  source={require('../../assets/images/logo.png')}
+                  style={styles.logo}
+                  resizeMode='contain'
+                />
                 <TextInput
-                  style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text, width: FIELD_WIDTH }]}
-                  placeholder="username do not use @"
-                  placeholderTextColor={colorScheme === 'dark' ? '#8899A6' : '#536471'}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: colors.inputBg,
+                      borderColor: colors.inputBorder,
+                      color: colors.text,
+                      width: FIELD_WIDTH,
+                    },
+                  ]}
+                  placeholder='username do not use @'
+                  placeholderTextColor={
+                    colorScheme === 'dark' ? '#8899A6' : '#536471'
+                  }
                   value={username}
                   onChangeText={setUsername}
-                  autoCapitalize="none"
+                  autoCapitalize='none'
                   autoCorrect={false}
                   editable={!loading}
                 />
                 <TextInput
-                  style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text, width: FIELD_WIDTH }]}
-                  placeholder="Posting key only"
-                  placeholderTextColor={colorScheme === 'dark' ? '#8899A6' : '#536471'}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: colors.inputBg,
+                      borderColor: colors.inputBorder,
+                      color: colors.text,
+                      width: FIELD_WIDTH,
+                    },
+                  ]}
+                  placeholder='Posting key only'
+                  placeholderTextColor={
+                    colorScheme === 'dark' ? '#8899A6' : '#536471'
+                  }
                   value={postingKey}
                   onChangeText={setPostingKey}
                   secureTextEntry
-                  autoCapitalize="none"
+                  autoCapitalize='none'
                   autoCorrect={false}
                   editable={!loading}
                 />
-                {error ? <Text style={{ color: 'red', marginBottom: 8 }}>{error}</Text> : null}
-                <TouchableOpacity style={[styles.button, { backgroundColor: colors.button, width: FIELD_WIDTH, opacity: loading ? 0.7 : 1 }]} onPress={handleLogin} disabled={loading}>
-                  {loading ? <ActivityIndicator color={colors.buttonText} /> : <Text style={[styles.buttonText, { color: colors.buttonText }]}>Login</Text>}
+                {error ? (
+                  <Text style={{ color: 'red', marginBottom: 8 }}>{error}</Text>
+                ) : null}
+                <TouchableOpacity
+                  style={[
+                    styles.button,
+                    {
+                      backgroundColor: colors.button,
+                      width: FIELD_WIDTH,
+                      opacity: loading ? 0.7 : 1,
+                    },
+                  ]}
+                  onPress={handleLogin}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color={colors.buttonText} />
+                  ) : (
+                    <Text
+                      style={[styles.buttonText, { color: colors.buttonText }]}
+                    >
+                      Login
+                    </Text>
+                  )}
                 </TouchableOpacity>
-                <Text style={[styles.info, { color: colors.text, width: FIELD_WIDTH }]}>Your keys are locally stored and encrypted. Only your posting key is required</Text>
+                <Text
+                  style={[
+                    styles.info,
+                    { color: colors.text, width: FIELD_WIDTH },
+                  ]}
+                >
+                  Your keys are locally stored and encrypted. Only your posting
+                  key is required
+                </Text>
                 {/* Add space and move the phrase up here */}
                 <View style={{ height: 32 }} />
-                
+
                 {/* Signup link */}
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={handleSignUpPress}
                   style={{ marginBottom: 16 }}
-                  accessibilityRole="button"
-                  accessibilityLabel="Sign up for a Hive account"
+                  accessibilityRole='button'
+                  accessibilityLabel='Sign up for a Hive account'
                 >
                   <Text style={[styles.signupLink, { color: colors.button }]}>
                     Don't have a Hive account?
                   </Text>
                 </TouchableOpacity>
-                
-                <Text style={[styles.footerText, { color: colors.footer }]}>Hivesnaps, made with love by @meno</Text>
+
+                <Text style={[styles.footerText, { color: colors.footer }]}>
+                  Hivesnaps, made with love by @meno
+                </Text>
               </View>
             </View>
           </KeyboardAvoidingView>

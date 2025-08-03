@@ -4,7 +4,15 @@
  */
 
 import React from 'react';
-import { View, Text, Pressable, Image, useColorScheme, Dimensions, Linking } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  Image,
+  useColorScheme,
+  Dimensions,
+  Linking,
+} from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { HivePostInfo } from '../utils/extractHivePostInfo';
@@ -15,9 +23,9 @@ interface HivePostPreviewProps {
   style?: any;
 }
 
-export const HivePostPreview: React.FC<HivePostPreviewProps> = ({ 
-  postInfo, 
-  style 
+export const HivePostPreview: React.FC<HivePostPreviewProps> = ({
+  postInfo,
+  style,
 }) => {
   const colorScheme = useColorScheme() || 'light';
   const isDark = colorScheme === 'dark';
@@ -86,32 +94,43 @@ export const HivePostPreview: React.FC<HivePostPreviewProps> = ({
       ]}
       onPress={handlePress}
       android_ripple={{ color: colors.border }}
-      accessibilityRole="button"
+      accessibilityRole='button'
       accessibilityLabel={`Hive post: ${postInfo.title} by ${postInfo.author}`}
     >
       {/* Header with site indicator */}
-      <View style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 12,
-        paddingTop: 8,
-        paddingBottom: 6,
-      }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 12,
+          paddingTop: 8,
+          paddingBottom: 6,
+        }}
+      >
         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-          <FontAwesome name="external-link" size={12} color={colors.textSecondary} />
-          <Text style={{
-            fontSize: 11,
-            color: colors.textSecondary,
-            marginLeft: 4,
-            fontWeight: '500',
-          }}>
-            {postInfo.originalUrl.includes('ecency.com') ? 'Ecency' :
-             postInfo.originalUrl.includes('peakd.com') ? 'PeakD' : 'Hive.blog'}
+          <FontAwesome
+            name='external-link'
+            size={12}
+            color={colors.textSecondary}
+          />
+          <Text
+            style={{
+              fontSize: 11,
+              color: colors.textSecondary,
+              marginLeft: 4,
+              fontWeight: '500',
+            }}
+          >
+            {postInfo.originalUrl.includes('ecency.com')
+              ? 'Ecency'
+              : postInfo.originalUrl.includes('peakd.com')
+                ? 'PeakD'
+                : 'Hive.blog'}
           </Text>
         </View>
         <Pressable onPress={handleExternalLinkPress} hitSlop={8}>
-          <FontAwesome name="external-link" size={14} color={colors.accent} />
+          <FontAwesome name='external-link' size={14} color={colors.accent} />
         </Pressable>
       </View>
 
@@ -119,18 +138,20 @@ export const HivePostPreview: React.FC<HivePostPreviewProps> = ({
       <View style={{ paddingHorizontal: 12 }}>
         {/* Post image if available */}
         {postInfo.imageUrl && (
-          <View style={{
-            width: '100%',
-            aspectRatio: 2,
-            borderRadius: 8,
-            overflow: 'hidden',
-            marginBottom: 12,
-            backgroundColor: isDark ? '#1A1A1A' : '#F5F5F5',
-          }}>
+          <View
+            style={{
+              width: '100%',
+              aspectRatio: 2,
+              borderRadius: 8,
+              overflow: 'hidden',
+              marginBottom: 12,
+              backgroundColor: isDark ? '#1A1A1A' : '#F5F5F5',
+            }}
+          >
             <Image
               source={{ uri: postInfo.imageUrl }}
               style={{ width: '100%', height: '100%' }}
-              resizeMode="cover"
+              resizeMode='cover'
               onError={() => {
                 // Silently handle image load errors
               }}
@@ -148,7 +169,7 @@ export const HivePostPreview: React.FC<HivePostPreviewProps> = ({
             marginBottom: 6,
           }}
           numberOfLines={2}
-          ellipsizeMode="tail"
+          ellipsizeMode='tail'
         >
           {postInfo.title}
         </Text>
@@ -162,18 +183,20 @@ export const HivePostPreview: React.FC<HivePostPreviewProps> = ({
             marginBottom: 12,
           }}
           numberOfLines={3}
-          ellipsizeMode="tail"
+          ellipsizeMode='tail'
         >
           {postInfo.summary}
         </Text>
 
         {/* Author and metadata row */}
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 12,
-        }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 12,
+          }}
+        >
           {/* Author info */}
           <Pressable
             style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
@@ -195,16 +218,22 @@ export const HivePostPreview: React.FC<HivePostPreviewProps> = ({
                 }}
               />
             ) : (
-              <View style={{
-                width: 24,
-                height: 24,
-                borderRadius: 12,
-                backgroundColor: colors.border,
-                marginRight: 8,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                <FontAwesome name="user" size={10} color={colors.textSecondary} />
+              <View
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 12,
+                  backgroundColor: colors.border,
+                  marginRight: 8,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <FontAwesome
+                  name='user'
+                  size={10}
+                  color={colors.textSecondary}
+                />
               </View>
             )}
             <Text
@@ -231,18 +260,22 @@ export const HivePostPreview: React.FC<HivePostPreviewProps> = ({
 
           {/* Category tag if available */}
           {postInfo.category && (
-            <View style={{
-              backgroundColor: isDark ? '#2A3B47' : '#E8F5FE',
-              paddingHorizontal: 8,
-              paddingVertical: 3,
-              borderRadius: 12,
-              marginLeft: 8,
-            }}>
-              <Text style={{
-                fontSize: 11,
-                color: colors.accent,
-                fontWeight: '500',
-              }}>
+            <View
+              style={{
+                backgroundColor: isDark ? '#2A3B47' : '#E8F5FE',
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderRadius: 12,
+                marginLeft: 8,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: colors.accent,
+                  fontWeight: '500',
+                }}
+              >
                 {postInfo.category}
               </Text>
             </View>
@@ -250,47 +283,67 @@ export const HivePostPreview: React.FC<HivePostPreviewProps> = ({
         </View>
 
         {/* Stats row */}
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingBottom: 12,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
-          paddingTop: 8,
-        }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingBottom: 12,
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+            paddingTop: 8,
+          }}
+        >
           {/* Left side stats */}
           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16 }}>
-              <FontAwesome name="arrow-up" size={14} color={colors.icon} />
-              <Text style={{
-                fontSize: 12,
-                color: colors.textSecondary,
-                marginLeft: 4,
-                fontWeight: '500',
-              }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginRight: 16,
+              }}
+            >
+              <FontAwesome name='arrow-up' size={14} color={colors.icon} />
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: colors.textSecondary,
+                  marginLeft: 4,
+                  fontWeight: '500',
+                }}
+              >
                 {postInfo.voteCount}
               </Text>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16 }}>
-              <FontAwesome name="comment-o" size={14} color={colors.icon} />
-              <Text style={{
-                fontSize: 12,
-                color: colors.textSecondary,
-                marginLeft: 4,
-                fontWeight: '500',
-              }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginRight: 16,
+              }}
+            >
+              <FontAwesome name='comment-o' size={14} color={colors.icon} />
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: colors.textSecondary,
+                  marginLeft: 4,
+                  fontWeight: '500',
+                }}
+              >
                 {postInfo.replyCount}
               </Text>
             </View>
           </View>
 
           {/* Payout */}
-          <Text style={{
-            fontSize: 12,
-            color: colors.payout,
-            fontWeight: '600',
-          }}>
+          <Text
+            style={{
+              fontSize: 12,
+              color: colors.payout,
+              fontWeight: '600',
+            }}
+          >
             ${postInfo.payout.toFixed(2)}
           </Text>
         </View>

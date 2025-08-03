@@ -1,6 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { useHiveNotifications, sendTestNotification, clearAllNotifications } from '../lib/useHiveNotifications';
+import {
+  useHiveNotifications,
+  sendTestNotification,
+  clearAllNotifications,
+} from '../lib/useHiveNotifications';
 
 interface NotificationContextType {
   isEnabled: boolean;
@@ -10,12 +14,16 @@ interface NotificationContextType {
   clearAllNotifications: () => Promise<void>;
 }
 
-const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+const NotificationContext = createContext<NotificationContextType | undefined>(
+  undefined
+);
 
 export function useNotifications() {
   const context = useContext(NotificationContext);
   if (context === undefined) {
-    throw new Error('useNotifications must be used within a NotificationProvider');
+    throw new Error(
+      'useNotifications must be used within a NotificationProvider'
+    );
   }
   return context;
 }
@@ -46,12 +54,18 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   // Initialize notifications for the current user
   useHiveNotifications({
     username: currentUsername || undefined,
-    onNotificationReceived: (notification) => {
-      console.log('🔔 App received notification:', notification.request.content.title);
+    onNotificationReceived: notification => {
+      console.log(
+        '🔔 App received notification:',
+        notification.request.content.title
+      );
     },
-    onNotificationTapped: (response) => {
-      console.log('🔔 User tapped notification:', response.notification.request.content.title);
-    }
+    onNotificationTapped: response => {
+      console.log(
+        '🔔 User tapped notification:',
+        response.notification.request.content.title
+      );
+    },
   });
 
   const contextValue: NotificationContextType = {

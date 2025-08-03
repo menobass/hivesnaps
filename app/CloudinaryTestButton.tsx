@@ -23,7 +23,7 @@ const CloudinaryTestButton = () => {
   };
   return (
     <View style={{ margin: 20 }}>
-      <Button title="Test Cloudinary Upload" onPress={handleTestUpload} />
+      <Button title='Test Cloudinary Upload' onPress={handleTestUpload} />
     </View>
   );
 };

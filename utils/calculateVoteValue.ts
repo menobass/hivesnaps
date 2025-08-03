@@ -17,8 +17,9 @@ export function calculateVoteValue(
   rewardFund: any,
   voteWeight: number,
   hivePrice?: number // optional, defaults to 1
-): { hbd: string, usd: string } {
-  if (!account || !globalProps || !rewardFund || !voteWeight) return { hbd: '0.000', usd: '0.00' };
+): { hbd: string; usd: string } {
+  if (!account || !globalProps || !rewardFund || !voteWeight)
+    return { hbd: '0.000', usd: '0.00' };
 
   // Debug logs for input
   console.log('[VoteCalcDebug] account:', account);
@@ -27,14 +28,25 @@ export function calculateVoteValue(
   console.log('[VoteCalcDebug] voteWeight:', voteWeight);
 
   // Parse vesting shares (VESTS)
-  const vestingShares = parseFloat((account.vesting_shares || '0').replace(' VESTS', ''));
-  const receivedVestingShares = parseFloat((account.received_vesting_shares || '0').replace(' VESTS', ''));
-  const delegatedVestingShares = parseFloat((account.delegated_vesting_shares || '0').replace(' VESTS', ''));
-  const effectiveVests = vestingShares + receivedVestingShares - delegatedVestingShares;
+  const vestingShares = parseFloat(
+    (account.vesting_shares || '0').replace(' VESTS', '')
+  );
+  const receivedVestingShares = parseFloat(
+    (account.received_vesting_shares || '0').replace(' VESTS', '')
+  );
+  const delegatedVestingShares = parseFloat(
+    (account.delegated_vesting_shares || '0').replace(' VESTS', '')
+  );
+  const effectiveVests =
+    vestingShares + receivedVestingShares - delegatedVestingShares;
 
   // Get global blockchain parameters
-  const totalVestingShares = parseFloat(globalProps.total_vesting_shares.replace(' VESTS', ''));
-  const totalVestingFundHive = parseFloat(globalProps.total_vesting_fund_hive.replace(' HIVE', ''));
+  const totalVestingShares = parseFloat(
+    globalProps.total_vesting_shares.replace(' VESTS', '')
+  );
+  const totalVestingFundHive = parseFloat(
+    globalProps.total_vesting_fund_hive.replace(' HIVE', '')
+  );
 
   // Convert HP to VESTS (if you want to use HP as input, otherwise use effectiveVests directly)
   // const hp = effectiveVests * (totalVestingFundHive / totalVestingShares);
@@ -59,7 +71,9 @@ export function calculateVoteValue(
 
   // Reward fund
   const recentClaims = parseFloat(rewardFund.recent_claims);
-  const rewardBalance = parseFloat((rewardFund.reward_balance || '0').replace(' HIVE', ''));
+  const rewardBalance = parseFloat(
+    (rewardFund.reward_balance || '0').replace(' HIVE', '')
+  );
 
   // Get Hive price (default 1 if not provided)
   const price = typeof hivePrice === 'number' && hivePrice > 0 ? hivePrice : 1;
@@ -84,6 +98,6 @@ export function calculateVoteValue(
 
   return {
     hbd: voteValueHBD.toFixed(3),
-    usd: voteValueUSD.toFixed(2)
+    usd: voteValueUSD.toFixed(2),
   };
 }

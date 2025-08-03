@@ -15,17 +15,14 @@ The original `ConversationScreen.tsx` was a massive **2,843-line monolithic comp
 We refactored the component using **custom React hooks** to separate concerns:
 
 ### 1. **useConversationData** - Data Fetching & Management
+
 ```typescript
-const {
-  snap,
-  replies,
-  loading,
-  error,
-  refreshConversation
-} = useConversationData(author, permlink, currentUsername);
+const { snap, replies, loading, error, refreshConversation } =
+  useConversationData(author, permlink, currentUsername);
 ```
 
 **Responsibilities:**
+
 - Fetch snap and replies data from Hive blockchain
 - Manage loading and error states
 - Handle avatar caching and enhancement
@@ -33,6 +30,7 @@ const {
 - Data refresh functionality
 
 ### 2. **useReply** - Reply Functionality
+
 ```typescript
 const {
   replyModalVisible,
@@ -43,17 +41,19 @@ const {
   openReplyModal,
   submitReply,
   addImage,
-  addGif
+  addGif,
 } = useReply(currentUsername);
 ```
 
 **Responsibilities:**
+
 - Reply modal state management
 - Image and GIF upload handling
 - Reply submission to blockchain
 - Error handling for replies
 
 ### 3. **useEdit** - Edit Functionality
+
 ```typescript
 const {
   editModalVisible,
@@ -64,17 +64,19 @@ const {
   openEditModal,
   submitEdit,
   addImage,
-  addGif
+  addGif,
 } = useEdit(currentUsername);
 ```
 
 **Responsibilities:**
+
 - Edit modal state management
 - Content editing for snaps and replies
 - Image and GIF handling for edits
 - Edit submission to blockchain
 
 ### 4. **useGifPicker** - GIF Selection
+
 ```typescript
 const {
   gifModalVisible,
@@ -83,17 +85,19 @@ const {
   gifLoading,
   openGifPicker,
   searchGifs,
-  selectGif
+  selectGif,
 } = useGifPicker();
 ```
 
 **Responsibilities:**
+
 - GIF picker modal state
 - Tenor API integration
 - GIF search and selection
 - Modal management
 
 ### 5. **Reused Hooks**
+
 - **useUserAuth** - User authentication state
 - **useUpvote** - Voting functionality
 - **useHiveData** - Hive blockchain data
@@ -101,31 +105,37 @@ const {
 ## Benefits
 
 ### ✅ **Separation of Concerns**
+
 - **UI Component**: Only handles rendering and user interactions
 - **Custom Hooks**: Handle business logic and state management
 - **Clear boundaries** between presentation and logic
 
 ### ✅ **Reusability**
+
 - Hooks can be used in other components
 - Logic is not tied to specific UI implementation
 - Easy to share functionality across screens
 
 ### ✅ **Testability**
+
 - Each hook can be tested independently
 - Business logic is isolated from UI
 - Easier to mock dependencies
 
 ### ✅ **Maintainability**
+
 - **Smaller, focused components** (from 2,843 to ~800 lines)
 - **Clear responsibility boundaries**
 - **Easier to locate and fix issues**
 
 ### ✅ **Performance**
+
 - **Optimized re-renders** - Only relevant state changes trigger updates
 - **Better caching** - Data fetching logic is optimized
 - **Reduced bundle size** - No duplicate logic
 
 ### ✅ **Developer Experience**
+
 - **Easier to understand** - Each hook has a single responsibility
 - **Better debugging** - State is co-located with logic
 - **Faster development** - Reusable patterns
@@ -133,6 +143,7 @@ const {
 ## Code Comparison
 
 ### Before (Monolithic)
+
 ```typescript
 // 2,843 lines of mixed concerns
 const ConversationScreen = () => {
@@ -164,6 +175,7 @@ const ConversationScreen = () => {
 ```
 
 ### After (Hooks-based)
+
 ```typescript
 // ~800 lines focused on UI
 const ConversationScreenRefactored = () => {
@@ -218,21 +230,25 @@ app/
 ## Future Improvements
 
 ### 🚀 **Additional Hooks**
+
 - **useImageUpload** - Centralized image upload logic
 - **useMarkdownProcessing** - Text processing utilities
 - **useNavigation** - Navigation logic abstraction
 
 ### 🚀 **Performance Optimizations**
+
 - **Memoization** of expensive computations
 - **Virtual scrolling** for large reply trees
 - **Image lazy loading** and caching
 
 ### 🚀 **Testing**
+
 - **Unit tests** for each custom hook
 - **Integration tests** for hook combinations
 - **E2E tests** for complete user flows
 
 ### 🚀 **State Management**
+
 - **Context providers** for shared state if needed
 - **Optimistic updates** for better UX
 - **Offline support** with local caching
@@ -247,4 +263,4 @@ The refactoring successfully **separated business logic from UI concerns**, maki
 - **More performant** - Optimized re-renders and data fetching
 - **Easier to understand** - Each piece has a single responsibility
 
-This pattern can be applied to other large components in the app, creating a consistent and scalable architecture. 
+This pattern can be applied to other large components in the app, creating a consistent and scalable architecture.

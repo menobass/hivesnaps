@@ -306,7 +306,7 @@ export const createFeedScreenStyles = (colors: any, isDark: boolean) => {
       fontWeight: 'bold',
       color: '#FFFFFF',
     },
-    
+
     // Search styles
     searchBtn: {
       padding: 10, // Increased padding for better touch target

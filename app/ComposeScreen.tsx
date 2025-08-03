@@ -45,7 +45,8 @@ export default function ComposeScreen() {
   const params = useLocalSearchParams();
 
   // Share extension integration
-  const { sharedContent, hasSharedContent, clearSharedContent } = useSharedContent();
+  const { sharedContent, hasSharedContent, clearSharedContent } =
+    useSharedContent();
   const shareContext = useShare();
   const notifications = useNotifications();
 
@@ -56,16 +57,16 @@ export default function ComposeScreen() {
   const [posting, setPosting] = useState(false);
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  
+
   // Text selection state for markdown formatting
   const [selectionStart, setSelectionStart] = useState(0);
   const [selectionEnd, setSelectionEnd] = useState(0);
   const textInputRef = useRef<TextInput>(null);
-  
+
   // Spoiler modal state
   const [spoilerModalVisible, setSpoilerModalVisible] = useState(false);
   const [spoilerButtonText, setSpoilerButtonText] = useState('');
-  
+
   // GIF picker state
   const [gifs, setGifs] = useState<string[]>([]);
   const [gifModalVisible, setGifModalVisible] = useState(false);
@@ -90,11 +91,13 @@ export default function ComposeScreen() {
       try {
         const storedUsername = await SecureStore.getItemAsync('hive_username');
         setCurrentUsername(storedUsername);
-        
+
         // Fetch user avatar
         if (storedUsername) {
           try {
-            const accounts = await client.database.call('get_accounts', [[storedUsername]]);
+            const accounts = await client.database.call('get_accounts', [
+              [storedUsername],
+            ]);
             if (accounts && accounts[0]) {
               let meta = accounts[0].posting_json_metadata;
               if (!meta || meta === '{}') {
@@ -130,22 +133,30 @@ export default function ComposeScreen() {
       switch (sharedContent.type) {
         case 'text':
           if (typeof sharedContent.data === 'string') {
-            setText(prev => prev ? `${prev}\n\n${sharedContent.data}` : sharedContent.data as string);
+            setText(prev =>
+              prev
+                ? `${prev}\n\n${sharedContent.data}`
+                : (sharedContent.data as string)
+            );
           }
           break;
-        
+
         case 'url':
           if (typeof sharedContent.data === 'string') {
-            setText(prev => prev ? `${prev}\n\n${sharedContent.data}` : sharedContent.data as string);
+            setText(prev =>
+              prev
+                ? `${prev}\n\n${sharedContent.data}`
+                : (sharedContent.data as string)
+            );
           }
           break;
-        
+
         case 'image':
           if (typeof sharedContent.data === 'string') {
             setImages(prev => [...prev, sharedContent.data as string]);
           }
           break;
-        
+
         case 'images':
           // For multiple images, add all of them
           if (Array.isArray(sharedContent.data)) {
@@ -162,50 +173,62 @@ export default function ComposeScreen() {
   const handleAddImage = async () => {
     try {
       let pickType: 'camera' | 'gallery' | 'cancel';
-      
+
       if (Platform.OS === 'ios') {
-        pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(resolve => {
-          import('react-native').then(({ ActionSheetIOS }) => {
-            ActionSheetIOS.showActionSheetWithOptions(
-              {
-                options: ['Cancel', 'Take Photo', 'Choose from Gallery'],
-                cancelButtonIndex: 0,
-              },
-              buttonIndex => {
-                if (buttonIndex === 0) resolve('cancel');
-                else if (buttonIndex === 1) resolve('camera');
-                else if (buttonIndex === 2) resolve('gallery');
-              }
-            );
-          });
-        });
+        pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(
+          resolve => {
+            import('react-native').then(({ ActionSheetIOS }) => {
+              ActionSheetIOS.showActionSheetWithOptions(
+                {
+                  options: ['Cancel', 'Take Photo', 'Choose from Gallery'],
+                  cancelButtonIndex: 0,
+                },
+                buttonIndex => {
+                  if (buttonIndex === 0) resolve('cancel');
+                  else if (buttonIndex === 1) resolve('camera');
+                  else if (buttonIndex === 2) resolve('gallery');
+                }
+              );
+            });
+          }
+        );
       } else {
-        pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(resolve => {
-          Alert.alert(
-            'Add Images',
-            'Choose an option',
-            [
-              { text: 'Take Photo', onPress: () => resolve('camera') },
-              { text: 'Choose from Gallery', onPress: () => resolve('gallery') },
-              { text: 'Cancel', style: 'cancel', onPress: () => resolve('cancel') },
-            ],
-            { cancelable: true }
-          );
-        });
+        pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(
+          resolve => {
+            Alert.alert(
+              'Add Images',
+              'Choose an option',
+              [
+                { text: 'Take Photo', onPress: () => resolve('camera') },
+                {
+                  text: 'Choose from Gallery',
+                  onPress: () => resolve('gallery'),
+                },
+                {
+                  text: 'Cancel',
+                  style: 'cancel',
+                  onPress: () => resolve('cancel'),
+                },
+              ],
+              { cancelable: true }
+            );
+          }
+        );
       }
-      
+
       if (pickType === 'cancel') return;
-      
+
       let result;
       if (pickType === 'camera') {
         const currentPermission = await ImagePicker.getCameraPermissionsAsync();
         let finalStatus = currentPermission.status;
-        
+
         if (finalStatus !== 'granted') {
-          const requestPermission = await ImagePicker.requestCameraPermissionsAsync();
+          const requestPermission =
+            await ImagePicker.requestCameraPermissionsAsync();
           finalStatus = requestPermission.status;
         }
-        
+
         if (finalStatus !== 'granted') {
           Alert.alert(
             'Camera Permission Required',
@@ -214,21 +237,23 @@ export default function ComposeScreen() {
           );
           return;
         }
-        
+
         result = await ImagePicker.launchCameraAsync({
           allowsEditing: true,
           quality: 0.8,
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
         });
       } else {
-        const currentPermission = await ImagePicker.getMediaLibraryPermissionsAsync();
+        const currentPermission =
+          await ImagePicker.getMediaLibraryPermissionsAsync();
         let finalStatus = currentPermission.status;
-        
+
         if (finalStatus !== 'granted') {
-          const requestPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          const requestPermission =
+            await ImagePicker.requestMediaLibraryPermissionsAsync();
           finalStatus = requestPermission.status;
         }
-        
+
         if (finalStatus !== 'granted') {
           Alert.alert(
             'Photo Library Permission Required',
@@ -237,7 +262,7 @@ export default function ComposeScreen() {
           );
           return;
         }
-        
+
         result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
           allowsEditing: false, // Allow multiple selection
@@ -246,9 +271,15 @@ export default function ComposeScreen() {
           selectionLimit: 10, // Limit to 10 images
         });
       }
-      
-      if (!result || result.canceled || !result.assets || result.assets.length === 0) return;
-      
+
+      if (
+        !result ||
+        result.canceled ||
+        !result.assets ||
+        result.assets.length === 0
+      )
+        return;
+
       setUploading(true);
       try {
         const uploadPromises = result.assets.map(async (asset, index) => {
@@ -259,12 +290,15 @@ export default function ComposeScreen() {
           };
           return await uploadImageToCloudinaryFixed(fileToUpload);
         });
-        
+
         const cloudinaryUrls = await Promise.all(uploadPromises);
         setImages(prev => [...prev, ...cloudinaryUrls]);
       } catch (err) {
         console.error('Image upload error:', err);
-        Alert.alert('Upload Failed', 'Failed to upload one or more images. Please try again.');
+        Alert.alert(
+          'Upload Failed',
+          'Failed to upload one or more images. Please try again.'
+        );
       } finally {
         setUploading(false);
       }
@@ -305,13 +339,16 @@ export default function ComposeScreen() {
       console.log('[GIF Search Debug] Importing tenor API...');
       const { searchGifs, getTrendingGifs } = await import('../utils/tenorApi');
       console.log('[GIF Search Debug] Tenor API imported successfully');
-      
-      const response = query.trim() 
-        ? await searchGifs(query, 20) 
+
+      const response = query.trim()
+        ? await searchGifs(query, 20)
         : await getTrendingGifs(20);
-      
+
       console.log('[GIF Search Debug] API response:', response);
-      console.log('[GIF Search Debug] Results count:', response?.results?.length || 0);
+      console.log(
+        '[GIF Search Debug] Results count:',
+        response?.results?.length || 0
+      );
       setGifResults(response.results);
     } catch (error) {
       console.error('[GIF Search Debug] Error searching GIFs:', error);
@@ -332,7 +369,10 @@ export default function ComposeScreen() {
 
   const handleSubmit = async () => {
     if (!text.trim() && images.length === 0 && gifs.length === 0) {
-      Alert.alert('Empty Post', 'Please add some text, images, or GIFs before posting.');
+      Alert.alert(
+        'Empty Post',
+        'Please add some text, images, or GIFs before posting.'
+      );
       return;
     }
 
@@ -367,7 +407,10 @@ export default function ComposeScreen() {
       }
 
       // Get latest @peak.snaps post (container) - Same as FeedScreen
-      const discussions = await client.database.call('get_discussions_by_blog', [{ tag: 'peak.snaps', limit: 1 }]);
+      const discussions = await client.database.call(
+        'get_discussions_by_blog',
+        [{ tag: 'peak.snaps', limit: 1 }]
+      );
       if (!discussions || discussions.length === 0) {
         throw new Error('No container post found.');
       }
@@ -375,32 +418,35 @@ export default function ComposeScreen() {
 
       // Generate permlink - Same format as FeedScreen
       const permlink = `snap-${Date.now()}`;
-      
+
       // Compose metadata - Same format as FeedScreen
       const allMedia = [...images, ...gifs];
-      const json_metadata = JSON.stringify({ 
-        app: 'hivesnaps/1.0', 
+      const json_metadata = JSON.stringify({
+        app: 'hivesnaps/1.0',
         image: allMedia, // Include all images and GIFs in metadata
         shared: hasSharedContent, // Additional flag for shared content
       });
 
       // Post to Hive blockchain as reply to container (same as FeedScreen)
-      await client.broadcast.comment({
-        parent_author: container.author,
-        parent_permlink: container.permlink,
-        author: currentUsername,
-        permlink,
-        title: '',
-        body,
-        json_metadata,
-      }, postingKey);
+      await client.broadcast.comment(
+        {
+          parent_author: container.author,
+          parent_permlink: container.permlink,
+          author: currentUsername,
+          permlink,
+          title: '',
+          body,
+          json_metadata,
+        },
+        postingKey
+      );
 
       // Success - clear form and navigate back to feed
       setText('');
       setImages([]);
       setGifs([]);
       clearSharedContent(); // Clear any shared content
-      
+
       Alert.alert(
         'Posted Successfully!',
         'Your snap has been published to the Hive blockchain.',
@@ -409,11 +455,10 @@ export default function ComposeScreen() {
             text: 'OK',
             onPress: () => {
               router.push('/FeedScreen');
-            }
-          }
+            },
+          },
         ]
       );
-
     } catch (error: any) {
       console.error('Error posting snap:', error);
       Alert.alert(
@@ -441,8 +486,8 @@ export default function ComposeScreen() {
               setImages([]);
               setGifs([]);
               router.back();
-            }
-          }
+            },
+          },
         ]
       );
     } else {
@@ -451,39 +496,44 @@ export default function ComposeScreen() {
   };
 
   // Markdown formatting functions
-  const insertMarkdown = (before: string, after: string, placeholder: string) => {
+  const insertMarkdown = (
+    before: string,
+    after: string,
+    placeholder: string
+  ) => {
     const hasSelection = selectionStart !== selectionEnd;
-    
+
     if (hasSelection) {
       // Wrap selected text
       const beforeText = text.substring(0, selectionStart);
       const selectedText = text.substring(selectionStart, selectionEnd);
       const afterText = text.substring(selectionEnd);
-      
+
       const newText = beforeText + before + selectedText + after + afterText;
       setText(newText);
-      
+
       // Position cursor after the formatted text
-      const newCursorPosition = selectionStart + before.length + selectedText.length + after.length;
+      const newCursorPosition =
+        selectionStart + before.length + selectedText.length + after.length;
       setTimeout(() => {
         textInputRef.current?.setNativeProps({
-          selection: { start: newCursorPosition, end: newCursorPosition }
+          selection: { start: newCursorPosition, end: newCursorPosition },
         });
       }, 10);
     } else {
       // Insert with placeholder and select it
       const beforeText = text.substring(0, selectionStart);
       const afterText = text.substring(selectionStart);
-      
+
       const newText = beforeText + before + placeholder + after + afterText;
       setText(newText);
-      
+
       // Select the placeholder text for easy replacement
       const placeholderStart = selectionStart + before.length;
       const placeholderEnd = placeholderStart + placeholder.length;
       setTimeout(() => {
         textInputRef.current?.setNativeProps({
-          selection: { start: placeholderStart, end: placeholderEnd }
+          selection: { start: placeholderStart, end: placeholderEnd },
         });
       }, 10);
     }
@@ -509,21 +559,21 @@ export default function ComposeScreen() {
   const handleSpoilerConfirm = () => {
     const buttonText = spoilerButtonText.trim() || 'button text';
     const spoilerSyntax = `>! [${buttonText}] spoiler content`;
-    
+
     const beforeText = text.substring(0, selectionStart);
     const afterText = text.substring(selectionStart);
     const newText = beforeText + spoilerSyntax + afterText;
     setText(newText);
-    
+
     // Position cursor after "spoiler content" and select it for easy replacement
     const contentStart = selectionStart + `>! [${buttonText}] `.length;
     const contentEnd = contentStart + 'spoiler content'.length;
     setTimeout(() => {
       textInputRef.current?.setNativeProps({
-        selection: { start: contentStart, end: contentEnd }
+        selection: { start: contentStart, end: contentEnd },
       });
     }, 10);
-    
+
     setSpoilerModalVisible(false);
     setSpoilerButtonText('');
   };
@@ -535,32 +585,53 @@ export default function ComposeScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <KeyboardAvoidingView 
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
+      <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         {/* Header */}
-        <View style={[styles.header, { borderBottomColor: colors.inputBorder }]}>
+        <View
+          style={[styles.header, { borderBottomColor: colors.inputBorder }]}
+        >
           <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
-            <Text style={[styles.headerButtonText, { color: colors.text }]}>Cancel</Text>
+            <Text style={[styles.headerButtonText, { color: colors.text }]}>
+              Cancel
+            </Text>
           </TouchableOpacity>
-          
-          <Text style={[styles.headerTitle, { color: colors.text }]}>New Snap</Text>
-          
-          <TouchableOpacity 
+
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            New Snap
+          </Text>
+
+          <TouchableOpacity
             onPress={handleSubmit}
-            disabled={posting || (!text.trim() && images.length === 0 && gifs.length === 0)}
+            disabled={
+              posting ||
+              (!text.trim() && images.length === 0 && gifs.length === 0)
+            }
             style={[
               styles.headerButton,
               styles.postButton,
-              { backgroundColor: posting || (!text.trim() && images.length === 0 && gifs.length === 0) ? colors.buttonInactive : colors.button }
+              {
+                backgroundColor:
+                  posting ||
+                  (!text.trim() && images.length === 0 && gifs.length === 0)
+                    ? colors.buttonInactive
+                    : colors.button,
+              },
             ]}
           >
             {posting ? (
-              <ActivityIndicator size="small" color={colors.buttonText} />
+              <ActivityIndicator size='small' color={colors.buttonText} />
             ) : (
-              <Text style={[styles.headerButtonText, { color: colors.buttonText }]}>Post</Text>
+              <Text
+                style={[styles.headerButtonText, { color: colors.buttonText }]}
+              >
+                Post
+              </Text>
             )}
           </TouchableOpacity>
         </View>
@@ -569,14 +640,16 @@ export default function ComposeScreen() {
           {/* User info */}
           <View style={styles.userRow}>
             {avatarUrl ? (
-              <Image 
-                source={{ uri: avatarUrl }} 
-                style={styles.avatar} 
+              <Image
+                source={{ uri: avatarUrl }}
+                style={styles.avatar}
                 onError={() => setAvatarUrl(null)}
               />
             ) : (
-              <View style={[styles.avatar, { backgroundColor: colors.inputBg }]}>
-                <FontAwesome name="user" size={20} color={colors.info} />
+              <View
+                style={[styles.avatar, { backgroundColor: colors.inputBg }]}
+              >
+                <FontAwesome name='user' size={20} color={colors.info} />
               </View>
             )}
             <Text style={[styles.username, { color: colors.text }]}>
@@ -587,71 +660,130 @@ export default function ComposeScreen() {
           {/* Test Share Function (Development Only) */}
           {__DEV__ && (
             <View style={styles.devSection}>
-              <Text style={[styles.sectionTitle, { color: colors.info }]}>🧪 Test Share Functionality</Text>
+              <Text style={[styles.sectionTitle, { color: colors.info }]}>
+                🧪 Test Share Functionality
+              </Text>
               <View style={styles.buttonRow}>
                 <TouchableOpacity
-                  style={[styles.testButton, { backgroundColor: colors.inputBg }]}
-                  onPress={() => shareContext.simulateSharedContent?.({ 
-                    type: 'text', 
-                    data: 'This is a test shared text! 🚀' 
-                  })}
+                  style={[
+                    styles.testButton,
+                    { backgroundColor: colors.inputBg },
+                  ]}
+                  onPress={() =>
+                    shareContext.simulateSharedContent?.({
+                      type: 'text',
+                      data: 'This is a test shared text! 🚀',
+                    })
+                  }
                 >
-                  <Text style={[styles.testButtonText, { color: colors.button }]}>Share Text</Text>
+                  <Text
+                    style={[styles.testButtonText, { color: colors.button }]}
+                  >
+                    Share Text
+                  </Text>
                 </TouchableOpacity>
-                
+
                 <TouchableOpacity
-                  style={[styles.testButton, { backgroundColor: colors.inputBg }]}
-                  onPress={() => shareContext.simulateSharedContent?.({ 
-                    type: 'url', 
-                    data: 'https://hive.blog' 
-                  })}
+                  style={[
+                    styles.testButton,
+                    { backgroundColor: colors.inputBg },
+                  ]}
+                  onPress={() =>
+                    shareContext.simulateSharedContent?.({
+                      type: 'url',
+                      data: 'https://hive.blog',
+                    })
+                  }
                 >
-                  <Text style={[styles.testButtonText, { color: colors.button }]}>Share URL</Text>
+                  <Text
+                    style={[styles.testButtonText, { color: colors.button }]}
+                  >
+                    Share URL
+                  </Text>
                 </TouchableOpacity>
               </View>
-              
+
               <View style={styles.buttonRow}>
                 <TouchableOpacity
-                  style={[styles.testButton, { backgroundColor: colors.inputBg }]}
-                  onPress={() => shareContext.simulateSharedContent?.({ 
-                    type: 'image', 
-                    data: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=500' 
-                  })}
+                  style={[
+                    styles.testButton,
+                    { backgroundColor: colors.inputBg },
+                  ]}
+                  onPress={() =>
+                    shareContext.simulateSharedContent?.({
+                      type: 'image',
+                      data: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=500',
+                    })
+                  }
                 >
-                  <Text style={[styles.testButtonText, { color: colors.button }]}>Share Image</Text>
+                  <Text
+                    style={[styles.testButtonText, { color: colors.button }]}
+                  >
+                    Share Image
+                  </Text>
                 </TouchableOpacity>
-                
+
                 <TouchableOpacity
-                  style={[styles.testButton, { backgroundColor: colors.inputBg }]}
-                  onPress={() => shareContext.simulateSharedContent?.({ 
-                    type: 'images', 
-                    data: [
-                      'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=500',
-                      'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=500'
-                    ]
-                  })}
+                  style={[
+                    styles.testButton,
+                    { backgroundColor: colors.inputBg },
+                  ]}
+                  onPress={() =>
+                    shareContext.simulateSharedContent?.({
+                      type: 'images',
+                      data: [
+                        'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=500',
+                        'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=500',
+                      ],
+                    })
+                  }
                 >
-                  <Text style={[styles.testButtonText, { color: colors.button }]}>Share Multiple</Text>
+                  <Text
+                    style={[styles.testButtonText, { color: colors.button }]}
+                  >
+                    Share Multiple
+                  </Text>
                 </TouchableOpacity>
               </View>
-              
-              <Text style={[styles.sectionTitle, { color: colors.info, marginTop: 20 }]}>🔔 Test Notifications</Text>
+
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  { color: colors.info, marginTop: 20 },
+                ]}
+              >
+                🔔 Test Notifications
+              </Text>
               <View style={styles.buttonRow}>
                 <TouchableOpacity
-                  style={[styles.testButton, { backgroundColor: colors.inputBg }]}
+                  style={[
+                    styles.testButton,
+                    { backgroundColor: colors.inputBg },
+                  ]}
                   onPress={notifications.sendTestNotification}
                 >
-                  <Text style={[styles.testButtonText, { color: colors.button }]}>Test Notification</Text>
+                  <Text
+                    style={[styles.testButtonText, { color: colors.button }]}
+                  >
+                    Test Notification
+                  </Text>
                 </TouchableOpacity>
-                
+
                 <TouchableOpacity
-                  style={[styles.testButton, { backgroundColor: colors.inputBg }]}
+                  style={[
+                    styles.testButton,
+                    { backgroundColor: colors.inputBg },
+                  ]}
                   onPress={notifications.clearAllNotifications}
                 >
-                  <Text style={[styles.testButtonText, { color: colors.button }]}>Clear All</Text>
+                  <Text
+                    style={[styles.testButtonText, { color: colors.button }]}
+                  >
+                    Clear All
+                  </Text>
                 </TouchableOpacity>
               </View>
-              
+
               <View style={styles.notificationStatus}>
                 <Text style={[styles.testButtonText, { color: colors.text }]}>
                   🔔 Status: {notifications.isEnabled ? 'Enabled' : 'Disabled'}
@@ -674,7 +806,7 @@ export default function ComposeScreen() {
                 backgroundColor: colors.background,
                 color: colors.text,
                 borderColor: colors.inputBorder,
-              }
+              },
             ]}
             value={text}
             onChangeText={setText}
@@ -682,15 +814,25 @@ export default function ComposeScreen() {
             placeholder="What's happening?"
             placeholderTextColor={colors.info}
             multiline
-            textAlignVertical="top"
+            textAlignVertical='top'
             maxLength={280}
           />
 
           {/* Character count */}
           <View style={styles.charCountRow}>
-            <Text style={[styles.charCount, { 
-              color: text.length > 260 ? '#e74c3c' : text.length > 240 ? '#f39c12' : colors.info 
-            }]}>
+            <Text
+              style={[
+                styles.charCount,
+                {
+                  color:
+                    text.length > 260
+                      ? '#e74c3c'
+                      : text.length > 240
+                        ? '#f39c12'
+                        : colors.info,
+                },
+              ]}
+            >
               {text.length}/280
             </Text>
           </View>
@@ -702,27 +844,38 @@ export default function ComposeScreen() {
                 <Text style={[styles.imagesCount, { color: colors.text }]}>
                   {images.length} image{images.length > 1 ? 's' : ''}
                 </Text>
-                <TouchableOpacity 
-                  style={[styles.clearAllButton, { backgroundColor: colors.buttonInactive }]}
+                <TouchableOpacity
+                  style={[
+                    styles.clearAllButton,
+                    { backgroundColor: colors.buttonInactive },
+                  ]}
                   onPress={handleClearAllImages}
                 >
-                  <Text style={[styles.clearAllText, { color: colors.text }]}>Clear All</Text>
+                  <Text style={[styles.clearAllText, { color: colors.text }]}>
+                    Clear All
+                  </Text>
                 </TouchableOpacity>
               </View>
-              <ScrollView 
-                horizontal 
+              <ScrollView
+                horizontal
                 showsHorizontalScrollIndicator={false}
                 style={styles.imagesScrollView}
                 contentContainerStyle={styles.imagesScrollContent}
               >
                 {images.map((imageUrl, index) => (
-                  <View key={`${imageUrl}-${index}`} style={styles.imageContainer}>
-                    <Image source={{ uri: imageUrl }} style={styles.imagePreview} />
-                    <TouchableOpacity 
+                  <View
+                    key={`${imageUrl}-${index}`}
+                    style={styles.imageContainer}
+                  >
+                    <Image
+                      source={{ uri: imageUrl }}
+                      style={styles.imagePreview}
+                    />
+                    <TouchableOpacity
                       style={styles.removeImageButton}
                       onPress={() => handleRemoveImage(index)}
                     >
-                      <FontAwesome name="times" size={16} color="#fff" />
+                      <FontAwesome name='times' size={16} color='#fff' />
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -734,27 +887,37 @@ export default function ComposeScreen() {
           {gifs.length > 0 && (
             <View style={styles.imagesContainer}>
               <View style={styles.imagesHeader}>
-                <Text style={[styles.imagesCount, { color: colors.text }]}>GIFs ({gifs.length})</Text>
+                <Text style={[styles.imagesCount, { color: colors.text }]}>
+                  GIFs ({gifs.length})
+                </Text>
                 {gifs.length > 1 && (
                   <TouchableOpacity onPress={() => setGifs([])}>
-                    <Text style={[styles.clearAllText, { color: colors.info }]}>Clear All</Text>
+                    <Text style={[styles.clearAllText, { color: colors.info }]}>
+                      Clear All
+                    </Text>
                   </TouchableOpacity>
                 )}
               </View>
-              <ScrollView 
-                horizontal 
+              <ScrollView
+                horizontal
                 showsHorizontalScrollIndicator={false}
                 style={styles.imagesScrollView}
                 contentContainerStyle={styles.imagesScrollContent}
               >
                 {gifs.map((gifUrl, index) => (
-                  <View key={`gif-${gifUrl}-${index}`} style={styles.imageContainer}>
-                    <Image source={{ uri: gifUrl }} style={styles.imagePreview} />
-                    <TouchableOpacity 
+                  <View
+                    key={`gif-${gifUrl}-${index}`}
+                    style={styles.imageContainer}
+                  >
+                    <Image
+                      source={{ uri: gifUrl }}
+                      style={styles.imagePreview}
+                    />
+                    <TouchableOpacity
                       style={styles.removeImageButton}
                       onPress={() => handleRemoveGif(index)}
                     >
-                      <FontAwesome name="times" size={16} color="#fff" />
+                      <FontAwesome name='times' size={16} color='#fff' />
                     </TouchableOpacity>
                     {/* GIF badge */}
                     <View style={styles.gifBadge}>
@@ -771,49 +934,75 @@ export default function ComposeScreen() {
             {/* Markdown formatting toolbar */}
             <View style={styles.markdownToolbar}>
               <TouchableOpacity
-                style={[styles.markdownButton, { backgroundColor: colors.inputBg }]}
+                style={[
+                  styles.markdownButton,
+                  { backgroundColor: colors.inputBg },
+                ]}
                 onPress={handleBold}
               >
-                <FontAwesome name="bold" size={16} color={colors.button} />
+                <FontAwesome name='bold' size={16} color={colors.button} />
               </TouchableOpacity>
-              
+
               <TouchableOpacity
-                style={[styles.markdownButton, { backgroundColor: colors.inputBg }]}
+                style={[
+                  styles.markdownButton,
+                  { backgroundColor: colors.inputBg },
+                ]}
                 onPress={handleItalic}
               >
-                <FontAwesome name="italic" size={16} color={colors.button} />
+                <FontAwesome name='italic' size={16} color={colors.button} />
               </TouchableOpacity>
-              
+
               <TouchableOpacity
-                style={[styles.markdownButton, { backgroundColor: colors.inputBg }]}
+                style={[
+                  styles.markdownButton,
+                  { backgroundColor: colors.inputBg },
+                ]}
                 onPress={handleUnderline}
               >
-                <FontAwesome name="underline" size={16} color={colors.button} />
+                <FontAwesome name='underline' size={16} color={colors.button} />
               </TouchableOpacity>
-              
+
               <TouchableOpacity
-                style={[styles.markdownButton, { backgroundColor: colors.inputBg }]}
+                style={[
+                  styles.markdownButton,
+                  { backgroundColor: colors.inputBg },
+                ]}
                 onPress={handleSpoiler}
               >
-                <FontAwesome name="eye-slash" size={16} color={colors.button} />
+                <FontAwesome name='eye-slash' size={16} color={colors.button} />
               </TouchableOpacity>
             </View>
 
             {/* Image and GIF buttons */}
             <View style={styles.mediaButtons}>
               <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: colors.inputBg }]}
+                style={[
+                  styles.actionButton,
+                  { backgroundColor: colors.inputBg },
+                ]}
                 onPress={handleAddImage}
                 disabled={uploading || images.length >= 10}
               >
                 {uploading ? (
-                  <ActivityIndicator size="small" color={colors.button} />
+                  <ActivityIndicator size='small' color={colors.button} />
                 ) : (
                   <>
-                    <FontAwesome name="image" size={20} color={images.length >= 10 ? colors.info : colors.button} />
+                    <FontAwesome
+                      name='image'
+                      size={20}
+                      color={images.length >= 10 ? colors.info : colors.button}
+                    />
                     {images.length > 0 && (
-                      <View style={[styles.imageBadge, { backgroundColor: colors.button }]}>
-                        <Text style={styles.imageBadgeText}>{images.length}</Text>
+                      <View
+                        style={[
+                          styles.imageBadge,
+                          { backgroundColor: colors.button },
+                        ]}
+                      >
+                        <Text style={styles.imageBadgeText}>
+                          {images.length}
+                        </Text>
                       </View>
                     )}
                   </>
@@ -821,19 +1010,35 @@ export default function ComposeScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: colors.inputBg, marginLeft: 12 }]}
+                style={[
+                  styles.actionButton,
+                  { backgroundColor: colors.inputBg, marginLeft: 12 },
+                ]}
                 onPress={handleOpenGifPicker}
                 disabled={gifs.length >= 5}
               >
-                <Text style={{ fontSize: 18, color: gifs.length >= 5 ? colors.info : colors.button, fontWeight: 'bold' }}>GIF</Text>
+                <Text
+                  style={{
+                    fontSize: 18,
+                    color: gifs.length >= 5 ? colors.info : colors.button,
+                    fontWeight: 'bold',
+                  }}
+                >
+                  GIF
+                </Text>
                 {gifs.length > 0 && (
-                  <View style={[styles.imageBadge, { backgroundColor: colors.button }]}>
+                  <View
+                    style={[
+                      styles.imageBadge,
+                      { backgroundColor: colors.button },
+                    ]}
+                  >
                     <Text style={styles.imageBadgeText}>{gifs.length}</Text>
                   </View>
                 )}
               </TouchableOpacity>
             </View>
-            
+
             {images.length >= 10 && (
               <Text style={[styles.limitText, { color: colors.info }]}>
                 Maximum 10 images
@@ -848,8 +1053,13 @@ export default function ComposeScreen() {
 
           {/* Shared content indicator */}
           {hasSharedContent && (
-            <View style={[styles.sharedIndicator, { backgroundColor: colors.inputBg }]}>
-              <FontAwesome name="share" size={16} color={colors.button} />
+            <View
+              style={[
+                styles.sharedIndicator,
+                { backgroundColor: colors.inputBg },
+              ]}
+            >
+              <FontAwesome name='share' size={16} color={colors.button} />
               <Text style={[styles.sharedText, { color: colors.info }]}>
                 Content shared from another app
               </Text>
@@ -867,37 +1077,45 @@ export default function ComposeScreen() {
         backdropOpacity={0.5}
         avoidKeyboard={true}
       >
-        <View style={{
-          backgroundColor: colors.background,
-          borderBottomLeftRadius: 20,
-          borderBottomRightRadius: 20,
-          height: '85%',
-          paddingTop: 60, // Account for status bar
-          marginTop: Platform.OS === 'ios' ? 44 : 24
-        }}>
+        <View
+          style={{
+            backgroundColor: colors.background,
+            borderBottomLeftRadius: 20,
+            borderBottomRightRadius: 20,
+            height: '85%',
+            paddingTop: 60, // Account for status bar
+            marginTop: Platform.OS === 'ios' ? 44 : 24,
+          }}
+        >
           {/* Modal Header */}
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: 20,
-            paddingBottom: 15,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.inputBorder
-          }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 20,
+              paddingBottom: 15,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.inputBorder,
+            }}
+          >
+            <Text
+              style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}
+            >
               Choose a GIF
             </Text>
             <Pressable onPress={handleCloseGifModal}>
-              <FontAwesome name="close" size={24} color={colors.text} />
+              <FontAwesome name='close' size={24} color={colors.text} />
             </Pressable>
           </View>
 
           {/* Search Bar */}
-          <View style={{
-            paddingHorizontal: 20,
-            paddingVertical: 15
-          }}>
+          <View
+            style={{
+              paddingHorizontal: 20,
+              paddingVertical: 15,
+            }}
+          >
             <TextInput
               style={{
                 backgroundColor: colors.inputBg,
@@ -905,13 +1123,13 @@ export default function ComposeScreen() {
                 paddingHorizontal: 15,
                 paddingVertical: 10,
                 fontSize: 16,
-                color: colors.text
+                color: colors.text,
               }}
-              placeholder="Search for GIFs..."
+              placeholder='Search for GIFs...'
               placeholderTextColor={colors.text + '80'}
               value={gifSearchQuery}
               onChangeText={setGifSearchQuery}
-              returnKeyType="search"
+              returnKeyType='search'
               onSubmitEditing={() => {
                 if (gifSearchQuery.trim()) {
                   handleSearchGifs(gifSearchQuery.trim());
@@ -925,24 +1143,35 @@ export default function ComposeScreen() {
           {/* GIF Results */}
           <View style={{ flex: 1, paddingHorizontal: 10, paddingBottom: 20 }}>
             {gifLoading ? (
-              <View style={{ alignItems: 'center', justifyContent: 'center', height: 200 }}>
-                <ActivityIndicator size="large" color={colors.button} />
-                <Text style={{ color: colors.text, marginTop: 10 }}>Searching GIFs...</Text>
+              <View
+                style={{
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: 200,
+                }}
+              >
+                <ActivityIndicator size='large' color={colors.button} />
+                <Text style={{ color: colors.text, marginTop: 10 }}>
+                  Searching GIFs...
+                </Text>
               </View>
             ) : gifResults.length > 0 ? (
               <FlatList
                 data={gifResults}
-                keyExtractor={(item, index) => `gif-${index}-${item?.id || Math.random()}`}
+                keyExtractor={(item, index) =>
+                  `gif-${index}-${item?.id || Math.random()}`
+                }
                 numColumns={2}
                 showsVerticalScrollIndicator={false}
                 renderItem={({ item }) => {
                   // Get the best GIF URL (preview size for picker)
-                  const gifUrl = item?.media_formats?.gif?.url || 
-                               item?.media_formats?.tinygif?.url || 
-                               item?.media_formats?.nanogif?.url;
-                  
+                  const gifUrl =
+                    item?.media_formats?.gif?.url ||
+                    item?.media_formats?.tinygif?.url ||
+                    item?.media_formats?.nanogif?.url;
+
                   if (!gifUrl) return null;
-                  
+
                   return (
                     <Pressable
                       onPress={() => handleSelectGif(gifUrl)}
@@ -951,7 +1180,7 @@ export default function ComposeScreen() {
                         margin: 5,
                         borderRadius: 8,
                         overflow: 'hidden',
-                        backgroundColor: colors.inputBg
+                        backgroundColor: colors.inputBg,
                       }}
                     >
                       <Image
@@ -959,18 +1188,34 @@ export default function ComposeScreen() {
                         style={{
                           width: '100%',
                           aspectRatio: 1,
-                          borderRadius: 8
+                          borderRadius: 8,
                         }}
-                        resizeMode="cover"
+                        resizeMode='cover'
                       />
                     </Pressable>
                   );
                 }}
               />
             ) : (
-              <View style={{ alignItems: 'center', justifyContent: 'center', height: 200 }}>
-                <FontAwesome name="search" size={48} color={colors.inputBorder} />
-                <Text style={{ color: colors.text, marginTop: 10, textAlign: 'center' }}>
+              <View
+                style={{
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: 200,
+                }}
+              >
+                <FontAwesome
+                  name='search'
+                  size={48}
+                  color={colors.inputBorder}
+                />
+                <Text
+                  style={{
+                    color: colors.text,
+                    marginTop: 10,
+                    textAlign: 'center',
+                  }}
+                >
                   {gifSearchQuery ? 'No GIFs found' : 'Search for GIFs above'}
                 </Text>
               </View>
@@ -983,19 +1228,29 @@ export default function ComposeScreen() {
       <Modal
         visible={spoilerModalVisible}
         transparent
-        animationType="fade"
+        animationType='fade'
         onRequestClose={() => setSpoilerModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.spoilerModal, { backgroundColor: colors.background, borderColor: colors.inputBorder }]}>
+          <View
+            style={[
+              styles.spoilerModal,
+              {
+                backgroundColor: colors.background,
+                borderColor: colors.inputBorder,
+              },
+            ]}
+          >
             <Text style={[styles.spoilerModalTitle, { color: colors.text }]}>
               Add Spoiler
             </Text>
-            
-            <Text style={[styles.spoilerModalDescription, { color: colors.info }]}>
+
+            <Text
+              style={[styles.spoilerModalDescription, { color: colors.info }]}
+            >
               Enter the text that will appear on the spoiler button:
             </Text>
-            
+
             <TextInput
               style={[
                 styles.spoilerInput,
@@ -1003,31 +1258,47 @@ export default function ComposeScreen() {
                   backgroundColor: colors.inputBg,
                   color: colors.text,
                   borderColor: colors.inputBorder,
-                }
+                },
               ]}
               value={spoilerButtonText}
               onChangeText={setSpoilerButtonText}
-              placeholder="button text"
+              placeholder='button text'
               placeholderTextColor={colors.info}
               maxLength={50}
               autoFocus
             />
-            
+
             <View style={styles.spoilerModalButtons}>
               <TouchableOpacity
-                style={[styles.spoilerModalButton, { backgroundColor: colors.inputBg }]}
+                style={[
+                  styles.spoilerModalButton,
+                  { backgroundColor: colors.inputBg },
+                ]}
                 onPress={() => setSpoilerModalVisible(false)}
               >
-                <Text style={[styles.spoilerModalButtonText, { color: colors.text }]}>
+                <Text
+                  style={[
+                    styles.spoilerModalButtonText,
+                    { color: colors.text },
+                  ]}
+                >
                   Cancel
                 </Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
-                style={[styles.spoilerModalButton, { backgroundColor: colors.button }]}
+                style={[
+                  styles.spoilerModalButton,
+                  { backgroundColor: colors.button },
+                ]}
                 onPress={handleSpoilerConfirm}
               >
-                <Text style={[styles.spoilerModalButtonText, { color: colors.buttonText }]}>
+                <Text
+                  style={[
+                    styles.spoilerModalButtonText,
+                    { color: colors.buttonText },
+                  ]}
+                >
                   Add Spoiler
                 </Text>
               </TouchableOpacity>
