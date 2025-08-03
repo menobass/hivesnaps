@@ -1,5 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, useColorScheme, Pressable, Linking } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  useColorScheme,
+  Pressable,
+  Linking,
+} from 'react-native';
 import { WebView } from 'react-native-webview';
 
 interface TwitterEmbedProps {
@@ -12,7 +19,7 @@ const twitterEmbedCache = new Map<string, string>();
 
 const TwitterEmbed: React.FC<TwitterEmbedProps> = ({ embedUrl, isDark }) => {
   const colorScheme = useColorScheme();
-  const themeIsDark = isDark ?? (colorScheme === 'dark');
+  const themeIsDark = isDark ?? colorScheme === 'dark';
   const [isLoaded, setIsLoaded] = useState(false);
   const [isCentered, setIsCentered] = useState(false);
   const webViewRef = useRef<WebView>(null);
@@ -21,7 +28,7 @@ const TwitterEmbed: React.FC<TwitterEmbedProps> = ({ embedUrl, isDark }) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       console.log('TwitterEmbed message received:', data);
-      
+
       switch (data.type) {
         case 'twitter-loaded':
           setIsLoaded(true);
@@ -88,7 +95,7 @@ const TwitterEmbed: React.FC<TwitterEmbedProps> = ({ embedUrl, isDark }) => {
       })();
       true;
     `;
-    
+
     webViewRef.current?.injectJavaScript(safeCenteringScript);
   };
 
@@ -98,7 +105,7 @@ const TwitterEmbed: React.FC<TwitterEmbedProps> = ({ embedUrl, isDark }) => {
     if (tweetIdMatch) {
       const tweetId = tweetIdMatch[1];
       const tweetUrl = `https://twitter.com/i/status/${tweetId}`;
-      
+
       // Try to open in Twitter app first, then browser
       Linking.openURL(tweetUrl).catch(() => {
         // Fallback to browser if Twitter app is not installed
@@ -109,7 +116,7 @@ const TwitterEmbed: React.FC<TwitterEmbedProps> = ({ embedUrl, isDark }) => {
 
   // Check if we have cached HTML
   const cachedHtml = twitterEmbedCache.get(embedUrl);
-  
+
   if (cachedHtml && isCentered) {
     // Use cached HTML to avoid reloading
     return (
@@ -124,16 +131,16 @@ const TwitterEmbed: React.FC<TwitterEmbedProps> = ({ embedUrl, isDark }) => {
           mediaPlaybackRequiresUserAction={true}
           allowsInlineMediaPlayback={true}
           onMessage={handleMessage}
-          onShouldStartLoadWithRequest={(request) => {
+          onShouldStartLoadWithRequest={request => {
             // Block all navigation when using cached HTML
             return false;
           }}
         />
         {/* Twitter type indicator */}
-        <View style={[styles.indicator, { backgroundColor: 'rgba(0,0,0,0.7)' }]}>
-          <Text style={[styles.indicatorText, { color: '#fff' }]}>
-            𝕏
-          </Text>
+        <View
+          style={[styles.indicator, { backgroundColor: 'rgba(0,0,0,0.7)' }]}
+        >
+          <Text style={[styles.indicatorText, { color: '#fff' }]}>𝕏</Text>
         </View>
       </Pressable>
     );
@@ -161,7 +168,7 @@ const TwitterEmbed: React.FC<TwitterEmbedProps> = ({ embedUrl, isDark }) => {
             true;
           `);
         }}
-        onShouldStartLoadWithRequest={(request) => {
+        onShouldStartLoadWithRequest={request => {
           // Allow the initial embed URL to load
           if (request.url === embedUrl) {
             return true;
@@ -172,9 +179,7 @@ const TwitterEmbed: React.FC<TwitterEmbedProps> = ({ embedUrl, isDark }) => {
       />
       {/* Twitter type indicator */}
       <View style={[styles.indicator, { backgroundColor: 'rgba(0,0,0,0.7)' }]}>
-        <Text style={[styles.indicatorText, { color: '#fff' }]}>
-          𝕏
-        </Text>
+        <Text style={[styles.indicatorText, { color: '#fff' }]}>𝕏</Text>
       </View>
     </Pressable>
   );
@@ -183,7 +188,7 @@ const TwitterEmbed: React.FC<TwitterEmbedProps> = ({ embedUrl, isDark }) => {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    aspectRatio: 16/9,
+    aspectRatio: 16 / 9,
     borderRadius: 12,
     overflow: 'hidden',
     position: 'relative',
@@ -206,4 +211,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default TwitterEmbed; 
+export default TwitterEmbed;

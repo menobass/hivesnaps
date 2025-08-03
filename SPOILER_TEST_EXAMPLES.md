@@ -3,11 +3,13 @@
 Here are some examples of the spoiler syntax that you can copy and paste into a snap to test the new spoiler functionality:
 
 ## Basic Spoiler
+
 ```
 >! [Show Answer] The answer is 42
 ```
 
 ## Chess Example
+
 ```
 Check this position out! Can you find checkmate in 3 moves?
 
@@ -15,6 +17,7 @@ Check this position out! Can you find checkmate in 3 moves?
 ```
 
 ## Quiz Example
+
 ```
 What is the capital of France?
 
@@ -22,6 +25,7 @@ What is the capital of France?
 ```
 
 ## Multiple Spoilers
+
 ```
 Here are some geography facts:
 
@@ -33,6 +37,7 @@ The longest river: >! [Show River] The Nile River
 ```
 
 ## Chess Puzzle Example (like the one you mentioned)
+
 ```
 White to move and mate in 3:
 
@@ -42,6 +47,7 @@ White to move and mate in 3:
 ```
 
 ## Test with Regular Text
+
 ```
 This is some regular text before the spoiler.
 

@@ -19,12 +19,18 @@ export const useUpvoteManagement = (
   hivePrice: number
 ) => {
   const [upvoteModalVisible, setUpvoteModalVisible] = useState(false);
-  const [upvoteTarget, setUpvoteTarget] = useState<{ author: string; permlink: string } | null>(null);
+  const [upvoteTarget, setUpvoteTarget] = useState<{
+    author: string;
+    permlink: string;
+  } | null>(null);
   const [voteWeight, setVoteWeight] = useState(100);
   const [voteWeightLoading, setVoteWeightLoading] = useState(false);
   const [upvoteLoading, setUpvoteLoading] = useState(false);
   const [upvoteSuccess, setUpvoteSuccess] = useState(false);
-  const [voteValue, setVoteValue] = useState<{ hbd: string, usd: string } | null>(null);
+  const [voteValue, setVoteValue] = useState<{
+    hbd: string;
+    usd: string;
+  } | null>(null);
 
   // Initialize reward fund and hive price
   useEffect(() => {
@@ -32,9 +38,11 @@ export const useUpvoteManagement = (
       try {
         // Fetch reward fund
         const fund = await client.database.call('get_reward_fund', ['post']);
-        
+
         // Fetch hive price
-        const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=hive&vs_currencies=usd');
+        const response = await fetch(
+          'https://api.coingecko.com/api/v3/simple/price?ids=hive&vs_currencies=usd'
+        );
         const data = await response.json();
         const price = data.hive?.usd || 1;
       } catch (error) {
@@ -45,25 +53,34 @@ export const useUpvoteManagement = (
   }, []);
 
   // Handle upvote for Snap component integration (opens modal)
-  const handleSnapUpvoteFromComponent = async (target: { author: string; permlink: string }) => {
+  const handleSnapUpvoteFromComponent = async (target: {
+    author: string;
+    permlink: string;
+  }) => {
     setUpvoteTarget(target);
     setVoteWeightLoading(true);
-    
+
     try {
       // Load last used vote weight if available
       const val = await AsyncStorage.getItem('hivesnaps_vote_weight');
       const weight = val !== null ? Number(val) : 100;
       setVoteWeight(weight);
-      
+
       // Calculate vote value if possible
       let accountObj = null;
       if (currentUsername) {
         const accounts = await client.database.getAccounts([currentUsername]);
         accountObj = accounts && accounts[0] ? accounts[0] : null;
       }
-      
+
       if (accountObj && globalProps && rewardFund) {
-        const calcValue = calculateVoteValue(accountObj, globalProps, rewardFund, weight, hivePrice);
+        const calcValue = calculateVoteValue(
+          accountObj,
+          globalProps,
+          rewardFund,
+          weight,
+          hivePrice
+        );
         setVoteValue(calcValue);
       } else {
         setVoteValue(null);
@@ -89,14 +106,14 @@ export const useUpvoteManagement = (
   // Confirm upvote
   const confirmUpvote = async () => {
     if (!upvoteTarget || !currentUsername) return;
-    
+
     setUpvoteLoading(true);
     setUpvoteSuccess(false);
-    
+
     try {
       // Haptic feedback for user interaction
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      
+
       // Get posting key from secure storage
       const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
       if (!postingKeyStr) {
@@ -125,17 +142,16 @@ export const useUpvoteManagement = (
 
       // Success haptic feedback
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
+
       setUpvoteLoading(false);
       setUpvoteSuccess(true);
-      
+
       console.log('Successfully upvoted snap:', upvoteTarget.permlink);
-      
+
       // Close modal after showing success
       setTimeout(() => {
         closeUpvoteModal();
       }, 1500);
-      
     } catch (error) {
       setUpvoteLoading(false);
       setUpvoteSuccess(false);
@@ -149,15 +165,21 @@ export const useUpvoteManagement = (
   // Update vote weight and recalculate value
   const updateVoteWeight = async (newWeight: number) => {
     setVoteWeight(newWeight);
-    
+
     // Recalculate vote value with new weight
     if (currentUsername && globalProps && rewardFund) {
       try {
         const accounts = await client.database.getAccounts([currentUsername]);
         const accountObj = accounts && accounts[0] ? accounts[0] : null;
-        
+
         if (accountObj) {
-          const calcValue = calculateVoteValue(accountObj, globalProps, rewardFund, newWeight, hivePrice);
+          const calcValue = calculateVoteValue(
+            accountObj,
+            globalProps,
+            rewardFund,
+            newWeight,
+            hivePrice
+          );
           setVoteValue(calcValue);
         }
       } catch (error) {
@@ -179,4 +201,4 @@ export const useUpvoteManagement = (
     confirmUpvote,
     updateVoteWeight,
   };
-}; 
+};

@@ -18,16 +18,16 @@ export const useRewardsManagement = (
 
   const handleClaimRewards = async () => {
     if (!profile || !currentUsername || !isOwnProfile) return;
-    
+
     const { unclaimedHive = 0, unclaimedHbd = 0, unclaimedVests = 0 } = profile;
-    
+
     // Check if there are any rewards to claim
     if (unclaimedHive === 0 && unclaimedHbd === 0 && unclaimedVests === 0) {
       return;
     }
-    
+
     setClaimLoading(true);
-    
+
     try {
       // Get posting key from secure storage
       const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
@@ -43,22 +43,27 @@ export const useRewardsManagement = (
 
       console.log('Claiming rewards:', {
         rewardHiveBalance,
-        rewardHbdBalance, 
-        rewardVestingBalance
+        rewardHbdBalance,
+        rewardVestingBalance,
       });
 
       // Broadcast the claim_reward_balance operation
-      await client.broadcast.sendOperations([
-        ['claim_reward_balance', {
-          account: currentUsername,
-          reward_hive: rewardHiveBalance,
-          reward_hbd: rewardHbdBalance,
-          reward_vests: rewardVestingBalance,
-        }]
-      ], postingKey);
+      await client.broadcast.sendOperations(
+        [
+          [
+            'claim_reward_balance',
+            {
+              account: currentUsername,
+              reward_hive: rewardHiveBalance,
+              reward_hbd: rewardHbdBalance,
+              reward_vests: rewardVestingBalance,
+            },
+          ],
+        ],
+        postingKey
+      );
 
       console.log('Rewards claimed successfully!');
-      
     } catch (error) {
       console.error('Error claiming rewards:', error);
       throw error;
@@ -71,4 +76,4 @@ export const useRewardsManagement = (
     claimLoading,
     handleClaimRewards,
   };
-}; 
+};

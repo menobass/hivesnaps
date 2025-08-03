@@ -100,7 +100,7 @@ export interface TenorSearchResponse {
 
 // Search GIFs by query term
 export const searchGifs = async (
-  query: string, 
+  query: string,
   limit: number = 20,
   pos?: string // For pagination
 ): Promise<TenorSearchResponse> => {
@@ -122,10 +122,14 @@ export const searchGifs = async (
   }
 
   try {
-    const response = await fetch(`${TENOR_BASE_URL}/search?${params.toString()}`);
-    
+    const response = await fetch(
+      `${TENOR_BASE_URL}/search?${params.toString()}`
+    );
+
     if (!response.ok) {
-      throw new Error(`Tenor API error: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Tenor API error: ${response.status} ${response.statusText}`
+      );
     }
 
     const data: TenorSearchResponse = await response.json();
@@ -137,7 +141,9 @@ export const searchGifs = async (
 };
 
 // Get trending GIFs (for default/empty search)
-export const getTrendingGifs = async (limit: number = 20): Promise<TenorSearchResponse> => {
+export const getTrendingGifs = async (
+  limit: number = 20
+): Promise<TenorSearchResponse> => {
   if (!TENOR_API_KEY) {
     throw new Error('Tenor API key not configured');
   }
@@ -151,10 +157,14 @@ export const getTrendingGifs = async (limit: number = 20): Promise<TenorSearchRe
   });
 
   try {
-    const response = await fetch(`${TENOR_BASE_URL}/featured?${params.toString()}`);
-    
+    const response = await fetch(
+      `${TENOR_BASE_URL}/featured?${params.toString()}`
+    );
+
     if (!response.ok) {
-      throw new Error(`Tenor API error: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Tenor API error: ${response.status} ${response.statusText}`
+      );
     }
 
     const data: TenorSearchResponse = await response.json();
@@ -166,7 +176,9 @@ export const getTrendingGifs = async (limit: number = 20): Promise<TenorSearchRe
 };
 
 // Get featured GIF categories
-export const getGifCategories = async (): Promise<{ tags: { searchterm: string; path: string; image: string; name: string }[] }> => {
+export const getGifCategories = async (): Promise<{
+  tags: { searchterm: string; path: string; image: string; name: string }[];
+}> => {
   if (!TENOR_API_KEY) {
     throw new Error('Tenor API key not configured');
   }
@@ -177,10 +189,14 @@ export const getGifCategories = async (): Promise<{ tags: { searchterm: string; 
   });
 
   try {
-    const response = await fetch(`${TENOR_BASE_URL}/categories?${params.toString()}`);
-    
+    const response = await fetch(
+      `${TENOR_BASE_URL}/categories?${params.toString()}`
+    );
+
     if (!response.ok) {
-      throw new Error(`Tenor API error: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Tenor API error: ${response.status} ${response.statusText}`
+      );
     }
 
     const data = await response.json();
@@ -210,8 +226,10 @@ export const getBestGifUrl = (gif: TenorGif): string => {
 // Utility to get preview image URL for thumbnails
 export const getGifPreviewUrl = (gif: TenorGif): string => {
   // Use the smallest format's preview for grid thumbnails
-  return gif.media_formats.nanogif?.preview || 
-         gif.media_formats.tinygif?.preview || 
-         gif.media_formats.gif?.preview || 
-         '';
+  return (
+    gif.media_formats.nanogif?.preview ||
+    gif.media_formats.tinygif?.preview ||
+    gif.media_formats.gif?.preview ||
+    ''
+  );
 };

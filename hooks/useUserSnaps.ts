@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Client } from '@hiveio/dhive';
+import { useOptimisticUpdates } from './useOptimisticUpdates';
 
 // User snap interface for profile bubbles
 export interface UserSnap {
@@ -266,29 +267,28 @@ export const useUserSnaps = (username: string | undefined) => {
     [hasUserUpvoted]
   );
 
+  const { updateSnapInArray } = useOptimisticUpdates();
+
   // Update a specific snap optimistically (for upvotes, etc.)
   const updateSnap = useCallback(
     (author: string, permlink: string, updates: any) => {
       setUserSnaps(prevSnaps =>
-        prevSnaps.map(snap =>
-          snap.author === author && snap.permlink === permlink
-            ? { ...snap, ...updates }
-            : snap
-        )
+        updateSnapInArray(prevSnaps, author, permlink, updates)
       );
 
       // Also update cache
       const cached = userSnapsCache.get(username || '');
       if (cached) {
-        const updatedSnaps = cached.snaps.map(snap =>
-          snap.author === author && snap.permlink === permlink
-            ? { ...snap, ...updates }
-            : snap
+        const updatedSnaps = updateSnapInArray(
+          cached.snaps,
+          author,
+          permlink,
+          updates
         );
         setCachedUserSnaps(username || '', updatedSnaps);
       }
     },
-    [username]
+    [username, updateSnapInArray]
   );
 
   return {

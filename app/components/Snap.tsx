@@ -446,8 +446,6 @@ const Snap: React.FC<SnapProps> = ({
   const spoilerData = convertSpoilerSyntax(textBody);
   textBody = spoilerData.processedText;
 
-
-
   // Add: linkify URLs first, then mentions, then hashtags (order matters!)
   textBody = linkifyUrls(textBody);
   textBody = linkifyMentions(textBody);
@@ -643,9 +641,9 @@ const Snap: React.FC<SnapProps> = ({
                       marginBottom: 8,
                     }}
                     enableExperimentalMarginCollapsing
-                    tagsStyles={{ 
+                    tagsStyles={{
                       a: { color: colors.icon },
-                      u: { textDecorationLine: 'underline' }
+                      u: { textDecorationLine: 'underline' },
                     }}
                     renderers={{
                       video: (props: any) => {
@@ -688,9 +686,9 @@ const Snap: React.FC<SnapProps> = ({
                   marginBottom: 8,
                 }}
                 enableExperimentalMarginCollapsing
-                tagsStyles={{ 
+                tagsStyles={{
                   a: { color: colors.icon },
-                  u: { textDecorationLine: 'underline' }
+                  u: { textDecorationLine: 'underline' },
                 }}
                 renderers={{
                   video: (props: any) => {

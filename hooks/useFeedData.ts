@@ -3,6 +3,7 @@ import { Client } from '@hiveio/dhive';
 import * as SecureStore from 'expo-secure-store';
 import { calculateVoteValue } from '../utils/calculateVoteValue';
 import { getHivePriceUSD } from '../utils/getHivePrice';
+import { useOptimisticUpdates } from './useOptimisticUpdates';
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -425,15 +426,13 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
     setState(prev => ({ ...prev, error: null }));
   }, []);
 
+  const { updateSnapInArray } = useOptimisticUpdates();
+
   const updateSnap = useCallback(
     (author: string, permlink: string, updates: Partial<Snap>) => {
       setState(prev => ({
         ...prev,
-        snaps: prev.snaps.map(snap =>
-          snap.author === author && snap.permlink === permlink
-            ? { ...snap, ...updates }
-            : snap
-        ),
+        snaps: updateSnapInArray(prev.snaps, author, permlink, updates),
       }));
 
       // Also update the cache
@@ -441,17 +440,18 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
         const updatedCache = { ...prev };
         Object.keys(updatedCache).forEach(filterKey => {
           if (updatedCache[filterKey]) {
-            updatedCache[filterKey] = updatedCache[filterKey].map(snap =>
-              snap.author === author && snap.permlink === permlink
-                ? { ...snap, ...updates }
-                : snap
+            updatedCache[filterKey] = updateSnapInArray(
+              updatedCache[filterKey],
+              author,
+              permlink,
+              updates
             );
           }
         });
         return updatedCache;
       });
     },
-    []
+    [updateSnapInArray]
   );
 
   return {

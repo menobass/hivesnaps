@@ -34,17 +34,17 @@ export interface HivePostInfo {
  */
 export function extractHivePostUrls(text: string): string[] {
   const hivePostUrls: string[] = [];
-  
+
   // Regex patterns for different Hive frontends
   const patterns = [
     // ecency.com patterns
     /(?:https?:\/\/)?(?:www\.)?ecency\.com\/(@[a-z0-9.-]{3,16}\/[a-z0-9-]+)/gi,
     /(?:https?:\/\/)?(?:www\.)?ecency\.com\/(hive-\d+\/@[a-z0-9.-]{3,16}\/[a-z0-9-]+)/gi,
-    
-    // peakd.com patterns  
+
+    // peakd.com patterns
     /(?:https?:\/\/)?(?:www\.)?peakd\.com\/(@[a-z0-9.-]{3,16}\/[a-z0-9-]+)/gi,
     /(?:https?:\/\/)?(?:www\.)?peakd\.com\/(hive-\d+\/@[a-z0-9.-]{3,16}\/[a-z0-9-]+)/gi,
-    
+
     // hive.blog patterns
     /(?:https?:\/\/)?(?:www\.)?hive\.blog\/(@[a-z0-9.-]{3,16}\/[a-z0-9-]+)/gi,
     /(?:https?:\/\/)?(?:www\.)?hive\.blog\/(hive-\d+\/@[a-z0-9.-]{3,16}\/[a-z0-9-]+)/gi,
@@ -53,7 +53,9 @@ export function extractHivePostUrls(text: string): string[] {
   patterns.forEach(pattern => {
     let match;
     while ((match = pattern.exec(text)) !== null) {
-      const fullUrl = match[0].startsWith('http') ? match[0] : `https://${match[0]}`;
+      const fullUrl = match[0].startsWith('http')
+        ? match[0]
+        : `https://${match[0]}`;
       if (!hivePostUrls.includes(fullUrl)) {
         hivePostUrls.push(fullUrl);
       }
@@ -66,29 +68,35 @@ export function extractHivePostUrls(text: string): string[] {
 /**
  * Parse author and permlink from Hive post URL
  */
-export function parseHivePostUrl(url: string): { author: string; permlink: string } | null {
+export function parseHivePostUrl(
+  url: string
+): { author: string; permlink: string } | null {
   try {
     // Remove protocol and www if present
     const cleanUrl = url.replace(/^https?:\/\/(?:www\.)?/, '');
-    
+
     // Extract path part
-    const pathMatch = cleanUrl.match(/^(?:ecency\.com|peakd\.com|hive\.blog)\/(.+)$/);
+    const pathMatch = cleanUrl.match(
+      /^(?:ecency\.com|peakd\.com|hive\.blog)\/(.+)$/
+    );
     if (!pathMatch) return null;
-    
+
     const path = pathMatch[1];
-    
+
     // Handle different URL formats
     let authorPermlinkMatch;
-    
+
     // Format: @author/permlink or hive-123/@author/permlink
-    authorPermlinkMatch = path.match(/^(?:hive-\d+\/)?@([a-z0-9.-]{3,16})\/([a-z0-9-]+)$/);
+    authorPermlinkMatch = path.match(
+      /^(?:hive-\d+\/)?@([a-z0-9.-]{3,16})\/([a-z0-9-]+)$/
+    );
     if (authorPermlinkMatch) {
       return {
         author: authorPermlinkMatch[1],
-        permlink: authorPermlinkMatch[2]
+        permlink: authorPermlinkMatch[2],
       };
     }
-    
+
     return null;
   } catch (error) {
     console.error('Error parsing Hive post URL:', error);
@@ -156,7 +164,7 @@ function generateSummary(body: string, maxLength = 150): string {
   // Truncate at word boundary
   const truncated = summary.substring(0, maxLength);
   const lastSpace = truncated.lastIndexOf(' ');
-  return lastSpace > maxLength * 0.7 
+  return lastSpace > maxLength * 0.7
     ? truncated.substring(0, lastSpace) + '...'
     : truncated + '...';
 }
@@ -208,12 +216,16 @@ async function fetchAuthorAvatar(author: string): Promise<string | undefined> {
 /**
  * Fetch complete Hive post information
  */
-export async function fetchHivePostInfo(author: string, permlink: string, originalUrl: string): Promise<HivePostInfo | null> {
+export async function fetchHivePostInfo(
+  author: string,
+  permlink: string,
+  originalUrl: string
+): Promise<HivePostInfo | null> {
   try {
     // Fetch post content and author avatar in parallel
     const [post, avatarUrl] = await Promise.all([
       client.database.call('get_content', [author, permlink]),
-      fetchAuthorAvatar(author)
+      fetchAuthorAvatar(author),
     ]);
 
     if (!post || !post.author) {
@@ -222,7 +234,11 @@ export async function fetchHivePostInfo(author: string, permlink: string, origin
     }
 
     // Calculate payout
-    const payout = parseFloat(post.pending_payout_value ? post.pending_payout_value.replace(' HBD', '') : '0');
+    const payout = parseFloat(
+      post.pending_payout_value
+        ? post.pending_payout_value.replace(' HBD', '')
+        : '0'
+    );
 
     // Extract tags from metadata
     let tags: string[] = [];
@@ -269,19 +285,22 @@ export async function fetchHivePostInfo(author: string, permlink: string, origin
 /**
  * Batch fetch multiple Hive post infos
  */
-export async function fetchMultipleHivePostInfos(urls: string[]): Promise<HivePostInfo[]> {
+export async function fetchMultipleHivePostInfos(
+  urls: string[]
+): Promise<HivePostInfo[]> {
   const results = await Promise.allSettled(
-    urls.map(async (url) => {
+    urls.map(async url => {
       const parsed = parseHivePostUrl(url);
       if (!parsed) return null;
-      
+
       return await fetchHivePostInfo(parsed.author, parsed.permlink, url);
     })
   );
 
   return results
-    .filter((result): result is PromiseFulfilledResult<HivePostInfo | null> => 
-      result.status === 'fulfilled' && result.value !== null
+    .filter(
+      (result): result is PromiseFulfilledResult<HivePostInfo | null> =>
+        result.status === 'fulfilled' && result.value !== null
     )
     .map(result => result.value!);
 }

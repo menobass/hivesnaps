@@ -3,6 +3,7 @@
 ## Problem Statement
 
 The original `FeedScreen.tsx` was a massive 2,160-line component that mixed business logic with UI rendering, making it:
+
 - **Hard to maintain**: Changes to business logic required touching UI code
 - **Difficult to test**: Business logic was tightly coupled to React components
 - **Not reusable**: Logic couldn't be shared between different screens
@@ -13,23 +14,26 @@ The original `FeedScreen.tsx` was a massive 2,160-line component that mixed busi
 Instead of Redux (which would be overkill), we implemented a **Custom Hooks + React Context** pattern that provides:
 
 ### 1. **useFeedData** - Feed Management
+
 ```typescript
 const {
   snaps,
   loading: feedLoading,
   error: feedError,
   fetchSnaps,
-  refreshSnaps
+  refreshSnaps,
 } = useFeedData(username);
 ```
 
 **Responsibilities:**
+
 - Fetch snaps for different filters (newest, following, trending, my)
 - Handle caching with 5-minute expiration
 - Avatar enhancement and caching
 - Error handling and loading states
 
 ### 2. **useUserAuth** - User Authentication & Profile
+
 ```typescript
 const {
   username,
@@ -38,17 +42,19 @@ const {
   votingPower,
   vpLoading,
   loading: userLoading,
-  logout
+  logout,
 } = useUserAuth();
 ```
 
 **Responsibilities:**
+
 - User authentication state
 - Profile data fetching
 - Voting power management
 - Logout functionality
 
 ### 3. **useUpvote** - Voting Functionality
+
 ```typescript
 const {
   upvoteModalVisible,
@@ -57,17 +63,19 @@ const {
   upvoteLoading,
   openUpvoteModal,
   confirmUpvote,
-  updateSnapsOptimistically
+  updateSnapsOptimistically,
 } = useUpvote(username, globalProps, rewardFund, hivePrice);
 ```
 
 **Responsibilities:**
+
 - Upvote modal state management
 - Vote weight calculation
 - Optimistic UI updates
 - Blockchain transaction handling
 
 ### 4. **useSearch** - Search Functionality
+
 ```typescript
 const {
   query: searchQuery,
@@ -75,26 +83,25 @@ const {
   results: searchResults,
   recentSearches,
   search: handleSearch,
-  saveToRecentSearches
+  saveToRecentSearches,
 } = useSearch();
 ```
 
 **Responsibilities:**
+
 - User and content search
 - Recent searches management
 - Search history persistence
 - Search type switching
 
 ### 5. **useHiveData** - Blockchain Data
+
 ```typescript
-const {
-  hivePrice,
-  globalProps,
-  rewardFund
-} = useHiveData();
+const { hivePrice, globalProps, rewardFund } = useHiveData();
 ```
 
 **Responsibilities:**
+
 - HIVE price fetching
 - Global blockchain properties
 - Reward fund data
@@ -103,26 +110,31 @@ const {
 ## Benefits of This Approach
 
 ### ✅ **Separation of Concerns**
+
 - **UI Components**: Focus only on rendering and user interactions
 - **Custom Hooks**: Handle all business logic, API calls, and state management
 - **Clear Boundaries**: Easy to understand what each part does
 
 ### ✅ **Reusability**
+
 - Hooks can be used across different screens
 - `useFeedData` works for FeedScreen, DiscoveryScreen, ProfileScreen
 - `useSearch` can be used in any screen that needs search
 
 ### ✅ **Testability**
+
 - Business logic can be tested independently of UI
 - Hooks can be unit tested with mock data
 - UI components can be tested with mock hooks
 
 ### ✅ **Maintainability**
+
 - Changes to business logic don't affect UI code
 - New features can be added by creating new hooks
 - Bug fixes are isolated to specific hooks
 
 ### ✅ **Performance**
+
 - Hooks can implement their own caching strategies
 - State updates are optimized per hook
 - Unnecessary re-renders are minimized
@@ -130,6 +142,7 @@ const {
 ## Before vs After
 
 ### Before (Original FeedScreen)
+
 ```typescript
 // 2,160 lines of mixed concerns
 const FeedScreen = () => {
@@ -159,6 +172,7 @@ const FeedScreen = () => {
 ```
 
 ### After (Refactored FeedScreen)
+
 ```typescript
 // 400 lines focused on UI only
 const FeedScreenRefactored = () => {
@@ -184,21 +198,25 @@ const FeedScreenRefactored = () => {
 ## Migration Strategy
 
 ### Phase 1: Create Hooks (✅ Complete)
+
 - Extract business logic into custom hooks
 - Maintain existing functionality
 - Add proper TypeScript interfaces
 
 ### Phase 2: Update FeedScreen (✅ Complete)
+
 - Replace inline logic with hook calls
 - Remove duplicate state management
 - Simplify event handlers
 
 ### Phase 3: Apply to Other Screens
+
 - Use `useFeedData` in DiscoveryScreen and ProfileScreen
 - Use `useSearch` in other search-enabled screens
 - Use `useUserAuth` across the app
 
 ### Phase 4: Add Features
+
 - Implement pagination in `useFeedData`
 - Add offline support
 - Add real-time updates
@@ -216,12 +234,14 @@ For this app, Redux would be overkill because:
 ## Future Considerations
 
 ### When to Consider Redux:
+
 - If state sharing becomes complex across many screens
 - If you need advanced dev tools for debugging
 - If you need middleware for side effects
 - If the team is already familiar with Redux
 
 ### Alternative State Management:
+
 - **Zustand**: Lighter alternative to Redux
 - **Jotai**: Atomic state management
 - **Valtio**: Proxy-based state management
@@ -236,4 +256,4 @@ This refactoring demonstrates that **you don't always need Redux** for clean arc
 - **Simpler debugging**
 - **Better performance**
 
-The FeedScreen is now focused purely on layout and user interactions, while all business logic is cleanly separated into reusable, testable hooks. 
+The FeedScreen is now focused purely on layout and user interactions, while all business logic is cleanly separated into reusable, testable hooks.
