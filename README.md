@@ -10,6 +10,7 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
 ## ✨ Features
 
 ### 🔐 Blockchain Integration
+
 - **Hive Blockchain Authentication** - Secure login with Hive posting keys
 - **Decentralized Content** - All posts stored on-chain via @peak.snaps
 - **Voting & Rewards** - Upvote posts with customizable weight (1-100%)
@@ -17,6 +18,7 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
 - **Voting Power Display** - Track your voting power with helpful tooltips
 
 ### 📱 Social Features
+
 - **Multiple Feed Views** - Following, Newest, Trending, and My Snaps
 - **Rich Text Support** - Markdown rendering with hashtag detection
 - **User Profiles** - View any user's profile with post history
@@ -25,6 +27,7 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
 - **Smart Caching** - 5-minute intelligent feed caching for performance
 
 ### 🎨 Rich Media Support
+
 - **Image Uploads** - Camera capture or gallery selection with Cloudinary hosting
 - **GIF Integration** - Powered by Tenor API with search functionality
 - **Video Embedding** - YouTube, 3Speak, and IPFS video support
@@ -32,6 +35,7 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
 - **Image Galleries** - Full-screen image viewing with zoom
 
 ### 📝 Content Creation
+
 - **Smart Composer** - Rich text editor with live previews
 - **Media Attachments** - Images, GIFs, and video embeds
 - **Edit Functionality** - Edit your posts and replies after publishing
@@ -39,6 +43,7 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
 - **Draft Support** - Auto-save functionality (coming soon)
 
 ### 🔔 User Experience
+
 - **Notifications System** - Track mentions, votes, and replies
 - **Dark/Light Theme** - Automatic theme switching
 - **Pull-to-Refresh** - Intuitive feed updates
@@ -47,6 +52,7 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
 - **Haptic Feedback** - Native mobile interactions
 
 ### 🎯 Discovery Features
+
 - **Hashtag Explorer** - Discover content by topics
 - **User Search** - Find and follow interesting accounts
 - **Trending Algorithm** - Content ranked by blockchain rewards
@@ -55,6 +61,7 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
 ## 🛠 Technical Stack
 
 ### Frontend
+
 - **React Native** (0.79.4) with Expo (53.0.12)
 - **TypeScript** for type safety
 - **Expo Router** for navigation
@@ -62,17 +69,20 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
 - **Expo AV** for video playback
 
 ### Blockchain
+
 - **@hiveio/dhive** for Hive blockchain integration
 - **Expo Secure Store** for private key management
 - **Real-time API** connections to multiple Hive nodes
 
 ### Media & Storage
+
 - **Cloudinary** for image hosting and optimization
 - **Tenor API** for GIF search and integration
 - **Expo Image Picker** for camera/gallery access
 - **AsyncStorage** for local data persistence
 
 ### UI/UX
+
 - **Safe Area Context** for notch/status bar handling
 - **React Native Webview** for embedded content
 - **React Native Markdown** for rich text rendering
@@ -81,18 +91,21 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
 ## 🚀 Getting Started
 
 1. **Clone the repository:**
+
    ```sh
    git clone https://github.com/menobass/hivesnaps.git
    cd hivesnaps
    ```
 
 2. **Install dependencies:**
+
    ```sh
    npm install
    ```
 
 3. **Set up environment variables:**
    Create a `.env` file with your API keys:
+
    ```env
    CLOUDINARY_CLOUD_NAME=your_cloud_name
    CLOUDINARY_API_KEY=your_api_key
@@ -101,6 +114,7 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
    ```
 
 4. **Start the development server:**
+
    ```sh
    npx expo start
    ```
@@ -118,20 +132,23 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
 ## 🔧 Development
 
 ### Testing
+
 ```sh
 npm test
 ```
 
 ### Building for Production
+
 ```sh
 # Android
 npx expo build:android
 
-# iOS  
+# iOS
 npx expo build:ios
 ```
 
 ### Code Structure
+
 ```
 app/
 ├── components/        # Reusable UI components
@@ -144,18 +161,21 @@ app/
 ## 🎯 Roadmap
 
 ### v1.2.0 (Next Release)
+
 - [ ] Push notifications for mentions and votes
 - [ ] Advanced search functionality
 - [ ] Post scheduling
 - [ ] Multiple account support
 
 ### v1.3.0 (Future)
+
 - [ ] Stories feature (24h expiring content)
 - [ ] Live streaming integration
 - [ ] Community creation tools
 - [ ] Advanced analytics dashboard
 
 ### v2.0.0 (Long-term)
+
 - [ ] Cross-chain support (other blockchains)
 - [ ] NFT integration
 - [ ] Decentralized messaging
@@ -178,6 +198,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**HiveSnaps** - *What's snappening today?* 🚀
+**HiveSnaps** - _What's snappening today?_ 🚀
 
 Follow us: [@hivesnaps](https://hive.blog/@hivesnaps) | Join our community on [Discord](https://discord.gg/hivesnaps)

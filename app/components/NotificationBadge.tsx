@@ -23,7 +23,7 @@ const NotificationBadge: React.FC<NotificationBadgeProps> = ({
   }
 
   const displayCount = count > maxCount ? `${maxCount}+` : count.toString();
-  
+
   const sizeStyles = {
     small: {
       minWidth: 16,
@@ -52,13 +52,7 @@ const NotificationBadge: React.FC<NotificationBadgeProps> = ({
   };
 
   return (
-    <View
-      style={[
-        styles.badge,
-        sizeStyles[size],
-        { backgroundColor: color },
-      ]}
-    >
+    <View style={[styles.badge, sizeStyles[size], { backgroundColor: color }]}>
       <Text
         style={[
           styles.badgeText,

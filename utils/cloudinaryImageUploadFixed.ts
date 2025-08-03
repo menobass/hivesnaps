@@ -11,7 +11,9 @@ export interface CloudinaryUploadFile {
   type: string;
 }
 
-export async function uploadImageToCloudinaryFixed(file: CloudinaryUploadFile): Promise<string> {
+export async function uploadImageToCloudinaryFixed(
+  file: CloudinaryUploadFile
+): Promise<string> {
   const data = new FormData();
   data.append('file', {
     uri: file.uri,
@@ -29,6 +31,7 @@ export async function uploadImageToCloudinaryFixed(file: CloudinaryUploadFile): 
     throw new Error('Cloudinary upload failed: ' + errText);
   }
   const json = await res.json();
-  if (!json.secure_url) throw new Error('No secure_url returned from Cloudinary');
+  if (!json.secure_url)
+    throw new Error('No secure_url returned from Cloudinary');
   return json.secure_url;
 }
