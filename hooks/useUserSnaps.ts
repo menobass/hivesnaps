@@ -140,7 +140,7 @@ export const useUserSnaps = (username: string | undefined) => {
       );
 
       // Fetch all replies in parallel instead of sequentially
-      const replyPromises = discussions.map(async post => {
+      const replyPromises = discussions.map(async (post: any) => {
         try {
           const replies: UserSnap[] = await client.database.call(
             'get_content_replies',

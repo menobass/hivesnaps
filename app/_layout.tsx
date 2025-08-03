@@ -67,6 +67,7 @@ function RootLayoutNav() {
               <Stack.Screen name='FeedScreen' />
               <Stack.Screen name='NotificationsScreen' />
               <Stack.Screen name='ConversationScreen' />
+              <Stack.Screen name='HivePostScreen' />
               <Stack.Screen name='ProfileScreen' />
               <Stack.Screen name='ComposeScreen' />
               <Stack.Screen name='modal' options={{ presentation: 'modal' }} />
