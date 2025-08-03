@@ -76,8 +76,28 @@ const HivePostPreviewProvider: React.FC<{ children: ReactNode }> = ({
     async (urls: string[]): Promise<HivePostInfo[]> => {
       if (urls.length === 0) return [];
 
+      // Filter out invalid URLs before processing
+      const validUrls = urls.filter(url => {
+        if (!url || typeof url !== 'string') return false;
+        if (url.length < 10) return false; // Too short to be valid
+        if (!url.includes('@') || !url.includes('/')) return false; // Missing required parts
+        return true;
+      });
+
+      if (validUrls.length === 0) {
+        console.log('[HivePostPreviewContext] No valid URLs to fetch');
+        return [];
+      }
+
+      if (validUrls.length !== urls.length) {
+        console.log('[HivePostPreviewContext] Filtered out invalid URLs:', {
+          original: urls.length,
+          valid: validUrls.length,
+        });
+      }
+
       const cache = cacheRef.current;
-      const cacheKey = urls.sort().join('|');
+      const cacheKey = validUrls.sort().join('|');
       const now = Date.now();
 
       // Check if we have cached data
@@ -104,8 +124,21 @@ const HivePostPreviewProvider: React.FC<{ children: ReactNode }> = ({
         }
       }
 
-      // Create new loading promise
-      const loadingPromise = fetchMultipleHivePostInfos(urls);
+      // Create new loading promise with error handling
+      const loadingPromise = fetchMultipleHivePostInfos(validUrls).catch(
+        error => {
+          console.error(
+            '[HivePostPreviewContext] Error fetching post previews:',
+            {
+              error,
+              urls: validUrls,
+              errorMessage:
+                error instanceof Error ? error.message : 'Unknown error',
+            }
+          );
+          return []; // Return empty array on error
+        }
+      );
 
       // Set cache entry with loading promise
       cache.set(cacheKey, {
@@ -126,7 +159,10 @@ const HivePostPreviewProvider: React.FC<{ children: ReactNode }> = ({
 
         return result;
       } catch (error) {
-        console.error('Error fetching post previews:', error);
+        console.error(
+          '[HivePostPreviewContext] Error in loading promise:',
+          error
+        );
 
         // Remove loading state on error
         const currentEntry = cache.get(cacheKey);

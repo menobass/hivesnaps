@@ -4,6 +4,7 @@
  */
 
 import { Client } from '@hiveio/dhive';
+import { detectPostType, type PostInfo } from './postTypeDetector';
 
 const client = new Client([
   'https://api.hive.blog',
@@ -72,6 +73,8 @@ export function parseHivePostUrl(
   url: string
 ): { author: string; permlink: string } | null {
   try {
+    console.log('[extractHivePostInfo] parseHivePostUrl called with:', url);
+
     // Remove protocol and www if present
     const cleanUrl = url.replace(/^https?:\/\/(?:www\.)?/, '');
 
@@ -79,7 +82,13 @@ export function parseHivePostUrl(
     const pathMatch = cleanUrl.match(
       /^(?:ecency\.com|peakd\.com|hive\.blog)\/(.+)$/
     );
-    if (!pathMatch) return null;
+    if (!pathMatch) {
+      console.log(
+        '[extractHivePostInfo] URL does not match expected domain pattern:',
+        cleanUrl
+      );
+      return null;
+    }
 
     const path = pathMatch[1];
 
@@ -91,15 +100,48 @@ export function parseHivePostUrl(
       /^(?:hive-\d+\/)?@([a-z0-9.-]{3,16})\/([a-z0-9-]+)$/
     );
     if (authorPermlinkMatch) {
-      return {
-        author: authorPermlinkMatch[1],
-        permlink: authorPermlinkMatch[2],
-      };
+      const author = authorPermlinkMatch[1];
+      const permlink = authorPermlinkMatch[2];
+
+      // Validate permlink format - should be longer than just a single word
+      if (permlink.length < 8) {
+        console.log('[extractHivePostInfo] Rejecting short permlink:', {
+          permlink,
+          length: permlink.length,
+          url,
+        });
+        return null;
+      }
+
+      // Check if permlink looks like a valid post permlink (not just a category/page)
+      const validPermlinkPattern =
+        /^[a-z0-9-]+(?:-\d{4}-\d{2}-\d{2}|-\d{10,}|-[a-z0-9-]{8,})$/;
+      if (!validPermlinkPattern.test(permlink)) {
+        console.log(
+          '[extractHivePostInfo] Rejecting invalid permlink format:',
+          {
+            permlink,
+            url,
+          }
+        );
+        return null;
+      }
+
+      console.log('[extractHivePostInfo] Successfully parsed URL:', {
+        author,
+        permlink,
+        url,
+      });
+      return { author, permlink };
     }
 
+    console.log(
+      '[extractHivePostInfo] URL does not match author/permlink pattern:',
+      path
+    );
     return null;
   } catch (error) {
-    console.error('Error parsing Hive post URL:', error);
+    console.error('[extractHivePostInfo] Error parsing Hive post URL:', error);
     return null;
   }
 }
@@ -222,6 +264,21 @@ export async function fetchHivePostInfo(
   originalUrl: string
 ): Promise<HivePostInfo | null> {
   try {
+    console.log('[extractHivePostInfo] fetchHivePostInfo called with:', {
+      author,
+      permlink,
+      originalUrl,
+    });
+
+    // Validate parameters before making API call
+    if (!author || !permlink || author.length < 3 || permlink.length < 5) {
+      console.warn('[extractHivePostInfo] Invalid parameters:', {
+        author,
+        permlink,
+      });
+      return null;
+    }
+
     // Fetch post content and author avatar in parallel
     const [post, avatarUrl] = await Promise.all([
       client.database.call('get_content', [author, permlink]),
@@ -229,7 +286,7 @@ export async function fetchHivePostInfo(
     ]);
 
     if (!post || !post.author) {
-      console.warn('Post not found:', author, permlink);
+      console.warn('[extractHivePostInfo] Post not found:', author, permlink);
       return null;
     }
 
@@ -260,10 +317,34 @@ export async function fetchHivePostInfo(
     // Generate summary
     const summary = generateSummary(post.body);
 
+    // Smart title function - determines title based on post type
+    const getSmartTitle = (postData: any): string => {
+      // If it has a title, use it
+      if (postData.title && postData.title.trim()) {
+        return postData.title;
+      }
+      
+      // Use post type detection logic for untitled posts
+      const postInfo: PostInfo = {
+        author: postData.author,
+        permlink: postData.permlink,
+        title: postData.title,
+        body: postData.body,
+        json_metadata: postData.json_metadata,
+        parent_author: postData.parent_author,
+        parent_permlink: postData.parent_permlink,
+      };
+      
+      const postType = detectPostType(postInfo);
+      
+      // Return appropriate label based on type
+      return postType === 'snap' ? 'Resnap' : 'Untitled Post';
+    };
+
     return {
       author: post.author,
       permlink: post.permlink,
-      title: post.title || 'Untitled Post',
+      title: getSmartTitle(post),
       body: post.body,
       created: post.created,
       voteCount: post.net_votes || 0,
@@ -277,7 +358,29 @@ export async function fetchHivePostInfo(
       tags: tags.slice(0, 5), // Limit to first 5 tags
     };
   } catch (error) {
-    console.error('Error fetching Hive post info:', error);
+    console.error('[extractHivePostInfo] Error fetching Hive post info:', {
+      error,
+      author,
+      permlink,
+      originalUrl,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    // Specific warning for "Invalid parameters" - likely malformed URL
+    if (
+      error instanceof Error &&
+      error.message.includes('Invalid parameters')
+    ) {
+      console.warn(
+        '[extractHivePostInfo] Invalid parameters detected - likely malformed URL or non-existent post:',
+        {
+          author,
+          permlink,
+          originalUrl,
+        }
+      );
+    }
+
     return null;
   }
 }
@@ -288,19 +391,43 @@ export async function fetchHivePostInfo(
 export async function fetchMultipleHivePostInfos(
   urls: string[]
 ): Promise<HivePostInfo[]> {
+  console.log('[extractHivePostInfo] fetchMultipleHivePostInfos called with:', {
+    urlsCount: urls.length,
+    urls: urls.slice(0, 3), // Log first 3 URLs for debugging
+  });
+
   const results = await Promise.allSettled(
     urls.map(async url => {
-      const parsed = parseHivePostUrl(url);
-      if (!parsed) return null;
+      try {
+        const parsed = parseHivePostUrl(url);
+        if (!parsed) {
+          console.log('[extractHivePostInfo] Failed to parse URL:', url);
+          return null;
+        }
 
-      return await fetchHivePostInfo(parsed.author, parsed.permlink, url);
+        return await fetchHivePostInfo(parsed.author, parsed.permlink, url);
+      } catch (error) {
+        console.error(
+          '[extractHivePostInfo] Error processing URL:',
+          url,
+          error
+        );
+        return null;
+      }
     })
   );
 
-  return results
+  const validResults = results
     .filter(
       (result): result is PromiseFulfilledResult<HivePostInfo | null> =>
         result.status === 'fulfilled' && result.value !== null
     )
     .map(result => result.value!);
+
+  console.log('[extractHivePostInfo] fetchMultipleHivePostInfos completed:', {
+    totalUrls: urls.length,
+    validResults: validResults.length,
+  });
+
+  return validResults;
 }

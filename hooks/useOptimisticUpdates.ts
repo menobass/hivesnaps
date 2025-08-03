@@ -48,7 +48,10 @@ export const useOptimisticUpdates = () => {
             return { ...reply, ...updates };
           }
           if (reply.replies) {
-            return { ...reply, replies: updateReplyRecursive(reply.replies as T[]) };
+            return {
+              ...reply,
+              replies: updateReplyRecursive(reply.replies as T[]),
+            };
           }
           return reply;
         });

@@ -35,6 +35,8 @@ import SpoilerText from './SpoilerText';
 import TwitterEmbed from './TwitterEmbed';
 import YouTubeEmbed from './YouTubeEmbed';
 import ThreeSpeakEmbed from './ThreeSpeakEmbed';
+import { extractHivePostUrls } from '../../utils/extractHivePostInfo';
+import { OptimizedHivePostPreviewRenderer } from '../../components/OptimizedHivePostPreviewRenderer';
 
 const twitterColors = {
   light: {
@@ -432,6 +434,7 @@ const Snap: React.FC<SnapProps> = ({
   const imageUrls = extractImageUrls(body);
   const rawImageUrls = extractRawImageUrls(body);
   const embeddedContent = extractVideoInfo(body); // Renamed from videoInfo to be more accurate
+  const hivePostUrls = extractHivePostUrls(body); // Extract Hive post URLs for previews
 
   // Remove embedded content URLs and image URLs from text body if present
   let textBody = stripImageTags(body);
@@ -440,6 +443,15 @@ const Snap: React.FC<SnapProps> = ({
   }
   if (rawImageUrls.length > 0) {
     textBody = removeRawImageUrls(textBody);
+  }
+
+  // Remove Hive post URLs from text body to avoid showing raw URLs
+  if (hivePostUrls.length > 0) {
+    hivePostUrls.forEach(url => {
+      textBody = textBody.replace(url, '').trim();
+    });
+    // Clean up any double spaces
+    textBody = textBody.replace(/\s{2,}/g, ' ').trim();
   }
 
   // Process spoiler syntax first, before other text processing
@@ -550,6 +562,7 @@ const Snap: React.FC<SnapProps> = ({
           ) : null}
         </View>
       )}
+
       {/* Images from markdown/html */}
       {imageUrls.length > 0 && (
         <View style={{ marginBottom: 8 }}>
@@ -773,6 +786,23 @@ const Snap: React.FC<SnapProps> = ({
           ${payout.toFixed(2)}
         </Text>
       </View>
+
+      {/* Hive Post Previews - Footer Style */}
+      {hivePostUrls.length > 0 && (
+        <View style={{ marginTop: 12 }}>
+          <OptimizedHivePostPreviewRenderer
+            postUrls={hivePostUrls}
+            colors={{
+              bubble: colors.bubble,
+              icon: colors.icon,
+              text: colors.text,
+            }}
+            onError={(error) => {
+              console.warn('[Snap] Hive post preview error:', error);
+            }}
+          />
+        </View>
+      )}
     </View>
   );
 };
