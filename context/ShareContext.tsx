@@ -23,16 +23,16 @@ export function ShareProvider({ children }: ShareProviderProps) {
   // When shared content is detected, navigate to compose screen
   useEffect(() => {
     if (shareHook.hasSharedContent && shareHook.sharedContent) {
-      console.log('📱 ShareProvider detected shared content, navigating to compose screen');
+      console.log(
+        '📱 ShareProvider detected shared content, navigating to compose screen'
+      );
       // Navigate to compose screen to handle shared content
       router.push('/ComposeScreen' as any);
     }
   }, [shareHook.hasSharedContent, router]);
 
   return (
-    <ShareContext.Provider value={shareHook}>
-      {children}
-    </ShareContext.Provider>
+    <ShareContext.Provider value={shareHook}>{children}</ShareContext.Provider>
   );
 }
 

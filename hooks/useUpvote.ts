@@ -3,6 +3,7 @@ import { Client, PrivateKey } from '@hiveio/dhive';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { calculateVoteValue } from '../utils/calculateVoteValue';
+import { useOptimisticUpdates } from './useOptimisticUpdates';
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -50,7 +51,8 @@ export const useUpvote = (
   globalProps: any,
   rewardFund: any,
   hivePrice: number,
-  updateSnap?: (author: string, permlink: string, updates: any) => void
+  updateSnap?: (author: string, permlink: string, updates: any) => void,
+  updateReply?: (author: string, permlink: string, updates: any) => void
 ): UseUpvoteReturn => {
   const [upvoteModalVisible, setUpvoteModalVisible] = useState(false);
   const [upvoteTarget, setUpvoteTarget] = useState<UpvoteTarget | null>(null);
@@ -166,24 +168,60 @@ export const useUpvote = (
       setUpvoteLoading(false);
       setUpvoteSuccess(true);
 
-      // Update the snap optimistically if updateSnap function is provided
-      if (updateSnap && upvoteTarget && upvoteTarget.snap) {
+      // Update the snap/reply optimistically if update functions are provided
+      if (upvoteTarget && upvoteTarget.snap) {
+        console.log('[useUpvote] Updating optimistically:', {
+          author: upvoteTarget.author,
+          permlink: upvoteTarget.permlink,
+          snapData: upvoteTarget.snap,
+        });
+
         const estimatedValueIncrease = voteValue
           ? parseFloat(voteValue.usd)
           : 0;
-        const currentVotes = upvoteTarget.snap.net_votes || 0;
-        const currentPayout = parseFloat(
-          upvoteTarget.snap.pending_payout_value?.replace(' HBD', '') || '0'
+        const upvoteUpdates = createUpvoteUpdate(voteWeight, username || '');
+        const currentVotes =
+          upvoteTarget.snap.voteCount || upvoteTarget.snap.net_votes || 0;
+        const currentPayout =
+          upvoteTarget.snap.payout ||
+          parseFloat(
+            upvoteTarget.snap.pending_payout_value?.replace(' HBD', '') || '0'
+          );
+
+        const updateData = {
+          ...upvoteUpdates,
+          voteCount: currentVotes + 1,
+          net_votes: currentVotes + 1,
+          payout: currentPayout + estimatedValueIncrease,
+          pending_payout_value: `${(currentPayout + estimatedValueIncrease).toFixed(3)} HBD`,
+        };
+
+        console.log('[useUpvote] Update data:', updateData);
+
+        // Determine if this is a reply or main snap
+        // Check for parent_author field (but exclude 'peak.snaps' which is a container)
+        // or permlink pattern that starts with "re-"
+        const isReply =
+          (upvoteTarget.snap.parent_author &&
+            upvoteTarget.snap.parent_author !== '' &&
+            upvoteTarget.snap.parent_author !== 'peak.snaps') ||
+          upvoteTarget.permlink.startsWith('re-');
+        console.log(
+          '[useUpvote] Is reply:',
+          isReply,
+          'permlink:',
+          upvoteTarget.permlink,
+          'parent_author:',
+          upvoteTarget.snap.parent_author
         );
 
-        updateSnap(upvoteTarget.author, upvoteTarget.permlink, {
-          net_votes: currentVotes + 1,
-          pending_payout_value: `${(currentPayout + estimatedValueIncrease).toFixed(3)} HBD`,
-          active_votes: [
-            ...(upvoteTarget.snap.active_votes || []),
-            { voter: username, percent: voteWeight, rshares: voteWeight * 100 },
-          ],
-        });
+        if (isReply && updateReply) {
+          console.log('[useUpvote] Using updateReply for reply');
+          updateReply(upvoteTarget.author, upvoteTarget.permlink, updateData);
+        } else if (updateSnap) {
+          console.log('[useUpvote] Using updateSnap for main snap');
+          updateSnap(upvoteTarget.author, upvoteTarget.permlink, updateData);
+        }
       }
 
       // Close modal after showing success
@@ -201,6 +239,8 @@ export const useUpvote = (
     }
   }, [upvoteTarget, username, voteWeight]);
 
+  const { updateSnapInArray, createUpvoteUpdate } = useOptimisticUpdates();
+
   const updateSnapsOptimistically = useCallback(
     (
       snaps: any[],
@@ -209,22 +249,18 @@ export const useUpvote = (
       value: VoteValue | null
     ) => {
       const estimatedValueIncrease = value ? parseFloat(value.usd) : 0;
-
-      return snaps.map(snap =>
-        snap.author === target.author && snap.permlink === target.permlink
-          ? {
-              ...snap,
-              voteCount: (snap.voteCount || 0) + 1,
-              payout: (snap.payout || 0) + estimatedValueIncrease,
-              active_votes: [
-                ...(snap.active_votes || []),
-                { voter: username, percent: weight, rshares: weight * 100 },
-              ],
-            }
-          : snap
+      const upvoteUpdates = createUpvoteUpdate(weight, username || '');
+      const targetSnap = snaps.find(
+        s => s.author === target.author && s.permlink === target.permlink
       );
+
+      return updateSnapInArray(snaps, target.author, target.permlink, {
+        ...upvoteUpdates,
+        voteCount: (targetSnap?.voteCount || 0) + 1,
+        payout: (targetSnap?.payout || 0) + estimatedValueIncrease,
+      });
     },
-    [username]
+    [username, updateSnapInArray, createUpvoteUpdate]
   );
 
   return {

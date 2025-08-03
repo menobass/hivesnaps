@@ -14,7 +14,10 @@ interface IPFSVideoPlayerProps {
   isDark?: boolean;
 }
 
-const IPFSVideoPlayer: React.FC<IPFSVideoPlayerProps> = ({ ipfsUrl, isDark = false }) => {
+const IPFSVideoPlayer: React.FC<IPFSVideoPlayerProps> = ({
+  ipfsUrl,
+  isDark = false,
+}) => {
   const [showVideo, setShowVideo] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -29,7 +32,15 @@ const IPFSVideoPlayer: React.FC<IPFSVideoPlayerProps> = ({ ipfsUrl, isDark = fal
 
   if (showVideo) {
     return (
-      <View style={{ width: '100%', aspectRatio: 16/9, borderRadius: 12, overflow: 'hidden', position: 'relative' }}>
+      <View
+        style={{
+          width: '100%',
+          aspectRatio: 16 / 9,
+          borderRadius: 12,
+          overflow: 'hidden',
+          position: 'relative',
+        }}
+      >
         <WebView
           source={{ uri: ipfsUrl }}
           style={{ flex: 1, backgroundColor: '#000' }}
@@ -43,31 +54,39 @@ const IPFSVideoPlayer: React.FC<IPFSVideoPlayerProps> = ({ ipfsUrl, isDark = fal
         />
         {/* Loading indicator */}
         {isLoading && (
-          <View style={{ 
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.7)',
-            justifyContent: 'center',
-            alignItems: 'center'
-          }}>
-            <FontAwesome name="spinner" size={32} color="#fff" />
-            <Text style={{ color: '#fff', marginTop: 8, fontSize: 14 }}>Loading video...</Text>
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.7)',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <FontAwesome name='spinner' size={32} color='#fff' />
+            <Text style={{ color: '#fff', marginTop: 8, fontSize: 14 }}>
+              Loading video...
+            </Text>
           </View>
         )}
         {/* Video type indicator */}
-        <View style={{ 
-          position: 'absolute', 
-          top: 8, 
-          right: 8, 
-          backgroundColor: 'rgba(0,0,0,0.7)', 
-          paddingHorizontal: 6, 
-          paddingVertical: 2, 
-          borderRadius: 4 
-        }}>
-          <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>IPFS</Text>
+        <View
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            paddingHorizontal: 6,
+            paddingVertical: 2,
+            borderRadius: 4,
+          }}
+        >
+          <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+            IPFS
+          </Text>
         </View>
       </View>
     );
@@ -75,27 +94,39 @@ const IPFSVideoPlayer: React.FC<IPFSVideoPlayerProps> = ({ ipfsUrl, isDark = fal
 
   // Show thumbnail with play button
   return (
-    <View style={{ width: '100%', aspectRatio: 16/9, borderRadius: 12, overflow: 'hidden', position: 'relative' }}>
+    <View
+      style={{
+        width: '100%',
+        aspectRatio: 16 / 9,
+        borderRadius: 12,
+        overflow: 'hidden',
+        position: 'relative',
+      }}
+    >
       {/* Video thumbnail background */}
-      <View style={{ 
-        flex: 1, 
-        backgroundColor: isDark ? '#1a1a1a' : '#000',
-        justifyContent: 'center',
-        alignItems: 'center'
-      }}>
-        {/* Video icon background */}
-        <View style={{
-          width: 60,
-          height: 60,
-          borderRadius: 30,
-          backgroundColor: 'rgba(255,255,255,0.1)',
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: isDark ? '#1a1a1a' : '#000',
           justifyContent: 'center',
           alignItems: 'center',
-          marginBottom: 8
-        }}>
-          <FontAwesome name="play" size={24} color="#fff" />
+        }}
+      >
+        {/* Video icon background */}
+        <View
+          style={{
+            width: 60,
+            height: 60,
+            borderRadius: 30,
+            backgroundColor: 'rgba(255,255,255,0.1)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginBottom: 8,
+          }}
+        >
+          <FontAwesome name='play' size={24} color='#fff' />
         </View>
-        
+
         {/* Play button */}
         <TouchableOpacity
           onPress={handlePlayPress}
@@ -105,10 +136,15 @@ const IPFSVideoPlayer: React.FC<IPFSVideoPlayerProps> = ({ ipfsUrl, isDark = fal
             paddingVertical: 8,
             borderRadius: 20,
             flexDirection: 'row',
-            alignItems: 'center'
+            alignItems: 'center',
           }}
         >
-          <FontAwesome name="play" size={14} color="#000" style={{ marginRight: 6 }} />
+          <FontAwesome
+            name='play'
+            size={14}
+            color='#000'
+            style={{ marginRight: 6 }}
+          />
           <Text style={{ color: '#000', fontWeight: 'bold', fontSize: 14 }}>
             Play Video
           </Text>
@@ -116,16 +152,20 @@ const IPFSVideoPlayer: React.FC<IPFSVideoPlayerProps> = ({ ipfsUrl, isDark = fal
       </View>
 
       {/* Video type indicator */}
-      <View style={{ 
-        position: 'absolute', 
-        top: 8, 
-        right: 8, 
-        backgroundColor: 'rgba(0,0,0,0.7)', 
-        paddingHorizontal: 6, 
-        paddingVertical: 2, 
-        borderRadius: 4 
-      }}>
-        <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>IPFS</Text>
+      <View
+        style={{
+          position: 'absolute',
+          top: 8,
+          right: 8,
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          paddingHorizontal: 6,
+          paddingVertical: 2,
+          borderRadius: 4,
+        }}
+      >
+        <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+          IPFS
+        </Text>
       </View>
     </View>
   );
