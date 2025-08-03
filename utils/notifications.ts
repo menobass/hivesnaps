@@ -81,7 +81,7 @@ export function parseNotification(
 
       // Extract voter and amount from message like "@alice voted on your post ($0.013)"
       const voteMatch = notification.msg.match(
-        /@(\w+) voted on your post \(\$([0-9.]+)\)/
+        /@([a-z0-9.-]+) voted on your post \(\$([0-9.]+)\)/
       );
       if (voteMatch) {
         parsed.actionUser = voteMatch[1];
@@ -95,7 +95,7 @@ export function parseNotification(
       parsed.actionText = 'Replied to';
 
       // Extract replier from message like "@bob replied to your post"
-      const replyMatch = notification.msg.match(/@(\w+) replied to your/);
+      const replyMatch = notification.msg.match(/@([a-z0-9.-]+) replied to your/);
       if (replyMatch) {
         parsed.actionUser = replyMatch[1];
       }
@@ -107,7 +107,7 @@ export function parseNotification(
       parsed.actionText = 'Reblogged';
 
       // Extract reblogger from message like "@charlie reblogged your post"
-      const reblogMatch = notification.msg.match(/@(\w+) reblogged your/);
+      const reblogMatch = notification.msg.match(/@([a-z0-9.-]+) reblogged your/);
       if (reblogMatch) {
         parsed.actionUser = reblogMatch[1];
       }
@@ -120,7 +120,7 @@ export function parseNotification(
 
       // Extract follower from message like "@dave followed you" or "@dave started following you"
       const followMatch = notification.msg.match(
-        /@(\w+) (?:followed|started following) you/
+        /@([a-z0-9.-]+) (?:followed|started following) you/
       );
       if (followMatch) {
         parsed.actionUser = followMatch[1];
@@ -136,7 +136,7 @@ export function parseNotification(
       parsed.actionText = 'Mentioned you';
 
       // Extract mentioner from message like "@eve mentioned you in a post"
-      const mentionMatch = notification.msg.match(/@(\w+) mentioned you/);
+      const mentionMatch = notification.msg.match(/@([a-z0-9.-]+) mentioned you/);
       if (mentionMatch) {
         parsed.actionUser = mentionMatch[1];
       }
@@ -175,7 +175,7 @@ export function parseNotification(
 
   // Extract target content information from URL
   if (notification.url) {
-    const urlMatch = notification.url.match(/@(\w+)\/([a-z0-9-]+)/);
+    const urlMatch = notification.url.match(/@([a-z0-9.-]+)\/([a-z0-9-]+)/);
     if (urlMatch) {
       parsed.targetContent = {
         author: urlMatch[1],
