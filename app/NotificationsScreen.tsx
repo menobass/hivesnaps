@@ -32,7 +32,6 @@ interface NotificationItemProps {
   isDark: boolean;
 }
 
-
 const NotificationItem: React.FC<NotificationItemProps> = ({
   notification,
   onPress,
@@ -42,7 +41,10 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
   // Convert UTC timestamp to local time before formatting
   const rawTimestamp = notification.date;
   // Parse as UTC and let JS handle local conversion
-  const localDate = typeof rawTimestamp === 'string' ? new Date(rawTimestamp + 'Z') : new Date(rawTimestamp);
+  const localDate =
+    typeof rawTimestamp === 'string'
+      ? new Date(rawTimestamp + 'Z')
+      : new Date(rawTimestamp);
   const translatedTimestamp = formatNotificationTime(localDate.toISOString());
 
   const handlePress = () => {
@@ -58,24 +60,40 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
         styles.notificationItem,
         {
           backgroundColor: notification.read
-            ? isDark ? '#15202B' : '#fff'
-            : isDark ? '#1C2938' : '#F0F8FF',
+            ? isDark
+              ? '#15202B'
+              : '#fff'
+            : isDark
+              ? '#1C2938'
+              : '#F0F8FF',
           borderBottomColor: isDark ? '#38444D' : '#E1E8ED',
         },
       ]}
       onPress={handlePress}
-      disabled={!isActionableNotification(notification) && notification.type !== 'follow'}
+      disabled={
+        !isActionableNotification(notification) &&
+        notification.type !== 'follow'
+      }
     >
       <View style={styles.notificationHeader}>
-        <View style={[styles.iconContainer, { backgroundColor: notification.color + '20' }]}>
-          <FontAwesome name={notification.icon as any} size={20} color={notification.color} />
+        <View
+          style={[
+            styles.iconContainer,
+            { backgroundColor: notification.color + '20' },
+          ]}
+        >
+          <FontAwesome
+            name={notification.icon as any}
+            size={20}
+            color={notification.color}
+          />
         </View>
         <View style={styles.notificationContent}>
           <View style={styles.notificationTop}>
             <Text
               style={[
                 styles.notificationMessage,
-                { 
+                {
                   color: isDark ? '#D7DBDC' : '#0F1419',
                   fontWeight: notification.read ? 'normal' : '600',
                 },
@@ -85,11 +103,21 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
               {notification.msg}
             </Text>
             {!notification.read && (
-              <View style={[styles.unreadDot, { backgroundColor: notification.color }]} />
+              <View
+                style={[
+                  styles.unreadDot,
+                  { backgroundColor: notification.color },
+                ]}
+              />
             )}
           </View>
           <View style={styles.notificationBottom}>
-            <Text style={[styles.timeText, { color: isDark ? '#8899A6' : '#657786' }]}>
+            <Text
+              style={[
+                styles.timeText,
+                { color: isDark ? '#8899A6' : '#657786' },
+              ]}
+            >
               {translatedTimestamp}
             </Text>
             {notification.amount && (
@@ -104,9 +132,6 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
   );
 };
 
-
-
-
 const NotificationsScreen = () => {
   const colorScheme = useColorScheme() || 'light';
   const isDark = colorScheme === 'dark';
@@ -114,7 +139,7 @@ const NotificationsScreen = () => {
 
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
   const [settingsVisible, setSettingsVisible] = useState(false);
-  
+
   // Use the notifications hook which handles settings persistence
   const {
     notifications,
@@ -128,8 +153,6 @@ const NotificationsScreen = () => {
     updateSettings,
   } = useNotifications(currentUsername);
 
-
-
   const colors = {
     background: isDark ? '#15202B' : '#fff',
     text: isDark ? '#D7DBDC' : '#0F1419',
@@ -138,8 +161,6 @@ const NotificationsScreen = () => {
     cardBackground: isDark ? '#1C2938' : '#F8F9FA',
     buttonBackground: isDark ? '#1DA1F2' : '#1DA1F2',
   };
-
-
 
   // Load username on mount
   useEffect(() => {
@@ -167,7 +188,7 @@ const NotificationsScreen = () => {
       });
       return;
     }
-    
+
     // Handle other actionable notifications - navigate to post/comment
     if (isActionableNotification(notification) && notification.targetContent) {
       router.push({
@@ -180,9 +201,12 @@ const NotificationsScreen = () => {
     }
   };
 
-  const handleMarkAsRead = useCallback(async (notificationId: number) => {
-    await markAsRead(notificationId);
-  }, [markAsRead]);
+  const handleMarkAsRead = useCallback(
+    async (notificationId: number) => {
+      await markAsRead(notificationId);
+    },
+    [markAsRead]
+  );
 
   const handleMarkAllAsRead = useCallback(async () => {
     await markAllAsRead();
@@ -204,21 +228,34 @@ const NotificationsScreen = () => {
   const renderHeader = () => (
     <View style={[styles.header, { borderBottomColor: colors.border }]}>
       <View style={styles.headerLeft}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <FontAwesome name="arrow-left" size={24} color={colors.text} />
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
+          <FontAwesome name='arrow-left' size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Notifications</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          Notifications
+        </Text>
       </View>
       <View style={styles.headerRight}>
         {unreadCount > 0 && (
-          <TouchableOpacity onPress={handleMarkAllAsRead} style={styles.markAllButton}>
-            <Text style={[styles.markAllText, { color: colors.buttonBackground }]}>
+          <TouchableOpacity
+            onPress={handleMarkAllAsRead}
+            style={styles.markAllButton}
+          >
+            <Text
+              style={[styles.markAllText, { color: colors.buttonBackground }]}
+            >
               Mark all read
             </Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity onPress={() => setSettingsVisible(true)} style={styles.settingsButton}>
-          <FontAwesome name="cog" size={24} color={colors.text} />
+        <TouchableOpacity
+          onPress={() => setSettingsVisible(true)}
+          style={styles.settingsButton}
+        >
+          <FontAwesome name='cog' size={24} color={colors.text} />
         </TouchableOpacity>
       </View>
     </View>
@@ -226,8 +263,10 @@ const NotificationsScreen = () => {
 
   const renderEmpty = () => (
     <View style={styles.emptyState}>
-      <FontAwesome name="bell-o" size={64} color={colors.subtext} />
-      <Text style={[styles.emptyTitle, { color: colors.text }]}>No notifications</Text>
+      <FontAwesome name='bell-o' size={64} color={colors.subtext} />
+      <Text style={[styles.emptyTitle, { color: colors.text }]}>
+        No notifications
+      </Text>
       <Text style={[styles.emptySubtitle, { color: colors.subtext }]}>
         You're all caught up! New notifications will appear here.
       </Text>
@@ -241,16 +280,20 @@ const NotificationsScreen = () => {
       onBackButtonPress={() => setSettingsVisible(false)}
       style={styles.modalStyle}
     >
-      <View style={[styles.settingsModal, { backgroundColor: colors.background }]}>
-        <View style={[styles.settingsHeader, { borderBottomColor: colors.border }]}>
+      <View
+        style={[styles.settingsModal, { backgroundColor: colors.background }]}
+      >
+        <View
+          style={[styles.settingsHeader, { borderBottomColor: colors.border }]}
+        >
           <Text style={[styles.settingsTitle, { color: colors.text }]}>
             Notification Settings
           </Text>
           <TouchableOpacity onPress={() => setSettingsVisible(false)}>
-            <FontAwesome name="times" size={24} color={colors.text} />
+            <FontAwesome name='times' size={24} color={colors.text} />
           </TouchableOpacity>
         </View>
-        
+
         <View style={styles.settingsContent}>
           {[
             { key: 'votes', label: 'Votes on my posts', icon: 'arrow-up' },
@@ -258,25 +301,40 @@ const NotificationsScreen = () => {
             { key: 'reblogs', label: 'Reblogs of my posts', icon: 'repeat' },
             { key: 'follows', label: 'New followers', icon: 'user-plus' },
             { key: 'mentions', label: 'Mentions', icon: 'at' },
-            { key: 'communityUpdates', label: 'Community updates', icon: 'users' },
+            {
+              key: 'communityUpdates',
+              label: 'Community updates',
+              icon: 'users',
+            },
           ].map(({ key, label, icon }) => (
-            <View key={key} style={[styles.settingItem, { borderBottomColor: colors.border }]}>
+            <View
+              key={key}
+              style={[styles.settingItem, { borderBottomColor: colors.border }]}
+            >
               <View style={styles.settingLeft}>
                 <FontAwesome name={icon as any} size={20} color={colors.text} />
-                <Text style={[styles.settingLabel, { color: colors.text }]}>{label}</Text>
+                <Text style={[styles.settingLabel, { color: colors.text }]}>
+                  {label}
+                </Text>
               </View>
               <Switch
                 value={settings[key as keyof typeof settings] as boolean}
-                onValueChange={(value) => updateSettings({ [key]: value })}
-                trackColor={{ false: colors.border, true: colors.buttonBackground + '50' }}
+                onValueChange={value => updateSettings({ [key]: value })}
+                trackColor={{
+                  false: colors.border,
+                  true: colors.buttonBackground + '50',
+                }}
                 thumbColor={colors.buttonBackground}
               />
             </View>
           ))}
         </View>
-        
+
         <TouchableOpacity
-          style={[styles.saveButton, { backgroundColor: colors.buttonBackground }]}
+          style={[
+            styles.saveButton,
+            { backgroundColor: colors.buttonBackground },
+          ]}
           onPress={() => {
             setSettingsVisible(false);
             // Settings are automatically saved when toggled, so just refresh
@@ -291,7 +349,9 @@ const NotificationsScreen = () => {
 
   if (!currentUsername) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: colors.background }]}
+      >
         {renderHeader()}
         <View style={styles.loadingContainer}>
           <Text style={[styles.errorText, { color: colors.subtext }]}>
@@ -303,12 +363,14 @@ const NotificationsScreen = () => {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
       {renderHeader()}
-      
+
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.buttonBackground} />
+          <ActivityIndicator size='large' color={colors.buttonBackground} />
           <Text style={[styles.loadingText, { color: colors.subtext }]}>
             Loading notifications...
           </Text>
@@ -317,7 +379,7 @@ const NotificationsScreen = () => {
         <FlatList
           data={notifications}
           renderItem={renderNotification}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={item => item.id.toString()}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -327,10 +389,12 @@ const NotificationsScreen = () => {
           }
           ListEmptyComponent={renderEmpty}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={notifications.length === 0 ? styles.emptyContainer : undefined}
+          contentContainerStyle={
+            notifications.length === 0 ? styles.emptyContainer : undefined
+          }
         />
       )}
-      
+
       {renderSettings()}
     </SafeAreaView>
   );

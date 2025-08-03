@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Client } from '@hiveio/dhive';
+import { useOptimisticUpdates } from './useOptimisticUpdates';
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -42,6 +43,16 @@ interface UseConversationDataReturn extends ConversationState {
   refreshConversation: () => Promise<void>;
   checkForNewContent: () => Promise<boolean>; // New function to check for new content without loading state
   clearError: () => void;
+  updateSnap: (
+    author: string,
+    permlink: string,
+    updates: Partial<SnapData>
+  ) => void;
+  updateReply: (
+    author: string,
+    permlink: string,
+    updates: Partial<ReplyData>
+  ) => void;
 }
 
 export const useConversationData = (
@@ -60,99 +71,122 @@ export const useConversationData = (
   const avatarProfileCache: Record<string, string | undefined> = {};
 
   // Recursively fetch replies, ensuring each reply has full content
-  const fetchRepliesTreeWithContent = useCallback(async (
-    author: string, 
-    permlink: string, 
-    depth = 0, 
-    maxDepth = 3
-  ): Promise<ReplyData[]> => {
-    if (depth > maxDepth) return [];
-    
-    try {
-      // Fetch shallow replies
-      const res = await fetch('https://api.hive.blog', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'condenser_api.get_content_replies',
-          params: [author, permlink],
-          id: 1,
-        }),
-      });
-      const data = await res.json();
-      const shallowReplies = data.result || [];
+  const fetchRepliesTreeWithContent = useCallback(
+    async (
+      author: string,
+      permlink: string,
+      depth = 0,
+      maxDepth = 3
+    ): Promise<ReplyData[]> => {
+      if (depth > maxDepth) return [];
 
-      // Batch fetch full content for all replies in parallel
-      const fullContentArr = await Promise.all(
-        shallowReplies.map((reply: { author: string; permlink: string }) =>
-          client.database.call('get_content', [reply.author, reply.permlink])
-            .catch(() => reply)
-        )
-      );
+      try {
+        // Fetch shallow replies
+        const res = await fetch('https://api.hive.blog', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'condenser_api.get_content_replies',
+            params: [author, permlink],
+            id: 1,
+          }),
+        });
+        const data = await res.json();
+        const shallowReplies = data.result || [];
 
-      // Collect all unique authors for avatar batch fetch, skipping those already cached
-      const authorsToFetch = Array.from(new Set(fullContentArr.map(r => r.author))).filter(a => !(a in avatarProfileCache));
-      let accountsArr: any[] = [];
-      if (authorsToFetch.length > 0) {
-        try {
-          accountsArr = await client.database.call('get_accounts', [authorsToFetch]);
-        } catch (e) {
-          accountsArr = [];
-        }
-        // Update cache with fetched avatars
-        for (const acc of accountsArr) {
-          let meta = acc.posting_json_metadata;
-          if (!meta || meta === '{}') {
-            meta = acc.json_metadata;
+        // Batch fetch full content for all replies in parallel
+        const fullContentArr = await Promise.all(
+          shallowReplies.map((reply: { author: string; permlink: string }) =>
+            client.database
+              .call('get_content', [reply.author, reply.permlink])
+              .catch(() => reply)
+          )
+        );
+
+        // Collect all unique authors for avatar batch fetch, skipping those already cached
+        const authorsToFetch = Array.from(
+          new Set(fullContentArr.map(r => r.author))
+        ).filter(a => !(a in avatarProfileCache));
+        let accountsArr: any[] = [];
+        if (authorsToFetch.length > 0) {
+          try {
+            accountsArr = await client.database.call('get_accounts', [
+              authorsToFetch,
+            ]);
+          } catch (e) {
+            accountsArr = [];
           }
-          if (meta) {
-            let profile;
-            try {
-              profile = JSON.parse(meta).profile;
-            } catch (e) {
-              profile = undefined;
+          // Update cache with fetched avatars
+          for (const acc of accountsArr) {
+            let meta = acc.posting_json_metadata;
+            if (!meta || meta === '{}') {
+              meta = acc.json_metadata;
             }
-            if (profile && profile.profile_image) {
-              avatarProfileCache[acc.name] = profile.profile_image;
+            if (meta) {
+              let profile;
+              try {
+                profile = JSON.parse(meta).profile;
+              } catch (e) {
+                profile = undefined;
+              }
+              if (profile && profile.profile_image) {
+                avatarProfileCache[acc.name] = profile.profile_image;
+              } else {
+                avatarProfileCache[acc.name] = undefined;
+              }
             } else {
               avatarProfileCache[acc.name] = undefined;
             }
-          } else {
-            avatarProfileCache[acc.name] = undefined;
           }
         }
-      }
 
-      // Build replies with avatar and recurse
-      const fullReplies: ReplyData[] = await Promise.all(fullContentArr.map(async (fullReply) => {
-        const avatarUrl = avatarProfileCache[fullReply.author];
-        const payout = parseFloat(fullReply.pending_payout_value ? fullReply.pending_payout_value.replace(' HBD', '') : '0');
-        const childrenReplies = await fetchRepliesTreeWithContent(fullReply.author, fullReply.permlink, depth + 1, maxDepth);
-        return {
-          author: fullReply.author,
-          avatarUrl,
-          body: fullReply.body,
-          created: fullReply.created,
-          voteCount: fullReply.net_votes,
-          replyCount: fullReply.children,
-          payout,
-          permlink: fullReply.permlink,
-          active_votes: fullReply.active_votes,
-          json_metadata: fullReply.json_metadata,
-          replies: childrenReplies,
-        };
-      }));
-      return fullReplies;
-    } catch (error) {
-      console.error('Error fetching replies tree:', error);
-      return [];
-    }
-  }, []);
+        // Build replies with avatar and recurse
+        const fullReplies: ReplyData[] = await Promise.all(
+          fullContentArr.map(async fullReply => {
+            const avatarUrl = avatarProfileCache[fullReply.author];
+            const payout = parseFloat(
+              fullReply.pending_payout_value
+                ? fullReply.pending_payout_value.replace(' HBD', '')
+                : '0'
+            );
+            const childrenReplies = await fetchRepliesTreeWithContent(
+              fullReply.author,
+              fullReply.permlink,
+              depth + 1,
+              maxDepth
+            );
+            return {
+              author: fullReply.author,
+              avatarUrl,
+              body: fullReply.body,
+              created: fullReply.created,
+              voteCount: fullReply.net_votes,
+              replyCount: fullReply.children,
+              payout,
+              permlink: fullReply.permlink,
+              active_votes: fullReply.active_votes,
+              json_metadata: fullReply.json_metadata,
+              replies: childrenReplies,
+            };
+          })
+        );
+        return fullReplies;
+      } catch (error) {
+        console.error('Error fetching replies tree:', error);
+        return [];
+      }
+    },
+    []
+  );
 
   const fetchSnapAndReplies = useCallback(async () => {
     if (!author || !permlink || !currentUsername) {
-      setState(prev => ({ ...prev, loading: false, error: 'Missing required parameters' }));
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: 'Missing required parameters',
+      }));
       return;
     }
 
@@ -160,13 +194,18 @@ export const useConversationData = (
 
     try {
       // Fetch the main post
-      const post = await client.database.call('get_content', [author, permlink]);
-      
+      const post = await client.database.call('get_content', [
+        author,
+        permlink,
+      ]);
+
       // Fetch avatar robustly from account profile
       let avatarUrl: string | undefined = undefined;
       try {
         let meta;
-        const accounts = await client.database.call('get_accounts', [[post.author]]);
+        const accounts = await client.database.call('get_accounts', [
+          [post.author],
+        ]);
         if (accounts && accounts[0]) {
           meta = accounts[0].posting_json_metadata;
           if (!meta || meta === '{}') {
@@ -195,7 +234,11 @@ export const useConversationData = (
         created: post.created,
         voteCount: post.net_votes,
         replyCount: post.children,
-        payout: parseFloat(post.pending_payout_value ? post.pending_payout_value.replace(' HBD', '') : '0'),
+        payout: parseFloat(
+          post.pending_payout_value
+            ? post.pending_payout_value.replace(' HBD', '')
+            : '0'
+        ),
         permlink: post.permlink,
         active_votes: post.active_votes,
         json_metadata: post.json_metadata,
@@ -217,7 +260,10 @@ export const useConversationData = (
       setState(prev => ({
         ...prev,
         loading: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch conversation data',
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to fetch conversation data',
       }));
     }
   }, [author, permlink, currentUsername, fetchRepliesTreeWithContent]);
@@ -233,14 +279,17 @@ export const useConversationData = (
 
     try {
       // Fetch the main post without setting loading state
-      const post = await client.database.call('get_content', [author, permlink]);
-      
+      const post = await client.database.call('get_content', [
+        author,
+        permlink,
+      ]);
+
       // Fetch replies tree without setting loading state
       const tree = await fetchRepliesTreeWithContent(author, permlink);
 
       // Check if we have new content
-      const hasNewContent = tree.length > state.replies.length || 
-                           (post.body !== state.snap?.body);
+      const hasNewContent =
+        tree.length > state.replies.length || post.body !== state.snap?.body;
 
       if (hasNewContent) {
         // Update state without loading indicator
@@ -253,7 +302,11 @@ export const useConversationData = (
             created: post.created,
             voteCount: post.net_votes,
             replyCount: post.children,
-            payout: parseFloat(post.pending_payout_value ? post.pending_payout_value.replace(' HBD', '') : '0'),
+            payout: parseFloat(
+              post.pending_payout_value
+                ? post.pending_payout_value.replace(' HBD', '')
+                : '0'
+            ),
             permlink: post.permlink,
             active_votes: post.active_votes,
             json_metadata: post.json_metadata,
@@ -269,11 +322,72 @@ export const useConversationData = (
       console.error('Error checking for new content:', error);
       return false;
     }
-  }, [author, permlink, currentUsername, fetchRepliesTreeWithContent, state.replies.length, state.snap?.body]);
+  }, [
+    author,
+    permlink,
+    currentUsername,
+    fetchRepliesTreeWithContent,
+    state.replies.length,
+    state.snap?.body,
+  ]);
 
   const clearError = useCallback(() => {
     setState(prev => ({ ...prev, error: null }));
   }, []);
+
+  const { updateSingleSnap, updateSnapInTree } = useOptimisticUpdates();
+
+  // Update snap optimistically (for upvotes, etc.)
+  const updateSnap = useCallback(
+    (author: string, permlink: string, updates: Partial<SnapData>) => {
+      console.log('[ConversationScreen] updateSnap called:', {
+        author,
+        permlink,
+        updates,
+      });
+      setState(prev => {
+        const updatedSnap = updateSingleSnap(
+          prev.snap,
+          author,
+          permlink,
+          updates
+        );
+        console.log('[ConversationScreen] Previous snap:', prev.snap);
+        console.log('[ConversationScreen] Updated snap:', updatedSnap);
+        return {
+          ...prev,
+          snap: updatedSnap,
+        };
+      });
+    },
+    [updateSingleSnap]
+  );
+
+  // Update reply optimistically (for upvotes, etc.)
+  const updateReply = useCallback(
+    (author: string, permlink: string, updates: Partial<ReplyData>) => {
+      console.log('[ConversationScreen] updateReply called:', {
+        author,
+        permlink,
+        updates,
+      });
+      setState(prev => {
+        const updatedReplies = updateSnapInTree(
+          prev.replies,
+          author,
+          permlink,
+          updates
+        );
+        console.log('[ConversationScreen] Previous replies:', prev.replies);
+        console.log('[ConversationScreen] Updated replies:', updatedReplies);
+        return {
+          ...prev,
+          replies: updatedReplies,
+        };
+      });
+    },
+    [updateSnapInTree]
+  );
 
   // Fetch data when parameters change
   useEffect(() => {
@@ -288,5 +402,7 @@ export const useConversationData = (
     refreshConversation,
     checkForNewContent,
     clearError,
+    updateSnap,
+    updateReply,
   };
-}; 
+};

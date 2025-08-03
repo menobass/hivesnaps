@@ -56,30 +56,33 @@ export const useGifPicker = (): UseGifPickerReturn => {
 
     try {
       const { searchGifs, getTrendingGifs } = await import('../utils/tenorApi');
-      const response = query.trim() 
-        ? await searchGifs(query, 20) 
+      const response = query.trim()
+        ? await searchGifs(query, 20)
         : await getTrendingGifs(20);
-      
-      setState(prev => ({ 
-        ...prev, 
+
+      setState(prev => ({
+        ...prev,
         gifResults: response.results,
-        gifLoading: false 
+        gifLoading: false,
       }));
     } catch (error) {
       console.error('Error searching GIFs:', error);
-      setState(prev => ({ 
-        ...prev, 
+      setState(prev => ({
+        ...prev,
         gifResults: [],
-        gifLoading: false 
+        gifLoading: false,
       }));
     }
   }, []);
 
-  const selectGif = useCallback((gifUrl: string) => {
-    // This will be handled by the parent component through a callback
-    // The hook just manages the modal state
-    closeGifModal();
-  }, [closeGifModal]);
+  const selectGif = useCallback(
+    (gifUrl: string) => {
+      // This will be handled by the parent component through a callback
+      // The hook just manages the modal state
+      closeGifModal();
+    },
+    [closeGifModal]
+  );
 
   const clearGifResults = useCallback(() => {
     setState(prev => ({ ...prev, gifResults: [] }));
@@ -94,4 +97,4 @@ export const useGifPicker = (): UseGifPickerReturn => {
     selectGif,
     clearGifResults,
   };
-}; 
+};

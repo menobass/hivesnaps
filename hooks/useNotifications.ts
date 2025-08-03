@@ -22,7 +22,9 @@ interface UseNotificationsResult {
   refresh: () => Promise<void>;
   markAsRead: (notificationId: number) => Promise<void>;
   markAllAsRead: () => Promise<void>;
-  updateSettings: (newSettings: Partial<ReturnType<typeof getDefaultNotificationSettings>>) => void;
+  updateSettings: (
+    newSettings: Partial<ReturnType<typeof getDefaultNotificationSettings>>
+  ) => void;
 }
 
 const STORAGE_KEYS = {
@@ -31,13 +33,15 @@ const STORAGE_KEYS = {
   LAST_CHECK: 'notification_last_check',
 };
 
-export const useNotifications = (username: string | null): UseNotificationsResult => {
+export const useNotifications = (
+  username: string | null
+): UseNotificationsResult => {
   const [notifications, setNotifications] = useState<ParsedNotification[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState(getDefaultNotificationSettings());
-  
+
   const appState = useRef(AppState.currentState);
   const lastFetchTime = useRef<number>(0);
   const refreshInterval = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -46,9 +50,14 @@ export const useNotifications = (username: string | null): UseNotificationsResul
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const storedSettings = await SecureStore.getItemAsync(STORAGE_KEYS.SETTINGS);
+        const storedSettings = await SecureStore.getItemAsync(
+          STORAGE_KEYS.SETTINGS
+        );
         if (storedSettings) {
-          setSettings({ ...getDefaultNotificationSettings(), ...JSON.parse(storedSettings) });
+          setSettings({
+            ...getDefaultNotificationSettings(),
+            ...JSON.parse(storedSettings),
+          });
         }
       } catch (error) {
         console.error('Error loading notification settings:', error);
@@ -58,21 +67,31 @@ export const useNotifications = (username: string | null): UseNotificationsResul
   }, []);
 
   // Save settings to storage
-  const updateSettings = useCallback(async (newSettings: Partial<ReturnType<typeof getDefaultNotificationSettings>>) => {
-    const updatedSettings = { ...settings, ...newSettings };
-    setSettings(updatedSettings);
-    
-    try {
-      await SecureStore.setItemAsync(STORAGE_KEYS.SETTINGS, JSON.stringify(updatedSettings));
-    } catch (error) {
-      console.error('Error saving notification settings:', error);
-    }
-  }, [settings]);
+  const updateSettings = useCallback(
+    async (
+      newSettings: Partial<ReturnType<typeof getDefaultNotificationSettings>>
+    ) => {
+      const updatedSettings = { ...settings, ...newSettings };
+      setSettings(updatedSettings);
+
+      try {
+        await SecureStore.setItemAsync(
+          STORAGE_KEYS.SETTINGS,
+          JSON.stringify(updatedSettings)
+        );
+      } catch (error) {
+        console.error('Error saving notification settings:', error);
+      }
+    },
+    [settings]
+  );
 
   // Load read status from storage
   const loadReadStatus = useCallback(async (): Promise<number[]> => {
     try {
-      const readStatus = await SecureStore.getItemAsync(STORAGE_KEYS.READ_STATUS);
+      const readStatus = await SecureStore.getItemAsync(
+        STORAGE_KEYS.READ_STATUS
+      );
       return readStatus ? JSON.parse(readStatus) : [];
     } catch (error) {
       console.error('Error loading read status:', error);
@@ -83,7 +102,10 @@ export const useNotifications = (username: string | null): UseNotificationsResul
   // Save read status to storage
   const saveReadStatus = useCallback(async (readIds: number[]) => {
     try {
-      await SecureStore.setItemAsync(STORAGE_KEYS.READ_STATUS, JSON.stringify(readIds));
+      await SecureStore.setItemAsync(
+        STORAGE_KEYS.READ_STATUS,
+        JSON.stringify(readIds)
+      );
     } catch (error) {
       console.error('Error saving read status:', error);
     }
@@ -92,81 +114,102 @@ export const useNotifications = (username: string | null): UseNotificationsResul
   // Update last check timestamp
   const updateLastCheck = useCallback(async () => {
     try {
-      await SecureStore.setItemAsync(STORAGE_KEYS.LAST_CHECK, Date.now().toString());
+      await SecureStore.setItemAsync(
+        STORAGE_KEYS.LAST_CHECK,
+        Date.now().toString()
+      );
     } catch (error) {
       console.error('Error updating last check:', error);
     }
   }, []);
 
   // Fetch notifications from API
-  const fetchNotificationsData = useCallback(async (isRefresh = false): Promise<ParsedNotification[]> => {
-    if (!username) return [];
+  const fetchNotificationsData = useCallback(
+    async (isRefresh = false): Promise<ParsedNotification[]> => {
+      if (!username) return [];
 
-    try {
-      const rawNotifications = await fetchNotifications(username, 50);
-      const parsed = rawNotifications.map(parseNotification);
-      
-      // Load read status
-      const readNotifications = await loadReadStatus();
-      const withReadStatus = parsed.map(notification => ({
-        ...notification,
-        read: readNotifications.includes(notification.id),
-      }));
+      try {
+        const rawNotifications = await fetchNotifications(username, 50);
+        const parsed = rawNotifications.map(parseNotification);
 
-      // Filter by settings and sort chronologically
-      const filtered = filterNotificationsBySettings(withReadStatus, settings);
-      return sortNotifications(filtered, 'chronological');
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Failed to fetch notifications');
-    }
-  }, [username, settings, loadReadStatus]);
+        // Load read status
+        const readNotifications = await loadReadStatus();
+        const withReadStatus = parsed.map(notification => ({
+          ...notification,
+          read: readNotifications.includes(notification.id),
+        }));
+
+        // Filter by settings and sort chronologically
+        const filtered = filterNotificationsBySettings(
+          withReadStatus,
+          settings
+        );
+        return sortNotifications(filtered, 'chronological');
+      } catch (err) {
+        throw new Error(
+          err instanceof Error ? err.message : 'Failed to fetch notifications'
+        );
+      }
+    },
+    [username, settings, loadReadStatus]
+  );
 
   // Main refresh function
-  const refresh = useCallback(async (isManualRefresh = false) => {
-    if (!username) return;
+  const refresh = useCallback(
+    async (isManualRefresh = false) => {
+      if (!username) return;
 
-    // Prevent too frequent API calls (minimum 30 seconds between calls)
-    const now = Date.now();
-    if (!isManualRefresh && now - lastFetchTime.current < 30000) {
-      return;
-    }
-
-    if (isManualRefresh) {
-      setRefreshing(true);
-    } else if (notifications.length === 0) {
-      setLoading(true);
-    }
-
-    setError(null);
-
-    try {
-      const fetchedNotifications = await fetchNotificationsData(isManualRefresh);
-      setNotifications(fetchedNotifications);
-      lastFetchTime.current = now;
-      
-      if (isManualRefresh) {
-        await updateLastCheck();
+      // Prevent too frequent API calls (minimum 30 seconds between calls)
+      const now = Date.now();
+      if (!isManualRefresh && now - lastFetchTime.current < 30000) {
+        return;
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load notifications';
-      setError(errorMessage);
-      console.error('Error refreshing notifications:', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [username, notifications.length, fetchNotificationsData, updateLastCheck]);
+
+      if (isManualRefresh) {
+        setRefreshing(true);
+      } else if (notifications.length === 0) {
+        setLoading(true);
+      }
+
+      setError(null);
+
+      try {
+        const fetchedNotifications =
+          await fetchNotificationsData(isManualRefresh);
+        setNotifications(fetchedNotifications);
+        lastFetchTime.current = now;
+
+        if (isManualRefresh) {
+          await updateLastCheck();
+        }
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to load notifications';
+        setError(errorMessage);
+        console.error('Error refreshing notifications:', err);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [username, notifications.length, fetchNotificationsData, updateLastCheck]
+  );
 
   // Mark single notification as read
-  const markAsRead = useCallback(async (notificationId: number) => {
-    const updatedNotifications = notifications.map(notification =>
-      notification.id === notificationId ? { ...notification, read: true } : notification
-    );
-    setNotifications(updatedNotifications);
-    
-    const readIds = updatedNotifications.filter(n => n.read).map(n => n.id);
-    await saveReadStatus(readIds);
-  }, [notifications, saveReadStatus]);
+  const markAsRead = useCallback(
+    async (notificationId: number) => {
+      const updatedNotifications = notifications.map(notification =>
+        notification.id === notificationId
+          ? { ...notification, read: true }
+          : notification
+      );
+      setNotifications(updatedNotifications);
+
+      const readIds = updatedNotifications.filter(n => n.read).map(n => n.id);
+      await saveReadStatus(readIds);
+    },
+    [notifications, saveReadStatus]
+  );
 
   // Mark all notifications as read
   const markAllAsRead = useCallback(async () => {
@@ -175,7 +218,7 @@ export const useNotifications = (username: string | null): UseNotificationsResul
       read: true,
     }));
     setNotifications(updatedNotifications);
-    
+
     const readIds = updatedNotifications.map(n => n.id);
     await saveReadStatus(readIds);
     await updateLastCheck();
@@ -187,14 +230,20 @@ export const useNotifications = (username: string | null): UseNotificationsResul
   // Set up automatic refresh when app becomes active
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
-      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === 'active'
+      ) {
         // App has come to the foreground
         refresh(false);
       }
       appState.current = nextAppState;
     };
 
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    const subscription = AppState.addEventListener(
+      'change',
+      handleAppStateChange
+    );
     return () => subscription?.remove();
   }, [refresh]);
 

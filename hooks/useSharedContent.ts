@@ -23,14 +23,16 @@ export interface SharedContent {
  * Will be enhanced with react-native-share-menu in production builds
  */
 export const useSharedContent = () => {
-  const [sharedContent, setSharedContent] = useState<SharedContent | null>(null);
+  const [sharedContent, setSharedContent] = useState<SharedContent | null>(
+    null
+  );
   const [isProcessingShare, setIsProcessingShare] = useState(false);
 
   // For now, this is a placeholder implementation
   // In a production build with custom dev client, we would implement:
   // - ShareMenu.getInitialShare()
   // - ShareMenu.addNewShareListener()
-  
+
   useEffect(() => {
     // Placeholder for future native share implementation
     console.log('📱 Share hook initialized (placeholder mode)');
@@ -40,18 +42,26 @@ export const useSharedContent = () => {
     console.log('📱 Processing shared data:', shareData);
 
     // Handle multiple images
-    if (shareData.data && Array.isArray(shareData.data) && shareData.data.length > 0) {
-      const imageData = shareData.data.filter((item: ShareItem) => 
-        item.data && (
-          item.mimeType?.startsWith('image/') || 
-          typeof item.data === 'string' && item.data.match(/\.(jpg|jpeg|png|gif|webp)$/i)
-        )
+    if (
+      shareData.data &&
+      Array.isArray(shareData.data) &&
+      shareData.data.length > 0
+    ) {
+      const imageData = shareData.data.filter(
+        (item: ShareItem) =>
+          item.data &&
+          (item.mimeType?.startsWith('image/') ||
+            (typeof item.data === 'string' &&
+              item.data.match(/\.(jpg|jpeg|png|gif|webp)$/i)))
       );
-      
+
       if (imageData.length > 0) {
         return {
           type: imageData.length === 1 ? 'image' : 'images',
-          data: imageData.length === 1 ? imageData[0].data : imageData.map((item: ShareItem) => item.data),
+          data:
+            imageData.length === 1
+              ? imageData[0].data
+              : imageData.map((item: ShareItem) => item.data),
           mimeType: imageData[0].mimeType,
         };
       }
@@ -59,15 +69,25 @@ export const useSharedContent = () => {
 
     // Handle single item (text, URL, or single image)
     if (shareData.data) {
-      const data = typeof shareData.data === 'string' ? shareData.data : shareData.data[0]?.data;
-      const mimeType = shareData.mimeType || (Array.isArray(shareData.data) ? shareData.data[0]?.mimeType : undefined);
+      const data =
+        typeof shareData.data === 'string'
+          ? shareData.data
+          : shareData.data[0]?.data;
+      const mimeType =
+        shareData.mimeType ||
+        (Array.isArray(shareData.data)
+          ? shareData.data[0]?.mimeType
+          : undefined);
 
       if (!data) {
         return { type: 'text', data: '' };
       }
 
       // Check if it's an image
-      if (mimeType?.startsWith('image/') || data.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+      if (
+        mimeType?.startsWith('image/') ||
+        data.match(/\.(jpg|jpeg|png|gif|webp)$/i)
+      ) {
         return {
           type: 'image',
           data,
@@ -106,10 +126,12 @@ export const useSharedContent = () => {
     setSharedContent(content);
   };
 
-  const hasSharedContent = sharedContent !== null && 
-    (sharedContent.type === 'text' ? 
-      typeof sharedContent.data === 'string' && sharedContent.data.trim() !== '' : 
-      true);
+  const hasSharedContent =
+    sharedContent !== null &&
+    (sharedContent.type === 'text'
+      ? typeof sharedContent.data === 'string' &&
+        sharedContent.data.trim() !== ''
+      : true);
 
   return {
     sharedContent,

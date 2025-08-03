@@ -3,7 +3,9 @@
 
 export async function getHivePriceUSD(): Promise<number> {
   try {
-    const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=hive&vs_currencies=usd');
+    const response = await fetch(
+      'https://api.coingecko.com/api/v3/simple/price?ids=hive&vs_currencies=usd'
+    );
     const data = await response.json();
     if (data && data.hive && typeof data.hive.usd === 'number') {
       return data.hive.usd;

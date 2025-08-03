@@ -26,20 +26,42 @@ export default function SnapMock() {
   const colors = twitterColors[colorScheme];
 
   return (
-    <View style={[styles.bubble, { backgroundColor: colors.bubble, borderColor: colors.border }]}> 
+    <View
+      style={[
+        styles.bubble,
+        { backgroundColor: colors.bubble, borderColor: colors.border },
+      ]}
+    >
       {/* Top row: avatar, username, timestamp */}
       <View style={styles.topRow}>
-        <Image source={require('../../assets/images/generic-avatar.png')} style={styles.avatar} />       
+        <Image
+          source={require('../../assets/images/generic-avatar.png')}
+          style={styles.avatar}
+        />
         <Text style={[styles.username, { color: colors.text }]}>menoshops</Text>
-        <Text style={[styles.timestamp, { color: colors.text }]}>2025-06-24 14:32</Text>    
+        <Text style={[styles.timestamp, { color: colors.text }]}>
+          2025-06-24 14:32
+        </Text>
       </View>
       {/* Body */}
-      <Text style={[styles.body, { color: colors.text }]}>This is a sample Snap! It can contain text, and later images or videos.</Text>
+      <Text style={[styles.body, { color: colors.text }]}>
+        This is a sample Snap! It can contain text, and later images or videos.
+      </Text>
       {/* VoteReplyBar */}
       <View style={styles.voteBar}>
-        <FontAwesome name="arrow-up" size={18} color={colors.icon} style={styles.icon} />
+        <FontAwesome
+          name='arrow-up'
+          size={18}
+          color={colors.icon}
+          style={styles.icon}
+        />
         <Text style={[styles.voteCount, { color: colors.text }]}>12</Text>
-        <FontAwesome name="comment-o" size={18} color={colors.icon} style={styles.icon} />
+        <FontAwesome
+          name='comment-o'
+          size={18}
+          color={colors.icon}
+          style={styles.icon}
+        />
         <Text style={[styles.replyCount, { color: colors.text }]}>3</Text>
         <View style={{ flex: 1 }} />
         <Text style={[styles.payout, { color: colors.payout }]}>$2.34</Text>

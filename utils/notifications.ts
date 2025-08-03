@@ -35,7 +35,7 @@ export interface ParsedNotification extends HiveNotification {
  * Fetch notifications for a given account from Hive Bridge API
  */
 export async function fetchNotifications(
-  account: string, 
+  account: string,
   limit: number = 50
 ): Promise<HiveNotification[]> {
   try {
@@ -61,7 +61,9 @@ export async function fetchNotifications(
 /**
  * Parse notification message to extract key information
  */
-export function parseNotification(notification: HiveNotification): ParsedNotification {
+export function parseNotification(
+  notification: HiveNotification
+): ParsedNotification {
   const parsed: ParsedNotification = {
     ...notification,
     icon: 'bell',
@@ -76,9 +78,11 @@ export function parseNotification(notification: HiveNotification): ParsedNotific
       parsed.icon = 'arrow-up';
       parsed.color = '#17BF63';
       parsed.actionText = 'Upvoted';
-      
+
       // Extract voter and amount from message like "@alice voted on your post ($0.013)"
-      const voteMatch = notification.msg.match(/@(\w+) voted on your post \(\$([0-9.]+)\)/);
+      const voteMatch = notification.msg.match(
+        /@(\w+) voted on your post \(\$([0-9.]+)\)/
+      );
       if (voteMatch) {
         parsed.actionUser = voteMatch[1];
         parsed.amount = `$${voteMatch[2]}`;
@@ -89,7 +93,7 @@ export function parseNotification(notification: HiveNotification): ParsedNotific
       parsed.icon = 'comment';
       parsed.color = '#1DA1F2';
       parsed.actionText = 'Replied to';
-      
+
       // Extract replier from message like "@bob replied to your post"
       const replyMatch = notification.msg.match(/@(\w+) replied to your/);
       if (replyMatch) {
@@ -101,7 +105,7 @@ export function parseNotification(notification: HiveNotification): ParsedNotific
       parsed.icon = 'repeat';
       parsed.color = '#17BF63';
       parsed.actionText = 'Reblogged';
-      
+
       // Extract reblogger from message like "@charlie reblogged your post"
       const reblogMatch = notification.msg.match(/@(\w+) reblogged your/);
       if (reblogMatch) {
@@ -113,9 +117,11 @@ export function parseNotification(notification: HiveNotification): ParsedNotific
       parsed.icon = 'user-plus';
       parsed.color = '#1DA1F2';
       parsed.actionText = 'Started following you';
-      
+
       // Extract follower from message like "@dave followed you" or "@dave started following you"
-      const followMatch = notification.msg.match(/@(\w+) (?:followed|started following) you/);
+      const followMatch = notification.msg.match(
+        /@(\w+) (?:followed|started following) you/
+      );
       if (followMatch) {
         parsed.actionUser = followMatch[1];
       } else if (notification.url && notification.url.startsWith('@')) {
@@ -128,7 +134,7 @@ export function parseNotification(notification: HiveNotification): ParsedNotific
       parsed.icon = 'at';
       parsed.color = '#F4900C';
       parsed.actionText = 'Mentioned you';
-      
+
       // Extract mentioner from message like "@eve mentioned you in a post"
       const mentionMatch = notification.msg.match(/@(\w+) mentioned you/);
       if (mentionMatch) {
@@ -202,7 +208,7 @@ export function getUnreadCount(notifications: ParsedNotification[]): number {
 }
 
 export function sortNotifications(
-  notifications: ParsedNotification[], 
+  notifications: ParsedNotification[],
   sortBy: 'priority' | 'chronological' = 'chronological'
 ): ParsedNotification[] {
   return notifications.sort((a, b) => {
@@ -216,7 +222,8 @@ export function sortNotifications(
       return a.read ? 1 : -1;
     }
     // Then by priority
-    const priorityDiff = getNotificationPriority(b) - getNotificationPriority(a);
+    const priorityDiff =
+      getNotificationPriority(b) - getNotificationPriority(a);
     if (priorityDiff !== 0) {
       return priorityDiff;
     }
@@ -265,43 +272,54 @@ export function filterNotificationsBySettings(
   });
 }
 
-export function getNotificationPriority(notification: ParsedNotification): number {
+export function getNotificationPriority(
+  notification: ParsedNotification
+): number {
   const priorities: Record<string, number> = {
-    'mention': 10,
-    'reply': 9,
-    'vote': 8,
-    'follow': 7,
-    'reblog': 6,
-    'set_role': 5,
-    'set_label': 4,
-    'subscribe': 3,
-    'new_community': 2,
+    mention: 10,
+    reply: 9,
+    vote: 8,
+    follow: 7,
+    reblog: 6,
+    set_role: 5,
+    set_label: 4,
+    subscribe: 3,
+    new_community: 2,
   };
   return priorities[notification.type] || 1;
 }
 
-export function markAsRead(notifications: ParsedNotification[], notificationId: number): ParsedNotification[] {
-  return notifications.map(n => 
+export function markAsRead(
+  notifications: ParsedNotification[],
+  notificationId: number
+): ParsedNotification[] {
+  return notifications.map(n =>
     n.id === notificationId ? { ...n, read: true } : n
   );
 }
 
-export function markAllAsRead(notifications: ParsedNotification[]): ParsedNotification[] {
+export function markAllAsRead(
+  notifications: ParsedNotification[]
+): ParsedNotification[] {
   return notifications.map(n => ({ ...n, read: true }));
 }
 
 export function formatNotificationTime(date: string): string {
   const notificationDate = new Date(date);
   const now = new Date();
-  const diffInMinutes = Math.floor((now.getTime() - notificationDate.getTime()) / (1000 * 60));
+  const diffInMinutes = Math.floor(
+    (now.getTime() - notificationDate.getTime()) / (1000 * 60)
+  );
   if (diffInMinutes < 1) {
     return 'Just now';
   } else if (diffInMinutes < 60) {
     return `${diffInMinutes}m ago`;
-  } else if (diffInMinutes < 1440) { // 24 hours
+  } else if (diffInMinutes < 1440) {
+    // 24 hours
     const hours = Math.floor(diffInMinutes / 60);
     return `${hours}h ago`;
-  } else if (diffInMinutes < 10080) { // 7 days
+  } else if (diffInMinutes < 10080) {
+    // 7 days
     const days = Math.floor(diffInMinutes / 1440);
     return `${days}d ago`;
   } else {
@@ -309,6 +327,8 @@ export function formatNotificationTime(date: string): string {
   }
 }
 
-export function isActionableNotification(notification: ParsedNotification): boolean {
+export function isActionableNotification(
+  notification: ParsedNotification
+): boolean {
   return !!(notification.url && notification.targetContent);
 }

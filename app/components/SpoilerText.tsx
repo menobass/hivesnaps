@@ -37,19 +37,19 @@ const SpoilerText: React.FC<SpoilerTextProps> = ({ buttonText, children }) => {
           {buttonText}
         </Text>
       </TouchableOpacity>
-      
+
       {isRevealed && (
-        <View style={{
-          marginTop: 8,
-          padding: 12,
-          backgroundColor: isDark ? '#2a2a2a' : '#f9f9f9',
-          borderRadius: 8,
-          borderLeftWidth: 3,
-          borderLeftColor: isDark ? '#4a90e2' : '#007AFF',
-        }}>
-          <Text style={{ color: isDark ? '#fff' : '#333' }}>
-            {children}
-          </Text>
+        <View
+          style={{
+            marginTop: 8,
+            padding: 12,
+            backgroundColor: isDark ? '#2a2a2a' : '#f9f9f9',
+            borderRadius: 8,
+            borderLeftWidth: 3,
+            borderLeftColor: isDark ? '#4a90e2' : '#007AFF',
+          }}
+        >
+          <Text style={{ color: isDark ? '#fff' : '#333' }}>{children}</Text>
         </View>
       )}
     </View>

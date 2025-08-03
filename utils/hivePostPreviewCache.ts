@@ -15,7 +15,10 @@ interface CacheEntry {
 class HivePostPreviewCache {
   private cache = new Map<string, CacheEntry>();
   private readonly TTL = 5 * 60 * 1000; // 5 minutes cache
-  private readonly loadingPromises = new Map<string, Promise<HivePostInfo | null>>();
+  private readonly loadingPromises = new Map<
+    string,
+    Promise<HivePostInfo | null>
+  >();
 
   /**
    * Generate cache key from URL
@@ -37,11 +40,11 @@ class HivePostPreviewCache {
   getCachedPostInfo(url: string): HivePostInfo | null {
     const key = this.getCacheKey(url);
     const entry = this.cache.get(key);
-    
+
     if (entry && this.isValidCacheEntry(entry)) {
       return entry.data;
     }
-    
+
     return null;
   }
 
@@ -50,8 +53,9 @@ class HivePostPreviewCache {
    */
   isLoading(url: string): boolean {
     const key = this.getCacheKey(url);
-    return this.loadingPromises.has(key) || 
-           (this.cache.get(key)?.loading === true);
+    return (
+      this.loadingPromises.has(key) || this.cache.get(key)?.loading === true
+    );
   }
 
   /**
@@ -60,12 +64,12 @@ class HivePostPreviewCache {
   setLoading(url: string, promise: Promise<HivePostInfo | null>): void {
     const key = this.getCacheKey(url);
     this.loadingPromises.set(key, promise);
-    
+
     // Set cache entry as loading
     this.cache.set(key, {
       data: null,
       timestamp: Date.now(),
-      loading: true
+      loading: true,
     });
 
     // Clean up promise when done
@@ -77,13 +81,17 @@ class HivePostPreviewCache {
   /**
    * Cache post info result
    */
-  setCachedPostInfo(url: string, postInfo: HivePostInfo | null, error?: string): void {
+  setCachedPostInfo(
+    url: string,
+    postInfo: HivePostInfo | null,
+    error?: string
+  ): void {
     const key = this.getCacheKey(url);
     this.cache.set(key, {
       data: postInfo,
       timestamp: Date.now(),
       loading: false,
-      error
+      error,
     });
   }
 
@@ -122,9 +130,9 @@ class HivePostPreviewCache {
     return {
       totalEntries: this.cache.size,
       loadingEntries: this.loadingPromises.size,
-      validEntries: Array.from(this.cache.values()).filter(entry => 
+      validEntries: Array.from(this.cache.values()).filter(entry =>
         this.isValidCacheEntry(entry)
-      ).length
+      ).length,
     };
   }
 }
@@ -133,6 +141,9 @@ class HivePostPreviewCache {
 export const hivePostPreviewCache = new HivePostPreviewCache();
 
 // Cleanup expired entries every 2 minutes
-setInterval(() => {
-  hivePostPreviewCache.cleanup();
-}, 2 * 60 * 1000);
+setInterval(
+  () => {
+    hivePostPreviewCache.cleanup();
+  },
+  2 * 60 * 1000
+);
