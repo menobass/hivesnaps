@@ -53,9 +53,15 @@ export const useUserProfile = (username: string | null) => {
         setAvatarUrl(avatar);
 
         // Check for unclaimed rewards
-        const unclaimedHbd = parseFloat(account.reward_hbd_balance || '0');
-        const unclaimedHive = parseFloat(account.reward_vesting_balance || '0');
-        const unclaimedVests = parseFloat(account.reward_vesting_steem || '0');
+        const unclaimedHbd = parseFloat(
+          String(account.reward_hbd_balance || '0')
+        );
+        const unclaimedHive = parseFloat(
+          String(account.reward_vesting_balance || '0')
+        );
+        const unclaimedVests = parseFloat(
+          String(account.reward_vesting_hive || '0')
+        );
 
         const hasRewards =
           unclaimedHbd > 0 || unclaimedHive > 0 || unclaimedVests > 0;

@@ -24,6 +24,15 @@ import {
   type ParsedNotification,
 } from '../utils/notifications';
 import { useNotifications } from '../hooks/useNotifications';
+import { detectPostType, type PostInfo } from '../utils/postTypeDetector';
+import { Client } from '@hiveio/dhive';
+
+const HIVE_NODES = [
+  'https://api.hive.blog',
+  'https://api.deathwing.me',
+  'https://api.openhive.network',
+];
+const client = new Client(HIVE_NODES);
 
 interface NotificationItemProps {
   notification: ParsedNotification;
@@ -177,9 +186,19 @@ const NotificationsScreen = () => {
 
   // The useNotifications hook handles loading notifications when username changes
 
-  const handleNotificationPress = (notification: ParsedNotification) => {
+  const handleNotificationPress = async (notification: ParsedNotification) => {
+    console.log('[NotificationsScreen] handleNotificationPress called:', {
+      notificationType: notification.type,
+      actionUser: notification.actionUser,
+      targetContent: notification.targetContent,
+      isActionable: isActionableNotification(notification),
+    });
+
     // Handle follower notifications - navigate to the follower's profile
     if (notification.type === 'follow' && notification.actionUser) {
+      console.log(
+        '[NotificationsScreen] Navigating to ProfileScreen for follow notification'
+      );
       router.push({
         pathname: '/ProfileScreen',
         params: {
@@ -191,13 +210,96 @@ const NotificationsScreen = () => {
 
     // Handle other actionable notifications - navigate to post/comment
     if (isActionableNotification(notification) && notification.targetContent) {
-      router.push({
-        pathname: '/ConversationScreen',
-        params: {
-          author: notification.targetContent.author,
-          permlink: notification.targetContent.permlink,
-        },
+      console.log('[NotificationsScreen] Fetching post data for navigation:', {
+        author: notification.targetContent.author,
+        permlink: notification.targetContent.permlink,
       });
+
+      try {
+        // Fetch the post data to determine if it's a snap or regular Hive post
+        const postData = await client.database.call('get_content', [
+          notification.targetContent.author,
+          notification.targetContent.permlink,
+        ]);
+
+        console.log('[NotificationsScreen] Post data received:', {
+          hasPostData: !!postData,
+          author: postData?.author,
+          permlink: postData?.permlink,
+          title: postData?.title,
+          parent_author: postData?.parent_author,
+          json_metadata: postData?.json_metadata ? 'present' : 'missing',
+        });
+
+        if (postData && postData.author) {
+          const postInfo: PostInfo = {
+            author: postData.author,
+            permlink: postData.permlink,
+            title: postData.title,
+            body: postData.body,
+            json_metadata: postData.json_metadata,
+            parent_author: postData.parent_author,
+            parent_permlink: postData.parent_permlink,
+          };
+
+          console.log('[NotificationsScreen] Post info for detection:', {
+            author: postInfo.author,
+            permlink: postInfo.permlink,
+            parent_author: postInfo.parent_author,
+            hasMetadata: !!postInfo.json_metadata,
+          });
+
+          const postType = detectPostType(postInfo);
+          console.log('[NotificationsScreen] Post type detected:', postType);
+
+          if (postType === 'snap') {
+            console.log(
+              '[NotificationsScreen] Navigating to ConversationScreen (snap)'
+            );
+            router.push({
+              pathname: '/ConversationScreen',
+              params: {
+                author: notification.targetContent.author,
+                permlink: notification.targetContent.permlink,
+              },
+            });
+          } else {
+            console.log(
+              '[NotificationsScreen] Navigating to HivePostScreen (regular post)'
+            );
+            router.push({
+              pathname: '/HivePostScreen',
+              params: {
+                author: notification.targetContent.author,
+                permlink: notification.targetContent.permlink,
+              },
+            });
+          }
+        } else {
+          console.log('[NotificationsScreen] Post not found, showing error');
+          // Show an error instead of navigating to a broken screen
+          Alert.alert(
+            'Post Not Found',
+            "The post you're trying to view could not be found. It may have been deleted or the link may be invalid.",
+            [{ text: 'OK' }]
+          );
+        }
+      } catch (error) {
+        console.error(
+          '[NotificationsScreen] Error fetching post data for navigation:',
+          error
+        );
+        // Show an error instead of navigating to a broken screen
+        Alert.alert(
+          'Error Loading Post',
+          'There was an error loading the post. Please try again later.',
+          [{ text: 'OK' }]
+        );
+      }
+    } else {
+      console.log(
+        '[NotificationsScreen] Notification not actionable or missing target content'
+      );
     }
   };
 
