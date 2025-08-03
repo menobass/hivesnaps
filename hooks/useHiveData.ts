@@ -20,13 +20,15 @@ export const useHiveData = () => {
         // Fetch reward fund
         const fund = await client.database.call('get_reward_fund', ['post']);
         setRewardFund(fund);
-        
+
         // Fetch global props
         const props = await client.database.getDynamicGlobalProperties();
         setGlobalProps(props);
-        
+
         // Fetch hive price
-        const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=hive&vs_currencies=usd');
+        const response = await fetch(
+          'https://api.coingecko.com/api/v3/simple/price?ids=hive&vs_currencies=usd'
+        );
         const data = await response.json();
         setHivePrice(data.hive?.usd || 1);
       } catch (error) {
@@ -42,4 +44,4 @@ export const useHiveData = () => {
     globalProps,
     rewardFund,
   };
-}; 
+};

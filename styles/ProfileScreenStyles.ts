@@ -79,7 +79,7 @@ interface ProfileScreenColors {
 
 export const createProfileScreenStyles = (isDark: boolean) => {
   const colors = isDark ? profileScreenColors.dark : profileScreenColors.light;
-  
+
   // Create extended colors object with all the specific color mappings
   const extendedColors: ProfileScreenColors = {
     ...colors,
@@ -116,7 +116,7 @@ export const createProfileScreenStyles = (isDark: boolean) => {
   };
 
   return StyleSheet.create({
-    safeArea: { 
+    safeArea: {
       flex: 1,
       backgroundColor: extendedColors.safeAreaBackground,
     },

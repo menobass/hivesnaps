@@ -50,7 +50,7 @@ function stripImageTags(text: string): string {
 }
 
 export const useEdit = (
-  currentUsername: string | null, 
+  currentUsername: string | null,
   onRefresh?: () => Promise<boolean>,
   onSubmissionStart?: () => void
 ): UseEditReturn => {
@@ -66,18 +66,21 @@ export const useEdit = (
     error: null,
   });
 
-  const openEditModal = useCallback((target: EditTarget, currentBody: string) => {
-    const textBody = stripImageTags(currentBody);
-    setState(prev => ({
-      ...prev,
-      editTarget: target,
-      editText: textBody,
-      editImage: null,
-      editGif: null,
-      editModalVisible: true,
-      error: null,
-    }));
-  }, []);
+  const openEditModal = useCallback(
+    (target: EditTarget, currentBody: string) => {
+      const textBody = stripImageTags(currentBody);
+      setState(prev => ({
+        ...prev,
+        editTarget: target,
+        editText: textBody,
+        editImage: null,
+        editGif: null,
+        editModalVisible: true,
+        error: null,
+      }));
+    },
+    []
+  );
 
   const closeEditModal = useCallback(() => {
     setState(prev => ({
@@ -109,8 +112,10 @@ export const useEdit = (
     setState(prev => ({ ...prev, uploading: true }));
 
     try {
-      const { launchImageLibraryAsync, MediaTypeOptions } = await import('expo-image-picker');
-      
+      const { launchImageLibraryAsync, MediaTypeOptions } = await import(
+        'expo-image-picker'
+      );
+
       const result = await launchImageLibraryAsync({
         mediaTypes: MediaTypeOptions.Images,
         allowsEditing: true,
@@ -119,21 +124,22 @@ export const useEdit = (
 
       if (!result.canceled && result.assets && result.assets[0]) {
         const asset = result.assets[0];
-        
+
         const fileToUpload = {
           uri: asset.uri,
           name: `edit-${Date.now()}.jpg`,
           type: 'image/jpeg',
         };
-        
+
         const cloudinaryUrl = await uploadImageToCloudinaryFixed(fileToUpload);
         setState(prev => ({ ...prev, editImage: cloudinaryUrl }));
       }
     } catch (error) {
       console.error('Image upload error:', error);
-      setState(prev => ({ 
-        ...prev, 
-        error: error instanceof Error ? error.message : 'Failed to upload image' 
+      setState(prev => ({
+        ...prev,
+        error:
+          error instanceof Error ? error.message : 'Failed to upload image',
       }));
     } finally {
       setState(prev => ({ ...prev, uploading: false }));
@@ -145,7 +151,11 @@ export const useEdit = (
   }, []);
 
   const submitEdit = useCallback(async () => {
-    if (!state.editTarget || (!state.editText.trim() && !state.editImage && !state.editGif) || !currentUsername) {
+    if (
+      !state.editTarget ||
+      (!state.editText.trim() && !state.editImage && !state.editGif) ||
+      !currentUsername
+    ) {
       return;
     }
 
@@ -168,8 +178,11 @@ export const useEdit = (
       }
 
       // Get the original post to preserve parent relationships
-      const originalPost = await client.database.call('get_content', [state.editTarget.author, state.editTarget.permlink]);
-      
+      const originalPost = await client.database.call('get_content', [
+        state.editTarget.author,
+        state.editTarget.permlink,
+      ]);
+
       // Parse existing metadata and add edited flag
       let existingMetadata: any = {};
       try {
@@ -197,31 +210,34 @@ export const useEdit = (
       }
 
       // Edit the post/reply using same author/permlink with new content
-      await client.broadcast.comment({
-        parent_author: originalPost.parent_author, // Keep original parent
-        parent_permlink: originalPost.parent_permlink, // Keep original parent permlink
-        author: currentUsername,
-        permlink: state.editTarget.permlink,
-        title: originalPost.title || '', // Keep original title
-        body,
-        json_metadata: JSON.stringify(json_metadata),
-      }, postingKey);
+      await client.broadcast.comment(
+        {
+          parent_author: originalPost.parent_author, // Keep original parent
+          parent_permlink: originalPost.parent_permlink, // Keep original parent permlink
+          author: currentUsername,
+          permlink: state.editTarget.permlink,
+          title: originalPost.title || '', // Keep original title
+          body,
+          json_metadata: JSON.stringify(json_metadata),
+        },
+        postingKey
+      );
 
       // Close modal and reset state
       closeEditModal();
-      
+
       // Set processing state to true
       setState(prev => ({ ...prev, processing: true }));
-      
+
       // Notify that submission has started
       onSubmissionStart?.();
-      
+
       // Add delay to account for Hive blockchain block time (3 seconds)
       setTimeout(() => {
         // Poll for new content every second for up to 4 retries
         let retryCount = 0;
         const maxRetries = 4;
-        
+
         const pollForContent = () => {
           console.log(`Edit polling attempt ${retryCount + 1}/${maxRetries}`);
           onRefresh?.().then(found => {
@@ -232,7 +248,9 @@ export const useEdit = (
             }
             retryCount++;
             if (retryCount < maxRetries) {
-              console.log(`Edited content not found, polling again in 1 second...`);
+              console.log(
+                `Edited content not found, polling again in 1 second...`
+              );
               setTimeout(pollForContent, 1000); // Poll again in 1 second
             } else {
               console.log('Max retries reached, stopping edit polling');
@@ -240,7 +258,7 @@ export const useEdit = (
             }
           });
         };
-        
+
         pollForContent(); // Start polling
       }, 3000);
     } catch (error) {
@@ -251,7 +269,16 @@ export const useEdit = (
         editing: false,
       }));
     }
-  }, [state.editTarget, state.editText, state.editImage, state.editGif, currentUsername, closeEditModal, onRefresh, onSubmissionStart]);
+  }, [
+    state.editTarget,
+    state.editText,
+    state.editImage,
+    state.editGif,
+    currentUsername,
+    closeEditModal,
+    onRefresh,
+    onSubmissionStart,
+  ]);
 
   const clearError = useCallback(() => {
     setState(prev => ({ ...prev, error: null }));
@@ -269,4 +296,4 @@ export const useEdit = (
     addGif,
     clearError,
   };
-}; 
+};

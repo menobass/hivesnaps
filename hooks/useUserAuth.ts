@@ -23,7 +23,10 @@ export const useUserAuth = () => {
       await SecureStore.deleteItemAsync('hive_posting_key');
       setCurrentUsername(null);
     } catch (err) {
-      throw new Error('Logout failed: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
+      throw new Error(
+        'Logout failed: ' +
+          (err instanceof Error ? err.message : JSON.stringify(err))
+      );
     }
   };
 
@@ -32,4 +35,4 @@ export const useUserAuth = () => {
     setCurrentUsername,
     handleLogout,
   };
-}; 
+};

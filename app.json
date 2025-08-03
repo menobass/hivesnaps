@@ -5,10 +5,7 @@
     "slug": "hivesnaps",
     "version": "1.1.0",
     "orientation": "portrait",
-    "platforms": [
-      "ios",
-      "android"
-    ],
+    "platforms": ["ios", "android"],
     "icon": "./assets/images/icon.png",
     "scheme": "hivesnaps",
     "userInterfaceStyle": "automatic",
@@ -38,9 +35,7 @@
       "intentFilters": [
         {
           "action": "android.intent.action.SEND",
-          "category": [
-            "android.intent.category.DEFAULT"
-          ],
+          "category": ["android.intent.category.DEFAULT"],
           "data": [
             {
               "mimeType": "image/*"
@@ -55,9 +50,7 @@
         },
         {
           "action": "android.intent.action.SEND_MULTIPLE",
-          "category": [
-            "android.intent.category.DEFAULT"
-          ],
+          "category": ["android.intent.category.DEFAULT"],
           "data": [
             {
               "mimeType": "image/*"

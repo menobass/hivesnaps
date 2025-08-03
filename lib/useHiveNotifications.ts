@@ -12,7 +12,7 @@ export interface NotificationHookOptions {
 export function useHiveNotifications({
   username,
   onNotificationReceived,
-  onNotificationTapped
+  onNotificationTapped,
 }: NotificationHookOptions) {
   const router = useRouter();
   const notificationListener = useRef<Notifications.Subscription | null>(null);
@@ -36,25 +36,29 @@ export function useHiveNotifications({
     initializeNotifications();
 
     // Listen for notifications while app is running
-    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-      console.log('🔔 Notification received:', notification);
-      onNotificationReceived?.(notification);
-    });
+    notificationListener.current =
+      Notifications.addNotificationReceivedListener(notification => {
+        console.log('🔔 Notification received:', notification);
+        onNotificationReceived?.(notification);
+      });
 
     // Listen for notification taps
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('🔔 Notification tapped:', response);
-      
-      // Handle navigation based on notification type
-      handleNotificationTap(response, router);
-      
-      onNotificationTapped?.(response);
-    });
+    responseListener.current =
+      Notifications.addNotificationResponseReceivedListener(response => {
+        console.log('🔔 Notification tapped:', response);
+
+        // Handle navigation based on notification type
+        handleNotificationTap(response, router);
+
+        onNotificationTapped?.(response);
+      });
 
     // Cleanup function
     return () => {
       if (notificationListener.current) {
-        Notifications.removeNotificationSubscription(notificationListener.current);
+        Notifications.removeNotificationSubscription(
+          notificationListener.current
+        );
       }
       if (responseListener.current) {
         Notifications.removeNotificationSubscription(responseListener.current);
@@ -72,11 +76,11 @@ export function useHiveNotifications({
 
 // Handle notification tap navigation
 function handleNotificationTap(
-  response: Notifications.NotificationResponse, 
+  response: Notifications.NotificationResponse,
   router: any
 ) {
   const { data } = response.notification.request.content;
-  
+
   if (!data) return;
 
   try {
@@ -86,41 +90,41 @@ function handleNotificationTap(
           // Navigate to the conversation screen
           router.push({
             pathname: '/ConversationScreen',
-            params: { author: data.author, permlink: data.permlink }
+            params: { author: data.author, permlink: data.permlink },
           });
         }
         break;
-        
+
       case 'mention':
         if (data.author && data.permlink) {
           // Navigate to the post where user was mentioned
           router.push({
             pathname: '/ConversationScreen',
-            params: { author: data.author, permlink: data.permlink }
+            params: { author: data.author, permlink: data.permlink },
           });
         }
         break;
-        
+
       case 'upvote':
         if (data.author && data.permlink) {
           // Navigate to the upvoted post
           router.push({
             pathname: '/ConversationScreen',
-            params: { author: data.author, permlink: data.permlink }
+            params: { author: data.author, permlink: data.permlink },
           });
         }
         break;
-        
+
       case 'follow':
         if (data.author) {
           // Navigate to the follower's profile
           router.push({
             pathname: '/ProfileScreen',
-            params: { username: data.author }
+            params: { username: data.author },
           });
         }
         break;
-        
+
       default:
         console.log('Unknown notification type:', data.type);
     }
@@ -139,11 +143,11 @@ export async function sendTestNotification() {
         data: {
           type: 'test',
           author: 'testuser',
-          permlink: 'test-post'
+          permlink: 'test-post',
         },
       },
-      trigger: { 
-        seconds: 2 
+      trigger: {
+        seconds: 2,
       } as any, // Expo notification trigger type
     });
     console.log('🔔 Test notification scheduled');

@@ -40,7 +40,7 @@ interface UseReplyReturn extends ReplyState {
 }
 
 export const useReply = (
-  currentUsername: string | null, 
+  currentUsername: string | null,
   onRefresh?: () => Promise<boolean>,
   onSubmissionStart?: () => void
 ): UseReplyReturn => {
@@ -94,8 +94,10 @@ export const useReply = (
     setState(prev => ({ ...prev, uploading: true }));
 
     try {
-      const { launchImageLibraryAsync, MediaTypeOptions } = await import('expo-image-picker');
-      
+      const { launchImageLibraryAsync, MediaTypeOptions } = await import(
+        'expo-image-picker'
+      );
+
       const result = await launchImageLibraryAsync({
         mediaTypes: MediaTypeOptions.Images,
         allowsEditing: true,
@@ -104,21 +106,22 @@ export const useReply = (
 
       if (!result.canceled && result.assets && result.assets[0]) {
         const asset = result.assets[0];
-        
+
         const fileToUpload = {
           uri: asset.uri,
           name: `reply-${Date.now()}.jpg`,
           type: 'image/jpeg',
         };
-        
+
         const cloudinaryUrl = await uploadImageToCloudinaryFixed(fileToUpload);
         setState(prev => ({ ...prev, replyImage: cloudinaryUrl }));
       }
     } catch (error) {
       console.error('Image upload error:', error);
-      setState(prev => ({ 
-        ...prev, 
-        error: error instanceof Error ? error.message : 'Failed to upload image' 
+      setState(prev => ({
+        ...prev,
+        error:
+          error instanceof Error ? error.message : 'Failed to upload image',
       }));
     } finally {
       setState(prev => ({ ...prev, uploading: false }));
@@ -130,7 +133,11 @@ export const useReply = (
   }, []);
 
   const submitReply = useCallback(async () => {
-    if (!state.replyTarget || (!state.replyText.trim() && !state.replyImage && !state.replyGif) || !currentUsername) {
+    if (
+      !state.replyTarget ||
+      (!state.replyText.trim() && !state.replyImage && !state.replyGif) ||
+      !currentUsername
+    ) {
       return;
     }
 
@@ -155,17 +162,19 @@ export const useReply = (
       const parent_author = state.replyTarget.author;
       const parent_permlink = state.replyTarget.permlink;
       const author = currentUsername;
-      
+
       // Sanitize parent_author for use in permlink
-      const sanitizedParentAuthor = parent_author.toLowerCase().replace(/[^a-z0-9-]/g, '');
+      const sanitizedParentAuthor = parent_author
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '');
       const permlink = `re-${sanitizedParentAuthor}-${parent_permlink}-${Date.now()}`;
-      
+
       const json_metadata: any = {
         app: 'hivesnaps/1.0',
         format: 'markdown',
         tags: ['hivesnaps', 'reply'],
       };
-      
+
       if (state.replyImage) {
         json_metadata.image = [state.replyImage];
       }
@@ -175,31 +184,34 @@ export const useReply = (
       }
 
       // Post to Hive blockchain
-      await client.broadcast.comment({
-        parent_author,
-        parent_permlink,
-        author,
-        permlink,
-        title: '',
-        body,
-        json_metadata: JSON.stringify(json_metadata),
-      }, postingKey);
-      
+      await client.broadcast.comment(
+        {
+          parent_author,
+          parent_permlink,
+          author,
+          permlink,
+          title: '',
+          body,
+          json_metadata: JSON.stringify(json_metadata),
+        },
+        postingKey
+      );
+
       // Close modal and reset state
       closeReplyModal();
-      
+
       // Set processing state to true
       setState(prev => ({ ...prev, processing: true }));
-      
+
       // Notify that submission has started
       onSubmissionStart?.();
-      
+
       // Add delay to account for Hive blockchain block time (3 seconds)
       setTimeout(() => {
         // Poll for new content every second for up to 4 retries
         let retryCount = 0;
         const maxRetries = 4;
-        
+
         const pollForContent = () => {
           console.log(`Polling attempt ${retryCount + 1}/${maxRetries}`);
           onRefresh?.().then(contentFound => {
@@ -209,7 +221,7 @@ export const useReply = (
               return;
             }
             retryCount++;
-            
+
             if (retryCount < maxRetries) {
               console.log(`Content not found, polling again in 1 second...`);
               setTimeout(pollForContent, 1000); // Poll again in 1 second
@@ -219,7 +231,7 @@ export const useReply = (
             }
           });
         };
-        
+
         pollForContent(); // Start polling
       }, 3000);
     } catch (error) {
@@ -230,7 +242,16 @@ export const useReply = (
         posting: false,
       }));
     }
-  }, [state.replyTarget, state.replyText, state.replyImage, state.replyGif, currentUsername, closeReplyModal, onRefresh, onSubmissionStart]);
+  }, [
+    state.replyTarget,
+    state.replyText,
+    state.replyImage,
+    state.replyGif,
+    currentUsername,
+    closeReplyModal,
+    onRefresh,
+    onSubmissionStart,
+  ]);
 
   const clearError = useCallback(() => {
     setState(prev => ({ ...prev, error: null }));
@@ -248,4 +269,4 @@ export const useReply = (
     addGif,
     clearError,
   };
-}; 
+};

@@ -20,45 +20,75 @@ export const useFollowManagement = (
 
   // Check if current user is following/muting the profile user
   const checkFollowStatus = async () => {
-    if (!currentUsername || !targetUsername || currentUsername === targetUsername) return;
-    
+    if (
+      !currentUsername ||
+      !targetUsername ||
+      currentUsername === targetUsername
+    )
+      return;
+
     try {
-      console.log(`🔍 Checking follow status: ${currentUsername} -> ${targetUsername}`);
-      
+      console.log(
+        `🔍 Checking follow status: ${currentUsername} -> ${targetUsername}`
+      );
+
       // Check following status - get all users that currentUsername follows
       // Parameters: [follower, startFollowing, followType, limit]
-      const following = await client.call('condenser_api', 'get_following', [currentUsername, '', 'blog', 1000]);
-      console.log(`📊 Following API returned ${following?.length || 0} results`);
-      
+      const following = await client.call('condenser_api', 'get_following', [
+        currentUsername,
+        '',
+        'blog',
+        1000,
+      ]);
+      console.log(
+        `📊 Following API returned ${following?.length || 0} results`
+      );
+
       // Check if the target username is in the list of people we follow
-      const isCurrentlyFollowing = Array.isArray(following) && 
+      const isCurrentlyFollowing =
+        Array.isArray(following) &&
         following.some((f: any) => {
-          const matches = f.following === targetUsername && f.what?.includes('blog');
+          const matches =
+            f.following === targetUsername && f.what?.includes('blog');
           if (matches) {
-            console.log(`✅ Found follow relationship: ${f.following} with what: ${f.what}`);
+            console.log(
+              `✅ Found follow relationship: ${f.following} with what: ${f.what}`
+            );
           }
           return matches;
         });
-      
-      console.log(`🎯 Follow status result: ${isCurrentlyFollowing ? 'FOLLOWING' : 'NOT FOLLOWING'}`);
+
+      console.log(
+        `🎯 Follow status result: ${isCurrentlyFollowing ? 'FOLLOWING' : 'NOT FOLLOWING'}`
+      );
       setIsFollowing(isCurrentlyFollowing);
 
       // Check mute status - get all users that currentUsername ignores
-      const ignoring = await client.call('condenser_api', 'get_following', [currentUsername, '', 'ignore', 1000]);
+      const ignoring = await client.call('condenser_api', 'get_following', [
+        currentUsername,
+        '',
+        'ignore',
+        1000,
+      ]);
       console.log(`🔇 Ignoring API returned ${ignoring?.length || 0} results`);
-      
-      const isCurrentlyMuting = Array.isArray(ignoring) && 
+
+      const isCurrentlyMuting =
+        Array.isArray(ignoring) &&
         ignoring.some((f: any) => {
-          const matches = f.following === targetUsername && f.what?.includes('ignore');
+          const matches =
+            f.following === targetUsername && f.what?.includes('ignore');
           if (matches) {
-            console.log(`🔇 Found mute relationship: ${f.following} with what: ${f.what}`);
+            console.log(
+              `🔇 Found mute relationship: ${f.following} with what: ${f.what}`
+            );
           }
           return matches;
         });
-      
-      console.log(`🔇 Mute status result: ${isCurrentlyMuting ? 'MUTED' : 'NOT MUTED'}`);
+
+      console.log(
+        `🔇 Mute status result: ${isCurrentlyMuting ? 'MUTED' : 'NOT MUTED'}`
+      );
       setIsMuted(isCurrentlyMuting);
-      
     } catch (error) {
       console.log('Error checking follow/mute status:', error);
       // Reset to default states on error
@@ -68,14 +98,18 @@ export const useFollowManagement = (
   };
 
   useEffect(() => {
-    if (currentUsername && targetUsername && currentUsername !== targetUsername) {
+    if (
+      currentUsername &&
+      targetUsername &&
+      currentUsername !== targetUsername
+    ) {
       checkFollowStatus();
     }
   }, [currentUsername, targetUsername]);
 
   const handleFollow = async () => {
     if (!currentUsername || !targetUsername || followLoading) return;
-    
+
     setFollowLoading(true);
     try {
       // Get posting key from secure storage
@@ -91,8 +125,8 @@ export const useFollowManagement = (
         {
           follower: currentUsername,
           following: targetUsername,
-          what: ['blog'] // Follow their blog posts
-        }
+          what: ['blog'], // Follow their blog posts
+        },
       ];
 
       // Broadcast the follow operation
@@ -101,7 +135,7 @@ export const useFollowManagement = (
           required_auths: [],
           required_posting_auths: [currentUsername],
           id: 'follow',
-          json: JSON.stringify(followOp)
+          json: JSON.stringify(followOp),
         },
         postingKey
       );
@@ -118,7 +152,7 @@ export const useFollowManagement = (
 
   const handleUnfollow = async () => {
     if (!currentUsername || !targetUsername || followLoading) return;
-    
+
     setFollowLoading(true);
     try {
       // Get posting key from secure storage
@@ -134,8 +168,8 @@ export const useFollowManagement = (
         {
           follower: currentUsername,
           following: targetUsername,
-          what: [] // Empty array means unfollow
-        }
+          what: [], // Empty array means unfollow
+        },
       ];
 
       // Broadcast the unfollow operation
@@ -144,7 +178,7 @@ export const useFollowManagement = (
           required_auths: [],
           required_posting_auths: [currentUsername],
           id: 'follow',
-          json: JSON.stringify(unfollowOp)
+          json: JSON.stringify(unfollowOp),
         },
         postingKey
       );
@@ -161,7 +195,7 @@ export const useFollowManagement = (
 
   const handleMute = async () => {
     if (!currentUsername || !targetUsername || muteLoading) return;
-    
+
     setMuteLoading(true);
     try {
       // Get posting key from secure storage
@@ -177,8 +211,8 @@ export const useFollowManagement = (
         {
           follower: currentUsername,
           following: targetUsername,
-          what: ['ignore'] // Mute/ignore user
-        }
+          what: ['ignore'], // Mute/ignore user
+        },
       ];
 
       // Broadcast the mute operation
@@ -187,7 +221,7 @@ export const useFollowManagement = (
           required_auths: [],
           required_posting_auths: [currentUsername],
           id: 'follow',
-          json: JSON.stringify(muteOp)
+          json: JSON.stringify(muteOp),
         },
         postingKey
       );
@@ -204,7 +238,7 @@ export const useFollowManagement = (
 
   const handleUnmute = async () => {
     if (!currentUsername || !targetUsername || muteLoading) return;
-    
+
     setMuteLoading(true);
     try {
       // Get posting key from secure storage
@@ -220,8 +254,8 @@ export const useFollowManagement = (
         {
           follower: currentUsername,
           following: targetUsername,
-          what: [] // Empty array removes all follow relationships including mute
-        }
+          what: [], // Empty array removes all follow relationships including mute
+        },
       ];
 
       // Broadcast the unmute operation
@@ -230,7 +264,7 @@ export const useFollowManagement = (
           required_auths: [],
           required_posting_auths: [currentUsername],
           id: 'follow',
-          json: JSON.stringify(unmuteOp)
+          json: JSON.stringify(unmuteOp),
         },
         postingKey
       );
@@ -256,4 +290,4 @@ export const useFollowManagement = (
     handleUnmute,
     checkFollowStatus,
   };
-}; 
+};

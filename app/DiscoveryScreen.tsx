@@ -2,7 +2,15 @@ import React, { useEffect, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { PrivateKey } from '@hiveio/dhive';
 import { useColorScheme, StyleSheet } from 'react-native';
-import { View, FlatList, Text, ActivityIndicator, Modal, Pressable, TouchableOpacity } from 'react-native';
+import {
+  View,
+  FlatList,
+  Text,
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  TouchableOpacity,
+} from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -59,7 +67,6 @@ interface Snap {
   [key: string]: any;
 }
 
-
 const AVATAR_CACHE_TTL = 1000 * 60 * 60 * 24 * 3; // 3 days
 
 const DiscoveryScreen = () => {
@@ -71,8 +78,9 @@ const DiscoveryScreen = () => {
 
   const [snaps, setSnaps] = useState<Snap[]>([]);
   const [loading, setLoading] = useState(true);
-  const [avatarCache, setAvatarCache] = useState<{ [username: string]: { url: string; ts: number } }>({});
-
+  const [avatarCache, setAvatarCache] = useState<{
+    [username: string]: { url: string; ts: number };
+  }>({});
 
   // Avatar fetching/caching helpers
   const getAvatarUrl = (username: string) =>
@@ -92,7 +100,10 @@ const DiscoveryScreen = () => {
 
   // Save avatar cache to AsyncStorage when it changes
   useEffect(() => {
-    AsyncStorage.setItem('hivesnaps_avatar_cache', JSON.stringify(avatarCache)).catch(() => {});
+    AsyncStorage.setItem(
+      'hivesnaps_avatar_cache',
+      JSON.stringify(avatarCache)
+    ).catch(() => {});
   }, [avatarCache]);
 
   // Refactor: extract fetchHashtagSnaps for reuse, accept username as parameter
@@ -100,11 +111,17 @@ const DiscoveryScreen = () => {
     setLoading(true);
     try {
       // Get more container posts to ensure good hashtag coverage
-      const discussions = await client.database.call('get_discussions_by_blog', [{ tag: 'peak.snaps', limit: 15 }]);
+      const discussions = await client.database.call(
+        'get_discussions_by_blog',
+        [{ tag: 'peak.snaps', limit: 15 }]
+      );
       let allSnaps: Snap[] = [];
       const snapPromises = discussions.map(async (post: any) => {
         try {
-          const replies: Snap[] = await client.database.call('get_content_replies', [post.author, post.permlink]);
+          const replies: Snap[] = await client.database.call(
+            'get_content_replies',
+            [post.author, post.permlink]
+          );
           // Filter snaps containing the hashtag (more precise matching)
           return replies.filter(reply => {
             if (!reply.body || !hashtag) return false;
@@ -121,19 +138,28 @@ const DiscoveryScreen = () => {
       const snapResults = await Promise.all(snapPromises);
       allSnaps = snapResults.flat();
       // Sort by created date descending
-      allSnaps.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
-      
+      allSnaps.sort(
+        (a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()
+      );
+
       // Limit results for better performance (show most recent 30 hashtag matches)
       const limitedSnaps = allSnaps.slice(0, 30);
-      console.log(`[DiscoveryScreen] Found ${allSnaps.length} snaps with hashtag #${hashtag}, showing ${limitedSnaps.length}`);
+      console.log(
+        `[DiscoveryScreen] Found ${allSnaps.length} snaps with hashtag #${hashtag}, showing ${limitedSnaps.length}`
+      );
 
       // Fetch avatars for all unique authors
       const now = Date.now();
-      const uniqueAuthors = Array.from(new Set(limitedSnaps.map(s => s.author)));
+      const uniqueAuthors = Array.from(
+        new Set(limitedSnaps.map(s => s.author))
+      );
       const newCache = { ...avatarCache };
       const avatarFetchPromises = uniqueAuthors.map(async username => {
         // Use cache if not expired
-        if (newCache[username] && now - newCache[username].ts < AVATAR_CACHE_TTL) {
+        if (
+          newCache[username] &&
+          now - newCache[username].ts < AVATAR_CACHE_TTL
+        ) {
           return;
         }
         // Check if user has custom avatar (by checking if the image exists)
@@ -154,7 +180,12 @@ const DiscoveryScreen = () => {
 
       // Attach avatarUrl and hasUpvoted to each snap
       const snapsWithAvatars = limitedSnaps.map(snap => {
-        const hasUpvoted = Array.isArray(snap.active_votes) && currentUsername && snap.active_votes.some((v: any) => v.voter === currentUsername && v.percent > 0);
+        const hasUpvoted =
+          Array.isArray(snap.active_votes) &&
+          currentUsername &&
+          snap.active_votes.some(
+            (v: any) => v.voter === currentUsername && v.percent > 0
+          );
         return {
           ...snap,
           avatarUrl: newCache[snap.author]?.url || '',
@@ -185,15 +216,20 @@ const DiscoveryScreen = () => {
     fetchHashtagSnaps(currentUsername ?? undefined);
   };
 
-
   // Upvote modal state and logic (copied/adapted from FeedScreen)
   const [upvoteModalVisible, setUpvoteModalVisible] = useState(false);
-  const [upvoteTarget, setUpvoteTarget] = useState<{ author: string; permlink: string } | null>(null);
+  const [upvoteTarget, setUpvoteTarget] = useState<{
+    author: string;
+    permlink: string;
+  } | null>(null);
   const [voteWeight, setVoteWeight] = useState(100);
   const [voteWeightLoading, setVoteWeightLoading] = useState(false);
   const [upvoteLoading, setUpvoteLoading] = useState(false);
   const [upvoteSuccess, setUpvoteSuccess] = useState(false);
-  const [voteValue, setVoteValue] = useState<{ hbd: string, usd: string } | null>(null);
+  const [voteValue, setVoteValue] = useState<{
+    hbd: string;
+    usd: string;
+  } | null>(null);
   const [username, setUsername] = useState('');
   const [globalProps, setGlobalProps] = useState<any | null>(null);
   const [rewardFund, setRewardFund] = useState<any | null>(null);
@@ -216,7 +252,9 @@ const DiscoveryScreen = () => {
     const fetchHivePrice = async () => {
       try {
         // You may want to use a shared utility for this
-        const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=hive&vs_currencies=usd');
+        const res = await fetch(
+          'https://api.coingecko.com/api/v3/simple/price?ids=hive&vs_currencies=usd'
+        );
         const data = await res.json();
         setHivePrice(data.hive?.usd || 1);
       } catch {
@@ -227,7 +265,13 @@ const DiscoveryScreen = () => {
     // Remove AsyncStorage username fetch, now handled in hashtag effect
   }, []);
 
-  const handleUpvotePress = async ({ author, permlink }: { author: string; permlink: string }) => {
+  const handleUpvotePress = async ({
+    author,
+    permlink,
+  }: {
+    author: string;
+    permlink: string;
+  }) => {
     setUpvoteTarget({ author, permlink });
     setVoteWeightLoading(true);
     try {
@@ -249,7 +293,13 @@ const DiscoveryScreen = () => {
         accountObj = accounts && accounts[0] ? accounts[0] : null;
       }
       if (accountObj && globalProps && rewardFund) {
-        const calcValue = calculateVoteValue(accountObj, globalProps, rewardFund, weight, hivePrice);
+        const calcValue = calculateVoteValue(
+          accountObj,
+          globalProps,
+          rewardFund,
+          weight,
+          hivePrice
+        );
         setVoteValue(calcValue);
       } else {
         setVoteValue(null);
@@ -274,34 +324,46 @@ const DiscoveryScreen = () => {
     try {
       // Get posting key from SecureStore
       const postingKeyStr = await SecureStore.getItemAsync('hive_posting_key');
-      if (!postingKeyStr) throw new Error('No posting key found. Please log in again.');
+      if (!postingKeyStr)
+        throw new Error('No posting key found. Please log in again.');
       const postingKey = PrivateKey.fromString(postingKeyStr);
       // Broadcast vote
-      await client.broadcast.vote({
-        voter: username,
-        author: upvoteTarget.author,
-        permlink: upvoteTarget.permlink,
-        weight: voteWeight * 100, // dhive expects 10000 = 100%
-      }, postingKey);
+      await client.broadcast.vote(
+        {
+          voter: username,
+          author: upvoteTarget.author,
+          permlink: upvoteTarget.permlink,
+          weight: voteWeight * 100, // dhive expects 10000 = 100%
+        },
+        postingKey
+      );
       // Persist the vote weight after successful vote
       await AsyncStorage.setItem('hivesnaps_vote_weight', String(voteWeight));
 
       // Optimistically update UI - add payout calculation (use USD since app displays in dollars)
       const estimatedValueIncrease = voteValue ? parseFloat(voteValue.usd) : 0;
-      setSnaps(prevSnaps => prevSnaps.map(snap => {
-        if (snap.author === upvoteTarget.author && snap.permlink === upvoteTarget.permlink) {
-          return {
-            ...snap,
-            hasUpvoted: true,
-            net_votes: (snap.net_votes || 0) + 1,
-            payout: (snap.payout || 0) + estimatedValueIncrease,
-            active_votes: Array.isArray(snap.active_votes)
-              ? [...snap.active_votes, { voter: username, percent: voteWeight * 100 }]
-              : [{ voter: username, percent: voteWeight * 100 }],
-          };
-        }
-        return snap;
-      }));
+      setSnaps(prevSnaps =>
+        prevSnaps.map(snap => {
+          if (
+            snap.author === upvoteTarget.author &&
+            snap.permlink === upvoteTarget.permlink
+          ) {
+            return {
+              ...snap,
+              hasUpvoted: true,
+              net_votes: (snap.net_votes || 0) + 1,
+              payout: (snap.payout || 0) + estimatedValueIncrease,
+              active_votes: Array.isArray(snap.active_votes)
+                ? [
+                    ...snap.active_votes,
+                    { voter: username, percent: voteWeight * 100 },
+                  ]
+                : [{ voter: username, percent: voteWeight * 100 }],
+            };
+          }
+          return snap;
+        })
+      );
 
       setUpvoteLoading(false);
       setUpvoteSuccess(true);
@@ -319,7 +381,13 @@ const DiscoveryScreen = () => {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: colors.background,
+        paddingTop: insets.top,
+      }}
+    >
       {/* Upvote Modal */}
       <UpvoteModal
         visible={upvoteModalVisible}
@@ -330,7 +398,7 @@ const DiscoveryScreen = () => {
         upvoteSuccess={upvoteSuccess}
         onClose={handleUpvoteCancel}
         onConfirm={handleUpvoteConfirm}
-        onVoteWeightChange={async (val) => {
+        onVoteWeightChange={async val => {
           setVoteWeight(val);
           // Live update vote value
           let accountObj = null;
@@ -339,7 +407,13 @@ const DiscoveryScreen = () => {
             accountObj = accounts && accounts[0] ? accounts[0] : null;
           }
           if (accountObj && globalProps && rewardFund) {
-            const calcValue = calculateVoteValue(accountObj, globalProps, rewardFund, val, hivePrice);
+            const calcValue = calculateVoteValue(
+              accountObj,
+              globalProps,
+              rewardFund,
+              val,
+              hivePrice
+            );
             setVoteValue(calcValue);
           } else {
             setVoteValue(null);
@@ -347,25 +421,36 @@ const DiscoveryScreen = () => {
         }}
         colors={colors}
       />
-      
+
       {/* Header with back arrow */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <FontAwesome name="arrow-left" size={24} color={colors.text} />
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
+            <FontAwesome name='arrow-left' size={24} color={colors.text} />
           </TouchableOpacity>
         </View>
       </View>
-      
+
       <View style={{ padding: 16 }}>
         <Text style={{ fontSize: 22, fontWeight: 'bold', color: colors.text }}>
           #{hashtag} Snaps
         </Text>
       </View>
       {loading ? (
-        <ActivityIndicator size="large" color={colors.button} style={{ marginTop: 40 }} />
+        <ActivityIndicator
+          size='large'
+          color={colors.button}
+          style={{ marginTop: 40 }}
+        />
       ) : snaps.length === 0 ? (
-        <Text style={{ color: colors.text, marginTop: 24, textAlign: 'center' }}>No snaps found for this hashtag.</Text>
+        <Text
+          style={{ color: colors.text, marginTop: 24, textAlign: 'center' }}
+        >
+          No snaps found for this hashtag.
+        </Text>
       ) : (
         <FlatList
           data={snaps}
@@ -378,22 +463,35 @@ const DiscoveryScreen = () => {
               created={item.created}
               voteCount={item.net_votes || 0}
               replyCount={item.children || 0}
-              payout={parseFloat(item.pending_payout_value ? item.pending_payout_value.replace(' HBD', '') : '0')}
+              payout={parseFloat(
+                item.pending_payout_value
+                  ? item.pending_payout_value.replace(' HBD', '')
+                  : '0'
+              )}
               permlink={item.permlink}
               onUpvotePress={handleUpvotePress}
               hasUpvoted={item.hasUpvoted}
               onSpeechBubblePress={() => {
-                router.push({ pathname: '/ConversationScreen', params: { author: item.author, permlink: item.permlink } });
+                router.push({
+                  pathname: '/ConversationScreen',
+                  params: { author: item.author, permlink: item.permlink },
+                });
               }}
               onContentPress={() => {
-                router.push({ pathname: '/ConversationScreen', params: { author: item.author, permlink: item.permlink } });
+                router.push({
+                  pathname: '/ConversationScreen',
+                  params: { author: item.author, permlink: item.permlink },
+                });
               }}
               onUserPress={username => {
                 router.push(`/ProfileScreen?username=${username}` as any);
               }}
               showAuthor
               onHashtagPress={tag => {
-                router.push({ pathname: '/DiscoveryScreen', params: { hashtag: tag } });
+                router.push({
+                  pathname: '/DiscoveryScreen',
+                  params: { hashtag: tag },
+                });
               }}
             />
           )}

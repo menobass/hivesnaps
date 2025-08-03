@@ -31,55 +31,67 @@ export const useAvatarManagement = (currentUsername: string | null) => {
     try {
       // Show action sheet to choose between camera and gallery
       let pickType: 'camera' | 'gallery' | 'cancel';
-      
+
       if (Platform.OS === 'ios') {
-        pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(resolve => {
-          import('react-native').then(({ ActionSheetIOS }) => {
-            ActionSheetIOS.showActionSheetWithOptions(
-              {
-                options: ['Cancel', 'Take Photo', 'Choose from Gallery'],
-                cancelButtonIndex: 0,
-              },
-              buttonIndex => {
-                if (buttonIndex === 0) resolve('cancel');
-                else if (buttonIndex === 1) resolve('camera');
-                else if (buttonIndex === 2) resolve('gallery');
-              }
-            );
-          });
-        });
+        pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(
+          resolve => {
+            import('react-native').then(({ ActionSheetIOS }) => {
+              ActionSheetIOS.showActionSheetWithOptions(
+                {
+                  options: ['Cancel', 'Take Photo', 'Choose from Gallery'],
+                  cancelButtonIndex: 0,
+                },
+                buttonIndex => {
+                  if (buttonIndex === 0) resolve('cancel');
+                  else if (buttonIndex === 1) resolve('camera');
+                  else if (buttonIndex === 2) resolve('gallery');
+                }
+              );
+            });
+          }
+        );
       } else {
-        pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(resolve => {
-          import('react-native').then(({ Alert }) => {
-            Alert.alert(
-              'Select Avatar Image',
-              'Choose an option',
-              [
-                { text: 'Take Photo', onPress: () => resolve('camera') },
-                { text: 'Choose from Gallery', onPress: () => resolve('gallery') },
-                { text: 'Cancel', style: 'cancel', onPress: () => resolve('cancel') },
-              ],
-              { cancelable: true }
-            );
-          });
-        });
+        pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(
+          resolve => {
+            import('react-native').then(({ Alert }) => {
+              Alert.alert(
+                'Select Avatar Image',
+                'Choose an option',
+                [
+                  { text: 'Take Photo', onPress: () => resolve('camera') },
+                  {
+                    text: 'Choose from Gallery',
+                    onPress: () => resolve('gallery'),
+                  },
+                  {
+                    text: 'Cancel',
+                    style: 'cancel',
+                    onPress: () => resolve('cancel'),
+                  },
+                ],
+                { cancelable: true }
+              );
+            });
+          }
+        );
       }
-      
+
       if (pickType === 'cancel') return;
-      
+
       // Enhanced permission handling with better error messages
       let result;
       if (pickType === 'camera') {
         // Check current permission status first
         const currentPermission = await ImagePicker.getCameraPermissionsAsync();
         let finalStatus = currentPermission.status;
-        
+
         if (finalStatus !== 'granted') {
           // Request permission if not granted
-          const requestPermission = await ImagePicker.requestCameraPermissionsAsync();
+          const requestPermission =
+            await ImagePicker.requestCameraPermissionsAsync();
           finalStatus = requestPermission.status;
         }
-        
+
         if (finalStatus !== 'granted') {
           import('react-native').then(({ Alert }) => {
             Alert.alert(
@@ -87,31 +99,39 @@ export const useAvatarManagement = (currentUsername: string | null) => {
               'HiveSnaps needs camera access to take photos. Please enable camera permissions in your device settings.',
               [
                 { text: 'Cancel', style: 'cancel' },
-                { text: 'Open Settings', onPress: () => {
-                  if (Platform.OS === 'ios') {
-                    import('expo-linking').then(({ default: Linking }) => {
-                      Linking.openURL('app-settings:');
-                    });
-                  } else {
-                    import('expo-intent-launcher').then(({ default: IntentLauncher }) => {
-                      IntentLauncher.startActivityAsync(
-                        IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS,
-                        { data: 'package:com.anonymous.hivesnaps' }
-                      );
-                    }).catch(() => {
-                      // Fallback for older Android versions
+                {
+                  text: 'Open Settings',
+                  onPress: () => {
+                    if (Platform.OS === 'ios') {
                       import('expo-linking').then(({ default: Linking }) => {
                         Linking.openURL('app-settings:');
                       });
-                    });
-                  }
-                }}
+                    } else {
+                      import('expo-intent-launcher')
+                        .then(({ default: IntentLauncher }) => {
+                          IntentLauncher.startActivityAsync(
+                            IntentLauncher.ActivityAction
+                              .APPLICATION_DETAILS_SETTINGS,
+                            { data: 'package:com.anonymous.hivesnaps' }
+                          );
+                        })
+                        .catch(() => {
+                          // Fallback for older Android versions
+                          import('expo-linking').then(
+                            ({ default: Linking }) => {
+                              Linking.openURL('app-settings:');
+                            }
+                          );
+                        });
+                    }
+                  },
+                },
               ]
             );
           });
           return;
         }
-        
+
         result = await ImagePicker.launchCameraAsync({
           allowsEditing: true,
           quality: 0.8,
@@ -120,14 +140,16 @@ export const useAvatarManagement = (currentUsername: string | null) => {
         });
       } else {
         // Media library permission handling
-        const currentPermission = await ImagePicker.getMediaLibraryPermissionsAsync();
+        const currentPermission =
+          await ImagePicker.getMediaLibraryPermissionsAsync();
         let finalStatus = currentPermission.status;
-        
+
         if (finalStatus !== 'granted') {
-          const requestPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          const requestPermission =
+            await ImagePicker.requestMediaLibraryPermissionsAsync();
           finalStatus = requestPermission.status;
         }
-        
+
         if (finalStatus !== 'granted') {
           import('react-native').then(({ Alert }) => {
             Alert.alert(
@@ -135,31 +157,39 @@ export const useAvatarManagement = (currentUsername: string | null) => {
               'HiveSnaps needs photo library access to select images. Please enable photo permissions in your device settings.',
               [
                 { text: 'Cancel', style: 'cancel' },
-                { text: 'Open Settings', onPress: () => {
-                  if (Platform.OS === 'ios') {
-                    import('expo-linking').then(({ default: Linking }) => {
-                      Linking.openURL('app-settings:');
-                    });
-                  } else {
-                    import('expo-intent-launcher').then(({ default: IntentLauncher }) => {
-                      IntentLauncher.startActivityAsync(
-                        IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS,
-                        { data: 'package:com.anonymous.hivesnaps' }
-                      );
-                    }).catch(() => {
-                      // Fallback for older Android versions
+                {
+                  text: 'Open Settings',
+                  onPress: () => {
+                    if (Platform.OS === 'ios') {
                       import('expo-linking').then(({ default: Linking }) => {
                         Linking.openURL('app-settings:');
                       });
-                    });
-                  }
-                }}
+                    } else {
+                      import('expo-intent-launcher')
+                        .then(({ default: IntentLauncher }) => {
+                          IntentLauncher.startActivityAsync(
+                            IntentLauncher.ActivityAction
+                              .APPLICATION_DETAILS_SETTINGS,
+                            { data: 'package:com.anonymous.hivesnaps' }
+                          );
+                        })
+                        .catch(() => {
+                          // Fallback for older Android versions
+                          import('expo-linking').then(
+                            ({ default: Linking }) => {
+                              Linking.openURL('app-settings:');
+                            }
+                          );
+                        });
+                    }
+                  },
+                },
               ]
             );
           });
           return;
         }
-        
+
         result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
           allowsEditing: true,
@@ -167,12 +197,13 @@ export const useAvatarManagement = (currentUsername: string | null) => {
           aspect: [1, 1], // Square aspect ratio for avatar
         });
       }
-      
-      if (!result || result.canceled || !result.assets || !result.assets[0]) return;
-      
+
+      if (!result || result.canceled || !result.assets || !result.assets[0])
+        return;
+
       const asset = result.assets[0];
       setAvatarUploading(true);
-      
+
       try {
         const fileToUpload = {
           uri: asset.uri,
@@ -183,7 +214,8 @@ export const useAvatarManagement = (currentUsername: string | null) => {
         setNewAvatarImage(cloudinaryUrl);
       } catch (err) {
         console.error('Image upload error:', err);
-        const errorMessage = err instanceof Error ? err.message : 'Unknown upload error';
+        const errorMessage =
+          err instanceof Error ? err.message : 'Unknown upload error';
         import('react-native').then(({ Alert }) => {
           Alert.alert(
             'Upload Failed',
@@ -198,11 +230,9 @@ export const useAvatarManagement = (currentUsername: string | null) => {
       console.error('Image picker error:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       import('react-native').then(({ Alert }) => {
-        Alert.alert(
-          'Error',
-          `Failed to pick image: ${errorMessage}`,
-          [{ text: 'OK' }]
-        );
+        Alert.alert('Error', `Failed to pick image: ${errorMessage}`, [
+          { text: 'OK' },
+        ]);
       });
       setAvatarUploading(false);
     }
@@ -216,10 +246,10 @@ export const useAvatarManagement = (currentUsername: string | null) => {
 
   const handleUpdateAvatar = async () => {
     if (!newAvatarImage || !currentUsername || !activeKeyInput.trim()) return;
-    
+
     setAvatarUpdateLoading(true);
     setAvatarUpdateSuccess(false);
-    
+
     try {
       // Validate and create active key
       let activeKey;
@@ -231,19 +261,21 @@ export const useAvatarManagement = (currentUsername: string | null) => {
         }
         activeKey = PrivateKey.fromString(keyStr);
       } catch (err) {
-        throw new Error('Invalid active key format. Please check your key and try again.');
+        throw new Error(
+          'Invalid active key format. Please check your key and try again.'
+        );
       }
-      
+
       // Get current account data to preserve existing metadata
       const accounts = await client.database.getAccounts([currentUsername]);
       if (!accounts || !accounts[0]) throw new Error('Account not found');
-      
+
       const account = accounts[0];
-      
+
       // Parse existing metadata and preserve it
       let postingMeta = {};
       let jsonMeta = {};
-      
+
       // Parse posting_json_metadata
       if (account.posting_json_metadata) {
         try {
@@ -252,8 +284,8 @@ export const useAvatarManagement = (currentUsername: string | null) => {
           console.log('Error parsing existing posting_json_metadata:', err);
         }
       }
-      
-      // Parse json_metadata  
+
+      // Parse json_metadata
       if (account.json_metadata) {
         try {
           jsonMeta = JSON.parse(account.json_metadata);
@@ -261,7 +293,7 @@ export const useAvatarManagement = (currentUsername: string | null) => {
           console.log('Error parsing existing json_metadata:', err);
         }
       }
-      
+
       // Update profile image in both metadata objects
       const updatedPostingMeta = {
         ...postingMeta,
@@ -270,7 +302,7 @@ export const useAvatarManagement = (currentUsername: string | null) => {
           profile_image: newAvatarImage,
         },
       };
-      
+
       const updatedJsonMeta = {
         ...jsonMeta,
         profile: {
@@ -278,7 +310,7 @@ export const useAvatarManagement = (currentUsername: string | null) => {
           profile_image: newAvatarImage,
         },
       };
-      
+
       // Broadcast account update2 - required for posting_json_metadata support
       const operation = [
         'account_update2',
@@ -288,17 +320,17 @@ export const useAvatarManagement = (currentUsername: string | null) => {
           json_metadata: JSON.stringify(updatedJsonMeta),
           posting_json_metadata: JSON.stringify(updatedPostingMeta),
           extensions: [], // Required field for account_update2
-        }
+        },
       ] as const;
-      
+
       await client.broadcast.sendOperations([operation], activeKey);
-      
+
       setAvatarUpdateLoading(false);
       setAvatarUpdateSuccess(true);
-      
+
       // Clear sensitive data immediately
       setActiveKeyInput('');
-      
+
       // Clear any cached avatar data and refresh profile
       setTimeout(async () => {
         setActiveKeyModalVisible(false);
@@ -306,7 +338,6 @@ export const useAvatarManagement = (currentUsername: string | null) => {
         setNewAvatarImage(null);
         setAvatarUpdateSuccess(false);
       }, 2000);
-      
     } catch (err) {
       setAvatarUpdateLoading(false);
       setAvatarUpdateSuccess(false);
@@ -340,4 +371,4 @@ export const useAvatarManagement = (currentUsername: string | null) => {
     handleUpdateAvatar,
     closeModals,
   };
-}; 
+};
