@@ -323,7 +323,7 @@ export async function fetchHivePostInfo(
       if (postData.title && postData.title.trim()) {
         return postData.title;
       }
-      
+
       // Use post type detection logic for untitled posts
       const postInfo: PostInfo = {
         author: postData.author,
@@ -334,9 +334,9 @@ export async function fetchHivePostInfo(
         parent_author: postData.parent_author,
         parent_permlink: postData.parent_permlink,
       };
-      
+
       const postType = detectPostType(postInfo);
-      
+
       // Return appropriate label based on type
       return postType === 'snap' ? 'Resnap' : 'Untitled Post';
     };

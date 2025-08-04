@@ -797,7 +797,7 @@ const Snap: React.FC<SnapProps> = ({
               icon: colors.icon,
               text: colors.text,
             }}
-            onError={(error) => {
+            onError={error => {
               console.warn('[Snap] Hive post preview error:', error);
             }}
           />
