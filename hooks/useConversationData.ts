@@ -272,6 +272,37 @@ export const useConversationData = (
     await fetchSnapAndReplies();
   }, [fetchSnapAndReplies]);
 
+  // Helper function to check if any replies have been modified
+  const checkForReplyChanges = useCallback(
+    (newTree: ReplyData[], oldTree: ReplyData[]): boolean => {
+      // If the number of replies is different, there are changes
+      if (newTree.length !== oldTree.length) {
+        return true;
+      }
+
+      // Check each reply for changes
+      for (let i = 0; i < newTree.length; i++) {
+        const newReply = newTree[i];
+        const oldReply = oldTree[i];
+
+        // Check if the reply content has changed
+        if (newReply.body !== oldReply.body) {
+          return true;
+        }
+
+        // Recursively check nested replies
+        if (
+          checkForReplyChanges(newReply.replies || [], oldReply.replies || [])
+        ) {
+          return true;
+        }
+      }
+
+      return false;
+    },
+    []
+  );
+
   const checkForNewContent = useCallback(async () => {
     if (!author || !permlink || !currentUsername) {
       return false;
@@ -288,8 +319,14 @@ export const useConversationData = (
       const tree = await fetchRepliesTreeWithContent(author, permlink);
 
       // Check if we have new content
+      const hasNewReplies = tree.length > state.replies.length;
+      const hasMainSnapChanges = post.body !== state.snap?.body;
+
+      // Check if any existing replies have been modified
+      const hasReplyChanges = checkForReplyChanges(tree, state.replies);
+
       const hasNewContent =
-        tree.length > state.replies.length || post.body !== state.snap?.body;
+        hasNewReplies || hasMainSnapChanges || hasReplyChanges;
 
       if (hasNewContent) {
         // Update state without loading indicator
@@ -329,6 +366,7 @@ export const useConversationData = (
     fetchRepliesTreeWithContent,
     state.replies.length,
     state.snap?.body,
+    checkForReplyChanges,
   ]);
 
   const clearError = useCallback(() => {
