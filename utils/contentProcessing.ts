@@ -1,5 +1,10 @@
 import { extractImageUrls } from './extractImageUrls';
-import { extractVideoInfo, removeVideoUrls, removeTwitterUrls, removeEmbedUrls } from './extractVideoInfo';
+import {
+  extractVideoInfo,
+  removeVideoUrls,
+  removeTwitterUrls,
+  removeEmbedUrls,
+} from './extractVideoInfo';
 import { extractHivePostUrls } from './extractHivePostInfo';
 import { convertSpoilerSyntax } from './spoilerParser';
 
@@ -58,12 +63,12 @@ export const processContent = (body: string) => {
   const hivePostUrls = extractHivePostUrls(body);
 
   let textBody = body;
-  
+
   // Remove video and embed URLs if present
   if (videoInfo || hivePostUrls.length > 0) {
     textBody = removeEmbedUrls(textBody);
   }
-  
+
   // Strip image tags
   textBody = stripImageTags(textBody);
 
@@ -83,6 +88,6 @@ export const processContent = (body: string) => {
     imageUrls,
     hivePostUrls,
     spoilerData,
-    isHtml: containsHtml(textBody)
+    isHtml: containsHtml(textBody),
   };
-}; 
+};

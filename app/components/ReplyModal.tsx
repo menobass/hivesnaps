@@ -140,9 +140,7 @@ const ReplyModal: React.FC<ReplyModalProps> = ({
                 borderRadius: 4,
               }}
             >
-              <Text
-                style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}
-              >
+              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
                 GIF
               </Text>
             </View>
@@ -151,9 +149,7 @@ const ReplyModal: React.FC<ReplyModalProps> = ({
 
         {/* Error message */}
         {replyError ? (
-          <Text style={{ color: 'red', marginBottom: 8 }}>
-            {replyError}
-          </Text>
+          <Text style={{ color: 'red', marginBottom: 8 }}>{replyError}</Text>
         ) : null}
 
         {/* Reply input row */}
@@ -226,9 +222,7 @@ const ReplyModal: React.FC<ReplyModalProps> = ({
                   : 1,
             }}
           >
-            <Text
-              style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}
-            >
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>
               {posting
                 ? 'Posting...'
                 : replyProcessing
@@ -242,4 +236,4 @@ const ReplyModal: React.FC<ReplyModalProps> = ({
   );
 };
 
-export default ReplyModal; 
+export default ReplyModal;

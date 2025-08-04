@@ -18,11 +18,22 @@ import { ConversationScreenStyles } from '../../styles/ConversationScreenStyles'
 import genericAvatar from '../../assets/images/generic-avatar.png';
 import SpoilerText from './SpoilerText';
 import TwitterEmbed from './TwitterEmbed';
-import { extractVideoInfo, removeEmbedUrls, removeTwitterUrls } from '../../utils/extractVideoInfo';
+import {
+  extractVideoInfo,
+  removeEmbedUrls,
+  removeTwitterUrls,
+} from '../../utils/extractVideoInfo';
 import { extractImageUrls } from '../../utils/extractImageUrls';
 import { extractHivePostUrls } from '../../utils/extractHivePostInfo';
 import { convertSpoilerSyntax } from '../../utils/spoilerParser';
-import { stripImageTags, preserveParagraphSpacing, linkifyUrls, linkifyMentions, linkifyHashtags, containsHtml } from '../../utils/contentProcessing';
+import {
+  stripImageTags,
+  preserveParagraphSpacing,
+  linkifyUrls,
+  linkifyMentions,
+  linkifyHashtags,
+  containsHtml,
+} from '../../utils/contentProcessing';
 
 interface ReplyProps {
   reply: ReplyData & { visualLevel: number };
@@ -80,13 +91,13 @@ const Reply: React.FC<ReplyProps> = ({
   if (videoInfo || hivePostUrls.length > 0) {
     textBody = removeEmbedUrls(textBody);
   }
-  
+
   // Check for Twitter posts and remove URLs if found
   const twitterPosts = extractAndRenderTwitterPosts(reply.body);
   if (twitterPosts) {
     textBody = removeTwitterUrls(textBody);
   }
-  
+
   textBody = stripImageTags(textBody);
 
   // Process spoiler syntax
@@ -100,14 +111,16 @@ const Reply: React.FC<ReplyProps> = ({
 
   const windowWidth = Dimensions.get('window').width;
   const isHtml = containsHtml(textBody);
-  
+
   // Calculate indentation based on visual level
   const maxVisualLevel = 2;
   const visualLevel = Math.min(reply.visualLevel, maxVisualLevel);
   const marginLeft = visualLevel * 18;
   const contentWidth = Math.max(windowWidth - marginLeft - 32, 200);
-  
-  console.log(`[REPLY] Rendering reply from ${reply.author}, visualLevel: ${visualLevel}, marginLeft: ${marginLeft}px`);
+
+  console.log(
+    `[REPLY] Rendering reply from ${reply.author}, visualLevel: ${visualLevel}, marginLeft: ${marginLeft}px`
+  );
 
   // Custom markdown rules
   const markdownRules = {
@@ -273,10 +286,7 @@ const Reply: React.FC<ReplyProps> = ({
         {imageUrls.length > 0 && (
           <View style={ConversationScreenStyles.imageContainer}>
             {imageUrls.map((url, idx) => (
-              <Pressable
-                key={url + idx}
-                onPress={() => onImagePress(url)}
-              >
+              <Pressable key={url + idx} onPress={() => onImagePress(url)}>
                 <ExpoImage
                   source={{ uri: url }}
                   style={ConversationScreenStyles.imageStyle}
@@ -367,7 +377,10 @@ const Reply: React.FC<ReplyProps> = ({
               ConversationScreenStyles.upvoteButton,
             ]}
             onPress={() =>
-              onUpvotePress({ author: reply.author, permlink: reply.permlink || '' })
+              onUpvotePress({
+                author: reply.author,
+                permlink: reply.permlink || '',
+              })
             }
             disabled={
               Array.isArray(reply.active_votes) &&
@@ -425,9 +438,7 @@ const Reply: React.FC<ReplyProps> = ({
           {reply.author === currentUsername && (
             <TouchableOpacity
               style={ConversationScreenStyles.replyButton}
-              onPress={() =>
-                onEditPress(reply)
-              }
+              onPress={() => onEditPress(reply)}
             >
               <FontAwesome name='edit' size={14} color={colors.icon} />
               <Text
@@ -443,9 +454,7 @@ const Reply: React.FC<ReplyProps> = ({
 
           <TouchableOpacity
             style={ConversationScreenStyles.replyButton}
-            onPress={() =>
-              onReplyPress(reply.author, reply.permlink || '')
-            }
+            onPress={() => onReplyPress(reply.author, reply.permlink || '')}
           >
             <FontAwesome name='reply' size={16} color={colors.icon} />
             <Text
@@ -463,4 +472,4 @@ const Reply: React.FC<ReplyProps> = ({
   );
 };
 
-export default Reply; 
+export default Reply;

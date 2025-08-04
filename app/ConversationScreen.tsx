@@ -41,9 +41,7 @@ import { Dimensions } from 'react-native';
 import { extractImageUrls } from '../utils/extractImageUrls';
 import ImageView from 'react-native-image-viewing';
 import genericAvatar from '../assets/images/generic-avatar.png';
-import {
-  extractHivePostUrls
-} from '../utils/extractHivePostInfo';
+import { extractHivePostUrls } from '../utils/extractHivePostInfo';
 import { ContextHivePostPreviewRenderer } from '../components/ContextHivePostPreviewRenderer';
 import { HivePostPreview } from '../components/HivePostPreview';
 import { convertSpoilerSyntax, SpoilerData } from '../utils/spoilerParser';
@@ -467,8 +465,6 @@ const ConversationScreenRefactored = () => {
     return /<([a-z][\s\S]*?)>/i.test(str);
   };
 
-
-
   // Extract and render Twitter/X posts
   const extractAndRenderTwitterPosts = (content: string) => {
     const videoInfo = extractVideoInfo(content);
@@ -612,26 +608,27 @@ const ConversationScreenRefactored = () => {
   );
 
   // Function to flatten nested replies into a flat array with level information
-  const flattenReplies = (replyList: ReplyData[], level = 0): Array<ReplyData & { visualLevel: number }> => {
+  const flattenReplies = (
+    replyList: ReplyData[],
+    level = 0
+  ): Array<ReplyData & { visualLevel: number }> => {
     const flattened: Array<ReplyData & { visualLevel: number }> = [];
-    
+
     replyList.forEach(reply => {
       // Add the current reply with its visual level
       const maxVisualLevel = 2;
       const visualLevel = Math.min(level, maxVisualLevel);
       flattened.push({ ...reply, visualLevel });
-      
+
       // Recursively flatten children
       if (reply.replies && reply.replies.length > 0) {
         const childReplies = flattenReplies(reply.replies, level + 1);
         flattened.push(...childReplies);
       }
     });
-    
+
     return flattened;
   };
-
-
 
   // DEPRECATED: renderReplyTree function - Now using flattened approach instead
   const renderReplyTree = (reply: ReplyData, level = 0) => {
@@ -730,7 +727,10 @@ const ConversationScreenRefactored = () => {
           {imageUrls.length > 0 && (
             <View style={ConversationScreenStyles.imageContainer}>
               {imageUrls.map((url, idx) => (
-                <Pressable key={url + idx} onPress={() => handleImagePress(url)}>
+                <Pressable
+                  key={url + idx}
+                  onPress={() => handleImagePress(url)}
+                >
                   <ExpoImage
                     source={{ uri: url }}
                     style={ConversationScreenStyles.imageStyle}
@@ -1327,12 +1327,12 @@ const ConversationScreenRefactored = () => {
                 hasUpvoted={snap.hasUpvoted || false}
                 onSpeechBubblePress={() => {}} // Disable in conversation view
                 onContentPress={() => {}} // Disable in conversation view
-                onUserPress={(username) => {
+                onUserPress={username => {
                   router.push(`/ProfileScreen?username=${username}` as any);
                 }}
                 onImagePress={handleImagePress}
                 showAuthor={true}
-                onHashtagPress={(tag) => {
+                onHashtagPress={tag => {
                   router.push({
                     pathname: '/DiscoveryScreen',
                     params: { hashtag: tag },
@@ -1347,7 +1347,7 @@ const ConversationScreenRefactored = () => {
                   reply={reply}
                   onUpvotePress={handleUpvotePress}
                   onReplyPress={handleOpenReplyModal}
-                  onEditPress={(replyData) =>
+                  onEditPress={replyData =>
                     handleOpenEditModal(
                       {
                         author: replyData.author,
