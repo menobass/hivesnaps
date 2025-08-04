@@ -13,11 +13,12 @@ const SafeRenderHtml: React.FC<SafeRenderHtmlProps> = props => {
       const message = args[0];
       if (
         typeof message === 'string' &&
-        message.includes(
+        (message.includes(
           'A props object containing a "key" prop is being spread into JSX'
-        )
+        ) ||
+        message.includes('FitImage'))
       ) {
-        return; // Suppress this specific warning
+        return; // Suppress these specific warnings
       }
       originalWarn.apply(console, args);
     };
