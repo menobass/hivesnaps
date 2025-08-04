@@ -1338,6 +1338,7 @@ const ConversationScreenRefactored = () => {
                     params: { hashtag: tag },
                   });
                 }}
+                onReplyPress={handleOpenReplyModal}
               />
             )}
             <View style={ConversationScreenStyles.repliesList}>
