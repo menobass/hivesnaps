@@ -52,6 +52,7 @@ import TwitterEmbed from './components/TwitterEmbed';
 import UpvoteModal from '../components/UpvoteModal';
 import Snap from './components/Snap';
 import Reply from './components/Reply';
+import ReplyModal from './components/ReplyModal';
 
 // Custom hooks for business logic
 import { useUserAuth } from '../hooks/useUserAuth';
@@ -1667,182 +1668,25 @@ const ConversationScreenRefactored = () => {
         {/* Upvote Modal, Reply Modal, Edit Modal, GIF Picker Modal */}
 
         {/* Reply Modal */}
-        <Modal
+        <ReplyModal
           isVisible={replyModalVisible}
-          onBackdropPress={posting ? undefined : closeReplyModal}
-          onBackButtonPress={posting ? undefined : closeReplyModal}
-          style={{
-            justifyContent: 'flex-end',
-            margin: 0,
-            ...(Platform.OS === 'ios' && {
-              paddingBottom: insets.bottom,
-            }),
-          }}
-          useNativeDriver
-          avoidKeyboard={true}
-        >
-          <View
-            style={{
-              backgroundColor: colors.background,
-              padding: 16,
-              borderTopLeftRadius: 18,
-              borderTopRightRadius: 18,
-            }}
-          >
-            <Text
-              style={{
-                color: colors.text,
-                fontWeight: 'bold',
-                fontSize: 16,
-                marginBottom: 8,
-              }}
-            >
-              Reply to {replyTarget?.author}
-            </Text>
-
-            {/* Reply image preview */}
-            {replyImage ? (
-              <View style={{ marginBottom: 10 }}>
-                <ExpoImage
-                  source={{ uri: replyImage }}
-                  style={{ width: 120, height: 120, borderRadius: 10 }}
-                  contentFit='cover'
-                />
-                <TouchableOpacity
-                  onPress={() => setReplyImage(null)}
-                  style={{ position: 'absolute', top: 4, right: 4 }}
-                  disabled={posting}
-                >
-                  <FontAwesome name='close' size={20} color={colors.icon} />
-                </TouchableOpacity>
-              </View>
-            ) : null}
-
-            {/* Reply GIF preview */}
-            {replyGif ? (
-              <View style={{ marginBottom: 10 }}>
-                <ExpoImage
-                  source={{ uri: replyGif }}
-                  style={{ width: 120, height: 120, borderRadius: 10 }}
-                  contentFit='cover'
-                />
-                <TouchableOpacity
-                  onPress={() => setReplyGif(null)}
-                  style={{ position: 'absolute', top: 4, right: 4 }}
-                  disabled={posting}
-                >
-                  <FontAwesome name='close' size={20} color={colors.icon} />
-                </TouchableOpacity>
-                <View
-                  style={{
-                    position: 'absolute',
-                    bottom: 4,
-                    left: 4,
-                    backgroundColor: 'rgba(0,0,0,0.7)',
-                    paddingHorizontal: 6,
-                    paddingVertical: 2,
-                    borderRadius: 4,
-                  }}
-                >
-                  <Text
-                    style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}
-                  >
-                    GIF
-                  </Text>
-                </View>
-              </View>
-            ) : null}
-
-            {/* Error message */}
-            {replyError ? (
-              <Text style={{ color: 'red', marginBottom: 8 }}>
-                {replyError}
-              </Text>
-            ) : null}
-
-            {/* Reply input row */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginBottom: 10,
-              }}
-            >
-              <TouchableOpacity
-                onPress={() => addReplyImage('reply')}
-                disabled={uploading || posting || replyProcessing}
-                style={{ marginRight: 16 }}
-              >
-                <FontAwesome name='image' size={22} color={colors.icon} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => handleOpenGifPicker('reply')}
-                disabled={uploading || posting || replyProcessing}
-                style={{ marginRight: 16 }}
-              >
-                <Text style={{ fontSize: 18, color: colors.icon }}>GIF</Text>
-              </TouchableOpacity>
-              <TextInput
-                value={replyText}
-                onChangeText={setReplyText}
-                style={{
-                  flex: 1,
-                  minHeight: 60,
-                  color: colors.text,
-                  backgroundColor: colors.bubble,
-                  borderRadius: 10,
-                  padding: 10,
-                  marginRight: 10,
-                }}
-                placeholder='Write your reply...'
-                placeholderTextColor={isDark ? '#8899A6' : '#888'}
-                multiline
-              />
-              {uploading ? (
-                <FontAwesome
-                  name='spinner'
-                  size={16}
-                  color='#fff'
-                  style={{ marginRight: 8 }}
-                />
-              ) : null}
-              <TouchableOpacity
-                onPress={submitReply}
-                disabled={
-                  uploading ||
-                  posting ||
-                  replyProcessing ||
-                  (!replyText.trim() && !replyImage && !replyGif) ||
-                  !currentUsername
-                }
-                style={{
-                  backgroundColor: colors.icon,
-                  borderRadius: 20,
-                  paddingHorizontal: 18,
-                  paddingVertical: 8,
-                  opacity:
-                    uploading ||
-                    posting ||
-                    replyProcessing ||
-                    (!replyText.trim() && !replyImage && !replyGif) ||
-                    !currentUsername
-                      ? 0.6
-                      : 1,
-                }}
-              >
-                <Text
-                  style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}
-                >
-                  {posting
-                    ? 'Posting...'
-                    : replyProcessing
-                      ? 'Checking...'
-                      : 'Send'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
+          onClose={closeReplyModal}
+          onSubmit={submitReply}
+          replyTarget={replyTarget}
+          replyText={replyText}
+          onReplyTextChange={setReplyText}
+          replyImage={replyImage}
+          replyGif={replyGif}
+          onImageRemove={() => setReplyImage(null)}
+          onGifRemove={() => setReplyGif(null)}
+          onAddImage={() => addReplyImage('reply')}
+          onAddGif={() => handleOpenGifPicker('reply')}
+          posting={posting}
+          uploading={uploading}
+          replyProcessing={replyProcessing}
+          replyError={replyError}
+          currentUsername={currentUsername}
+        />
 
         {/* Edit Modal */}
         <Modal
