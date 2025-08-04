@@ -53,9 +53,9 @@ export const HivePostPreview: React.FC<HivePostPreviewProps> = ({
   };
 
   const handlePress = () => {
-    // Navigate to ConversationScreen to view the full post
+    // Navigate to HivePostScreen to view the full post
     router.push({
-      pathname: '/ConversationScreen',
+      pathname: '/HivePostScreen',
       params: {
         author: postInfo.author,
         permlink: postInfo.permlink,
