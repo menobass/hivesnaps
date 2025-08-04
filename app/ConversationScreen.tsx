@@ -51,6 +51,7 @@ import SpoilerText from './components/SpoilerText';
 import TwitterEmbed from './components/TwitterEmbed';
 import UpvoteModal from '../components/UpvoteModal';
 import Snap from './components/Snap';
+import Reply from './components/Reply';
 
 // Custom hooks for business logic
 import { useUserAuth } from '../hooks/useUserAuth';
@@ -1637,7 +1638,27 @@ const ConversationScreenRefactored = () => {
               />
             )}
             <View style={ConversationScreenStyles.repliesList}>
-              {flattenReplies(replies).map(reply => renderSingleReply(reply))}
+              {flattenReplies(replies).map(reply => (
+                <Reply
+                  key={reply.author + reply.permlink + '-' + reply.visualLevel}
+                  reply={reply}
+                  onUpvotePress={handleUpvotePress}
+                  onReplyPress={handleOpenReplyModal}
+                  onEditPress={(replyData) =>
+                    handleOpenEditModal(
+                      {
+                        author: replyData.author,
+                        permlink: replyData.permlink || '',
+                        body: replyData.body,
+                      },
+                      'reply'
+                    )
+                  }
+                  onImagePress={handleImagePress}
+                  currentUsername={currentUsername}
+                  colors={colors}
+                />
+              ))}
             </View>
           </ScrollView>
         )}
