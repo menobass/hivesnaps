@@ -318,7 +318,7 @@ export async function fetchHivePostInfo(
     const summary = generateSummary(post.body);
 
     // Smart title function - determines title based on post type
-    const getSmartTitle = (postData: any): string => {
+    const getSmartTitle = async (postData: any): Promise<string> => {
       // If it has a title, use it
       if (postData.title && postData.title.trim()) {
         return postData.title;
@@ -335,7 +335,7 @@ export async function fetchHivePostInfo(
         parent_permlink: postData.parent_permlink,
       };
 
-      const postType = detectPostType(postInfo);
+      const postType = await detectPostType(postInfo);
 
       // Return appropriate label based on type
       return postType === 'snap' ? 'Resnap' : 'Untitled Post';
@@ -344,7 +344,7 @@ export async function fetchHivePostInfo(
     return {
       author: post.author,
       permlink: post.permlink,
-      title: getSmartTitle(post),
+      title: await getSmartTitle(post),
       body: post.body,
       created: post.created,
       voteCount: post.net_votes || 0,

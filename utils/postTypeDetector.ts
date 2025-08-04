@@ -12,43 +12,214 @@ export interface PostInfo {
   parent_permlink?: string;
 }
 
+/**
+ * Recursively check if any parent in the chain is a snap
+ * This handles nested replies to snaps
+ */
+async function checkParentChainForSnap(
+  author: string,
+  permlink: string,
+  depth = 0
+): Promise<boolean> {
+  // Prevent infinite recursion
+  if (depth > 10) {
+    console.log(
+      '[postTypeDetector] Max recursion depth reached, stopping parent chain check'
+    );
+    return false;
+  }
+
+  console.log(`[postTypeDetector] Checking parent chain at depth ${depth}:`, {
+    author,
+    permlink,
+  });
+
+  try {
+    // Import dhive dynamically to avoid circular dependencies
+    const { Client } = await import('@hiveio/dhive');
+    const client = new Client([
+      'https://api.hive.blog',
+      'https://api.hivekings.com',
+      'https://anyx.io',
+    ]);
+
+    // Get the post data
+    const post = await client.database.call('get_content', [author, permlink]);
+
+    if (!post) {
+      console.log(`[postTypeDetector] No post found at depth ${depth}`);
+      return false;
+    }
+
+    console.log(`[postTypeDetector] Parent at depth ${depth}:`, {
+      author: post.author,
+      permlink: post.permlink,
+      parent_author: post.parent_author,
+      parent_permlink: post.parent_permlink,
+    });
+
+    // Check if this parent is a snap
+    if (post.permlink && post.permlink.startsWith('snap-')) {
+      console.log(
+        `[postTypeDetector] ✅ Found snap in parent chain at depth ${depth}`
+      );
+      return true;
+    }
+
+    // If this parent has a parent, continue climbing
+    if (post.parent_author && post.parent_permlink) {
+      return await checkParentChainForSnap(
+        post.parent_author,
+        post.parent_permlink,
+        depth + 1
+      );
+    }
+
+    // No more parents to check
+    console.log(
+      `[postTypeDetector] Reached top of parent chain at depth ${depth}`
+    );
+    return false;
+  } catch (error) {
+    console.log(
+      `[postTypeDetector] Error checking parent at depth ${depth}:`,
+      error
+    );
+    return false;
+  }
+}
+
 export type PostType = 'snap' | 'hive_post';
 
 /**
  * Detect if a post is a snap based on its metadata and content
  */
-export function detectPostType(post: PostInfo): PostType {
-  console.log('[postTypeDetector] detectPostType called with:', {
+export async function detectPostType(post: PostInfo): Promise<PostType> {
+  console.log('[postTypeDetector] ===== STARTING POST TYPE DETECTION =====');
+  console.log('[postTypeDetector] Input post data:', {
     author: post.author,
     permlink: post.permlink,
     parent_author: post.parent_author,
+    parent_permlink: post.parent_permlink,
     hasMetadata: !!post.json_metadata,
     hasBody: !!post.body,
+    bodyLength: post.body?.length || 0,
   });
 
   // Check for invalid/short permlinks that are likely not real posts
   if (post.permlink && post.permlink.length < 5) {
-    console.log('[postTypeDetector] Very short permlink, likely invalid post');
+    console.log(
+      '[postTypeDetector] ❌ Very short permlink, likely invalid post'
+    );
     return 'hive_post'; // Default to regular post for invalid ones
   }
 
-  // Check if it's a snap based on metadata
+  // PRIMARY SNAP DETECTION: Check if it's a snap based on permlink pattern
+  // Snaps typically have permlinks that start with "snap-" followed by a timestamp
+  // This is the most reliable indicator and works regardless of which frontend was used
+  console.log('[postTypeDetector] 🔍 Checking permlink pattern...');
+  console.log('[postTypeDetector]   - Permlink:', post.permlink);
+  console.log(
+    '[postTypeDetector]   - Starts with "snap-":',
+    post.permlink?.startsWith('snap-')
+  );
+
+  if (post.permlink && post.permlink.startsWith('snap-')) {
+    console.log('[postTypeDetector] ✅ Detected snap by permlink pattern');
+    return 'snap';
+  }
+
+  // SECONDARY SNAP DETECTION: Check if it's a snap based on parent_author
+  // Snaps are typically replies to a container post by 'peak.snaps'
+  console.log('[postTypeDetector] 🔍 Checking parent_author...');
+  console.log('[postTypeDetector]   - Parent author:', post.parent_author);
+  console.log(
+    '[postTypeDetector]   - Equals "peak.snaps":',
+    post.parent_author === 'peak.snaps'
+  );
+
+  if (post.parent_author === 'peak.snaps') {
+    console.log('[postTypeDetector] ✅ Detected snap by parent_author');
+    return 'snap';
+  }
+
+  // TERTIARY SNAP DETECTION: Check if parent_permlink indicates this is a reply to a snap
+  // This handles cases where someone replies to a snap from peakD or other frontends
+  console.log('[postTypeDetector] 🔍 Checking parent_permlink...');
+  console.log('[postTypeDetector]   - Parent permlink:', post.parent_permlink);
+  console.log(
+    '[postTypeDetector]   - Parent permlink starts with "snap-":',
+    post.parent_permlink && post.parent_permlink.startsWith('snap-')
+  );
+
+  if (post.parent_permlink && post.parent_permlink.startsWith('snap-')) {
+    console.log(
+      '[postTypeDetector] ✅ Detected snap by parent_permlink (reply to snap)'
+    );
+    return 'snap';
+  }
+
+  // QUATERNARY SNAP DETECTION: Check parent chain recursively for snaps
+  // This handles nested replies to snaps (replies to replies to snaps)
+  if (post.parent_author && post.parent_permlink) {
+    console.log('[postTypeDetector] 🔍 Checking parent chain recursively...');
+    console.log('[postTypeDetector]   - Starting with parent:', {
+      author: post.parent_author,
+      permlink: post.parent_permlink,
+    });
+
+    const isInSnapChain = await checkParentChainForSnap(
+      post.parent_author,
+      post.parent_permlink
+    );
+
+    if (isInSnapChain) {
+      console.log(
+        '[postTypeDetector] ✅ Detected snap by parent chain (nested reply to snap)'
+      );
+      return 'snap';
+    } else {
+      console.log('[postTypeDetector] ❌ No snap found in parent chain');
+    }
+  }
+
+  // QUINARY SNAP DETECTION: Check if it's a snap based on metadata
+  console.log('[postTypeDetector] 🔍 Checking metadata...');
+  console.log('[postTypeDetector]   - Has metadata:', !!post.json_metadata);
+
   if (post.json_metadata) {
     try {
       const metadata = JSON.parse(post.json_metadata);
-      console.log('[postTypeDetector] Parsed metadata:', {
+      console.log('[postTypeDetector]   - Parsed metadata:', {
         app: metadata.app,
         tags: metadata.tags,
         tagsCount: metadata.tags?.length || 0,
+        fullMetadata: metadata,
       });
 
       // Check for snap-specific metadata
+      console.log('[postTypeDetector]   - Checking app field...');
+      console.log('[postTypeDetector]     - App value:', metadata.app);
+      console.log(
+        '[postTypeDetector]     - App includes "hivesnaps":',
+        metadata.app && metadata.app.includes('hivesnaps')
+      );
+
       if (metadata.app && metadata.app.includes('hivesnaps')) {
-        console.log('[postTypeDetector] Detected snap by app metadata');
+        console.log('[postTypeDetector] ✅ Detected snap by app metadata');
         return 'snap';
       }
 
       // Check for snap-specific tags - be more specific
+      console.log('[postTypeDetector]   - Checking tags...');
+      console.log('[postTypeDetector]     - Tags array:', metadata.tags);
+      console.log(
+        '[postTypeDetector]     - Tags includes "hivesnaps":',
+        metadata.tags &&
+          Array.isArray(metadata.tags) &&
+          metadata.tags.includes('hivesnaps')
+      );
+
       if (metadata.tags && Array.isArray(metadata.tags)) {
         // Only detect as snap if it has the specific hivesnaps tag AND other snap indicators
         if (metadata.tags.includes('hivesnaps')) {
@@ -59,14 +230,31 @@ export function detectPostType(post: PostInfo): PostType {
             (post.permlink && post.permlink.startsWith('snap-')) ||
             post.parent_author === 'peak.snaps';
 
+          console.log(
+            '[postTypeDetector]     - Has other snap indicators:',
+            hasOtherSnapIndicators
+          );
+          console.log(
+            '[postTypeDetector]       - App includes hivesnaps:',
+            metadata.app && metadata.app.includes('hivesnaps')
+          );
+          console.log(
+            '[postTypeDetector]       - Permlink starts with snap-:',
+            post.permlink && post.permlink.startsWith('snap-')
+          );
+          console.log(
+            '[postTypeDetector]       - Parent author is peak.snaps:',
+            post.parent_author === 'peak.snaps'
+          );
+
           if (hasOtherSnapIndicators) {
             console.log(
-              '[postTypeDetector] Detected snap by hivesnaps tag + other indicators'
+              '[postTypeDetector] ✅ Detected snap by hivesnaps tag + other indicators'
             );
             return 'snap';
           } else {
             console.log(
-              '[postTypeDetector] Has hivesnaps tag but no other snap indicators - treating as regular post'
+              '[postTypeDetector] ⚠️ Has hivesnaps tag but no other snap indicators - treating as regular post'
             );
           }
         }
@@ -74,47 +262,57 @@ export function detectPostType(post: PostInfo): PostType {
         // Many regular posts might have 'snap' as a tag but aren't actually snaps
       }
     } catch (e) {
-      console.log('[postTypeDetector] Invalid JSON metadata:', e);
+      console.log('[postTypeDetector] ❌ Invalid JSON metadata:', e);
       // Invalid JSON metadata, continue with other checks
     }
+  } else {
+    console.log('[postTypeDetector]   - No metadata available');
   }
 
-  // Check if it's a snap based on permlink pattern
-  // Snaps typically have permlinks that start with "snap-" followed by a timestamp
-  if (post.permlink && post.permlink.startsWith('snap-')) {
-    console.log('[postTypeDetector] Detected snap by permlink pattern');
-    return 'snap';
-  }
+  // SENARY SNAP DETECTION: Check if it's a snap based on content patterns
+  console.log('[postTypeDetector] 🔍 Checking content patterns...');
+  console.log('[postTypeDetector]   - Has body:', !!post.body);
 
-  // Check if it's a snap based on parent_author
-  // Snaps are typically replies to a container post by 'peak.snaps'
-  if (post.parent_author === 'peak.snaps') {
-    console.log('[postTypeDetector] Detected snap by parent_author');
-    return 'snap';
-  }
-
-  // Additional check: if parent_author is empty or null, it's likely a regular post
-  if (!post.parent_author || post.parent_author === '') {
-    console.log('[postTypeDetector] No parent_author, likely regular post');
-    // Continue with other checks, but this is a good indicator
-  }
-
-  // Check if it's a snap based on content patterns
   if (post.body) {
     const body = post.body.toLowerCase();
+    console.log(
+      '[postTypeDetector]   - Body preview (first 100 chars):',
+      body.substring(0, 100)
+    );
+    console.log(
+      '[postTypeDetector]   - Body includes "#hivesnaps":',
+      body.includes('#hivesnaps')
+    );
 
     // Look for snap-specific content patterns - be more specific
     if (body.includes('#hivesnaps')) {
-      console.log('[postTypeDetector] Detected snap by #hivesnaps hashtag');
+      console.log('[postTypeDetector] ✅ Detected snap by #hivesnaps hashtag');
       return 'snap';
     }
 
     // Don't detect as snap just because it mentions 'snapie' or 'snap-' in content
     // This is too broad and catches regular posts that mention these words
     // Only detect if it has specific snap formatting or patterns
+  } else {
+    console.log('[postTypeDetector]   - No body content available');
   }
 
-  console.log('[postTypeDetector] Defaulting to regular Hive post');
+  // Additional check: if parent_author is empty or null, it's likely a regular post
+  console.log('[postTypeDetector] 🔍 Final checks...');
+  console.log(
+    '[postTypeDetector]   - Parent author is empty/null:',
+    !post.parent_author || post.parent_author === ''
+  );
+
+  if (!post.parent_author || post.parent_author === '') {
+    console.log('[postTypeDetector] ⚠️ No parent_author, likely regular post');
+    // Continue with other checks, but this is a good indicator
+  }
+
+  console.log(
+    '[postTypeDetector] ❌ All checks failed - defaulting to regular Hive post'
+  );
+  console.log('[postTypeDetector] ===== ENDING POST TYPE DETECTION =====');
   // Default to regular Hive post
   return 'hive_post';
 }
@@ -122,8 +320,8 @@ export function detectPostType(post: PostInfo): PostType {
 /**
  * Get the appropriate screen route based on post type
  */
-export function getPostScreenRoute(post: PostInfo): string {
-  const postType = detectPostType(post);
+export async function getPostScreenRoute(post: PostInfo): Promise<string> {
+  const postType = await detectPostType(post);
 
   if (postType === 'snap') {
     return '/ConversationScreen';
@@ -135,8 +333,8 @@ export function getPostScreenRoute(post: PostInfo): string {
 /**
  * Get navigation parameters for the appropriate screen
  */
-export function getPostNavigationParams(post: PostInfo) {
-  const route = getPostScreenRoute(post);
+export async function getPostNavigationParams(post: PostInfo) {
+  const route = await getPostScreenRoute(post);
 
   return {
     route,

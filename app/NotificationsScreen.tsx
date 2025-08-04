@@ -249,7 +249,7 @@ const NotificationsScreen = () => {
             hasMetadata: !!postInfo.json_metadata,
           });
 
-          const postType = detectPostType(postInfo);
+          const postType = await detectPostType(postInfo);
           console.log('[NotificationsScreen] Post type detected:', postType);
 
           if (postType === 'snap') {
