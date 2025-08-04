@@ -24,7 +24,6 @@ import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Modal from 'react-native-modal';
 import Markdown from 'react-native-markdown-display';
-import { WebView } from 'react-native-webview';
 import {
   extractVideoInfo,
   removeVideoUrls,
@@ -32,27 +31,18 @@ import {
   removeEmbedUrls,
   extractYouTubeId,
 } from '../utils/extractVideoInfo';
-import * as SecureStore from 'expo-secure-store';
-import Slider from '@react-native-community/slider';
-import { useVoteWeightMemory } from '../hooks/useVoteWeightMemory';
-import { calculateVoteValue } from '../utils/calculateVoteValue';
-import { getHivePriceUSD } from '../utils/getHivePrice';
-import IPFSVideoPlayer from './components/IPFSVideoPlayer';
 import { Image as ExpoImage } from 'expo-image';
 import RenderHtml, {
   defaultHTMLElementModels,
   HTMLContentModel,
 } from 'react-native-render-html';
 import { Dimensions } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
+
 import { extractImageUrls } from '../utils/extractImageUrls';
 import ImageView from 'react-native-image-viewing';
 import genericAvatar from '../assets/images/generic-avatar.png';
 import {
-  extractHivePostUrls,
-  fetchMultipleHivePostInfos,
-  removeHivePostUrls,
-  HivePostInfo,
+  extractHivePostUrls
 } from '../utils/extractHivePostInfo';
 import { ContextHivePostPreviewRenderer } from '../components/ContextHivePostPreviewRenderer';
 import { HivePostPreview } from '../components/HivePostPreview';
@@ -60,6 +50,7 @@ import { convertSpoilerSyntax, SpoilerData } from '../utils/spoilerParser';
 import SpoilerText from './components/SpoilerText';
 import TwitterEmbed from './components/TwitterEmbed';
 import UpvoteModal from '../components/UpvoteModal';
+import Snap from './components/Snap';
 
 // Custom hooks for business logic
 import { useUserAuth } from '../hooks/useUserAuth';
@@ -474,29 +465,7 @@ const ConversationScreenRefactored = () => {
     return /<([a-z][\s\S]*?)>/i.test(str);
   };
 
-  // Render functions (simplified)
-  const renderMp4Video = (uri: string, key?: string | number) => (
-    <View
-      key={key || uri}
-      style={{
-        width: '100%',
-        aspectRatio: 16 / 9,
-        marginVertical: 10,
-        borderRadius: 12,
-        overflow: 'hidden',
-        backgroundColor: isDark ? '#222' : '#eee',
-      }}
-    >
-      <Video
-        source={{ uri }}
-        useNativeControls
-        resizeMode={ResizeMode.CONTAIN}
-        style={{ width: '100%', height: '100%' }}
-        shouldPlay={false}
-        isLooping={false}
-      />
-    </View>
-  );
+
 
   // Extract and render Twitter/X posts
   const extractAndRenderTwitterPosts = (content: string) => {
@@ -926,7 +895,7 @@ const ConversationScreenRefactored = () => {
     );
   };
 
-  // Render the snap as a header for the replies list (simplified)
+  // DEPRECATED: renderSnapHeader function - Now using Snap component instead
   const renderSnapHeader = () => {
     if (!snap) return null;
 
@@ -1320,7 +1289,38 @@ const ConversationScreenRefactored = () => {
               </View>
             )}
 
-            {renderSnapHeader()}
+            {snap && (
+              <Snap
+                author={snap.author}
+                avatarUrl={snap.avatarUrl}
+                body={snap.body}
+                created={snap.created}
+                voteCount={snap.voteCount || 0}
+                replyCount={snap.replyCount || 0}
+                payout={snap.payout || 0}
+                permlink={snap.permlink}
+                onUpvotePress={() =>
+                  handleUpvotePress({
+                    author: snap.author,
+                    permlink: snap.permlink || '',
+                  })
+                }
+                hasUpvoted={snap.hasUpvoted || false}
+                onSpeechBubblePress={() => {}} // Disable in conversation view
+                onContentPress={() => {}} // Disable in conversation view
+                onUserPress={(username) => {
+                  router.push(`/ProfileScreen?username=${username}` as any);
+                }}
+                onImagePress={handleImagePress}
+                showAuthor={true}
+                onHashtagPress={(tag) => {
+                  router.push({
+                    pathname: '/DiscoveryScreen',
+                    params: { hashtag: tag },
+                  });
+                }}
+              />
+            )}
             <View style={ConversationScreenStyles.repliesList}>
               {replies.map(reply => renderReplyTree(reply))}
             </View>
