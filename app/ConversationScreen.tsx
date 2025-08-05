@@ -1358,6 +1358,17 @@ const ConversationScreenRefactored = () => {
                   });
                 }}
                 onReplyPress={handleOpenReplyModal}
+                onEditPress={snapData =>
+                  handleOpenEditModal(
+                    {
+                      author: snapData.author,
+                      permlink: snapData.permlink,
+                      body: snapData.body,
+                    },
+                    'snap'
+                  )
+                }
+                currentUsername={currentUsername}
               />
             )}
             <View style={ConversationScreenStyles.repliesList}>

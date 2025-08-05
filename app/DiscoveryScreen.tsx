@@ -10,8 +10,10 @@ import {
   Modal,
   Pressable,
   TouchableOpacity,
+  TextInput,
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
+import { Image as ExpoImage } from 'expo-image';
 import Slider from '@react-native-community/slider';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { calculateVoteValue } from '../utils/calculateVoteValue';
@@ -20,6 +22,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import Snap from './components/Snap';
 import { Client } from '@hiveio/dhive';
 import UpvoteModal from '../components/UpvoteModal';
+import { useEdit } from '../hooks/useEdit';
 
 // Use local twitterColors definition (copied from FeedScreen)
 const twitterColors = {
@@ -37,6 +40,7 @@ const twitterColors = {
     reward: '#FFD700',
     error: '#FF3B30',
     footer: '#F5F8FA',
+    bubble: '#f0f0f0',
   },
   dark: {
     background: '#15202B',
@@ -52,6 +56,7 @@ const twitterColors = {
     reward: '#FFD700',
     error: '#FF3B30',
     footer: '#22303C',
+    bubble: '#192734',
   },
 };
 
@@ -76,11 +81,33 @@ const DiscoveryScreen = () => {
   const router = useRouter();
   const { hashtag } = useLocalSearchParams<{ hashtag: string }>();
 
+  // Get current username
+  const [currentUsername, setCurrentUsername] = useState<string | null>(null);
+
   const [snaps, setSnaps] = useState<Snap[]>([]);
   const [loading, setLoading] = useState(true);
   const [avatarCache, setAvatarCache] = useState<{
     [username: string]: { url: string; ts: number };
   }>({});
+
+  // Edit functionality
+  const {
+    editModalVisible,
+    editText,
+    editImage,
+    editGif,
+    editing,
+    error: editError,
+    uploading: editUploading,
+    openEditModal,
+    closeEditModal,
+    setEditText,
+    setEditImage,
+    setEditGif,
+    submitEdit,
+    addImage: addEditImage,
+    addGif: addEditGif,
+  } = useEdit(currentUsername);
 
   // Avatar fetching/caching helpers
   const getAvatarUrl = (username: string) =>
@@ -203,7 +230,7 @@ const DiscoveryScreen = () => {
   useEffect(() => {
     const loadUsernameAndFetch = async () => {
       const storedUsername = await SecureStore.getItemAsync('hive_username');
-      if (storedUsername) setUsername(storedUsername);
+      if (storedUsername) setCurrentUsername(storedUsername);
       // Only pass string or undefined, never null
       if (hashtag) fetchHashtagSnaps(storedUsername ?? undefined);
     };
@@ -315,6 +342,18 @@ const DiscoveryScreen = () => {
     setUpvoteTarget(null);
     setVoteValue(null);
     // Do not reset voteWeight, keep last used value
+  };
+
+  // Handle edit press
+  const handleEditPress = (snapData: {
+    author: string;
+    permlink: string;
+    body: string;
+  }) => {
+    openEditModal(
+      { author: snapData.author, permlink: snapData.permlink, type: 'snap' },
+      snapData.body
+    );
   };
 
   const handleUpvoteConfirm = async () => {
@@ -493,6 +532,8 @@ const DiscoveryScreen = () => {
                   params: { hashtag: tag },
                 });
               }}
+              onEditPress={handleEditPress}
+              currentUsername={currentUsername}
             />
           )}
           contentContainerStyle={{ paddingBottom: 80 }}
@@ -501,6 +542,178 @@ const DiscoveryScreen = () => {
           onRefresh={handleRefresh}
         />
       )}
+
+      {/* Edit Modal */}
+      <Modal
+        visible={editModalVisible}
+        animationType='slide'
+        transparent={true}
+        onRequestClose={closeEditModal}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: colors.background,
+              padding: 16,
+              borderTopLeftRadius: 18,
+              borderTopRightRadius: 18,
+            }}
+          >
+            <Text
+              style={{
+                color: colors.text,
+                fontWeight: 'bold',
+                fontSize: 16,
+                marginBottom: 8,
+              }}
+            >
+              Edit Snap
+            </Text>
+
+            {/* Edit image preview */}
+            {editImage ? (
+              <View style={{ marginBottom: 10 }}>
+                <ExpoImage
+                  source={{ uri: editImage }}
+                  style={{ width: 120, height: 120, borderRadius: 10 }}
+                  contentFit='cover'
+                />
+                <TouchableOpacity
+                  onPress={() => setEditImage(null)}
+                  style={{ position: 'absolute', top: 4, right: 4 }}
+                  disabled={editing}
+                >
+                  <FontAwesome name='close' size={20} color={colors.icon} />
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+            {/* Edit GIF preview */}
+            {editGif ? (
+              <View style={{ marginBottom: 10 }}>
+                <ExpoImage
+                  source={{ uri: editGif }}
+                  style={{ width: 120, height: 120, borderRadius: 10 }}
+                  contentFit='cover'
+                />
+                <TouchableOpacity
+                  onPress={() => setEditGif(null)}
+                  style={{ position: 'absolute', top: 4, right: 4 }}
+                  disabled={editing}
+                >
+                  <FontAwesome name='close' size={20} color={colors.icon} />
+                </TouchableOpacity>
+                <View
+                  style={{
+                    position: 'absolute',
+                    bottom: 4,
+                    left: 4,
+                    backgroundColor: 'rgba(0,0,0,0.7)',
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    borderRadius: 4,
+                  }}
+                >
+                  <Text
+                    style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}
+                  >
+                    GIF
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+
+            {/* Error message */}
+            {editError ? (
+              <Text style={{ color: 'red', marginBottom: 8 }}>{editError}</Text>
+            ) : null}
+
+            {/* Edit input row */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginBottom: 10,
+              }}
+            >
+              <TouchableOpacity
+                onPress={() => addEditImage('edit')}
+                disabled={editUploading || editing}
+                style={{ marginRight: 16 }}
+              >
+                <FontAwesome name='image' size={22} color={colors.icon} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => addEditGif('edit')}
+                disabled={editUploading || editing}
+                style={{ marginRight: 16 }}
+              >
+                <Text style={{ fontSize: 18, color: colors.icon }}>GIF</Text>
+              </TouchableOpacity>
+              <TextInput
+                value={editText}
+                onChangeText={setEditText}
+                style={{
+                  flex: 1,
+                  minHeight: 80,
+                  color: colors.text,
+                  backgroundColor: colors.bubble,
+                  borderRadius: 10,
+                  padding: 10,
+                  marginRight: 10,
+                }}
+                placeholder='Edit your snap...'
+                placeholderTextColor={
+                  colorScheme === 'dark' ? '#8899A6' : '#888'
+                }
+                multiline
+              />
+              {editUploading ? (
+                <FontAwesome
+                  name='spinner'
+                  size={16}
+                  color='#fff'
+                  style={{ marginRight: 8 }}
+                />
+              ) : null}
+              <TouchableOpacity
+                onPress={submitEdit}
+                disabled={
+                  editUploading ||
+                  editing ||
+                  (!editText.trim() && !editImage && !editGif) ||
+                  !currentUsername
+                }
+                style={{
+                  backgroundColor: colors.icon,
+                  borderRadius: 20,
+                  paddingHorizontal: 18,
+                  paddingVertical: 8,
+                  opacity:
+                    editUploading ||
+                    editing ||
+                    (!editText.trim() && !editImage && !editGif) ||
+                    !currentUsername
+                      ? 0.6
+                      : 1,
+                }}
+              >
+                <Text
+                  style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}
+                >
+                  {editing ? 'Saving...' : 'Save'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
