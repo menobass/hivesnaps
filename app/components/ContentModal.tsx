@@ -170,6 +170,60 @@ const ContentModal: React.FC<ContentModalProps> = ({
             >
               <FontAwesome name='close' size={20} color={colors.icon} />
             </TouchableOpacity>
+
+            {/* Image information for edit mode */}
+            {mode === 'edit' && (
+              <View
+                style={{
+                  backgroundColor: colors.bubble,
+                  padding: 8,
+                  borderRadius: 6,
+                  marginTop: 4,
+                }}
+              >
+                <Text
+                  style={{
+                    color: colors.text,
+                    fontSize: 12,
+                    fontWeight: 'bold',
+                    marginBottom: 2,
+                  }}
+                >
+                  Image URL:
+                </Text>
+                <Text
+                  style={{
+                    color: colors.text,
+                    fontSize: 11,
+                    fontFamily: 'monospace',
+                    marginBottom: 4,
+                  }}
+                  numberOfLines={2}
+                >
+                  {image}
+                </Text>
+                <Text
+                  style={{
+                    color: colors.text,
+                    fontSize: 12,
+                    fontWeight: 'bold',
+                    marginBottom: 2,
+                  }}
+                >
+                  Markdown:
+                </Text>
+                <Text
+                  style={{
+                    color: colors.text,
+                    fontSize: 11,
+                    fontFamily: 'monospace',
+                  }}
+                  numberOfLines={2}
+                >
+                  ![image]({image})
+                </Text>
+              </View>
+            )}
           </View>
         ) : null}
 
