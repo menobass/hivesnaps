@@ -18,6 +18,7 @@ import {
   ScrollView,
   Linking,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { ConversationScreenStyles } from '../styles/ConversationScreenStyles';
 import { FontAwesome } from '@expo/vector-icons';
@@ -190,6 +191,7 @@ const ConversationScreenRefactored = () => {
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [modalImages, setModalImages] = useState<Array<{ uri: string }>>([]);
   const [modalImageIndex, setModalImageIndex] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Error handling
   if (!author || !permlink) {
@@ -224,6 +226,15 @@ const ConversationScreenRefactored = () => {
   // Event handlers
   const handleRefresh = () => {
     refreshConversation();
+  };
+
+  const handlePullToRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refreshConversation();
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const handleGoToParentSnap = () => {
@@ -1278,6 +1289,14 @@ const ConversationScreenRefactored = () => {
           <ScrollView
             style={{ flex: 1 }}
             contentContainerStyle={{ paddingBottom: 32 }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handlePullToRefresh}
+                colors={[colors.icon]}
+                tintColor={colors.icon}
+              />
+            }
           >
             {/* Blockchain Processing Indicator */}
             {(replyProcessing || editProcessing) && (
