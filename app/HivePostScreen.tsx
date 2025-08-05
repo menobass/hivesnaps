@@ -12,6 +12,7 @@ import {
   useColorScheme,
   ActivityIndicator,
   Linking,
+  Pressable,
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -267,7 +268,46 @@ const HivePostScreen = () => {
   }
 
   const windowWidth = Dimensions.get('window').width;
-  const isHtml = post.body.includes('<') && post.body.includes('>');
+
+  // Smart HTML detection - distinguish between HTML and markdown content
+  const hasHtmlTags = /<([a-z][\s\S]*?)>/i.test(post.body);
+  const hasComplexHtml =
+    post.body.includes('<div') ||
+    post.body.includes('<p') ||
+    post.body.includes('<span') ||
+    post.body.includes('<img') ||
+    post.body.includes('<a') ||
+    post.body.includes('<h') ||
+    post.body.includes('<ul') ||
+    post.body.includes('<ol') ||
+    post.body.includes('<li') ||
+    post.body.includes('<br') ||
+    post.body.includes('<hr');
+
+  // Use HTML renderer only for complex HTML, use markdown for simple formatting tags
+  const isHtml = hasComplexHtml;
+
+  // Preprocess content for markdown rendering - convert <u> tags to markdown format
+  const preprocessForMarkdown = (content: string) => {
+    return content
+      .replace(/<u>(.*?)<\/u>/g, '___$1___') // Convert <u> tags to markdown underlines
+      .replace(/<strong>(.*?)<\/strong>/g, '**$1**') // Convert <strong> tags to markdown bold
+      .replace(/<em>(.*?)<\/em>/g, '*$1*') // Convert <em> tags to markdown italic
+      .replace(
+        /(^|[^\w/@])@([a-z0-9\-\.]{3,16})(?![a-z0-9\-\.])/gi,
+        '$1[**@$2**](profile://$2)'
+      ); // Convert @usernames to clickable links
+  };
+
+  console.log('[HivePostScreen] Content type detection:', {
+    isHtml,
+    bodyLength: post.body.length,
+    bodyPreview: post.body.substring(0, 200),
+    hasMarkdownHeaders: /^#{1,6}\s/.test(post.body),
+    hasMarkdownBold: /\*\*.*\*\*/.test(post.body),
+    hasMarkdownItalic: /\*.*\*/.test(post.body),
+    hasUTags: post.body.includes('<u>'),
+  });
 
   return (
     <SafeAreaViewSA style={{ flex: 1, backgroundColor: colors.background }}>
@@ -373,35 +413,188 @@ const HivePostScreen = () => {
                   fontWeight: 'bold',
                   marginBottom: 10,
                 },
+                u: { textDecorationLine: 'underline' },
               }}
             />
           ) : (
             <Markdown
               style={{
-                body: { color: colors.text, fontSize: 16, lineHeight: 24 },
-                paragraph: { marginBottom: 16 },
+                body: {
+                  color: colors.text,
+                  fontSize: 16,
+                  lineHeight: 24,
+                  fontFamily: 'System',
+                },
+                paragraph: {
+                  marginBottom: 16,
+                  color: colors.text,
+                },
                 heading1: {
                   color: colors.text,
                   fontSize: 24,
                   fontWeight: 'bold',
                   marginBottom: 16,
+                  marginTop: 24,
                 },
                 heading2: {
                   color: colors.text,
                   fontSize: 20,
                   fontWeight: 'bold',
                   marginBottom: 12,
+                  marginTop: 20,
                 },
                 heading3: {
                   color: colors.text,
                   fontSize: 18,
                   fontWeight: 'bold',
                   marginBottom: 10,
+                  marginTop: 16,
                 },
-                link: { color: colors.button },
+                heading4: {
+                  color: colors.text,
+                  fontSize: 16,
+                  fontWeight: 'bold',
+                  marginBottom: 8,
+                  marginTop: 12,
+                },
+                heading5: {
+                  color: colors.text,
+                  fontSize: 14,
+                  fontWeight: 'bold',
+                  marginBottom: 6,
+                  marginTop: 10,
+                },
+                heading6: {
+                  color: colors.text,
+                  fontSize: 12,
+                  fontWeight: 'bold',
+                  marginBottom: 4,
+                  marginTop: 8,
+                },
+                link: {
+                  color: colors.button,
+                  textDecorationLine: 'underline',
+                },
+                strong: {
+                  fontWeight: 'bold',
+                  color: colors.text,
+                },
+                em: {
+                  fontStyle: 'italic',
+                  color: colors.text,
+                },
+                // Add styling for markdown underlines (___text___)
+                underline: {
+                  textDecorationLine: 'underline',
+                  color: colors.text,
+                },
+                u: {
+                  textDecorationLine: 'underline',
+                  color: colors.text,
+                },
+
+                code_inline: {
+                  backgroundColor: isDark ? '#2C3E50' : '#F8F9FA',
+                  color: isDark ? '#E74C3C' : '#E74C3C',
+                  paddingHorizontal: 4,
+                  paddingVertical: 2,
+                  borderRadius: 4,
+                  fontFamily: 'monospace',
+                  fontSize: 14,
+                },
+                code_block: {
+                  backgroundColor: isDark ? '#2C3E50' : '#F8F9FA',
+                  color: isDark ? '#E74C3C' : '#E74C3C',
+                  padding: 12,
+                  borderRadius: 8,
+                  fontFamily: 'monospace',
+                  fontSize: 14,
+                  marginVertical: 8,
+                },
+                blockquote: {
+                  borderLeftWidth: 4,
+                  borderLeftColor: colors.button,
+                  paddingLeft: 16,
+                  marginVertical: 8,
+                  backgroundColor: isDark ? '#2C3E50' : '#F8F9FA',
+                  paddingVertical: 8,
+                  paddingRight: 12,
+                },
+                list_item: {
+                  marginBottom: 4,
+                  color: colors.text,
+                },
+                bullet_list: {
+                  marginBottom: 16,
+                  paddingLeft: 16,
+                },
+                ordered_list: {
+                  marginBottom: 16,
+                  paddingLeft: 16,
+                },
+                hr: {
+                  backgroundColor: colors.border,
+                  height: 1,
+                  marginVertical: 16,
+                },
+              }}
+              rules={{
+                link: (node, children, parent, styles) => {
+                  const { href } = node.attributes;
+
+                  // Handle profile:// links for mentions
+                  if (href && href.startsWith('profile://')) {
+                    const username = href.replace('profile://', '');
+                    return (
+                      <Pressable
+                        key={node.key}
+                        onPress={() =>
+                          router.push(
+                            `/ProfileScreen?username=${username}` as any
+                          )
+                        }
+                        style={({ pressed }) => [
+                          { opacity: pressed ? 0.6 : 1 },
+                        ]}
+                        accessibilityRole='link'
+                        accessibilityLabel={`View @${username}'s profile`}
+                      >
+                        <Text
+                          style={{
+                            color: colors.button,
+                            fontWeight: 'bold',
+                            transform: [{ translateY: 4 }] // hack to move down
+                          }}
+                        >
+                          @{username}
+                        </Text>
+                      </Pressable>
+                    );
+                  }
+
+                  // Handle regular links
+                  return (
+                    <Pressable
+                      key={node.key}
+                      onPress={() => Linking.openURL(href)}
+                      style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+                      accessibilityRole='link'
+                      accessibilityLabel={`Open link: ${href}`}
+                    >
+                      <Text
+                        style={{
+                          color: colors.button,
+                          textDecorationLine: 'underline',
+                        }}
+                      >
+                        {children}
+                      </Text>
+                    </Pressable>
+                  );
+                },
               }}
             >
-              {post.body}
+              {preprocessForMarkdown(post.body)}
             </Markdown>
           )}
         </View>
