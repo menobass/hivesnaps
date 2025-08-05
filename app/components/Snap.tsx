@@ -74,6 +74,7 @@ interface SnapProps {
   onImagePress?: (imageUrl: string) => void; // NEW: handler for image press
   showAuthor?: boolean; // Optional: show author info in Snap bubble
   onHashtagPress?: (hashtag: string) => void; // Optional: handle hashtag press
+  onReplyPress?: (author: string, permlink: string) => void; // NEW: handler for reply button
 }
 
 // Utility to extract raw image URLs from text (not in markdown or html)
@@ -419,6 +420,7 @@ const Snap: React.FC<SnapProps> = ({
   onImagePress,
   showAuthor = false,
   onHashtagPress,
+  onReplyPress,
 }) => {
   // Process hashtags in text, converting them to clickable markdown links
   function processHashtags(text: string): string {
@@ -785,6 +787,35 @@ const Snap: React.FC<SnapProps> = ({
         <Text style={[styles.payout, { color: colors.payout }]}>
           ${payout.toFixed(2)}
         </Text>
+        {onReplyPress && permlink && (
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              alignSelf: 'auto',
+              marginLeft: 12,
+              paddingHorizontal: 14,
+              paddingVertical: 7,
+              borderRadius: 20,
+              backgroundColor: 'transparent',
+            }}
+            onPress={() => onReplyPress(author, permlink)}
+            accessibilityRole='button'
+            accessibilityLabel='Reply to this snap'
+          >
+            <FontAwesome name='reply' size={16} color={colors.icon} />
+            <Text
+              style={{
+                marginLeft: 6,
+                fontWeight: 'bold',
+                fontSize: 15,
+                color: colors.icon,
+              }}
+            >
+              Reply
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Hive Post Previews - Footer Style */}
@@ -797,7 +828,7 @@ const Snap: React.FC<SnapProps> = ({
               icon: colors.icon,
               text: colors.text,
             }}
-            onError={(error) => {
+            onError={error => {
               console.warn('[Snap] Hive post preview error:', error);
             }}
           />

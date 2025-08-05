@@ -102,10 +102,11 @@ const ProfileScreen = () => {
     handleUpdateAvatar,
     closeModals,
   } = useAvatarManagement(currentUsername);
-  const { claimLoading, handleClaimRewards } = useRewardsManagement(
+  const { claimLoading, processing, handleClaimRewards } = useRewardsManagement(
     currentUsername,
     profile,
-    isOwnProfile
+    isOwnProfile,
+    refetchProfile
   );
   const {
     upvoteModalVisible,
@@ -506,7 +507,7 @@ const ProfileScreen = () => {
                       { backgroundColor: colors.icon },
                     ]}
                     onPress={handleClaimRewards}
-                    disabled={claimLoading}
+                    disabled={claimLoading || processing}
                   >
                     {claimLoading ? (
                       <FontAwesome
@@ -514,11 +515,17 @@ const ProfileScreen = () => {
                         size={16}
                         color='#fff'
                       />
+                    ) : processing ? (
+                      <FontAwesome name='refresh' size={16} color='#fff' />
                     ) : (
                       <FontAwesome name='dollar' size={16} color='#fff' />
                     )}
                     <Text style={styles.claimButtonText}>
-                      {claimLoading ? 'Claiming...' : 'CLAIM NOW'}
+                      {claimLoading
+                        ? 'Claiming...'
+                        : processing
+                          ? 'Processing...'
+                          : 'CLAIM NOW'}
                     </Text>
                   </TouchableOpacity>
                 </View>

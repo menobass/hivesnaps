@@ -18,13 +18,13 @@ import {
   ScrollView,
   Linking,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { ConversationScreenStyles } from '../styles/ConversationScreenStyles';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Modal from 'react-native-modal';
 import Markdown from 'react-native-markdown-display';
-import { WebView } from 'react-native-webview';
 import {
   extractVideoInfo,
   removeVideoUrls,
@@ -32,34 +32,26 @@ import {
   removeEmbedUrls,
   extractYouTubeId,
 } from '../utils/extractVideoInfo';
-import * as SecureStore from 'expo-secure-store';
-import Slider from '@react-native-community/slider';
-import { useVoteWeightMemory } from '../hooks/useVoteWeightMemory';
-import { calculateVoteValue } from '../utils/calculateVoteValue';
-import { getHivePriceUSD } from '../utils/getHivePrice';
-import IPFSVideoPlayer from './components/IPFSVideoPlayer';
 import { Image as ExpoImage } from 'expo-image';
 import RenderHtml, {
   defaultHTMLElementModels,
   HTMLContentModel,
 } from 'react-native-render-html';
 import { Dimensions } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
+
 import { extractImageUrls } from '../utils/extractImageUrls';
 import ImageView from 'react-native-image-viewing';
 import genericAvatar from '../assets/images/generic-avatar.png';
-import {
-  extractHivePostUrls,
-  fetchMultipleHivePostInfos,
-  removeHivePostUrls,
-  HivePostInfo,
-} from '../utils/extractHivePostInfo';
+import { extractHivePostUrls } from '../utils/extractHivePostInfo';
 import { ContextHivePostPreviewRenderer } from '../components/ContextHivePostPreviewRenderer';
 import { HivePostPreview } from '../components/HivePostPreview';
 import { convertSpoilerSyntax, SpoilerData } from '../utils/spoilerParser';
 import SpoilerText from './components/SpoilerText';
 import TwitterEmbed from './components/TwitterEmbed';
 import UpvoteModal from '../components/UpvoteModal';
+import Snap from './components/Snap';
+import Reply from './components/Reply';
+import ReplyModal from './components/ReplyModal';
 
 // Custom hooks for business logic
 import { useUserAuth } from '../hooks/useUserAuth';
@@ -199,6 +191,7 @@ const ConversationScreenRefactored = () => {
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [modalImages, setModalImages] = useState<Array<{ uri: string }>>([]);
   const [modalImageIndex, setModalImageIndex] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Error handling
   if (!author || !permlink) {
@@ -233,6 +226,15 @@ const ConversationScreenRefactored = () => {
   // Event handlers
   const handleRefresh = () => {
     refreshConversation();
+  };
+
+  const handlePullToRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refreshConversation();
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const handleGoToParentSnap = () => {
@@ -474,30 +476,6 @@ const ConversationScreenRefactored = () => {
     return /<([a-z][\s\S]*?)>/i.test(str);
   };
 
-  // Render functions (simplified)
-  const renderMp4Video = (uri: string, key?: string | number) => (
-    <View
-      key={key || uri}
-      style={{
-        width: '100%',
-        aspectRatio: 16 / 9,
-        marginVertical: 10,
-        borderRadius: 12,
-        overflow: 'hidden',
-        backgroundColor: isDark ? '#222' : '#eee',
-      }}
-    >
-      <Video
-        source={{ uri }}
-        useNativeControls
-        resizeMode={ResizeMode.CONTAIN}
-        style={{ width: '100%', height: '100%' }}
-        shouldPlay={false}
-        isLooping={false}
-      />
-    </View>
-  );
-
   // Extract and render Twitter/X posts
   const extractAndRenderTwitterPosts = (content: string) => {
     const videoInfo = extractVideoInfo(content);
@@ -640,7 +618,30 @@ const ConversationScreenRefactored = () => {
     }
   );
 
-  // Recursive threaded reply renderer (simplified)
+  // Function to flatten nested replies into a flat array with level information
+  const flattenReplies = (
+    replyList: ReplyData[],
+    level = 0
+  ): Array<ReplyData & { visualLevel: number }> => {
+    const flattened: Array<ReplyData & { visualLevel: number }> = [];
+
+    replyList.forEach(reply => {
+      // Add the current reply with its visual level
+      const maxVisualLevel = 2;
+      const visualLevel = Math.min(level, maxVisualLevel);
+      flattened.push({ ...reply, visualLevel });
+
+      // Recursively flatten children
+      if (reply.replies && reply.replies.length > 0) {
+        const childReplies = flattenReplies(reply.replies, level + 1);
+        flattened.push(...childReplies);
+      }
+    });
+
+    return flattened;
+  };
+
+  // DEPRECATED: renderReplyTree function - Now using flattened approach instead
   const renderReplyTree = (reply: ReplyData, level = 0) => {
     const videoInfo = extractVideoInfo(reply.body);
     const imageUrls = extractImageUrls(reply.body);
@@ -668,13 +669,11 @@ const ConversationScreenRefactored = () => {
 
     const windowWidth = Dimensions.get('window').width;
     const isHtml = containsHtml(textBody);
-    const maxVisualLevel = 3;
-    const visualLevel = Math.min(level, maxVisualLevel);
 
     return (
       <View
         key={reply.author + reply.permlink + '-' + level}
-        style={{ marginLeft: visualLevel * 18, marginBottom: 10 }}
+        style={{ marginLeft: level * 18, marginBottom: 10 }}
       >
         <View
           style={[
@@ -781,7 +780,7 @@ const ConversationScreenRefactored = () => {
             >
               {isHtml ? (
                 <RenderHtml
-                  contentWidth={windowWidth - visualLevel * 18 - 32}
+                  contentWidth={windowWidth - level * 18 - 32}
                   source={{ html: textBody }}
                   baseStyle={{
                     color: colors.text,
@@ -926,7 +925,7 @@ const ConversationScreenRefactored = () => {
     );
   };
 
-  // Render the snap as a header for the replies list (simplified)
+  // DEPRECATED: renderSnapHeader function - Now using Snap component instead
   const renderSnapHeader = () => {
     if (!snap) return null;
 
@@ -1290,6 +1289,14 @@ const ConversationScreenRefactored = () => {
           <ScrollView
             style={{ flex: 1 }}
             contentContainerStyle={{ paddingBottom: 32 }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handlePullToRefresh}
+                colors={[colors.icon]}
+                tintColor={colors.icon}
+              />
+            }
           >
             {/* Blockchain Processing Indicator */}
             {(replyProcessing || editProcessing) && (
@@ -1320,9 +1327,61 @@ const ConversationScreenRefactored = () => {
               </View>
             )}
 
-            {renderSnapHeader()}
+            {snap && (
+              <Snap
+                author={snap.author}
+                avatarUrl={snap.avatarUrl}
+                body={snap.body}
+                created={snap.created}
+                voteCount={snap.voteCount || 0}
+                replyCount={snap.replyCount || 0}
+                payout={snap.payout || 0}
+                permlink={snap.permlink}
+                onUpvotePress={() =>
+                  handleUpvotePress({
+                    author: snap.author,
+                    permlink: snap.permlink || '',
+                  })
+                }
+                hasUpvoted={snap.hasUpvoted || false}
+                onSpeechBubblePress={() => {}} // Disable in conversation view
+                onContentPress={() => {}} // Disable in conversation view
+                onUserPress={username => {
+                  router.push(`/ProfileScreen?username=${username}` as any);
+                }}
+                onImagePress={handleImagePress}
+                showAuthor={true}
+                onHashtagPress={tag => {
+                  router.push({
+                    pathname: '/DiscoveryScreen',
+                    params: { hashtag: tag },
+                  });
+                }}
+                onReplyPress={handleOpenReplyModal}
+              />
+            )}
             <View style={ConversationScreenStyles.repliesList}>
-              {replies.map(reply => renderReplyTree(reply))}
+              {flattenReplies(replies).map(reply => (
+                <Reply
+                  key={reply.author + reply.permlink + '-' + reply.visualLevel}
+                  reply={reply}
+                  onUpvotePress={handleUpvotePress}
+                  onReplyPress={handleOpenReplyModal}
+                  onEditPress={replyData =>
+                    handleOpenEditModal(
+                      {
+                        author: replyData.author,
+                        permlink: replyData.permlink || '',
+                        body: replyData.body,
+                      },
+                      'reply'
+                    )
+                  }
+                  onImagePress={handleImagePress}
+                  currentUsername={currentUsername}
+                  colors={colors}
+                />
+              ))}
             </View>
           </ScrollView>
         )}
@@ -1331,182 +1390,25 @@ const ConversationScreenRefactored = () => {
         {/* Upvote Modal, Reply Modal, Edit Modal, GIF Picker Modal */}
 
         {/* Reply Modal */}
-        <Modal
+        <ReplyModal
           isVisible={replyModalVisible}
-          onBackdropPress={posting ? undefined : closeReplyModal}
-          onBackButtonPress={posting ? undefined : closeReplyModal}
-          style={{
-            justifyContent: 'flex-end',
-            margin: 0,
-            ...(Platform.OS === 'ios' && {
-              paddingBottom: insets.bottom,
-            }),
-          }}
-          useNativeDriver
-          avoidKeyboard={true}
-        >
-          <View
-            style={{
-              backgroundColor: colors.background,
-              padding: 16,
-              borderTopLeftRadius: 18,
-              borderTopRightRadius: 18,
-            }}
-          >
-            <Text
-              style={{
-                color: colors.text,
-                fontWeight: 'bold',
-                fontSize: 16,
-                marginBottom: 8,
-              }}
-            >
-              Reply to {replyTarget?.author}
-            </Text>
-
-            {/* Reply image preview */}
-            {replyImage ? (
-              <View style={{ marginBottom: 10 }}>
-                <ExpoImage
-                  source={{ uri: replyImage }}
-                  style={{ width: 120, height: 120, borderRadius: 10 }}
-                  contentFit='cover'
-                />
-                <TouchableOpacity
-                  onPress={() => setReplyImage(null)}
-                  style={{ position: 'absolute', top: 4, right: 4 }}
-                  disabled={posting}
-                >
-                  <FontAwesome name='close' size={20} color={colors.icon} />
-                </TouchableOpacity>
-              </View>
-            ) : null}
-
-            {/* Reply GIF preview */}
-            {replyGif ? (
-              <View style={{ marginBottom: 10 }}>
-                <ExpoImage
-                  source={{ uri: replyGif }}
-                  style={{ width: 120, height: 120, borderRadius: 10 }}
-                  contentFit='cover'
-                />
-                <TouchableOpacity
-                  onPress={() => setReplyGif(null)}
-                  style={{ position: 'absolute', top: 4, right: 4 }}
-                  disabled={posting}
-                >
-                  <FontAwesome name='close' size={20} color={colors.icon} />
-                </TouchableOpacity>
-                <View
-                  style={{
-                    position: 'absolute',
-                    bottom: 4,
-                    left: 4,
-                    backgroundColor: 'rgba(0,0,0,0.7)',
-                    paddingHorizontal: 6,
-                    paddingVertical: 2,
-                    borderRadius: 4,
-                  }}
-                >
-                  <Text
-                    style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}
-                  >
-                    GIF
-                  </Text>
-                </View>
-              </View>
-            ) : null}
-
-            {/* Error message */}
-            {replyError ? (
-              <Text style={{ color: 'red', marginBottom: 8 }}>
-                {replyError}
-              </Text>
-            ) : null}
-
-            {/* Reply input row */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginBottom: 10,
-              }}
-            >
-              <TouchableOpacity
-                onPress={() => addReplyImage('reply')}
-                disabled={uploading || posting || replyProcessing}
-                style={{ marginRight: 16 }}
-              >
-                <FontAwesome name='image' size={22} color={colors.icon} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => handleOpenGifPicker('reply')}
-                disabled={uploading || posting || replyProcessing}
-                style={{ marginRight: 16 }}
-              >
-                <Text style={{ fontSize: 18, color: colors.icon }}>GIF</Text>
-              </TouchableOpacity>
-              <TextInput
-                value={replyText}
-                onChangeText={setReplyText}
-                style={{
-                  flex: 1,
-                  minHeight: 60,
-                  color: colors.text,
-                  backgroundColor: colors.bubble,
-                  borderRadius: 10,
-                  padding: 10,
-                  marginRight: 10,
-                }}
-                placeholder='Write your reply...'
-                placeholderTextColor={isDark ? '#8899A6' : '#888'}
-                multiline
-              />
-              {uploading ? (
-                <FontAwesome
-                  name='spinner'
-                  size={16}
-                  color='#fff'
-                  style={{ marginRight: 8 }}
-                />
-              ) : null}
-              <TouchableOpacity
-                onPress={submitReply}
-                disabled={
-                  uploading ||
-                  posting ||
-                  replyProcessing ||
-                  (!replyText.trim() && !replyImage && !replyGif) ||
-                  !currentUsername
-                }
-                style={{
-                  backgroundColor: colors.icon,
-                  borderRadius: 20,
-                  paddingHorizontal: 18,
-                  paddingVertical: 8,
-                  opacity:
-                    uploading ||
-                    posting ||
-                    replyProcessing ||
-                    (!replyText.trim() && !replyImage && !replyGif) ||
-                    !currentUsername
-                      ? 0.6
-                      : 1,
-                }}
-              >
-                <Text
-                  style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}
-                >
-                  {posting
-                    ? 'Posting...'
-                    : replyProcessing
-                      ? 'Checking...'
-                      : 'Send'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
+          onClose={closeReplyModal}
+          onSubmit={submitReply}
+          replyTarget={replyTarget}
+          replyText={replyText}
+          onReplyTextChange={setReplyText}
+          replyImage={replyImage}
+          replyGif={replyGif}
+          onImageRemove={() => setReplyImage(null)}
+          onGifRemove={() => setReplyGif(null)}
+          onAddImage={() => addReplyImage('reply')}
+          onAddGif={() => handleOpenGifPicker('reply')}
+          posting={posting}
+          uploading={uploading}
+          replyProcessing={replyProcessing}
+          replyError={replyError}
+          currentUsername={currentUsername}
+        />
 
         {/* Edit Modal */}
         <Modal
