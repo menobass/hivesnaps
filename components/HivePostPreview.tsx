@@ -17,6 +17,7 @@ import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { HivePostInfo } from '../utils/extractHivePostInfo';
 import { formatDistanceToNow } from 'date-fns';
+import { getHivePostNavigationInfo } from '../utils/extractHivePostInfo';
 
 interface HivePostPreviewProps {
   postInfo: HivePostInfo;
@@ -52,15 +53,48 @@ export const HivePostPreview: React.FC<HivePostPreviewProps> = ({
     }
   };
 
-  const handlePress = () => {
-    // Navigate to HivePostScreen to view the full post
-    router.push({
-      pathname: '/HivePostScreen',
-      params: {
-        author: postInfo.author,
-        permlink: postInfo.permlink,
-      },
-    });
+  const handlePress = async () => {
+    try {
+      // Check if this post is a snap and get navigation info
+      const navigationInfo = await getHivePostNavigationInfo(
+        postInfo.originalUrl
+      );
+
+      if (navigationInfo) {
+        console.log('[HivePostPreview] Navigating to:', navigationInfo.route);
+        // Navigate to the appropriate screen based on post type
+        router.push({
+          pathname: navigationInfo.route as any,
+          params: {
+            author: postInfo.author,
+            permlink: postInfo.permlink,
+          },
+        });
+      } else {
+        // Fallback to HivePostScreen if we can't determine the type
+        console.log('[HivePostPreview] Fallback to HivePostScreen');
+        router.push({
+          pathname: '/HivePostScreen',
+          params: {
+            author: postInfo.author,
+            permlink: postInfo.permlink,
+          },
+        });
+      }
+    } catch (error) {
+      console.error(
+        '[HivePostPreview] Error determining navigation route:',
+        error
+      );
+      // Fallback to HivePostScreen on error
+      router.push({
+        pathname: '/HivePostScreen',
+        params: {
+          author: postInfo.author,
+          permlink: postInfo.permlink,
+        },
+      });
+    }
   };
 
   const handleExternalLinkPress = (e: any) => {

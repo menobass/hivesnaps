@@ -431,3 +431,97 @@ export async function fetchMultipleHivePostInfos(
 
   return validResults;
 }
+
+/**
+ * Check if a URL is a snap URL by detecting the post type
+ */
+export async function isSnapUrl(url: string): Promise<boolean> {
+  try {
+    console.log('[extractHivePostInfo] Checking if URL is a snap:', url);
+
+    // Parse the URL to get author and permlink
+    const postInfo = parseHivePostUrl(url);
+    if (!postInfo) {
+      console.log('[extractHivePostInfo] Could not parse URL as Hive post');
+      return false;
+    }
+
+    // Import postTypeDetector dynamically to avoid circular dependencies
+    const { detectPostType } = await import('./postTypeDetector');
+
+    // Detect the post type
+    const postType = await detectPostType({
+      author: postInfo.author,
+      permlink: postInfo.permlink,
+    });
+
+    const isSnap = postType === 'snap';
+    console.log(
+      '[extractHivePostInfo] URL post type:',
+      postType,
+      'isSnap:',
+      isSnap
+    );
+
+    return isSnap;
+  } catch (error) {
+    console.error(
+      '[extractHivePostInfo] Error checking if URL is snap:',
+      error
+    );
+    return false;
+  }
+}
+
+/**
+ * Get navigation info for a Hive post URL
+ */
+export async function getHivePostNavigationInfo(url: string): Promise<{
+  isSnap: boolean;
+  author: string;
+  permlink: string;
+  route: string;
+} | null> {
+  try {
+    console.log('[extractHivePostInfo] Getting navigation info for URL:', url);
+
+    // Parse the URL to get author and permlink
+    const postInfo = parseHivePostUrl(url);
+    if (!postInfo) {
+      console.log('[extractHivePostInfo] Could not parse URL as Hive post');
+      return null;
+    }
+
+    // Import postTypeDetector dynamically to avoid circular dependencies
+    const { detectPostType } = await import('./postTypeDetector');
+
+    // Detect the post type
+    const postType = await detectPostType({
+      author: postInfo.author,
+      permlink: postInfo.permlink,
+    });
+
+    const isSnap = postType === 'snap';
+    const route = isSnap ? '/ConversationScreen' : '/HivePostScreen';
+
+    console.log('[extractHivePostInfo] Navigation info:', {
+      isSnap,
+      author: postInfo.author,
+      permlink: postInfo.permlink,
+      route,
+    });
+
+    return {
+      isSnap,
+      author: postInfo.author,
+      permlink: postInfo.permlink,
+      route,
+    };
+  } catch (error) {
+    console.error(
+      '[extractHivePostInfo] Error getting navigation info:',
+      error
+    );
+    return null;
+  }
+}
