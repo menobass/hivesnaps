@@ -32,6 +32,8 @@ interface ReplyModalProps {
   currentUsername: string | null;
 }
 
+const CHARACTER_LIMIT = 288;
+
 const ReplyModal: React.FC<ReplyModalProps> = ({
   isVisible,
   onClose,
@@ -60,6 +62,25 @@ const ReplyModal: React.FC<ReplyModalProps> = ({
     background: isDark ? '#1a1a1a' : '#fff',
     bubble: isDark ? '#2a2a2a' : '#f0f0f0',
     icon: isDark ? '#8899A6' : '#666',
+    primary: '#007AFF',
+    error: '#FF3B30',
+    disabled: isDark ? '#444' : '#ccc',
+  };
+
+  const isTextEmpty = !replyText.trim();
+  const isOverLimit = replyText.length > CHARACTER_LIMIT;
+  const canSubmit =
+    !isTextEmpty &&
+    !isOverLimit &&
+    !uploading &&
+    !posting &&
+    !replyProcessing &&
+    currentUsername;
+
+  const handleTextChange = (text: string) => {
+    if (text.length <= CHARACTER_LIMIT) {
+      onReplyTextChange(text);
+    }
   };
 
   return (
@@ -90,7 +111,7 @@ const ReplyModal: React.FC<ReplyModalProps> = ({
             color: colors.text,
             fontWeight: 'bold',
             fontSize: 16,
-            marginBottom: 8,
+            marginBottom: 12,
           }}
         >
           Reply to {replyTarget?.author}
@@ -149,80 +170,114 @@ const ReplyModal: React.FC<ReplyModalProps> = ({
 
         {/* Error message */}
         {replyError ? (
-          <Text style={{ color: 'red', marginBottom: 8 }}>{replyError}</Text>
+          <Text style={{ color: colors.error, marginBottom: 8 }}>
+            {replyError}
+          </Text>
         ) : null}
 
-        {/* Reply input row */}
+        {/* Character count */}
         <View
           style={{
             flexDirection: 'row',
-            alignItems: 'center',
-            marginBottom: 10,
+            justifyContent: 'flex-end',
+            marginBottom: 8,
+            paddingHorizontal: 4,
           }}
         >
-          <TouchableOpacity
-            onPress={onAddImage}
-            disabled={uploading || posting || replyProcessing}
-            style={{ marginRight: 16 }}
+          <Text
+            style={{
+              color: isOverLimit ? colors.error : colors.icon,
+              fontSize: 12,
+              fontWeight: isOverLimit ? 'bold' : 'normal',
+            }}
           >
-            <FontAwesome name='image' size={22} color={colors.icon} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={onAddGif}
-            disabled={uploading || posting || replyProcessing}
-            style={{ marginRight: 16 }}
-          >
-            <Text style={{ fontSize: 18, color: colors.icon }}>GIF</Text>
-          </TouchableOpacity>
+            {replyText.length}/{CHARACTER_LIMIT}
+          </Text>
+        </View>
+
+        {/* Reply input section */}
+        <View
+          style={{
+            backgroundColor: colors.bubble,
+            borderRadius: 12,
+            padding: 12,
+            marginBottom: 12,
+            minHeight: 100,
+          }}
+        >
           <TextInput
             value={replyText}
-            onChangeText={onReplyTextChange}
+            onChangeText={handleTextChange}
             style={{
               flex: 1,
-              minHeight: 60,
+              minHeight: 80,
               color: colors.text,
-              backgroundColor: colors.bubble,
-              borderRadius: 10,
-              padding: 10,
-              marginRight: 10,
+              fontSize: 16,
+              lineHeight: 22,
+              textAlignVertical: 'top',
             }}
             placeholder='Write your reply...'
             placeholderTextColor={isDark ? '#8899A6' : '#888'}
             multiline
+            maxLength={CHARACTER_LIMIT}
           />
-          {uploading ? (
-            <FontAwesome
-              name='spinner'
-              size={16}
-              color='#fff'
-              style={{ marginRight: 8 }}
-            />
-          ) : null}
+        </View>
+
+        {/* Action buttons row */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          {/* Left side - Media buttons */}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity
+              onPress={onAddImage}
+              disabled={uploading || posting || replyProcessing}
+              style={{
+                marginRight: 16,
+                opacity: uploading || posting || replyProcessing ? 0.5 : 1,
+              }}
+            >
+              <FontAwesome name='image' size={22} color={colors.icon} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={onAddGif}
+              disabled={uploading || posting || replyProcessing}
+              style={{
+                marginRight: 16,
+                opacity: uploading || posting || replyProcessing ? 0.5 : 1,
+              }}
+            >
+              <Text style={{ fontSize: 18, color: colors.icon }}>GIF</Text>
+            </TouchableOpacity>
+            {uploading && (
+              <FontAwesome name='spinner' size={16} color={colors.icon} />
+            )}
+          </View>
+
+          {/* Right side - Send button */}
           <TouchableOpacity
             onPress={onSubmit}
-            disabled={
-              uploading ||
-              posting ||
-              replyProcessing ||
-              (!replyText.trim() && !replyImage && !replyGif) ||
-              !currentUsername
-            }
+            disabled={!canSubmit}
             style={{
-              backgroundColor: colors.icon,
+              backgroundColor: canSubmit ? colors.primary : colors.disabled,
               borderRadius: 20,
-              paddingHorizontal: 18,
-              paddingVertical: 8,
-              opacity:
-                uploading ||
-                posting ||
-                replyProcessing ||
-                (!replyText.trim() && !replyImage && !replyGif) ||
-                !currentUsername
-                  ? 0.6
-                  : 1,
+              paddingHorizontal: 20,
+              paddingVertical: 10,
+              minWidth: 80,
+              alignItems: 'center',
             }}
           >
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>
+            <Text
+              style={{
+                color: '#fff',
+                fontWeight: 'bold',
+                fontSize: 15,
+              }}
+            >
               {posting
                 ? 'Posting...'
                 : replyProcessing
