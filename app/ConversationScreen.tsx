@@ -51,7 +51,8 @@ import TwitterEmbed from './components/TwitterEmbed';
 import UpvoteModal from '../components/UpvoteModal';
 import Snap from './components/Snap';
 import Reply from './components/Reply';
-import ReplyModal from './components/ReplyModal';
+
+import ContentModal from './components/ContentModal';
 
 // Custom hooks for business logic
 import { useUserAuth } from '../hooks/useUserAuth';
@@ -1401,195 +1402,48 @@ const ConversationScreenRefactored = () => {
         {/* Upvote Modal, Reply Modal, Edit Modal, GIF Picker Modal */}
 
         {/* Reply Modal */}
-        <ReplyModal
+        <ContentModal
           isVisible={replyModalVisible}
           onClose={closeReplyModal}
           onSubmit={submitReply}
-          replyTarget={replyTarget}
-          replyText={replyText}
-          onReplyTextChange={setReplyText}
-          replyImage={replyImage}
-          replyGif={replyGif}
+          mode='reply'
+          target={replyTarget}
+          text={replyText}
+          onTextChange={setReplyText}
+          image={replyImage}
+          gif={replyGif}
           onImageRemove={() => setReplyImage(null)}
           onGifRemove={() => setReplyGif(null)}
           onAddImage={() => addReplyImage('reply')}
           onAddGif={() => handleOpenGifPicker('reply')}
           posting={posting}
           uploading={uploading}
-          replyProcessing={replyProcessing}
-          replyError={replyError}
+          processing={replyProcessing}
+          error={replyError}
           currentUsername={currentUsername}
         />
 
         {/* Edit Modal */}
-        <Modal
+        <ContentModal
           isVisible={editModalVisible}
-          onBackdropPress={editing ? undefined : closeEditModal}
-          onBackButtonPress={editing ? undefined : closeEditModal}
-          style={{ justifyContent: 'flex-end', margin: 0 }}
-          useNativeDriver
-          avoidKeyboard={true}
-        >
-          <View
-            style={{
-              backgroundColor: colors.background,
-              padding: 16,
-              borderTopLeftRadius: 18,
-              borderTopRightRadius: 18,
-            }}
-          >
-            <Text
-              style={{
-                color: colors.text,
-                fontWeight: 'bold',
-                fontSize: 16,
-                marginBottom: 8,
-              }}
-            >
-              Edit {editTarget?.type === 'reply' ? 'Reply' : 'Snap'}
-            </Text>
-
-            {/* Edit image preview */}
-            {editImage ? (
-              <View style={{ marginBottom: 10 }}>
-                <ExpoImage
-                  source={{ uri: editImage }}
-                  style={{ width: 120, height: 120, borderRadius: 10 }}
-                  contentFit='cover'
-                />
-                <TouchableOpacity
-                  onPress={() => setEditImage(null)}
-                  style={{ position: 'absolute', top: 4, right: 4 }}
-                  disabled={editing}
-                >
-                  <FontAwesome name='close' size={20} color={colors.icon} />
-                </TouchableOpacity>
-              </View>
-            ) : null}
-
-            {/* Edit GIF preview */}
-            {editGif ? (
-              <View style={{ marginBottom: 10 }}>
-                <ExpoImage
-                  source={{ uri: editGif }}
-                  style={{ width: 120, height: 120, borderRadius: 10 }}
-                  contentFit='cover'
-                />
-                <TouchableOpacity
-                  onPress={() => setEditGif(null)}
-                  style={{ position: 'absolute', top: 4, right: 4 }}
-                  disabled={editing}
-                >
-                  <FontAwesome name='close' size={20} color={colors.icon} />
-                </TouchableOpacity>
-                <View
-                  style={{
-                    position: 'absolute',
-                    bottom: 4,
-                    left: 4,
-                    backgroundColor: 'rgba(0,0,0,0.7)',
-                    paddingHorizontal: 6,
-                    paddingVertical: 2,
-                    borderRadius: 4,
-                  }}
-                >
-                  <Text
-                    style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}
-                  >
-                    GIF
-                  </Text>
-                </View>
-              </View>
-            ) : null}
-
-            {/* Error message */}
-            {editError ? (
-              <Text style={{ color: 'red', marginBottom: 8 }}>{editError}</Text>
-            ) : null}
-
-            {/* Edit input row */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginBottom: 10,
-              }}
-            >
-              <TouchableOpacity
-                onPress={() => addEditImage('edit')}
-                disabled={editUploading || editing || editProcessing}
-                style={{ marginRight: 16 }}
-              >
-                <FontAwesome name='image' size={22} color={colors.icon} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => handleOpenGifPicker('edit')}
-                disabled={editUploading || editing || editProcessing}
-                style={{ marginRight: 16 }}
-              >
-                <Text style={{ fontSize: 18, color: colors.icon }}>GIF</Text>
-              </TouchableOpacity>
-              <TextInput
-                value={editText}
-                onChangeText={setEditText}
-                style={{
-                  flex: 1,
-                  minHeight: 80,
-                  color: colors.text,
-                  backgroundColor: colors.bubble,
-                  borderRadius: 10,
-                  padding: 10,
-                  marginRight: 10,
-                }}
-                placeholder={`Edit your ${editTarget?.type === 'reply' ? 'reply' : 'snap'}...`}
-                placeholderTextColor={isDark ? '#8899A6' : '#888'}
-                multiline
-              />
-              {editUploading ? (
-                <FontAwesome
-                  name='spinner'
-                  size={16}
-                  color='#fff'
-                  style={{ marginRight: 8 }}
-                />
-              ) : null}
-              <TouchableOpacity
-                onPress={submitEdit}
-                disabled={
-                  editUploading ||
-                  editing ||
-                  editProcessing ||
-                  (!editText.trim() && !editImage && !editGif) ||
-                  !currentUsername
-                }
-                style={{
-                  backgroundColor: colors.icon,
-                  borderRadius: 20,
-                  paddingHorizontal: 18,
-                  paddingVertical: 8,
-                  opacity:
-                    editUploading ||
-                    editing ||
-                    editProcessing ||
-                    (!editText.trim() && !editImage && !editGif) ||
-                    !currentUsername
-                      ? 0.6
-                      : 1,
-                }}
-              >
-                <Text
-                  style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}
-                >
-                  {editing
-                    ? 'Saving...'
-                    : editProcessing
-                      ? 'Checking...'
-                      : 'Save'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
+          onClose={closeEditModal}
+          onSubmit={submitEdit}
+          mode='edit'
+          target={editTarget}
+          text={editText}
+          onTextChange={setEditText}
+          image={editImage}
+          gif={editGif}
+          onImageRemove={() => setEditImage(null)}
+          onGifRemove={() => setEditGif(null)}
+          onAddImage={() => addEditImage('edit')}
+          onAddGif={() => handleOpenGifPicker('edit')}
+          posting={editing}
+          uploading={editUploading}
+          processing={editProcessing}
+          error={editError}
+          currentUsername={currentUsername}
+        />
 
         {/* Upvote Modal */}
         <UpvoteModal

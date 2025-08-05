@@ -12,46 +12,58 @@ import { Image as ExpoImage } from 'expo-image';
 import Modal from 'react-native-modal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-interface ReplyModalProps {
+export type ContentModalMode = 'reply' | 'edit';
+
+export interface ContentTarget {
+  author: string;
+  permlink: string;
+  type?: 'snap' | 'reply';
+}
+
+interface ContentModalProps {
   isVisible: boolean;
   onClose: () => void;
   onSubmit: () => Promise<void>;
-  replyTarget: { author: string; permlink: string } | null;
-  replyText: string;
-  onReplyTextChange: (text: string) => void;
-  replyImage: string | null;
-  replyGif: string | null;
+  mode: ContentModalMode;
+  target: ContentTarget | null;
+  text: string;
+  onTextChange: (text: string) => void;
+  image: string | null;
+  gif: string | null;
   onImageRemove: () => void;
   onGifRemove: () => void;
   onAddImage: () => void;
   onAddGif: () => void;
   posting: boolean;
   uploading: boolean;
-  replyProcessing: boolean;
-  replyError: string | null;
+  processing: boolean;
+  error: string | null;
   currentUsername: string | null;
+  characterLimit?: number;
 }
 
-const CHARACTER_LIMIT = 288;
+const DEFAULT_CHARACTER_LIMIT = 288;
 
-const ReplyModal: React.FC<ReplyModalProps> = ({
+const ContentModal: React.FC<ContentModalProps> = ({
   isVisible,
   onClose,
   onSubmit,
-  replyTarget,
-  replyText,
-  onReplyTextChange,
-  replyImage,
-  replyGif,
+  mode,
+  target,
+  text,
+  onTextChange,
+  image,
+  gif,
   onImageRemove,
   onGifRemove,
   onAddImage,
   onAddGif,
   posting,
   uploading,
-  replyProcessing,
-  replyError,
+  processing,
+  error,
   currentUsername,
+  characterLimit = DEFAULT_CHARACTER_LIMIT,
 }) => {
   const colorScheme = useColorScheme() || 'light';
   const isDark = colorScheme === 'dark';
@@ -67,19 +79,45 @@ const ReplyModal: React.FC<ReplyModalProps> = ({
     disabled: isDark ? '#444' : '#ccc',
   };
 
-  const isTextEmpty = !replyText.trim();
-  const isOverLimit = replyText.length > CHARACTER_LIMIT;
+  const isTextEmpty = !text.trim();
+  const isOverLimit = text.length > characterLimit;
   const canSubmit =
     !isTextEmpty &&
     !isOverLimit &&
     !uploading &&
     !posting &&
-    !replyProcessing &&
+    !processing &&
     currentUsername;
 
-  const handleTextChange = (text: string) => {
-    if (text.length <= CHARACTER_LIMIT) {
-      onReplyTextChange(text);
+  const handleTextChange = (newText: string) => {
+    if (newText.length <= characterLimit) {
+      onTextChange(newText);
+    }
+  };
+
+  const getTitle = () => {
+    if (mode === 'reply') {
+      return `Reply to ${target?.author}`;
+    } else {
+      return `Edit ${target?.type === 'reply' ? 'Reply' : 'Snap'}`;
+    }
+  };
+
+  const getPlaceholder = () => {
+    if (mode === 'reply') {
+      return 'Write your reply...';
+    } else {
+      return `Edit your ${target?.type === 'reply' ? 'reply' : 'snap'}...`;
+    }
+  };
+
+  const getSubmitButtonText = () => {
+    if (posting) {
+      return mode === 'reply' ? 'Posting...' : 'Saving...';
+    } else if (processing) {
+      return 'Checking...';
+    } else {
+      return mode === 'reply' ? 'Send' : 'Save';
     }
   };
 
@@ -114,14 +152,14 @@ const ReplyModal: React.FC<ReplyModalProps> = ({
             marginBottom: 12,
           }}
         >
-          Reply to {replyTarget?.author}
+          {getTitle()}
         </Text>
 
-        {/* Reply image preview */}
-        {replyImage ? (
+        {/* Image preview */}
+        {image ? (
           <View style={{ marginBottom: 10 }}>
             <ExpoImage
-              source={{ uri: replyImage }}
+              source={{ uri: image }}
               style={{ width: 120, height: 120, borderRadius: 10 }}
               contentFit='cover'
             />
@@ -135,11 +173,11 @@ const ReplyModal: React.FC<ReplyModalProps> = ({
           </View>
         ) : null}
 
-        {/* Reply GIF preview */}
-        {replyGif ? (
+        {/* GIF preview */}
+        {gif ? (
           <View style={{ marginBottom: 10 }}>
             <ExpoImage
-              source={{ uri: replyGif }}
+              source={{ uri: gif }}
               style={{ width: 120, height: 120, borderRadius: 10 }}
               contentFit='cover'
             />
@@ -169,10 +207,8 @@ const ReplyModal: React.FC<ReplyModalProps> = ({
         ) : null}
 
         {/* Error message */}
-        {replyError ? (
-          <Text style={{ color: colors.error, marginBottom: 8 }}>
-            {replyError}
-          </Text>
+        {error ? (
+          <Text style={{ color: colors.error, marginBottom: 8 }}>{error}</Text>
         ) : null}
 
         {/* Character count */}
@@ -191,11 +227,11 @@ const ReplyModal: React.FC<ReplyModalProps> = ({
               fontWeight: isOverLimit ? 'bold' : 'normal',
             }}
           >
-            {replyText.length}/{CHARACTER_LIMIT}
+            {text.length}/{characterLimit}
           </Text>
         </View>
 
-        {/* Reply input section */}
+        {/* Input section */}
         <View
           style={{
             backgroundColor: colors.bubble,
@@ -206,7 +242,7 @@ const ReplyModal: React.FC<ReplyModalProps> = ({
           }}
         >
           <TextInput
-            value={replyText}
+            value={text}
             onChangeText={handleTextChange}
             style={{
               flex: 1,
@@ -216,10 +252,10 @@ const ReplyModal: React.FC<ReplyModalProps> = ({
               lineHeight: 22,
               textAlignVertical: 'top',
             }}
-            placeholder='Write your reply...'
+            placeholder={getPlaceholder()}
             placeholderTextColor={isDark ? '#8899A6' : '#888'}
             multiline
-            maxLength={CHARACTER_LIMIT}
+            maxLength={characterLimit}
           />
         </View>
 
@@ -235,20 +271,20 @@ const ReplyModal: React.FC<ReplyModalProps> = ({
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity
               onPress={onAddImage}
-              disabled={uploading || posting || replyProcessing}
+              disabled={uploading || posting || processing}
               style={{
                 marginRight: 16,
-                opacity: uploading || posting || replyProcessing ? 0.5 : 1,
+                opacity: uploading || posting || processing ? 0.5 : 1,
               }}
             >
               <FontAwesome name='image' size={22} color={colors.icon} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={onAddGif}
-              disabled={uploading || posting || replyProcessing}
+              disabled={uploading || posting || processing}
               style={{
                 marginRight: 16,
-                opacity: uploading || posting || replyProcessing ? 0.5 : 1,
+                opacity: uploading || posting || processing ? 0.5 : 1,
               }}
             >
               <Text style={{ fontSize: 18, color: colors.icon }}>GIF</Text>
@@ -258,7 +294,7 @@ const ReplyModal: React.FC<ReplyModalProps> = ({
             )}
           </View>
 
-          {/* Right side - Send button */}
+          {/* Right side - Submit button */}
           <TouchableOpacity
             onPress={onSubmit}
             disabled={!canSubmit}
@@ -278,11 +314,7 @@ const ReplyModal: React.FC<ReplyModalProps> = ({
                 fontSize: 15,
               }}
             >
-              {posting
-                ? 'Posting...'
-                : replyProcessing
-                  ? 'Checking...'
-                  : 'Send'}
+              {getSubmitButtonText()}
             </Text>
           </TouchableOpacity>
         </View>
@@ -291,4 +323,4 @@ const ReplyModal: React.FC<ReplyModalProps> = ({
   );
 };
 
-export default ReplyModal;
+export default ContentModal;

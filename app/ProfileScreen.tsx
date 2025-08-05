@@ -20,6 +20,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { createProfileScreenStyles } from '../styles/ProfileScreenStyles';
 import Snap from './components/Snap';
 import UpvoteModal from '../components/UpvoteModal';
+import ContentModal from './components/ContentModal';
 
 // Import custom hooks
 import { useProfileData } from '../hooks/useProfileData';
@@ -135,9 +136,11 @@ const ProfileScreen = () => {
     editText,
     editImage,
     editGif,
+    editTarget,
     editing,
     error: editError,
     uploading: editUploading,
+    processing: editProcessing,
     openEditModal,
     closeEditModal,
     setEditText,
@@ -1344,174 +1347,26 @@ const ProfileScreen = () => {
       />
 
       {/* Edit Modal */}
-      <Modal
-        visible={editModalVisible}
-        animationType='slide'
-        transparent={true}
-        onRequestClose={closeEditModal}
-      >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            justifyContent: 'flex-end',
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: colors.background,
-              padding: 16,
-              borderTopLeftRadius: 18,
-              borderTopRightRadius: 18,
-            }}
-          >
-            <Text
-              style={{
-                color: colors.text,
-                fontWeight: 'bold',
-                fontSize: 16,
-                marginBottom: 8,
-              }}
-            >
-              Edit Snap
-            </Text>
-
-            {/* Edit image preview */}
-            {editImage ? (
-              <View style={{ marginBottom: 10 }}>
-                <ExpoImage
-                  source={{ uri: editImage }}
-                  style={{ width: 120, height: 120, borderRadius: 10 }}
-                  contentFit='cover'
-                />
-                <TouchableOpacity
-                  onPress={() => setEditImage(null)}
-                  style={{ position: 'absolute', top: 4, right: 4 }}
-                  disabled={editing}
-                >
-                  <FontAwesome name='close' size={20} color={colors.icon} />
-                </TouchableOpacity>
-              </View>
-            ) : null}
-
-            {/* Edit GIF preview */}
-            {editGif ? (
-              <View style={{ marginBottom: 10 }}>
-                <ExpoImage
-                  source={{ uri: editGif }}
-                  style={{ width: 120, height: 120, borderRadius: 10 }}
-                  contentFit='cover'
-                />
-                <TouchableOpacity
-                  onPress={() => setEditGif(null)}
-                  style={{ position: 'absolute', top: 4, right: 4 }}
-                  disabled={editing}
-                >
-                  <FontAwesome name='close' size={20} color={colors.icon} />
-                </TouchableOpacity>
-                <View
-                  style={{
-                    position: 'absolute',
-                    bottom: 4,
-                    left: 4,
-                    backgroundColor: 'rgba(0,0,0,0.7)',
-                    paddingHorizontal: 6,
-                    paddingVertical: 2,
-                    borderRadius: 4,
-                  }}
-                >
-                  <Text
-                    style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}
-                  >
-                    GIF
-                  </Text>
-                </View>
-              </View>
-            ) : null}
-
-            {/* Error message */}
-            {editError ? (
-              <Text style={{ color: 'red', marginBottom: 8 }}>{editError}</Text>
-            ) : null}
-
-            {/* Edit input row */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginBottom: 10,
-              }}
-            >
-              <TouchableOpacity
-                onPress={() => addEditImage('edit')}
-                disabled={editUploading || editing}
-                style={{ marginRight: 16 }}
-              >
-                <FontAwesome name='image' size={22} color={colors.icon} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => addEditGif('edit')}
-                disabled={editUploading || editing}
-                style={{ marginRight: 16 }}
-              >
-                <Text style={{ fontSize: 18, color: colors.icon }}>GIF</Text>
-              </TouchableOpacity>
-              <TextInput
-                value={editText}
-                onChangeText={setEditText}
-                style={{
-                  flex: 1,
-                  minHeight: 80,
-                  color: colors.text,
-                  backgroundColor: colors.bubble,
-                  borderRadius: 10,
-                  padding: 10,
-                  marginRight: 10,
-                }}
-                placeholder='Edit your snap...'
-                placeholderTextColor={isDark ? '#8899A6' : '#888'}
-                multiline
-              />
-              {editUploading ? (
-                <FontAwesome
-                  name='spinner'
-                  size={16}
-                  color='#fff'
-                  style={{ marginRight: 8 }}
-                />
-              ) : null}
-              <TouchableOpacity
-                onPress={submitEdit}
-                disabled={
-                  editUploading ||
-                  editing ||
-                  (!editText.trim() && !editImage && !editGif) ||
-                  !currentUsername
-                }
-                style={{
-                  backgroundColor: colors.icon,
-                  borderRadius: 20,
-                  paddingHorizontal: 18,
-                  paddingVertical: 8,
-                  opacity:
-                    editUploading ||
-                    editing ||
-                    (!editText.trim() && !editImage && !editGif) ||
-                    !currentUsername
-                      ? 0.6
-                      : 1,
-                }}
-              >
-                <Text
-                  style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}
-                >
-                  {editing ? 'Saving...' : 'Save'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <ContentModal
+        isVisible={editModalVisible}
+        onClose={closeEditModal}
+        onSubmit={submitEdit}
+        mode='edit'
+        target={editTarget}
+        text={editText}
+        onTextChange={setEditText}
+        image={editImage}
+        gif={editGif}
+        onImageRemove={() => setEditImage(null)}
+        onGifRemove={() => setEditGif(null)}
+        onAddImage={() => addEditImage('edit')}
+        onAddGif={() => addEditGif('edit')}
+        posting={editing}
+        uploading={editUploading}
+        processing={editProcessing}
+        error={editError}
+        currentUsername={currentUsername}
+      />
     </SafeAreaViewSA>
   );
 };
