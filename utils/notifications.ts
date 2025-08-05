@@ -95,7 +95,9 @@ export function parseNotification(
       parsed.actionText = 'Replied to';
 
       // Extract replier from message like "@bob replied to your post"
-      const replyMatch = notification.msg.match(/@([a-z0-9.-]+) replied to your/);
+      const replyMatch = notification.msg.match(
+        /@([a-z0-9.-]+) replied to your/
+      );
       if (replyMatch) {
         parsed.actionUser = replyMatch[1];
       }
@@ -107,7 +109,9 @@ export function parseNotification(
       parsed.actionText = 'Reblogged';
 
       // Extract reblogger from message like "@charlie reblogged your post"
-      const reblogMatch = notification.msg.match(/@([a-z0-9.-]+) reblogged your/);
+      const reblogMatch = notification.msg.match(
+        /@([a-z0-9.-]+) reblogged your/
+      );
       if (reblogMatch) {
         parsed.actionUser = reblogMatch[1];
       }
@@ -136,7 +140,9 @@ export function parseNotification(
       parsed.actionText = 'Mentioned you';
 
       // Extract mentioner from message like "@eve mentioned you in a post"
-      const mentionMatch = notification.msg.match(/@([a-z0-9.-]+) mentioned you/);
+      const mentionMatch = notification.msg.match(
+        /@([a-z0-9.-]+) mentioned you/
+      );
       if (mentionMatch) {
         parsed.actionUser = mentionMatch[1];
       }
