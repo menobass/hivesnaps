@@ -269,6 +269,30 @@ export async function detectPostType(post: PostInfo): Promise<PostType> {
     console.log('[postTypeDetector]   - No metadata available');
   }
 
+  // ADDITIONAL DETECTION: Check for content length and format (snap-like characteristics)
+  // This helps detect short-form content that might be snap-like even without app metadata
+  console.log('[postTypeDetector] 🔍 Checking content characteristics...');
+  if (post.body) {
+    const bodyLength = post.body.length;
+    const hasTitle = post.title && post.title.trim().length > 0;
+
+    console.log('[postTypeDetector]   - Body length:', bodyLength);
+    console.log('[postTypeDetector]   - Has title:', hasTitle);
+
+    // If it's short content (under 500 chars) with no title or minimal title,
+    // and not a reply (no parent), it's likely snap-like content
+    if (
+      bodyLength < 500 &&
+      !hasTitle &&
+      (!post.parent_author || post.parent_author === '')
+    ) {
+      console.log(
+        '[postTypeDetector] ✅ Detected snap-like content by characteristics'
+      );
+      return 'snap';
+    }
+  }
+
   // SENARY SNAP DETECTION: Check if it's a snap based on content patterns
   console.log('[postTypeDetector] 🔍 Checking content patterns...');
   console.log('[postTypeDetector]   - Has body:', !!post.body);
@@ -295,6 +319,22 @@ export async function detectPostType(post: PostInfo): Promise<PostType> {
     // Only detect if it has specific snap formatting or patterns
   } else {
     console.log('[postTypeDetector]   - No body content available');
+  }
+
+  // SEPTENARY DETECTION: Make general Hive posts resnapable
+  // Allow any Hive post to be treated as "snap-like" for resnapping purposes
+  // This enables users to resnap content from any Hive frontend
+  console.log(
+    '[postTypeDetector] 🔍 Checking if this should be treated as resnapable content...'
+  );
+
+  // If we've gotten this far and it's a valid Hive post (has author/permlink),
+  // treat it as snap-like content to enable resnapping from any frontend
+  if (post.author && post.permlink && post.permlink.length >= 5) {
+    console.log(
+      '[postTypeDetector] ✅ Treating as snap-like content for resnapping purposes'
+    );
+    return 'snap';
   }
 
   // Additional check: if parent_author is empty or null, it's likely a regular post
