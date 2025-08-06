@@ -247,7 +247,23 @@ const markdownRules = {
     );
   },
   link: (node: any, children: any, parent: any, styles: any) => {
-    const { href } = node.attributes;
+    let { href } = node.attributes;
+
+    // Safety check: if href contains markdown syntax, extract the actual URL
+    if (href && (href.includes('%5B') || href.includes('['))) {
+      let textToProcess = href;
+
+      // If URL is encoded, decode it first
+      if (href.includes('%5B')) {
+        textToProcess = decodeURIComponent(href);
+      }
+
+      // Extract URL from markdown link syntax [text](url)
+      const markdownMatch = textToProcess.match(/\[([^\]]+)\]\(([^)]+)\)/);
+      if (markdownMatch) {
+        href = markdownMatch[2]; // Extract the URL part
+      }
+    }
     const mp4Match = href && href.match(/\.mp4($|\?)/i);
     if (mp4Match) {
       return renderMp4Video(href, href);
@@ -316,7 +332,31 @@ const markdownRules = {
           textDecorationLine: 'underline',
         }}
         onPress={() => {
-          if (href) Linking.openURL(href);
+          if (href) {
+            // Validate the URL before opening
+            try {
+              // Ensure the URL has a proper protocol
+              const urlToOpen =
+                href.startsWith('http://') || href.startsWith('https://')
+                  ? href
+                  : `https://${href}`;
+
+              // Validate it's a proper URL and has a valid domain
+              const urlObj = new URL(urlToOpen);
+
+              // Basic validation: must have a hostname with at least one dot (for TLD)
+              if (!urlObj.hostname || !urlObj.hostname.includes('.')) {
+                throw new Error('Invalid domain');
+              }
+
+              // Open the URL
+              Linking.openURL(urlToOpen).catch(error => {
+                console.error('Error opening URL:', urlToOpen, error);
+              });
+            } catch (error) {
+              console.error('Invalid URL:', href, error);
+            }
+          }
         }}
       >
         {children}
