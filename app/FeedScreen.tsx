@@ -179,7 +179,8 @@ const FeedScreenRefactored = () => {
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [modalImages, setModalImages] = useState<Array<{ uri: string }>>([]);
   const [modalImageIndex, setModalImageIndex] = useState(0);
-  const [exitTimestamp, setExitTimestamp] = useState<number | null>(null);
+  const [backPressCount, setBackPressCount] = useState(0);
+  const [showLogoutGuidanceModal, setShowLogoutGuidanceModal] = useState(false);
 
   // Refs
   const flatListRef = useRef<FlatList<any>>(null);
@@ -264,31 +265,22 @@ const FeedScreenRefactored = () => {
     await handleSearch(searchTerm);
   };
 
-  // Handle back button for exit confirmation
+  // Handle back button - prevent accidental logout, show guidance instead
   useFocusEffect(
     React.useCallback(() => {
       const backAction = () => {
-        const now = Date.now();
+        const newCount = backPressCount + 1;
+        setBackPressCount(newCount);
 
-        if (exitTimestamp && now - exitTimestamp < 2000) {
-          logout();
-          return true;
-        } else {
-          setExitTimestamp(now);
-
-          if (Platform.OS === 'android') {
-            ToastAndroid.show(
-              'Press back again to log out',
-              ToastAndroid.SHORT
-            );
-          }
-
-          setTimeout(() => {
-            setExitTimestamp(null);
-          }, 2000);
-
-          return true;
+        // Show guidance modal after 3+ back presses
+        if (newCount >= 3) {
+          setShowLogoutGuidanceModal(true);
+          // Reset counter after showing modal
+          setBackPressCount(0);
         }
+
+        // Always prevent back navigation - FeedScreen is the "dead end"
+        return true;
       };
 
       const backHandler = BackHandler.addEventListener(
@@ -296,7 +288,7 @@ const FeedScreenRefactored = () => {
         backAction
       );
       return () => backHandler.remove();
-    }, [exitTimestamp, logout])
+    }, [backPressCount])
   );
 
   // Viewability config for FlatList
@@ -1055,6 +1047,59 @@ const FeedScreenRefactored = () => {
         error={editError}
         currentUsername={username}
       />
+
+      {/* Logout Guidance Modal */}
+      <Modal
+        isVisible={showLogoutGuidanceModal}
+        onBackdropPress={() => setShowLogoutGuidanceModal(false)}
+        onBackButtonPress={() => setShowLogoutGuidanceModal(false)}
+        animationIn="fadeIn"
+        animationOut="fadeOut"
+        style={{
+          margin: 0,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        <View
+          style={{
+            backgroundColor: isDark ? '#1C2938' : '#fff',
+            margin: 20,
+            padding: 24,
+            borderRadius: 16,
+            maxWidth: SCREEN_WIDTH - 40,
+            alignItems: 'center',
+          }}
+        >
+          <FontAwesome
+            name="info-circle"
+            size={48}
+            color={isDark ? '#1DA1F2' : '#1DA1F2'}
+            style={{ marginBottom: 16 }}
+          />
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: 'bold',
+              color: isDark ? '#D7DBDC' : '#0F1419',
+              textAlign: 'center',
+              marginBottom: 12,
+            }}
+          >
+            Looking to logout?
+          </Text>
+          <Text
+            style={{
+              fontSize: 16,
+              color: isDark ? '#8899A6' : '#657786',
+              textAlign: 'center',
+              lineHeight: 22,
+            }}
+          >
+            If you are trying to logout, you can do so in your Profile. Click on your username or avatar.
+          </Text>
+        </View>
+      </Modal>
     </View>
   );
 };
