@@ -360,7 +360,9 @@ const FeedScreenRefactored = () => {
                 </View>
               )}
               <Text style={[styles.username, { color: colors.text }]}>
-                {username && username.length > 8 ? username.slice(0, 8) + '...' : username}
+                {username && username.length > 8
+                  ? username.slice(0, 8) + '...'
+                  : username}
               </Text>
             </Pressable>
 
@@ -371,7 +373,13 @@ const FeedScreenRefactored = () => {
                 style={{ marginLeft: 8 }}
               />
             ) : username ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginLeft: 8,
+                }}
+              >
                 {/* Voting Power */}
                 <Pressable
                   onPress={() => setVpInfoModalVisible(true)}
@@ -398,7 +406,11 @@ const FeedScreenRefactored = () => {
                       fontWeight: 'bold',
                     }}
                   >
-                    VP: {votingPower !== null ? (votingPower / 100).toFixed(1) : '--'}%
+                    VP:{' '}
+                    {votingPower !== null
+                      ? (votingPower / 100).toFixed(1)
+                      : '--'}
+                    %
                   </Text>
                   <FontAwesome
                     name='question-circle'
@@ -409,7 +421,15 @@ const FeedScreenRefactored = () => {
                 </Pressable>
 
                 {/* Separator */}
-                <Text style={{ color: colors.text, fontSize: 12, marginHorizontal: 4 }}>|</Text>
+                <Text
+                  style={{
+                    color: colors.text,
+                    fontSize: 12,
+                    marginHorizontal: 4,
+                  }}
+                >
+                  |
+                </Text>
 
                 {/* Resource Credits */}
                 <Pressable
@@ -437,7 +457,11 @@ const FeedScreenRefactored = () => {
                       fontWeight: 'bold',
                     }}
                   >
-                    RC: {resourceCredits !== null ? resourceCredits.toFixed(1) : '--'}%
+                    RC:{' '}
+                    {resourceCredits !== null
+                      ? resourceCredits.toFixed(1)
+                      : '--'}
+                    %
                   </Text>
                   <FontAwesome
                     name='question-circle'
@@ -505,12 +529,12 @@ const FeedScreenRefactored = () => {
                 >
                   Voting Power (VP) is a measure of your ability to upvote posts
                   and comments on the Hive blockchain. The higher your VP, the
-                  more influence your votes have.{'\n\n'}- VP decreases each time
-                  you upvote.{'\n'}- VP regenerates automatically over time (about
-                  20% per day).{'\n'}- Keeping your VP high means your votes have
-                  more impact.{'\n\n'}
-                  You can see your current VP in the top bar. After upvoting, your
-                  VP will drop slightly and recharge over time.
+                  more influence your votes have.{'\n\n'}- VP decreases each
+                  time you upvote.{'\n'}- VP regenerates automatically over time
+                  (about 20% per day).{'\n'}- Keeping your VP high means your
+                  votes have more impact.{'\n\n'}
+                  You can see your current VP in the top bar. After upvoting,
+                  your VP will drop slightly and recharge over time.
                 </Text>
                 <Pressable
                   style={{
@@ -590,13 +614,33 @@ const FeedScreenRefactored = () => {
                     textAlign: 'left',
                   }}
                 >
-                  Resource Credits are like digital fuel. You need them to do things on Hive, like posting, voting, or making transactions. Every account has them, and using the network costs a small amount each time.{'\n\n'}
-                  <Text style={{ fontWeight: 'bold' }}>How can I get more?</Text>{'\n\n'}
-                  • <Text style={{ fontWeight: '600' }}>Power Up Hive:</Text> The more Hive Power you have, the more RC you get.{'\n\n'}
-                  • <Text style={{ fontWeight: '600' }}>Ask for a Delegation:</Text> A friend or community can temporarily boost your RC by delegating Hive Power.{'\n\n'}
-                  • <Text style={{ fontWeight: '600' }}>Use a Faucet or Service:</Text> Some apps or websites offer small amounts of RC for free.{'\n\n'}
-                  <Text style={{ fontWeight: 'bold' }}>Don't worry—RC recharges over time!</Text>{'\n\n'}
-                  Even if you're out of credits, just wait a bit. Your RC will slowly refill, and you'll be able to use Hive again without doing anything else.
+                  Resource Credits are like digital fuel. You need them to do
+                  things on Hive, like posting, voting, or making transactions.
+                  Every account has them, and using the network costs a small
+                  amount each time.{'\n\n'}
+                  <Text style={{ fontWeight: 'bold' }}>
+                    How can I get more?
+                  </Text>
+                  {'\n\n'}•{' '}
+                  <Text style={{ fontWeight: '600' }}>Power Up Hive:</Text> The
+                  more Hive Power you have, the more RC you get.{'\n\n'}•{' '}
+                  <Text style={{ fontWeight: '600' }}>
+                    Ask for a Delegation:
+                  </Text>{' '}
+                  A friend or community can temporarily boost your RC by
+                  delegating Hive Power.{'\n\n'}•{' '}
+                  <Text style={{ fontWeight: '600' }}>
+                    Use a Faucet or Service:
+                  </Text>{' '}
+                  Some apps or websites offer small amounts of RC for free.
+                  {'\n\n'}
+                  <Text style={{ fontWeight: 'bold' }}>
+                    Don't worry—RC recharges over time!
+                  </Text>
+                  {'\n\n'}
+                  Even if you're out of credits, just wait a bit. Your RC will
+                  slowly refill, and you'll be able to use Hive again without
+                  doing anything else.
                 </Text>
                 <Pressable
                   style={{
