@@ -170,6 +170,27 @@ export default function ComposeScreen() {
     }
   }, [sharedContent, hasSharedContent, clearSharedContent]);
 
+  // Handle resnap URL parameter
+  useEffect(() => {
+    if (params.resnapUrl) {
+      const resnapUrl = Array.isArray(params.resnapUrl)
+        ? params.resnapUrl[0]
+        : params.resnapUrl;
+
+      if (typeof resnapUrl === 'string') {
+        const newText = resnapUrl + '\n\n';
+        setText(newText);
+
+        // Focus the input and position cursor after URL and line breaks
+        setTimeout(() => {
+          textInputRef.current?.focus();
+          const cursorPosition = newText.length;
+          textInputRef.current?.setSelection(cursorPosition, cursorPosition);
+        }, 100);
+      }
+    }
+  }, [params.resnapUrl]);
+
   const handleAddImage = async () => {
     try {
       let pickType: 'camera' | 'gallery' | 'cancel';
