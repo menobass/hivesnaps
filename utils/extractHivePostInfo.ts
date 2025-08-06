@@ -40,15 +40,15 @@ export function extractHivePostUrls(text: string): string[] {
   const patterns = [
     // ecency.com patterns
     /(?:https?:\/\/)?(?:www\.)?ecency\.com\/(@[a-z0-9.-]{3,16}\/[a-z0-9-]+)/gi,
-    /(?:https?:\/\/)?(?:www\.)?ecency\.com\/(hive-\d+\/@[a-z0-9.-]{3,16}\/[a-z0-9-]+)/gi,
+    /(?:https?:\/\/)?(?:www\.)?ecency\.com\/([a-z0-9-]+\/@[a-z0-9.-]{3,16}\/[a-z0-9-]+)/gi,
 
     // peakd.com patterns
     /(?:https?:\/\/)?(?:www\.)?peakd\.com\/(@[a-z0-9.-]{3,16}\/[a-z0-9-]+)/gi,
-    /(?:https?:\/\/)?(?:www\.)?peakd\.com\/(hive-\d+\/@[a-z0-9.-]{3,16}\/[a-z0-9-]+)/gi,
+    /(?:https?:\/\/)?(?:www\.)?peakd\.com\/([a-z0-9-]+\/@[a-z0-9.-]{3,16}\/[a-z0-9-]+)/gi,
 
     // hive.blog patterns
     /(?:https?:\/\/)?(?:www\.)?hive\.blog\/(@[a-z0-9.-]{3,16}\/[a-z0-9-]+)/gi,
-    /(?:https?:\/\/)?(?:www\.)?hive\.blog\/(hive-\d+\/@[a-z0-9.-]{3,16}\/[a-z0-9-]+)/gi,
+    /(?:https?:\/\/)?(?:www\.)?hive\.blog\/([a-z0-9-]+\/@[a-z0-9.-]{3,16}\/[a-z0-9-]+)/gi,
   ];
 
   patterns.forEach(pattern => {
@@ -95,9 +95,9 @@ export function parseHivePostUrl(
     // Handle different URL formats
     let authorPermlinkMatch;
 
-    // Format: @author/permlink or hive-123/@author/permlink
+    // Format: @author/permlink or community/@author/permlink
     authorPermlinkMatch = path.match(
-      /^(?:hive-\d+\/)?@([a-z0-9.-]{3,16})\/([a-z0-9-]+)$/
+      /^(?:[a-z0-9-]+\/)?@([a-z0-9.-]{3,16})\/([a-z0-9-]+)$/
     );
     if (authorPermlinkMatch) {
       const author = authorPermlinkMatch[1];
