@@ -1369,6 +1369,13 @@ const ConversationScreenRefactored = () => {
                     'snap'
                   )
                 }
+                onResnapPress={(author, permlink) => {
+                  const snapUrl = `https://hive.blog/@${author}/${permlink}`;
+                  router.push({
+                    pathname: '/ComposeScreen',
+                    params: { resnapUrl: snapUrl },
+                  });
+                }}
                 currentUsername={currentUsername}
               />
             )}

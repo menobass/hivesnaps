@@ -407,9 +407,11 @@ const FeedScreenRefactored = () => {
               <View style={styles.creditsContainer}>
                 {/* Voting Power */}
                 <SmallButton
-                  label="VP:"
-                  value={votingPower !== null ? (votingPower / 100).toFixed(1) : '--'}
-                  unit="%"
+                  label='VP:'
+                  value={
+                    votingPower !== null ? (votingPower / 100).toFixed(1) : '--'
+                  }
+                  unit='%'
                   colors={colors}
                   onPress={() => setVpInfoModalVisible(true)}
                   accessibilityLabel='Show Voting Power info'
@@ -422,9 +424,11 @@ const FeedScreenRefactored = () => {
 
                 {/* Resource Credits */}
                 <SmallButton
-                  label="RC:"
-                  value={resourceCredits !== null ? resourceCredits.toFixed(1) : '--'}
-                  unit="%"
+                  label='RC:'
+                  value={
+                    resourceCredits !== null ? resourceCredits.toFixed(1) : '--'
+                  }
+                  unit='%'
                   colors={colors}
                   onPress={() => setRcInfoModalVisible(true)}
                   accessibilityLabel='Show Resource Credits info'
@@ -618,6 +622,13 @@ const FeedScreenRefactored = () => {
                   router.push({
                     pathname: '/DiscoveryScreen',
                     params: { hashtag: tag },
+                  });
+                }}
+                onResnapPress={(author, permlink) => {
+                  const snapUrl = `https://hive.blog/@${author}/${permlink}`;
+                  router.push({
+                    pathname: '/ComposeScreen',
+                    params: { resnapUrl: snapUrl },
                   });
                 }}
               />
