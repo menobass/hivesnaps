@@ -536,6 +536,13 @@ const DiscoveryScreen = () => {
                 });
               }}
               onEditPress={handleEditPress}
+              onResnapPress={(author, permlink) => {
+                const snapUrl = `https://hive.blog/@${author}/${permlink}`;
+                router.push({
+                  pathname: '/ComposeScreen',
+                  params: { resnapUrl: snapUrl },
+                });
+              }}
               currentUsername={currentUsername}
             />
           )}

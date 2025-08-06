@@ -170,6 +170,19 @@ export default function ComposeScreen() {
     }
   }, [sharedContent, hasSharedContent, clearSharedContent]);
 
+  // Handle resnap URL parameter
+  useEffect(() => {
+    if (params.resnapUrl) {
+      const resnapUrl = Array.isArray(params.resnapUrl)
+        ? params.resnapUrl[0]
+        : params.resnapUrl;
+
+      if (typeof resnapUrl === 'string') {
+        setText(prev => (prev ? `${prev}\n\n${resnapUrl}` : resnapUrl));
+      }
+    }
+  }, [params.resnapUrl]);
+
   const handleAddImage = async () => {
     try {
       let pickType: 'camera' | 'gallery' | 'cancel';
