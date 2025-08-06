@@ -41,10 +41,41 @@ import { useUserProfile } from '../hooks/useUserProfile';
 // Components
 import Snap from './components/Snap';
 import NotificationBadge from './components/NotificationBadge';
+import SmallButton from '../components/SmallButton';
+import StaticContentModal from '../components/StaticContentModal';
 import Slider from '@react-native-community/slider';
 import UpvoteModal from '../components/UpvoteModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// Modal content constants
+const VP_MODAL_CONTENT = {
+  title: 'What is Voting Power (VP)?',
+  content: `Voting Power (VP) is a measure of your ability to upvote posts and comments on the Hive blockchain. The higher your VP, the more influence your votes have.
+
+- VP decreases each time you upvote.
+- VP regenerates automatically over time (about 20% per day).
+- Keeping your VP high means your votes have more impact.
+
+You can see your current VP in the top bar. After upvoting, your VP will drop slightly and recharge over time.`,
+};
+
+const RC_MODAL_CONTENT = {
+  title: 'What are Resource Credits (RC)?',
+  content: `Resource Credits are like digital fuel. You need them to do things on Hive, like posting, voting, or making transactions. Every account has them, and using the network costs a small amount each time.
+
+How can I get more?
+
+• Power Up Hive: The more Hive Power you have, the more RC you get.
+
+• Ask for a Delegation: A friend or community can temporarily boost your RC by delegating Hive Power.
+
+• Use a Faucet or Service: Some apps or websites offer small amounts of RC for free.
+
+Don't worry—RC recharges over time!
+
+Even if you're out of credits, just wait a bit. Your RC will slowly refill, and you'll be able to use Hive again without doing anything else.`,
+};
 
 const twitterColors = {
   light: {
@@ -370,303 +401,59 @@ const FeedScreenRefactored = () => {
               <ActivityIndicator
                 size='small'
                 color={colors.button}
-                style={{ marginLeft: 8 }}
+                style={styles.creditsIcon}
               />
             ) : username ? (
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  marginLeft: 8,
-                }}
-              >
+              <View style={styles.creditsContainer}>
                 {/* Voting Power */}
-                <Pressable
+                <SmallButton
+                  label="VP:"
+                  value={votingPower !== null ? (votingPower / 100).toFixed(1) : '--'}
+                  unit="%"
+                  colors={colors}
                   onPress={() => setVpInfoModalVisible(true)}
-                  style={({ pressed }) => [
-                    {
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      paddingHorizontal: 6,
-                      paddingVertical: 4,
-                      borderRadius: 6,
-                      backgroundColor: pressed
-                        ? colors.buttonInactive
-                        : 'transparent',
-                    },
-                  ]}
                   accessibilityLabel='Show Voting Power info'
                   accessibilityRole='button'
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Text
-                    style={{
-                      color: colors.button,
-                      fontSize: 12,
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    VP:{' '}
-                    {votingPower !== null
-                      ? (votingPower / 100).toFixed(1)
-                      : '--'}
-                    %
-                  </Text>
-                  <FontAwesome
-                    name='question-circle'
-                    size={14}
-                    color={colors.button}
-                    style={{ marginLeft: 4 }}
-                  />
-                </Pressable>
+                />
 
                 {/* Separator */}
-                <Text
-                  style={{
-                    color: colors.text,
-                    fontSize: 12,
-                    marginHorizontal: 4,
-                  }}
-                >
-                  |
-                </Text>
+                <Text style={styles.creditsSeparator}>|</Text>
 
                 {/* Resource Credits */}
-                <Pressable
+                <SmallButton
+                  label="RC:"
+                  value={resourceCredits !== null ? resourceCredits.toFixed(1) : '--'}
+                  unit="%"
+                  colors={colors}
                   onPress={() => setRcInfoModalVisible(true)}
-                  style={({ pressed }) => [
-                    {
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      paddingHorizontal: 6,
-                      paddingVertical: 4,
-                      borderRadius: 6,
-                      backgroundColor: pressed
-                        ? colors.buttonInactive
-                        : 'transparent',
-                    },
-                  ]}
                   accessibilityLabel='Show Resource Credits info'
                   accessibilityRole='button'
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Text
-                    style={{
-                      color: colors.button,
-                      fontSize: 12,
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    RC:{' '}
-                    {resourceCredits !== null
-                      ? resourceCredits.toFixed(1)
-                      : '--'}
-                    %
-                  </Text>
-                  <FontAwesome
-                    name='question-circle'
-                    size={14}
-                    color={colors.button}
-                    style={{ marginLeft: 4 }}
-                  />
-                </Pressable>
+                />
               </View>
             ) : null}
           </View>
         </View>
 
-        {/* Voting Power Info Modal */}
-        <Modal
+        {/* Info Modals */}
+        <StaticContentModal
           visible={vpInfoModalVisible}
-          transparent
-          animationType='fade'
-          onRequestClose={() => setVpInfoModalVisible(false)}
-        >
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: 'rgba(0,0,0,0.4)',
-              justifyContent: 'center',
-              alignItems: 'center',
-              padding: 20,
-            }}
-          >
-            <View
-              style={{
-                backgroundColor: colors.background,
-                borderRadius: 16,
-                width: '100%',
-                maxWidth: 400,
-                maxHeight: '80%',
-                alignItems: 'center',
-              }}
-            >
-              <ScrollView
-                contentContainerStyle={{
-                  padding: 24,
-                  alignItems: 'center',
-                }}
-                showsVerticalScrollIndicator={false}
-              >
-                <Text
-                  style={{
-                    color: colors.text,
-                    fontSize: 18,
-                    fontWeight: 'bold',
-                    marginBottom: 12,
-                    textAlign: 'center',
-                  }}
-                >
-                  What is Voting Power (VP)?
-                </Text>
-                <Text
-                  style={{
-                    color: colors.text,
-                    fontSize: 15,
-                    marginBottom: 18,
-                    textAlign: 'left',
-                  }}
-                >
-                  Voting Power (VP) is a measure of your ability to upvote posts
-                  and comments on the Hive blockchain. The higher your VP, the
-                  more influence your votes have.{'\n\n'}- VP decreases each
-                  time you upvote.{'\n'}- VP regenerates automatically over time
-                  (about 20% per day).{'\n'}- Keeping your VP high means your
-                  votes have more impact.{'\n\n'}
-                  You can see your current VP in the top bar. After upvoting,
-                  your VP will drop slightly and recharge over time.
-                </Text>
-                <Pressable
-                  style={{
-                    backgroundColor: colors.button,
-                    borderRadius: 8,
-                    paddingVertical: 10,
-                    paddingHorizontal: 24,
-                    marginTop: 8,
-                  }}
-                  onPress={() => setVpInfoModalVisible(false)}
-                  accessibilityLabel='Close Voting Power info'
-                >
-                  <Text
-                    style={{
-                      color: colors.buttonText,
-                      fontWeight: '600',
-                      fontSize: 16,
-                    }}
-                  >
-                    Close
-                  </Text>
-                </Pressable>
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
+          onClose={() => setVpInfoModalVisible(false)}
+          title={VP_MODAL_CONTENT.title}
+          content={VP_MODAL_CONTENT.content}
+          colors={colors}
+          closeButtonAccessibilityLabel='Close Voting Power info'
+        />
 
-        {/* Resource Credits Info Modal */}
-        <Modal
+        <StaticContentModal
           visible={rcInfoModalVisible}
-          transparent
-          animationType='fade'
-          onRequestClose={() => setRcInfoModalVisible(false)}
-        >
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: 'rgba(0,0,0,0.4)',
-              justifyContent: 'center',
-              alignItems: 'center',
-              padding: 20,
-            }}
-          >
-            <View
-              style={{
-                backgroundColor: colors.background,
-                borderRadius: 16,
-                width: '100%',
-                maxWidth: 400,
-                maxHeight: '80%',
-                alignItems: 'center',
-              }}
-            >
-              <ScrollView
-                contentContainerStyle={{
-                  padding: 24,
-                  alignItems: 'center',
-                }}
-                showsVerticalScrollIndicator={false}
-              >
-                <Text
-                  style={{
-                    color: colors.text,
-                    fontSize: 18,
-                    fontWeight: 'bold',
-                    marginBottom: 12,
-                    textAlign: 'center',
-                  }}
-                >
-                  What are Resource Credits (RC)?
-                </Text>
-                <Text
-                  style={{
-                    color: colors.text,
-                    fontSize: 15,
-                    marginBottom: 18,
-                    textAlign: 'left',
-                  }}
-                >
-                  Resource Credits are like digital fuel. You need them to do
-                  things on Hive, like posting, voting, or making transactions.
-                  Every account has them, and using the network costs a small
-                  amount each time.{'\n\n'}
-                  <Text style={{ fontWeight: 'bold' }}>
-                    How can I get more?
-                  </Text>
-                  {'\n\n'}•{' '}
-                  <Text style={{ fontWeight: '600' }}>Power Up Hive:</Text> The
-                  more Hive Power you have, the more RC you get.{'\n\n'}•{' '}
-                  <Text style={{ fontWeight: '600' }}>
-                    Ask for a Delegation:
-                  </Text>{' '}
-                  A friend or community can temporarily boost your RC by
-                  delegating Hive Power.{'\n\n'}•{' '}
-                  <Text style={{ fontWeight: '600' }}>
-                    Use a Faucet or Service:
-                  </Text>{' '}
-                  Some apps or websites offer small amounts of RC for free.
-                  {'\n\n'}
-                  <Text style={{ fontWeight: 'bold' }}>
-                    Don't worry—RC recharges over time!
-                  </Text>
-                  {'\n\n'}
-                  Even if you're out of credits, just wait a bit. Your RC will
-                  slowly refill, and you'll be able to use Hive again without
-                  doing anything else.
-                </Text>
-                <Pressable
-                  style={{
-                    backgroundColor: colors.button,
-                    borderRadius: 8,
-                    paddingVertical: 10,
-                    paddingHorizontal: 24,
-                    marginTop: 8,
-                  }}
-                  onPress={() => setRcInfoModalVisible(false)}
-                  accessibilityLabel='Close Resource Credits info'
-                >
-                  <Text
-                    style={{
-                      color: colors.buttonText,
-                      fontWeight: '600',
-                      fontSize: 16,
-                    }}
-                  >
-                    Close
-                  </Text>
-                </Pressable>
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
+          onClose={() => setRcInfoModalVisible(false)}
+          title={RC_MODAL_CONTENT.title}
+          content={RC_MODAL_CONTENT.content}
+          colors={colors}
+          closeButtonAccessibilityLabel='Close Resource Credits info'
+        />
 
         {/* Slogan row */}
         <View style={styles.sloganRow}>
