@@ -178,7 +178,15 @@ export default function ComposeScreen() {
         : params.resnapUrl;
 
       if (typeof resnapUrl === 'string') {
-        setText(prev => (prev ? `${prev}\n\n${resnapUrl}` : resnapUrl));
+        const newText = resnapUrl + '\n\n';
+        setText(newText);
+
+        // Focus the input and position cursor after URL and line breaks
+        setTimeout(() => {
+          textInputRef.current?.focus();
+          const cursorPosition = newText.length;
+          textInputRef.current?.setSelection(cursorPosition, cursorPosition);
+        }, 100);
       }
     }
   }, [params.resnapUrl]);
