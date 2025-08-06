@@ -627,6 +627,21 @@ export const createFeedScreenStyles = (colors: any, isDark: boolean) => {
     visible: {
       opacity: 1,
     },
+
+    // Resource Credits and Voting Power styles
+    creditsContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginLeft: 8,
+    },
+    creditsIcon: {
+      marginLeft: 4,
+    },
+    creditsSeparator: {
+      color: colors.text,
+      fontSize: 12,
+      marginHorizontal: 4,
+    },
   });
 };
 
