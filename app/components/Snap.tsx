@@ -37,6 +37,7 @@ import YouTubeEmbed from './YouTubeEmbed';
 import ThreeSpeakEmbed from './ThreeSpeakEmbed';
 import { extractHivePostUrls } from '../../utils/extractHivePostInfo';
 import { OptimizedHivePostPreviewRenderer } from '../../components/OptimizedHivePostPreviewRenderer';
+import { classifyUrl, extractAndClassifyUrls } from '../../utils/urlClassifier';
 
 const twitterColors = {
   light: {
@@ -153,27 +154,23 @@ function linkifyMentions(text: string): string {
 
 // Utility: Preprocess raw URLs to clickable markdown links (if not already linked)
 function linkifyUrls(text: string): string {
-  // Regex for URLs (http/https) - includes @ character for Hive frontend URLs
+  // Use our URL classifier to determine how to handle each URL
   return text.replace(/(https?:\/\/[\w.-]+(?:\/[\w\-./?%&=+#@]*)?)/gi, url => {
     // If already inside a markdown or html link, skip
     if (/\]\([^)]+\)$/.test(url) || /href=/.test(url)) return url;
 
-    // Skip URLs that should be handled as embedded media (YouTube, 3Speak, IPFS, MP4)
-    const youtubeMatch = url.match(
-      /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/
-    );
-    const threeSpeakMatch = url.match(
-      /https:\/\/3speak\.tv\/watch\?v=([^\/\s]+)\/([a-zA-Z0-9_-]+)/
-    );
-    const ipfsMatch = url.match(/ipfs\/([A-Za-z0-9]+)/);
-    const mp4Match = url.match(/\.mp4($|\?)/i);
+    // Classify the URL using our utility
+    const urlInfo = classifyUrl(url);
 
-    if (youtubeMatch || threeSpeakMatch || ipfsMatch || mp4Match) {
-      return url; // Don't linkify, let markdown rules handle video embedding
+    // For now, only create markdown links for normal URLs
+    // Hive posts and embedded media will be handled by their respective renderers
+    if (urlInfo.type === 'normal') {
+      return `[${urlInfo.displayText || url}](${url})`;
     }
 
-    // Do NOT shorten display for long URLs; use full URL as display
-    return `[${url}](${url})`;
+    // For all other types (hive_post, embedded_media, invalid), return as-is
+    // This allows the existing renderers to handle them properly
+    return url;
   });
 }
 

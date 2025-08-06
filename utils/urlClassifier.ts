@@ -16,14 +16,14 @@ export interface UrlInfo {
  */
 export function classifyUrl(url: string): UrlInfo {
   const cleanUrl = url.trim();
-  
+
   // Validate it's a proper URL first
   try {
     new URL(cleanUrl);
   } catch {
     return {
       type: 'invalid',
-      url: cleanUrl
+      url: cleanUrl,
     };
   }
 
@@ -31,13 +31,13 @@ export function classifyUrl(url: string): UrlInfo {
   if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
     return {
       type: 'invalid',
-      url: cleanUrl
+      url: cleanUrl,
     };
   }
 
   // Check for Hive post URLs
   const hivePostMatch = cleanUrl.match(
-    /(?:https?:\/\/)?(?:www\.)?(?:ecency\.com|peakd\.com|hive\.blog)\/(?:[^\/]+\/)?(@[a-z0-9.-]{3,16}\/([a-z0-9-]+))/i
+    /(?:https?:\/\/)?(?:www\.)?(?:ecency\.com|peakd\.com|hive\.blog)\/(?:[a-z0-9-]+\/)?(@[a-z0-9.-]{3,16}\/([a-z0-9-]+))/i
   );
   if (hivePostMatch) {
     return {
@@ -45,8 +45,8 @@ export function classifyUrl(url: string): UrlInfo {
       url: cleanUrl,
       metadata: {
         hiveAuthor: hivePostMatch[1].split('/')[0], // @username
-        hivePermlink: hivePostMatch[2] // permlink
-      }
+        hivePermlink: hivePostMatch[2], // permlink
+      },
     };
   }
 
@@ -59,8 +59,8 @@ export function classifyUrl(url: string): UrlInfo {
       type: 'embedded_media',
       url: cleanUrl,
       metadata: {
-        youtubeId: youtubeMatch[1]
-      }
+        youtubeId: youtubeMatch[1],
+      },
     };
   }
 
@@ -72,8 +72,8 @@ export function classifyUrl(url: string): UrlInfo {
       type: 'embedded_media',
       url: cleanUrl,
       metadata: {
-        threeSpeakId: `${threeSpeakMatch[1]}/${threeSpeakMatch[2]}`
-      }
+        threeSpeakId: `${threeSpeakMatch[1]}/${threeSpeakMatch[2]}`,
+      },
     };
   }
 
@@ -83,8 +83,8 @@ export function classifyUrl(url: string): UrlInfo {
       type: 'embedded_media',
       url: cleanUrl,
       metadata: {
-        ipfsHash: ipfsMatch[1]
-      }
+        ipfsHash: ipfsMatch[1],
+      },
     };
   }
 
@@ -92,7 +92,7 @@ export function classifyUrl(url: string): UrlInfo {
   if (mp4Match) {
     return {
       type: 'embedded_media',
-      url: cleanUrl
+      url: cleanUrl,
     };
   }
 
@@ -100,7 +100,8 @@ export function classifyUrl(url: string): UrlInfo {
   return {
     type: 'normal',
     url: cleanUrl,
-    displayText: cleanUrl.length > 50 ? cleanUrl.substring(0, 47) + '...' : cleanUrl
+    displayText:
+      cleanUrl.length > 50 ? cleanUrl.substring(0, 47) + '...' : cleanUrl,
   };
 }
 
@@ -110,7 +111,7 @@ export function classifyUrl(url: string): UrlInfo {
 export function extractAndClassifyUrls(text: string): UrlInfo[] {
   const urlRegex = /(https?:\/\/[\w.-]+(?:\/[\w\-./?%&=+#@]*)?)/gi;
   const matches = text.match(urlRegex) || [];
-  
+
   return matches.map(url => classifyUrl(url));
 }
 
@@ -133,4 +134,4 @@ export function shouldBeEmbedded(urlInfo: UrlInfo): boolean {
  */
 export function shouldBeHivePreview(urlInfo: UrlInfo): boolean {
   return urlInfo.type === 'hive_post';
-} 
+}
