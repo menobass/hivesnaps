@@ -8,7 +8,6 @@ import {
   Dimensions,
   ActivityIndicator,
   FlatList,
-  Modal,
   Pressable,
   Platform,
   TextInput,
@@ -18,6 +17,9 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
+import { Image as ExpoImage } from 'expo-image';
+import Modal from 'react-native-modal';
+import ContentModal from './components/ContentModal';
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -36,6 +38,7 @@ import { useHiveData } from '../hooks/useHiveData';
 import { useNotifications } from '../hooks/useNotifications';
 import { useVotingPower } from '../hooks/useVotingPower';
 import { useUserProfile } from '../hooks/useUserProfile';
+import { useEdit } from '../hooks/useEdit';
 
 // Components
 import Snap from './components/Snap';
@@ -148,6 +151,27 @@ const FeedScreenRefactored = () => {
 
   const { unreadCount } = useNotifications(username || null);
 
+  // Edit functionality
+  const {
+    editModalVisible,
+    editText,
+    editImage,
+    editGif,
+    editTarget,
+    editing,
+    error: editError,
+    uploading: editUploading,
+    processing: editProcessing,
+    openEditModal,
+    closeEditModal,
+    setEditText,
+    setEditImage,
+    setEditGif,
+    submitEdit,
+    addImage: addEditImage,
+    addGif: addEditGif,
+  } = useEdit(username);
+
   // Local UI state
   const [activeFilter, setActiveFilter] = useState<FeedFilter>('newest');
   const [isSearchModalVisible, setIsSearchModalVisible] = useState(false);
@@ -195,6 +219,18 @@ const FeedScreenRefactored = () => {
     setModalImages([{ uri: imageUrl }]);
     setModalImageIndex(0);
     setImageModalVisible(true);
+  };
+
+  // Handle edit press
+  const handleEditPress = (snapData: {
+    author: string;
+    permlink: string;
+    body: string;
+  }) => {
+    openEditModal(
+      { author: snapData.author, permlink: snapData.permlink, type: 'snap' },
+      snapData.body
+    );
   };
 
   // Handle search modal close
@@ -414,10 +450,11 @@ const FeedScreenRefactored = () => {
 
         {/* Voting Power Info Modal */}
         <Modal
-          visible={vpInfoModalVisible}
-          transparent
-          animationType='fade'
-          onRequestClose={() => setVpInfoModalVisible(false)}
+          isVisible={vpInfoModalVisible}
+          onBackdropPress={() => setVpInfoModalVisible(false)}
+          onBackButtonPress={() => setVpInfoModalVisible(false)}
+          style={{ justifyContent: 'center', margin: 20 }}
+          useNativeDriver
         >
           <View
             style={{
@@ -653,6 +690,8 @@ const FeedScreenRefactored = () => {
                     params: { hashtag: tag },
                   });
                 }}
+                onEditPress={handleEditPress}
+                currentUsername={username}
               />
             )}
             contentContainerStyle={{ paddingBottom: 80 }}
@@ -727,10 +766,11 @@ const FeedScreenRefactored = () => {
 
       {/* Search Modal */}
       <Modal
-        visible={isSearchModalVisible}
-        animationType='slide'
-        transparent={true}
-        onRequestClose={() => setIsSearchModalVisible(false)}
+        isVisible={isSearchModalVisible}
+        onBackdropPress={() => setIsSearchModalVisible(false)}
+        onBackButtonPress={() => setIsSearchModalVisible(false)}
+        style={{ justifyContent: 'flex-end', margin: 0 }}
+        useNativeDriver
       >
         <View style={styles.searchModal}>
           <KeyboardAvoidingView
@@ -993,6 +1033,28 @@ const FeedScreenRefactored = () => {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
+      {/* Edit Modal */}
+      <ContentModal
+        isVisible={editModalVisible}
+        onClose={closeEditModal}
+        onSubmit={submitEdit}
+        mode='edit'
+        target={editTarget}
+        text={editText}
+        onTextChange={setEditText}
+        image={editImage}
+        gif={editGif}
+        onImageRemove={() => setEditImage(null)}
+        onGifRemove={() => setEditGif(null)}
+        onAddImage={() => addEditImage('edit')}
+        onAddGif={() => addEditGif('edit')}
+        posting={editing}
+        uploading={editUploading}
+        processing={editProcessing}
+        error={editError}
+        currentUsername={username}
+      />
     </View>
   );
 };
