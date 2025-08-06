@@ -81,6 +81,7 @@ interface SnapProps {
     permlink: string;
     body: string;
   }) => void; // NEW: handler for edit button
+  onResnapPress?: (author: string, permlink: string) => void; // NEW: handler for resnap button
   currentUsername?: string | null; // NEW: current user to check if they can edit
 }
 
@@ -465,6 +466,7 @@ const Snap: React.FC<SnapProps> = ({
   onHashtagPress,
   onReplyPress,
   onEditPress,
+  onResnapPress,
   currentUsername,
 }) => {
   // Process hashtags in text, converting them to clickable markdown links
@@ -828,6 +830,23 @@ const Snap: React.FC<SnapProps> = ({
         <Text style={[styles.replyCount, { color: colors.text }]}>
           {replyCount}
         </Text>
+        {/* Resnap button */}
+        {onResnapPress && permlink && (
+          <Pressable
+            onPress={() => onResnapPress(author, permlink)}
+            style={({ pressed }) => [
+              {
+                opacity: pressed ? 0.6 : 1,
+                marginLeft: 12,
+                padding: 4,
+              },
+            ]}
+            accessibilityRole='button'
+            accessibilityLabel='Resnap this post'
+          >
+            <FontAwesome name='retweet' size={18} color={colors.icon} />
+          </Pressable>
+        )}
         <View style={{ flex: 1 }} />
         <Text style={[styles.payout, { color: colors.payout }]}>
           ${payout.toFixed(2)}
