@@ -37,6 +37,7 @@ import YouTubeEmbed from './YouTubeEmbed';
 import ThreeSpeakEmbed from './ThreeSpeakEmbed';
 import { extractHivePostUrls } from '../../utils/extractHivePostInfo';
 import { OptimizedHivePostPreviewRenderer } from '../../components/OptimizedHivePostPreviewRenderer';
+import { classifyUrl, extractAndClassifyUrls } from '../../utils/urlClassifier';
 
 const twitterColors = {
   light: {
@@ -153,27 +154,23 @@ function linkifyMentions(text: string): string {
 
 // Utility: Preprocess raw URLs to clickable markdown links (if not already linked)
 function linkifyUrls(text: string): string {
-  // Regex for URLs (http/https) - includes @ character for Hive frontend URLs
+  // Use our URL classifier to determine how to handle each URL
   return text.replace(/(https?:\/\/[\w.-]+(?:\/[\w\-./?%&=+#@]*)?)/gi, url => {
     // If already inside a markdown or html link, skip
     if (/\]\([^)]+\)$/.test(url) || /href=/.test(url)) return url;
 
-    // Skip URLs that should be handled as embedded media (YouTube, 3Speak, IPFS, MP4)
-    const youtubeMatch = url.match(
-      /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/
-    );
-    const threeSpeakMatch = url.match(
-      /https:\/\/3speak\.tv\/watch\?v=([^\/\s]+)\/([a-zA-Z0-9_-]+)/
-    );
-    const ipfsMatch = url.match(/ipfs\/([A-Za-z0-9]+)/);
-    const mp4Match = url.match(/\.mp4($|\?)/i);
+    // Classify the URL using our utility
+    const urlInfo = classifyUrl(url);
 
-    if (youtubeMatch || threeSpeakMatch || ipfsMatch || mp4Match) {
-      return url; // Don't linkify, let markdown rules handle video embedding
+    // For now, only create markdown links for normal URLs
+    // Hive posts and embedded media will be handled by their respective renderers
+    if (urlInfo.type === 'normal') {
+      return `[${urlInfo.displayText || url}](${url})`;
     }
 
-    // Do NOT shorten display for long URLs; use full URL as display
-    return `[${url}](${url})`;
+    // For all other types (hive_post, embedded_media, invalid), return as-is
+    // This allows the existing renderers to handle them properly
+    return url;
   });
 }
 
@@ -250,7 +247,23 @@ const markdownRules = {
     );
   },
   link: (node: any, children: any, parent: any, styles: any) => {
-    const { href } = node.attributes;
+    let { href } = node.attributes;
+
+    // Safety check: if href contains markdown syntax, extract the actual URL
+    if (href && (href.includes('%5B') || href.includes('['))) {
+      let textToProcess = href;
+
+      // If URL is encoded, decode it first
+      if (href.includes('%5B')) {
+        textToProcess = decodeURIComponent(href);
+      }
+
+      // Extract URL from markdown link syntax [text](url)
+      const markdownMatch = textToProcess.match(/\[([^\]]+)\]\(([^)]+)\)/);
+      if (markdownMatch) {
+        href = markdownMatch[2]; // Extract the URL part
+      }
+    }
     const mp4Match = href && href.match(/\.mp4($|\?)/i);
     if (mp4Match) {
       return renderMp4Video(href, href);
@@ -319,7 +332,31 @@ const markdownRules = {
           textDecorationLine: 'underline',
         }}
         onPress={() => {
-          if (href) Linking.openURL(href);
+          if (href) {
+            // Validate the URL before opening
+            try {
+              // Ensure the URL has a proper protocol
+              const urlToOpen =
+                href.startsWith('http://') || href.startsWith('https://')
+                  ? href
+                  : `https://${href}`;
+
+              // Validate it's a proper URL and has a valid domain
+              const urlObj = new URL(urlToOpen);
+
+              // Basic validation: must have a hostname with at least one dot (for TLD)
+              if (!urlObj.hostname || !urlObj.hostname.includes('.')) {
+                throw new Error('Invalid domain');
+              }
+
+              // Open the URL
+              Linking.openURL(urlToOpen).catch(error => {
+                console.error('Error opening URL:', urlToOpen, error);
+              });
+            } catch (error) {
+              console.error('Invalid URL:', href, error);
+            }
+          }
         }}
       >
         {children}
