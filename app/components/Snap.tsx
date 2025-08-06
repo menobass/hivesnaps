@@ -75,6 +75,12 @@ interface SnapProps {
   showAuthor?: boolean; // Optional: show author info in Snap bubble
   onHashtagPress?: (hashtag: string) => void; // Optional: handle hashtag press
   onReplyPress?: (author: string, permlink: string) => void; // NEW: handler for reply button
+  onEditPress?: (snap: {
+    author: string;
+    permlink: string;
+    body: string;
+  }) => void; // NEW: handler for edit button
+  currentUsername?: string | null; // NEW: current user to check if they can edit
 }
 
 // Utility to extract raw image URLs from text (not in markdown or html)
@@ -421,6 +427,8 @@ const Snap: React.FC<SnapProps> = ({
   showAuthor = false,
   onHashtagPress,
   onReplyPress,
+  onEditPress,
+  currentUsername,
 }) => {
   // Process hashtags in text, converting them to clickable markdown links
   function processHashtags(text: string): string {
@@ -787,6 +795,36 @@ const Snap: React.FC<SnapProps> = ({
         <Text style={[styles.payout, { color: colors.payout }]}>
           ${payout.toFixed(2)}
         </Text>
+        {/* Edit button - only show for own snaps */}
+        {onEditPress && permlink && author === currentUsername && (
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              alignSelf: 'auto',
+              marginLeft: 12,
+              paddingHorizontal: 14,
+              paddingVertical: 7,
+              borderRadius: 20,
+              backgroundColor: 'transparent',
+            }}
+            onPress={() => onEditPress({ author, permlink, body })}
+            accessibilityRole='button'
+            accessibilityLabel='Edit this snap'
+          >
+            <FontAwesome name='edit' size={16} color={colors.icon} />
+            <Text
+              style={{
+                marginLeft: 6,
+                fontWeight: 'bold',
+                fontSize: 15,
+                color: colors.icon,
+              }}
+            >
+              Edit
+            </Text>
+          </TouchableOpacity>
+        )}
         {onReplyPress && permlink && (
           <TouchableOpacity
             style={{

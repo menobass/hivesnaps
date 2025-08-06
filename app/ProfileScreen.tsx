@@ -15,10 +15,12 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
+import { Image as ExpoImage } from 'expo-image';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { createProfileScreenStyles } from '../styles/ProfileScreenStyles';
 import Snap from './components/Snap';
 import UpvoteModal from '../components/UpvoteModal';
+import ContentModal from './components/ContentModal';
 
 // Import custom hooks
 import { useProfileData } from '../hooks/useProfileData';
@@ -29,6 +31,7 @@ import { useRewardsManagement } from '../hooks/useRewardsManagement';
 import { useUserAuth } from '../hooks/useUserAuth';
 import { useUpvote } from '../hooks/useUpvote';
 import { useHiveData } from '../hooks/useHiveData';
+import { useEdit } from '../hooks/useEdit';
 
 const ProfileScreen = () => {
   const colorScheme = useColorScheme() || 'light';
@@ -127,6 +130,27 @@ const ProfileScreen = () => {
     updateSnap
   );
 
+  // Edit functionality
+  const {
+    editModalVisible,
+    editText,
+    editImage,
+    editGif,
+    editTarget,
+    editing,
+    error: editError,
+    uploading: editUploading,
+    processing: editProcessing,
+    openEditModal,
+    closeEditModal,
+    setEditText,
+    setEditImage,
+    setEditGif,
+    submitEdit,
+    addImage: addEditImage,
+    addGif: addEditGif,
+  } = useEdit(currentUsername);
+
   // Initialize styles
   const styles = createProfileScreenStyles(isDark);
 
@@ -198,6 +222,18 @@ const ProfileScreen = () => {
         permlink: snap.permlink,
       },
     });
+  };
+
+  // Handle edit press
+  const handleEditPress = (snapData: {
+    author: string;
+    permlink: string;
+    body: string;
+  }) => {
+    openEditModal(
+      { author: snapData.author, permlink: snapData.permlink, type: 'snap' },
+      snapData.body
+    );
   };
 
   const handleBack = () => {
@@ -702,6 +738,8 @@ const ProfileScreen = () => {
                               }
                               onContentPress={() => handleSnapPress(userSnap)}
                               showAuthor={true} // Show author for consistency with other feeds
+                              onEditPress={handleEditPress}
+                              currentUsername={currentUsername}
                             />
                           );
                         })}
@@ -1306,6 +1344,28 @@ const ProfileScreen = () => {
         onConfirm={confirmUpvote}
         onVoteWeightChange={setVoteWeight}
         colors={colors}
+      />
+
+      {/* Edit Modal */}
+      <ContentModal
+        isVisible={editModalVisible}
+        onClose={closeEditModal}
+        onSubmit={submitEdit}
+        mode='edit'
+        target={editTarget}
+        text={editText}
+        onTextChange={setEditText}
+        image={editImage}
+        gif={editGif}
+        onImageRemove={() => setEditImage(null)}
+        onGifRemove={() => setEditGif(null)}
+        onAddImage={() => addEditImage('edit')}
+        onAddGif={() => addEditGif('edit')}
+        posting={editing}
+        uploading={editUploading}
+        processing={editProcessing}
+        error={editError}
+        currentUsername={currentUsername}
       />
     </SafeAreaViewSA>
   );

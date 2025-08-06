@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { Client, PrivateKey } from '@hiveio/dhive';
 import * as SecureStore from 'expo-secure-store';
 import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
+import { stripImageTags, getFirstImageUrl } from '../utils/extractImageInfo';
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -40,15 +41,6 @@ interface UseEditReturn extends EditState {
   clearError: () => void;
 }
 
-// Utility to remove image markdown/html from text
-function stripImageTags(text: string): string {
-  // Remove markdown images
-  let out = text.replace(/!\[[^\]]*\]\([^\)]+\)/g, '');
-  // Remove html <img ...>
-  out = out.replace(/<img[^>]+src=["'][^"'>]+["'][^>]*>/g, '');
-  return out;
-}
-
 export const useEdit = (
   currentUsername: string | null,
   onRefresh?: () => Promise<boolean>,
@@ -69,11 +61,13 @@ export const useEdit = (
   const openEditModal = useCallback(
     (target: EditTarget, currentBody: string) => {
       const textBody = stripImageTags(currentBody);
+      const existingImageUrl = getFirstImageUrl(currentBody);
+
       setState(prev => ({
         ...prev,
         editTarget: target,
         editText: textBody,
-        editImage: null,
+        editImage: existingImageUrl,
         editGif: null,
         editModalVisible: true,
         error: null,
