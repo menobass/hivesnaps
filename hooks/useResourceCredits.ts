@@ -24,9 +24,9 @@ export const useResourceCredits = (username: string | null) => {
     try {
       const currentMana = parseFloat(rcData.rc_manabar.current_mana);
       const maxRc = parseFloat(rcData.max_rc);
-      
+
       if (maxRc === 0) return 0;
-      
+
       // Calculate percentage (0-100)
       const percentage = (currentMana / maxRc) * 100;
       return Math.max(0, Math.min(100, percentage));
@@ -54,7 +54,7 @@ export const useResourceCredits = (username: string | null) => {
       ]);
 
       const response = await client.call('rc_api', 'find_rc_accounts', {
-        accounts: [username]
+        accounts: [username],
       });
 
       if (response?.rc_accounts && response.rc_accounts.length > 0) {
@@ -66,7 +66,9 @@ export const useResourceCredits = (username: string | null) => {
       }
     } catch (err) {
       console.error('Error fetching resource credits:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch resource credits');
+      setError(
+        err instanceof Error ? err.message : 'Failed to fetch resource credits'
+      );
       setResourceCredits(null);
     } finally {
       setLoading(false);
