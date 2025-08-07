@@ -475,6 +475,7 @@ export async function isSnapUrl(url: string): Promise<boolean> {
 
 /**
  * Get navigation info for a Hive post URL
+ * Uses more restrictive detection for navigation to avoid misclassifying regular posts as snaps
  */
 export async function getHivePostNavigationInfo(url: string): Promise<{
   isSnap: boolean;
@@ -495,7 +496,7 @@ export async function getHivePostNavigationInfo(url: string): Promise<{
     // Import postTypeDetector dynamically to avoid circular dependencies
     const { detectPostType } = await import('./postTypeDetector');
 
-    // Detect the post type
+    // Detect the post type using the restrictive logic for navigation
     const postType = await detectPostType({
       author: postInfo.author,
       permlink: postInfo.permlink,
@@ -520,6 +521,137 @@ export async function getHivePostNavigationInfo(url: string): Promise<{
   } catch (error) {
     console.error(
       '[extractHivePostInfo] Error getting navigation info:',
+      error
+    );
+    return null;
+  }
+}
+
+/**
+ * Get navigation info for Hive post previews (more inclusive)
+ * This allows external Hive posts to be navigated to HivePostScreen
+ */
+export async function getHivePostPreviewNavigationInfo(url: string): Promise<{
+  isSnap: boolean;
+  author: string;
+  permlink: string;
+  route: string;
+} | null> {
+  try {
+    console.log(
+      '[extractHivePostInfo] Getting preview navigation info for URL:',
+      url
+    );
+
+    // Parse the URL to get author and permlink
+    const postInfo = parseHivePostUrl(url);
+    if (!postInfo) {
+      console.log('[extractHivePostInfo] Could not parse URL as Hive post');
+      return null;
+    }
+
+    // Use a more conservative approach for preview navigation
+    // Only treat as snap if it has very clear snap indicators
+    let isSnap = false;
+
+    // Check for explicit snap permlink pattern
+    if (postInfo.permlink.startsWith('snap-')) {
+      isSnap = true;
+      console.log('[extractHivePostInfo] Detected snap by permlink pattern');
+    } else {
+      // For other posts, use a lightweight check without the full detectPostType logic
+      // Import dhive dynamically to avoid circular dependencies
+      const { Client } = await import('@hiveio/dhive');
+      const client = new Client([
+        'https://api.hive.blog',
+        'https://api.hivekings.com',
+        'https://anyx.io',
+      ]);
+
+      try {
+        // Get the post data to check for snap indicators
+        const post = await client.database.call('get_content', [
+          postInfo.author,
+          postInfo.permlink,
+        ]);
+
+        if (post) {
+          // Check for snap indicators without using the full detectPostType logic
+          const snapIndicators = [];
+
+          // Check for snap permlink
+          if (post.permlink && post.permlink.startsWith('snap-')) {
+            snapIndicators.push('snap_permlink');
+          }
+
+          // Check for snap parent
+          if (post.parent_author === 'peak.snaps') {
+            snapIndicators.push('snap_parent');
+          }
+
+          // Check for snap metadata
+          if (post.json_metadata) {
+            try {
+              const metadata = JSON.parse(post.json_metadata);
+              if (metadata.app && metadata.app.includes('hivesnaps')) {
+                snapIndicators.push('hivesnaps_app');
+              }
+              if (
+                metadata.tags &&
+                Array.isArray(metadata.tags) &&
+                metadata.tags.includes('hivesnaps')
+              ) {
+                snapIndicators.push('hivesnaps_tag');
+              }
+            } catch (e) {
+              // Invalid JSON, ignore
+            }
+          }
+
+          // Check for snap-like content characteristics
+          if (
+            post.body &&
+            post.body.length < 500 &&
+            (!post.title || post.title.trim().length === 0)
+          ) {
+            snapIndicators.push('snap_characteristics');
+          }
+
+          console.log(
+            '[extractHivePostInfo] Snap indicators found:',
+            snapIndicators
+          );
+
+          // Require at least 2 clear snap indicators to treat as snap
+          isSnap = snapIndicators.length >= 2;
+        }
+      } catch (error) {
+        console.log(
+          '[extractHivePostInfo] Error fetching post data, defaulting to HivePostScreen:',
+          error
+        );
+        isSnap = false;
+      }
+    }
+
+    const route = isSnap ? '/ConversationScreen' : '/HivePostScreen';
+
+    console.log('[extractHivePostInfo] Preview navigation info:', {
+      isSnap,
+      author: postInfo.author,
+      permlink: postInfo.permlink,
+      route,
+    });
+
+    return {
+      isSnap,
+      author: postInfo.author,
+      permlink: postInfo.permlink,
+      route,
+    };
+  } catch (error) {
+    console.error(
+      '[extractHivePostInfo] Error getting preview navigation info:',
       error
     );
     return null;
