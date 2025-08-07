@@ -269,6 +269,30 @@ export async function detectPostType(post: PostInfo): Promise<PostType> {
     console.log('[postTypeDetector]   - No metadata available');
   }
 
+  // ADDITIONAL DETECTION: Check for content length and format (snap-like characteristics)
+  // This helps detect short-form content that might be snap-like even without app metadata
+  console.log('[postTypeDetector] 🔍 Checking content characteristics...');
+  if (post.body) {
+    const bodyLength = post.body.length;
+    const hasTitle = post.title && post.title.trim().length > 0;
+
+    console.log('[postTypeDetector]   - Body length:', bodyLength);
+    console.log('[postTypeDetector]   - Has title:', hasTitle);
+
+    // If it's short content (under 500 chars) with no title or minimal title,
+    // and not a reply (no parent), it's likely snap-like content
+    if (
+      bodyLength < 500 &&
+      !hasTitle &&
+      (!post.parent_author || post.parent_author === '')
+    ) {
+      console.log(
+        '[postTypeDetector] ✅ Detected snap-like content by characteristics'
+      );
+      return 'snap';
+    }
+  }
+
   // SENARY SNAP DETECTION: Check if it's a snap based on content patterns
   console.log('[postTypeDetector] 🔍 Checking content patterns...');
   console.log('[postTypeDetector]   - Has body:', !!post.body);
@@ -295,6 +319,66 @@ export async function detectPostType(post: PostInfo): Promise<PostType> {
     // Only detect if it has specific snap formatting or patterns
   } else {
     console.log('[postTypeDetector]   - No body content available');
+  }
+
+  // SEPTENARY DETECTION: Check for specific snap-like characteristics
+  // Only treat as snap if it has clear snap-like characteristics
+  // This prevents regular blog posts from being treated as snaps for navigation
+  console.log(
+    '[postTypeDetector] 🔍 Checking for snap-like characteristics...'
+  );
+
+  // Only treat as snap if it has multiple snap indicators
+  const snapIndicators = [];
+
+  // Check for short content
+  if (post.body && post.body.length < 500) {
+    snapIndicators.push('short_content');
+  }
+
+  // Check for no title
+  if (!post.title || post.title.trim().length === 0) {
+    snapIndicators.push('no_title');
+  }
+
+  // Check for no parent (not a reply)
+  if (!post.parent_author || post.parent_author === '') {
+    snapIndicators.push('no_parent');
+  }
+
+  // Check for snap-like permlink pattern
+  if (post.permlink && post.permlink.startsWith('snap-')) {
+    snapIndicators.push('snap_permlink');
+  }
+
+  // Check for snap-related metadata
+  if (post.json_metadata) {
+    try {
+      const metadata = JSON.parse(post.json_metadata);
+      if (metadata.app && metadata.app.includes('hivesnaps')) {
+        snapIndicators.push('hivesnaps_app');
+      }
+      if (
+        metadata.tags &&
+        Array.isArray(metadata.tags) &&
+        metadata.tags.includes('hivesnaps')
+      ) {
+        snapIndicators.push('hivesnaps_tag');
+      }
+    } catch (e) {
+      // Invalid JSON, ignore
+    }
+  }
+
+  console.log('[postTypeDetector]   - Snap indicators found:', snapIndicators);
+
+  // Require at least 2 snap indicators to treat as snap for navigation
+  // This prevents regular blog posts from being misclassified
+  if (snapIndicators.length >= 2) {
+    console.log(
+      '[postTypeDetector] ✅ Detected as snap with multiple indicators'
+    );
+    return 'snap';
   }
 
   // Additional check: if parent_author is empty or null, it's likely a regular post
@@ -343,4 +427,13 @@ export async function getPostNavigationParams(post: PostInfo) {
       permlink: post.permlink,
     },
   };
+}
+
+/**
+ * Check if a post can be resnapped (more inclusive than snap detection)
+ * This allows resnapping external Hive posts without affecting navigation
+ */
+export function canBeResnapped(post: PostInfo): boolean {
+  // Any valid Hive post can be resnapped, regardless of its type
+  return !!(post.author && post.permlink && post.permlink.length >= 5);
 }

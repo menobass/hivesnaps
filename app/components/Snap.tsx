@@ -38,6 +38,7 @@ import ThreeSpeakEmbed from './ThreeSpeakEmbed';
 import { extractHivePostUrls } from '../../utils/extractHivePostInfo';
 import { OptimizedHivePostPreviewRenderer } from '../../components/OptimizedHivePostPreviewRenderer';
 import { classifyUrl, extractAndClassifyUrls } from '../../utils/urlClassifier';
+import { canBeResnapped } from '../../utils/postTypeDetector';
 
 const twitterColors = {
   light: {
@@ -831,7 +832,7 @@ const Snap: React.FC<SnapProps> = ({
           {replyCount}
         </Text>
         {/* Resnap button */}
-        {onResnapPress && permlink && (
+        {onResnapPress && permlink && canBeResnapped({ author, permlink }) && (
           <Pressable
             onPress={() => onResnapPress(author, permlink)}
             style={({ pressed }) => [
