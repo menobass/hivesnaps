@@ -17,7 +17,7 @@ import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { HivePostInfo } from '../utils/extractHivePostInfo';
 import { formatDistanceToNow } from 'date-fns';
-import { getHivePostNavigationInfo } from '../utils/extractHivePostInfo';
+import { getHivePostPreviewNavigationInfo } from '../utils/extractHivePostInfo';
 
 interface HivePostPreviewProps {
   postInfo: HivePostInfo;
@@ -56,7 +56,7 @@ export const HivePostPreview: React.FC<HivePostPreviewProps> = ({
   const handlePress = async () => {
     try {
       // Check if this post is a snap and get navigation info
-      const navigationInfo = await getHivePostNavigationInfo(
+      const navigationInfo = await getHivePostPreviewNavigationInfo(
         postInfo.originalUrl
       );
 

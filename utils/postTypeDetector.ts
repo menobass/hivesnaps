@@ -321,18 +321,62 @@ export async function detectPostType(post: PostInfo): Promise<PostType> {
     console.log('[postTypeDetector]   - No body content available');
   }
 
-  // SEPTENARY DETECTION: Make general Hive posts resnapable
-  // Allow any Hive post to be treated as "snap-like" for resnapping purposes
-  // This enables users to resnap content from any Hive frontend
+  // SEPTENARY DETECTION: Check for specific snap-like characteristics
+  // Only treat as snap if it has clear snap-like characteristics
+  // This prevents regular blog posts from being treated as snaps for navigation
   console.log(
-    '[postTypeDetector] 🔍 Checking if this should be treated as resnapable content...'
+    '[postTypeDetector] 🔍 Checking for snap-like characteristics...'
   );
 
-  // If we've gotten this far and it's a valid Hive post (has author/permlink),
-  // treat it as snap-like content to enable resnapping from any frontend
-  if (post.author && post.permlink && post.permlink.length >= 5) {
+  // Only treat as snap if it has multiple snap indicators
+  const snapIndicators = [];
+
+  // Check for short content
+  if (post.body && post.body.length < 500) {
+    snapIndicators.push('short_content');
+  }
+
+  // Check for no title
+  if (!post.title || post.title.trim().length === 0) {
+    snapIndicators.push('no_title');
+  }
+
+  // Check for no parent (not a reply)
+  if (!post.parent_author || post.parent_author === '') {
+    snapIndicators.push('no_parent');
+  }
+
+  // Check for snap-like permlink pattern
+  if (post.permlink && post.permlink.startsWith('snap-')) {
+    snapIndicators.push('snap_permlink');
+  }
+
+  // Check for snap-related metadata
+  if (post.json_metadata) {
+    try {
+      const metadata = JSON.parse(post.json_metadata);
+      if (metadata.app && metadata.app.includes('hivesnaps')) {
+        snapIndicators.push('hivesnaps_app');
+      }
+      if (
+        metadata.tags &&
+        Array.isArray(metadata.tags) &&
+        metadata.tags.includes('hivesnaps')
+      ) {
+        snapIndicators.push('hivesnaps_tag');
+      }
+    } catch (e) {
+      // Invalid JSON, ignore
+    }
+  }
+
+  console.log('[postTypeDetector]   - Snap indicators found:', snapIndicators);
+
+  // Require at least 2 snap indicators to treat as snap for navigation
+  // This prevents regular blog posts from being misclassified
+  if (snapIndicators.length >= 2) {
     console.log(
-      '[postTypeDetector] ✅ Treating as snap-like content for resnapping purposes'
+      '[postTypeDetector] ✅ Detected as snap with multiple indicators'
     );
     return 'snap';
   }
@@ -383,4 +427,13 @@ export async function getPostNavigationParams(post: PostInfo) {
       permlink: post.permlink,
     },
   };
+}
+
+/**
+ * Check if a post can be resnapped (more inclusive than snap detection)
+ * This allows resnapping external Hive posts without affecting navigation
+ */
+export function canBeResnapped(post: PostInfo): boolean {
+  // Any valid Hive post can be resnapped, regardless of its type
+  return !!(post.author && post.permlink && post.permlink.length >= 5);
 }
