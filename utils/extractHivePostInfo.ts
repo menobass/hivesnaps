@@ -474,7 +474,8 @@ export async function isSnapUrl(url: string): Promise<boolean> {
 }
 
 /**
- * Get navigation info for a Hive post URL
+ * Get navigation info for a Hive post URL using title-based detection
+ * Simple and reliable: Posts with titles go to HivePostScreen, posts without titles (snaps) go to ConversationScreen
  */
 export async function getHivePostNavigationInfo(url: string): Promise<{
   isSnap: boolean;
@@ -492,23 +493,28 @@ export async function getHivePostNavigationInfo(url: string): Promise<{
       return null;
     }
 
-    // Import postTypeDetector dynamically to avoid circular dependencies
-    const { detectPostType } = await import('./postTypeDetector');
+    // Fetch the post to check if it has a title
+    const post = await client.database.call('get_content', [postInfo.author, postInfo.permlink]);
+    
+    if (!post || !post.author) {
+      console.log('[extractHivePostInfo] Post not found');
+      return null;
+    }
 
-    // Detect the post type
-    const postType = await detectPostType({
-      author: postInfo.author,
-      permlink: postInfo.permlink,
-    });
-
-    const isSnap = postType === 'snap';
+    // Simple title-based detection: 
+    // - If post has a title, it's a blog post -> HivePostScreen
+    // - If post has no title, it's a snap -> ConversationScreen
+    const hasTitle = post.title && post.title.trim().length > 0;
+    const isSnap = !hasTitle;
     const route = isSnap ? '/ConversationScreen' : '/HivePostScreen';
 
-    console.log('[extractHivePostInfo] Navigation info:', {
+    console.log('[extractHivePostInfo] Title-based navigation info:', {
+      hasTitle,
       isSnap,
       author: postInfo.author,
       permlink: postInfo.permlink,
       route,
+      title: post.title?.substring(0, 50) + '...' || '(no title)',
     });
 
     return {
