@@ -20,35 +20,13 @@ import { Image as ExpoImage } from 'expo-image';
 import SafeRenderHtml from '../components/SafeRenderHtml';
 import { Dimensions } from 'react-native';
 import Markdown from 'react-native-markdown-display';
-import { Client } from '@hiveio/dhive';
 import { useUserAuth } from '../hooks/useUserAuth';
 import { useUpvote } from '../hooks/useUpvote';
 import { useHiveData } from '../hooks/useHiveData';
+import { useHivePostData } from '../hooks/useHivePostData';
 import UpvoteModal from '../components/UpvoteModal';
+import Reply from './components/Reply';
 import genericAvatar from '../assets/images/generic-avatar.png';
-
-const HIVE_NODES = [
-  'https://api.hive.blog',
-  'https://api.deathwing.me',
-  'https://api.openhive.network',
-];
-const client = new Client(HIVE_NODES);
-
-interface HivePostData {
-  author: string;
-  permlink: string;
-  title: string;
-  body: string;
-  created: string;
-  voteCount: number;
-  replyCount: number;
-  payout: number;
-  avatarUrl?: string;
-  active_votes?: any[];
-  json_metadata?: string;
-  category?: string;
-  tags?: string[];
-}
 
 const HivePostScreen = () => {
   const { author, permlink } = useLocalSearchParams<{
@@ -66,9 +44,18 @@ const HivePostScreen = () => {
     permlink,
   });
 
-  const [post, setPost] = useState<HivePostData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Use the new hook for post and comments data
+  const {
+    post,
+    comments,
+    loading,
+    commentsLoading,
+    error,
+    commentsError,
+    refreshAll,
+    updatePost,
+    updateComment,
+  } = useHivePostData(author, permlink, currentUsername);
 
   const {
     upvoteModalVisible,
@@ -84,104 +71,6 @@ const HivePostScreen = () => {
     confirmUpvote,
   } = useUpvote(currentUsername, globalProps, rewardFund, hivePrice);
 
-  const fetchHivePost = useCallback(async () => {
-    console.log('[HivePostScreen] fetchHivePost called with:', {
-      author,
-      permlink,
-    });
-
-    if (!author || !permlink) {
-      console.log('[HivePostScreen] Missing parameters');
-      setError('Missing post parameters');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      console.log('[HivePostScreen] Fetching post data from Hive...');
-      // Fetch the post
-      const postData = await client.database.call('get_content', [
-        author,
-        permlink,
-      ]);
-
-      if (!postData || !postData.author) {
-        setError('Post not found');
-        setLoading(false);
-        return;
-      }
-
-      // Fetch author avatar
-      let avatarUrl: string | undefined = undefined;
-      try {
-        const accounts = await client.database.call('get_accounts', [
-          [postData.author],
-        ]);
-        if (accounts && accounts[0]) {
-          const metadata =
-            accounts[0].posting_json_metadata || accounts[0].json_metadata;
-          if (metadata) {
-            try {
-              const profile = JSON.parse(metadata).profile;
-              if (profile && profile.profile_image) {
-                avatarUrl = profile.profile_image;
-              }
-            } catch (e) {
-              // Invalid JSON metadata
-            }
-          }
-        }
-      } catch (e) {
-        // Avatar fetch failed
-      }
-
-      // Extract tags from metadata
-      let tags: string[] = [];
-      try {
-        if (postData.json_metadata) {
-          const metadata = JSON.parse(postData.json_metadata);
-          tags = metadata.tags || [];
-        }
-      } catch (e) {
-        // Invalid JSON metadata
-      }
-
-      const hivePostData: HivePostData = {
-        author: postData.author,
-        permlink: postData.permlink,
-        title: postData.title || 'Untitled Post',
-        body: postData.body,
-        created: postData.created,
-        voteCount: postData.net_votes || 0,
-        replyCount: postData.children || 0,
-        payout: parseFloat(
-          postData.pending_payout_value
-            ? postData.pending_payout_value.replace(' HBD', '')
-            : '0'
-        ),
-        avatarUrl,
-        active_votes: postData.active_votes,
-        json_metadata: postData.json_metadata,
-        category: postData.category,
-        tags,
-      };
-
-      setPost(hivePostData);
-    } catch (error) {
-      console.error('Error fetching Hive post:', error);
-      setError('Failed to load post');
-    } finally {
-      setLoading(false);
-    }
-  }, [author, permlink]);
-
-  React.useEffect(() => {
-    fetchHivePost();
-  }, [fetchHivePost]);
-
   const handleUpvotePress = useCallback(() => {
     if (!post) return;
 
@@ -193,8 +82,8 @@ const HivePostScreen = () => {
   }, [post, openUpvoteModal]);
 
   const handleRefresh = useCallback(() => {
-    fetchHivePost();
-  }, [fetchHivePost]);
+    refreshAll();
+  }, [refreshAll]);
 
   const colors = {
     background: isDark ? '#15202B' : '#fff',
@@ -206,6 +95,67 @@ const HivePostScreen = () => {
     buttonInactive: isDark ? '#38444D' : '#E1E8ED',
     payout: '#17BF63',
   };
+
+  const windowWidth = Dimensions.get('window').width;
+
+  // Function to flatten nested comments into a flat array with level information
+  // This follows the same pattern as ConversationScreen for consistency
+  const flattenComments = (
+    commentList: any[],
+    level = 0
+  ): Array<any & { visualLevel: number }> => {
+    const flattened: Array<any & { visualLevel: number }> = [];
+
+    commentList.forEach(comment => {
+      // Add the current comment with its visual level
+      const maxVisualLevel = 2;
+      const visualLevel = Math.min(level, maxVisualLevel);
+      flattened.push({ ...comment, visualLevel });
+
+      // Recursively flatten children
+      if (comment.replies && comment.replies.length > 0) {
+        const childComments = flattenComments(comment.replies, level + 1);
+        flattened.push(...childComments);
+      }
+    });
+
+    return flattened;
+  };
+
+  // Handle comment upvote press
+  const handleCommentUpvotePress = useCallback(
+    (params: { author: string; permlink: string }) => {
+      // Find the comment in our data structure
+      const findComment = (comments: any[], author: string, permlink: string): any => {
+        for (const comment of comments) {
+          if (comment.author === author && comment.permlink === permlink) {
+            return comment;
+          }
+          if (comment.replies) {
+            const found = findComment(comment.replies, author, permlink);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+
+      const comment = findComment(comments, params.author, params.permlink);
+      if (comment) {
+        openUpvoteModal({
+          author: comment.author,
+          permlink: comment.permlink,
+          snap: comment,
+        });
+      }
+    },
+    [comments, openUpvoteModal]
+  );
+
+  // Handle image press (placeholder for now)
+  const handleImagePress = useCallback((imageUrl: string) => {
+    console.log('Image pressed:', imageUrl);
+    // TODO: Implement image viewer
+  }, []);
 
   if (loading) {
     return (
@@ -266,8 +216,6 @@ const HivePostScreen = () => {
       </SafeAreaViewSA>
     );
   }
-
-  const windowWidth = Dimensions.get('window').width;
 
   // Smart HTML detection - distinguish between HTML and markdown content
   const hasHtmlTags = /<([a-z][\s\S]*?)>/i.test(post.body);
@@ -675,6 +623,117 @@ const HivePostScreen = () => {
           >
             ${post.payout.toFixed(2)}
           </Text>
+        </View>
+
+        {/* Comments Section */}
+        <View style={{ marginTop: 20 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingVertical: 16,
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border,
+            }}
+          >
+            <Text
+              style={{
+                color: colors.text,
+                fontSize: 16,
+                fontWeight: '600',
+              }}
+            >
+              Comments ({post.replyCount})
+            </Text>
+            {commentsLoading && (
+              <ActivityIndicator size="small" color={colors.button} />
+            )}
+          </View>
+
+          {/* Comments Error */}
+          {commentsError && (
+            <View
+              style={{
+                padding: 16,
+                backgroundColor: colors.background,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: colors.icon, fontSize: 14, textAlign: 'center' }}>
+                {commentsError}
+              </Text>
+              <TouchableOpacity
+                onPress={refreshAll}
+                style={{
+                  backgroundColor: colors.button,
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                  borderRadius: 6,
+                  marginTop: 8,
+                }}
+              >
+                <Text style={{ color: colors.buttonText, fontSize: 12 }}>
+                  Retry
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Render Comments */}
+          {!commentsLoading && !commentsError && comments.length > 0 && (
+            <View style={{ marginTop: 8 }}>
+              {flattenComments(comments).map(comment => (
+                <Reply
+                  key={comment.author + comment.permlink + '-' + comment.visualLevel}
+                  reply={comment}
+                  onUpvotePress={handleCommentUpvotePress}
+                  onReplyPress={(author: string, permlink: string) => {
+                    console.log('Reply to comment:', author, permlink);
+                    // TODO: Implement reply functionality
+                  }}
+                  onEditPress={(comment) => {
+                    console.log('Edit comment:', comment);
+                    // TODO: Implement edit functionality
+                  }}
+                  onImagePress={handleImagePress}
+                  currentUsername={currentUsername}
+                  colors={{
+                    text: colors.text,
+                    bubble: colors.background,
+                    icon: colors.icon,
+                    payout: colors.payout,
+                    button: colors.button,
+                    buttonText: colors.buttonText,
+                  }}
+                />
+              ))}
+            </View>
+          )}
+
+          {/* No Comments State */}
+          {!commentsLoading && !commentsError && comments.length === 0 && (
+            <View
+              style={{
+                padding: 20,
+                alignItems: 'center',
+              }}
+            >
+              <FontAwesome name="comment-o" size={32} color={colors.icon} />
+              <Text
+                style={{
+                  color: colors.icon,
+                  fontSize: 14,
+                  marginTop: 8,
+                  textAlign: 'center',
+                }}
+              >
+                No comments yet. Be the first to comment!
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 
