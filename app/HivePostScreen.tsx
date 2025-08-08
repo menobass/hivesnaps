@@ -28,6 +28,7 @@ import { useUserAuth } from '../hooks/useUserAuth';
 import { useUpvote } from '../hooks/useUpvote';
 import { useHiveData } from '../hooks/useHiveData';
 import { useHivePostData } from '../hooks/useHivePostData';
+import { HivePostScreenStyles } from '../styles/HivePostScreenStyles';
 import { useReply, ReplyTarget } from '../hooks/useReply';
 import { useGifPicker, GifMode } from '../hooks/useGifPicker';
 import UpvoteModal from '../components/UpvoteModal';
@@ -220,12 +221,10 @@ const HivePostScreen = () => {
 
   if (loading) {
     return (
-      <SafeAreaViewSA style={{ flex: 1, backgroundColor: colors.background }}>
-        <View
-          style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
-        >
+      <SafeAreaViewSA style={[HivePostScreenStyles.safeArea, { backgroundColor: colors.background }]}>
+        <View style={HivePostScreenStyles.loadingContainer}>
           <ActivityIndicator size='large' color={colors.button} />
-          <Text style={{ color: colors.text, marginTop: 16 }}>
+          <Text style={[HivePostScreenStyles.loadingText, { color: colors.text }]}>
             Loading post...
           </Text>
         </View>
@@ -235,41 +234,21 @@ const HivePostScreen = () => {
 
   if (error || !post) {
     return (
-      <SafeAreaViewSA style={{ flex: 1, backgroundColor: colors.background }}>
-        <View
-          style={{
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: 20,
-          }}
-        >
+      <SafeAreaViewSA style={[HivePostScreenStyles.safeArea, { backgroundColor: colors.background }]}>
+        <View style={HivePostScreenStyles.errorContainer}>
           <FontAwesome
             name='exclamation-triangle'
             size={48}
             color={colors.icon}
           />
-          <Text
-            style={{
-              color: colors.text,
-              fontSize: 18,
-              marginTop: 16,
-              textAlign: 'center',
-            }}
-          >
+          <Text style={[HivePostScreenStyles.errorText, { color: colors.text }]}>
             {error || 'Post not found'}
           </Text>
           <TouchableOpacity
             onPress={handleRefresh}
-            style={{
-              backgroundColor: colors.button,
-              paddingHorizontal: 20,
-              paddingVertical: 10,
-              borderRadius: 8,
-              marginTop: 16,
-            }}
+            style={[HivePostScreenStyles.retryButton, { backgroundColor: colors.button }]}
           >
-            <Text style={{ color: colors.buttonText, fontWeight: '600' }}>
+            <Text style={[HivePostScreenStyles.retryButtonText, { color: colors.buttonText }]}>
               Retry
             </Text>
           </TouchableOpacity>
@@ -319,30 +298,13 @@ const HivePostScreen = () => {
   });
 
   return (
-    <SafeAreaViewSA style={{ flex: 1, backgroundColor: colors.background }}>
+    <SafeAreaViewSA style={[HivePostScreenStyles.safeArea, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: 16,
-          paddingVertical: 12,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.border,
-        }}
-      >
+      <View style={[HivePostScreenStyles.header, { borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
           <FontAwesome name='arrow-left' size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text
-          style={{
-            color: colors.text,
-            fontSize: 18,
-            fontWeight: '600',
-            marginLeft: 16,
-            flex: 1,
-          }}
-        >
+        <Text style={[HivePostScreenStyles.headerTitle, { color: colors.text }]}>
           Hive Post
         </Text>
         <TouchableOpacity onPress={handleRefresh}>
@@ -350,27 +312,19 @@ const HivePostScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
+      <ScrollView style={HivePostScreenStyles.scrollContainer} contentContainerStyle={HivePostScreenStyles.contentContainer}>
         {/* Author Info */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            marginBottom: 16,
-          }}
-        >
+        <View style={HivePostScreenStyles.authorInfo}>
           <ExpoImage
             source={post.avatarUrl ? { uri: post.avatarUrl } : genericAvatar}
-            style={{ width: 48, height: 48, borderRadius: 24 }}
+            style={HivePostScreenStyles.avatar}
             contentFit='cover'
           />
-          <View style={{ marginLeft: 12, flex: 1 }}>
-            <Text
-              style={{ color: colors.text, fontSize: 16, fontWeight: '600' }}
-            >
+          <View style={HivePostScreenStyles.authorDetails}>
+            <Text style={[HivePostScreenStyles.authorName, { color: colors.text }]}>
               {post.author}
             </Text>
-            <Text style={{ color: colors.icon, fontSize: 14 }}>
+            <Text style={[HivePostScreenStyles.timestamp, { color: colors.icon }]}>
               {new Date(post.created + 'Z').toLocaleString()}
             </Text>
           </View>
@@ -378,20 +332,13 @@ const HivePostScreen = () => {
 
         {/* Title */}
         {post.title && (
-          <Text
-            style={{
-              color: colors.text,
-              fontSize: 20,
-              fontWeight: 'bold',
-              marginBottom: 16,
-            }}
-          >
+          <Text style={[HivePostScreenStyles.title, { color: colors.text }]}>
             {post.title}
           </Text>
         )}
 
         {/* Content */}
-        <View style={{ marginBottom: 20 }}>
+        <View style={HivePostScreenStyles.contentBody}>
           {isHtml ? (
             <SafeRenderHtml
               contentWidth={windowWidth - 32}
@@ -610,22 +557,13 @@ const HivePostScreen = () => {
 
         {/* Tags */}
         {post.tags && post.tags.length > 0 && (
-          <View
-            style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 20 }}
-          >
+          <View style={HivePostScreenStyles.tagsContainer}>
             {post.tags.slice(0, 5).map((tag, index) => (
               <View
                 key={index}
-                style={{
-                  backgroundColor: colors.button,
-                  paddingHorizontal: 8,
-                  paddingVertical: 4,
-                  borderRadius: 12,
-                  marginRight: 8,
-                  marginBottom: 4,
-                }}
+                style={[HivePostScreenStyles.tag, { backgroundColor: colors.button }]}
               >
-                <Text style={{ color: colors.buttonText, fontSize: 12 }}>
+                <Text style={[HivePostScreenStyles.tagText, { color: colors.buttonText }]}>
                   #{tag}
                 </Text>
               </View>
@@ -634,24 +572,15 @@ const HivePostScreen = () => {
         )}
 
         {/* Engagement Metrics */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingVertical: 16,
-            borderTopWidth: 1,
-            borderTopColor: colors.border,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View style={[HivePostScreenStyles.engagementMetrics, { borderTopColor: colors.border }]}>
+          <View style={HivePostScreenStyles.engagementLeft}>
             <TouchableOpacity
               onPress={handleUpvotePress}
               disabled={post.active_votes?.some(
                 (vote: any) =>
                   vote.voter === currentUsername && vote.percent > 0
               )}
-              style={{ marginRight: 16 }}
+              style={HivePostScreenStyles.upvoteButton}
             >
               <FontAwesome
                 name='arrow-up'
@@ -666,61 +595,50 @@ const HivePostScreen = () => {
                 }
               />
             </TouchableOpacity>
-            <Text style={{ color: colors.text, fontSize: 16, marginRight: 16 }}>
+            <Text style={[HivePostScreenStyles.engagementText, { color: colors.text }]}>
               {post.voteCount}
             </Text>
             <FontAwesome
               name='comment-o'
               size={16}
               color={colors.icon}
-              style={{ marginRight: 8 }}
+              style={HivePostScreenStyles.commentIcon}
             />
-            <Text style={{ color: colors.text, fontSize: 16, marginRight: 16 }}>
+            <Text style={[HivePostScreenStyles.engagementText, { color: colors.text }]}>
               {post.replyCount}
             </Text>
             <TouchableOpacity
               onPress={() => handleOpenReplyModal(post.author, post.permlink)}
-              style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16 }}
+              style={HivePostScreenStyles.replyButton}
             >
               <FontAwesome
                 name='reply'
                 size={16}
                 color={colors.icon}
-                style={{ marginRight: 6 }}
+                style={HivePostScreenStyles.replyIcon}
               />
-              <Text style={{ color: colors.text, fontSize: 16 }}>
+              <Text style={[HivePostScreenStyles.replyText, { color: colors.text }]}>
                 Reply
               </Text>
             </TouchableOpacity>
           </View>
-          <Text
-            style={{ color: colors.payout, fontSize: 16, fontWeight: '600' }}
-          >
+          <Text style={[HivePostScreenStyles.payoutText, { color: colors.payout }]}>
             ${post.payout.toFixed(2)}
           </Text>
         </View>
 
         {/* Comments Section */}
-        <View style={{ marginTop: 20 }}>
+        <View style={HivePostScreenStyles.commentsSection}>
           <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingVertical: 16,
-              borderTopWidth: 1,
-              borderTopColor: colors.border,
-              borderBottomWidth: 1,
-              borderBottomColor: colors.border,
-            }}
+            style={[
+              HivePostScreenStyles.commentsHeader,
+              { 
+                borderTopColor: colors.border,
+                borderBottomColor: colors.border,
+              }
+            ]}
           >
-            <Text
-              style={{
-                color: colors.text,
-                fontSize: 16,
-                fontWeight: '600',
-              }}
-            >
+            <Text style={[HivePostScreenStyles.commentsHeaderText, { color: colors.text }]}>
               Comments ({post.replyCount})
             </Text>
             {commentsLoading && (
@@ -730,27 +648,15 @@ const HivePostScreen = () => {
 
           {/* Comments Error */}
           {commentsError && (
-            <View
-              style={{
-                padding: 16,
-                backgroundColor: colors.background,
-                alignItems: 'center',
-              }}
-            >
-              <Text style={{ color: colors.icon, fontSize: 14, textAlign: 'center' }}>
+            <View style={HivePostScreenStyles.commentsError}>
+              <Text style={[HivePostScreenStyles.commentsErrorText, { color: colors.icon }]}>
                 {commentsError}
               </Text>
               <TouchableOpacity
                 onPress={refreshAll}
-                style={{
-                  backgroundColor: colors.button,
-                  paddingHorizontal: 16,
-                  paddingVertical: 8,
-                  borderRadius: 6,
-                  marginTop: 8,
-                }}
+                style={[HivePostScreenStyles.retryCommentsButton, { backgroundColor: colors.button }]}
               >
-                <Text style={{ color: colors.buttonText, fontSize: 12 }}>
+                <Text style={[HivePostScreenStyles.retryCommentsButtonText, { color: colors.buttonText }]}>
                   Retry
                 </Text>
               </TouchableOpacity>
@@ -759,7 +665,7 @@ const HivePostScreen = () => {
 
           {/* Render Comments */}
           {!commentsLoading && !commentsError && comments.length > 0 && (
-            <View style={{ marginTop: 8 }}>
+            <View style={HivePostScreenStyles.commentsList}>
               {flattenComments(comments).map(comment => (
                 <Reply
                   key={comment.author + comment.permlink + '-' + comment.visualLevel}
@@ -787,21 +693,9 @@ const HivePostScreen = () => {
 
           {/* No Comments State */}
           {!commentsLoading && !commentsError && comments.length === 0 && (
-            <View
-              style={{
-                padding: 20,
-                alignItems: 'center',
-              }}
-            >
+            <View style={HivePostScreenStyles.noCommentsContainer}>
               <FontAwesome name="comment-o" size={32} color={colors.icon} />
-              <Text
-                style={{
-                  color: colors.icon,
-                  fontSize: 14,
-                  marginTop: 8,
-                  textAlign: 'center',
-                }}
-              >
+              <Text style={[HivePostScreenStyles.noCommentsText, { color: colors.icon }]}>
                 No comments yet. Be the first to comment!
               </Text>
             </View>
@@ -839,28 +733,10 @@ const HivePostScreen = () => {
         style={{ justifyContent: 'flex-start', margin: 0 }}
         useNativeDriver
       >
-        <View
-          style={{ flex: 1, backgroundColor: colors.background }}
-        >
+        <View style={[HivePostScreenStyles.gifModalContainer, { backgroundColor: colors.background }]}>
           {/* Header */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: 16,
-              paddingVertical: 12,
-              borderBottomWidth: 1,
-              borderBottomColor: colors.border,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: '600',
-                color: colors.text,
-              }}
-            >
+          <View style={[HivePostScreenStyles.gifModalHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[HivePostScreenStyles.gifModalTitle, { color: colors.text }]}>
               Choose a GIF
             </Text>
             <Pressable
@@ -875,23 +751,8 @@ const HivePostScreen = () => {
           </View>
 
           {/* Search Bar */}
-          <View
-            style={{
-              padding: 16,
-              borderBottomWidth: 1,
-              borderBottomColor: colors.border,
-            }}
-          >
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: isDark ? '#2a2a2a' : '#f0f0f0',
-                borderRadius: 25,
-                paddingHorizontal: 16,
-                paddingVertical: 12,
-              }}
-            >
+          <View style={[HivePostScreenStyles.gifSearchContainer, { borderBottomColor: colors.border }]}>
+            <View style={[HivePostScreenStyles.gifSearchInputContainer, { backgroundColor: isDark ? '#2a2a2a' : '#f0f0f0' }]}>
               <FontAwesome
                 name='search'
                 size={16}
@@ -904,11 +765,7 @@ const HivePostScreen = () => {
                 value={gifSearchQuery}
                 onChangeText={setGifSearchQuery}
                 onSubmitEditing={() => searchGifs(gifSearchQuery)}
-                style={{
-                  flex: 1,
-                  fontSize: 16,
-                  color: colors.text,
-                }}
+                style={[HivePostScreenStyles.gifSearchInput, { color: colors.text }]}
                 returnKeyType='search'
               />
               {gifSearchQuery.length > 0 && (
@@ -917,7 +774,7 @@ const HivePostScreen = () => {
                     setGifSearchQuery('');
                     searchGifs('');
                   }}
-                  style={{ marginLeft: 8 }}
+                  style={HivePostScreenStyles.gifClearButton}
                 >
                   <FontAwesome
                     name='times-circle'
@@ -930,19 +787,11 @@ const HivePostScreen = () => {
           </View>
 
           {/* GIF Grid */}
-          <View style={{ flex: 1, padding: 16 }}>
+          <View style={HivePostScreenStyles.gifGrid}>
             {gifLoading ? (
-              <View
-                style={{
-                  flex: 1,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-              >
+              <View style={HivePostScreenStyles.gifLoadingContainer}>
                 <ActivityIndicator size='large' color={colors.icon} />
-                <Text
-                  style={{ color: colors.text, marginTop: 12, fontSize: 16 }}
-                >
+                <Text style={[HivePostScreenStyles.gifEmptyText, { color: colors.text }]}>
                   {gifSearchQuery.trim() ? 'Searching GIFs...' : 'Loading...'}
                 </Text>
               </View>
@@ -961,23 +810,16 @@ const HivePostScreen = () => {
                     <Pressable
                       onPress={() => handleSelectGif(gifUrl)}
                       style={({ pressed }) => [
-                        {
-                          flex: 1,
-                          margin: 2,
-                          borderRadius: 8,
-                          overflow: 'hidden',
-                          aspectRatio: 1,
-                          opacity: pressed ? 0.7 : 1,
-                        },
+                        HivePostScreenStyles.gifItem,
+                        { opacity: pressed ? 0.7 : 1 },
                       ]}
                     >
                       <Image
                         source={{ uri: previewUrl || gifUrl }}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          backgroundColor: isDark ? '#333' : '#f0f0f0',
-                        }}
+                        style={[
+                          HivePostScreenStyles.gifImage,
+                          { backgroundColor: isDark ? '#333' : '#f0f0f0' }
+                        ]}
                         resizeMode='cover'
                       />
                     </Pressable>
@@ -986,24 +828,12 @@ const HivePostScreen = () => {
                 numColumns={2}
                 keyExtractor={(item, index) => index.toString()}
                 showsVerticalScrollIndicator={false}
+                contentContainerStyle={HivePostScreenStyles.gifGridContent}
               />
             ) : (
-              <View
-                style={{
-                  flex: 1,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-              >
+              <View style={HivePostScreenStyles.gifEmptyContainer}>
                 <FontAwesome name='search' size={48} color={colors.icon} />
-                <Text
-                  style={{
-                    color: colors.text,
-                    fontSize: 16,
-                    marginTop: 16,
-                    textAlign: 'center',
-                  }}
-                >
+                <Text style={[HivePostScreenStyles.gifEmptyText, { color: colors.text }]}>
                   {gifSearchQuery.trim()
                     ? 'No GIFs found. Try a different search.'
                     : 'Search for GIFs to add to your reply'}
