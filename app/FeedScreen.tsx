@@ -269,7 +269,6 @@ const FeedScreenRefactored = () => {
           BackHandler.exitApp();
           return true;
         }
-        return false;
       };
 
       const backHandler = BackHandler.addEventListener(
