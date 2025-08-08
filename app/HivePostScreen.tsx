@@ -20,35 +20,18 @@ import { Image as ExpoImage } from 'expo-image';
 import SafeRenderHtml from '../components/SafeRenderHtml';
 import { Dimensions } from 'react-native';
 import Markdown from 'react-native-markdown-display';
-import { Client } from '@hiveio/dhive';
 import { useUserAuth } from '../hooks/useUserAuth';
 import { useUpvote } from '../hooks/useUpvote';
 import { useHiveData } from '../hooks/useHiveData';
+import { useHivePostData } from '../hooks/useHivePostData';
+import { HivePostScreenStyles } from '../styles/HivePostScreenStyles';
+import { useReply, ReplyTarget } from '../hooks/useReply';
+import { useGifPicker, GifMode } from '../hooks/useGifPicker';
 import UpvoteModal from '../components/UpvoteModal';
+import Reply from './components/Reply';
+import ContentModal from './components/ContentModal';
+import GifPickerModal from './components/GifPickerModal';
 import genericAvatar from '../assets/images/generic-avatar.png';
-
-const HIVE_NODES = [
-  'https://api.hive.blog',
-  'https://api.deathwing.me',
-  'https://api.openhive.network',
-];
-const client = new Client(HIVE_NODES);
-
-interface HivePostData {
-  author: string;
-  permlink: string;
-  title: string;
-  body: string;
-  created: string;
-  voteCount: number;
-  replyCount: number;
-  payout: number;
-  avatarUrl?: string;
-  active_votes?: any[];
-  json_metadata?: string;
-  category?: string;
-  tags?: string[];
-}
 
 const HivePostScreen = () => {
   const { author, permlink } = useLocalSearchParams<{
@@ -66,9 +49,18 @@ const HivePostScreen = () => {
     permlink,
   });
 
-  const [post, setPost] = useState<HivePostData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Use the new hook for post and comments data
+  const {
+    post,
+    comments,
+    loading,
+    commentsLoading,
+    error,
+    commentsError,
+    refreshAll,
+    updatePost,
+    updateComment,
+  } = useHivePostData(author, permlink, currentUsername);
 
   const {
     upvoteModalVisible,
@@ -84,103 +76,43 @@ const HivePostScreen = () => {
     confirmUpvote,
   } = useUpvote(currentUsername, globalProps, rewardFund, hivePrice);
 
-  const fetchHivePost = useCallback(async () => {
-    console.log('[HivePostScreen] fetchHivePost called with:', {
-      author,
-      permlink,
-    });
+  // Reply functionality hook
+  const {
+    replyModalVisible,
+    replyText,
+    replyImage,
+    replyGif,
+    replyTarget,
+    posting: replyPosting,
+    uploading: replyUploading,
+    processing: replyProcessing,
+    error: replyError,
+    openReplyModal,
+    closeReplyModal,
+    setReplyText,
+    setReplyImage,
+    setReplyGif,
+    submitReply,
+    addImage: addReplyImage,
+    addGif: addReplyGif,
+    clearError: clearReplyError,
+  } = useReply(currentUsername, async () => {
+    await refreshAll();
+    return true; // Always return true since we refreshed
+  });
 
-    if (!author || !permlink) {
-      console.log('[HivePostScreen] Missing parameters');
-      setError('Missing post parameters');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      console.log('[HivePostScreen] Fetching post data from Hive...');
-      // Fetch the post
-      const postData = await client.database.call('get_content', [
-        author,
-        permlink,
-      ]);
-
-      if (!postData || !postData.author) {
-        setError('Post not found');
-        setLoading(false);
-        return;
-      }
-
-      // Fetch author avatar
-      let avatarUrl: string | undefined = undefined;
-      try {
-        const accounts = await client.database.call('get_accounts', [
-          [postData.author],
-        ]);
-        if (accounts && accounts[0]) {
-          const metadata =
-            accounts[0].posting_json_metadata || accounts[0].json_metadata;
-          if (metadata) {
-            try {
-              const profile = JSON.parse(metadata).profile;
-              if (profile && profile.profile_image) {
-                avatarUrl = profile.profile_image;
-              }
-            } catch (e) {
-              // Invalid JSON metadata
-            }
-          }
-        }
-      } catch (e) {
-        // Avatar fetch failed
-      }
-
-      // Extract tags from metadata
-      let tags: string[] = [];
-      try {
-        if (postData.json_metadata) {
-          const metadata = JSON.parse(postData.json_metadata);
-          tags = metadata.tags || [];
-        }
-      } catch (e) {
-        // Invalid JSON metadata
-      }
-
-      const hivePostData: HivePostData = {
-        author: postData.author,
-        permlink: postData.permlink,
-        title: postData.title || 'Untitled Post',
-        body: postData.body,
-        created: postData.created,
-        voteCount: postData.net_votes || 0,
-        replyCount: postData.children || 0,
-        payout: parseFloat(
-          postData.pending_payout_value
-            ? postData.pending_payout_value.replace(' HBD', '')
-            : '0'
-        ),
-        avatarUrl,
-        active_votes: postData.active_votes,
-        json_metadata: postData.json_metadata,
-        category: postData.category,
-        tags,
-      };
-
-      setPost(hivePostData);
-    } catch (error) {
-      console.error('Error fetching Hive post:', error);
-      setError('Failed to load post');
-    } finally {
-      setLoading(false);
-    }
-  }, [author, permlink]);
-
-  React.useEffect(() => {
-    fetchHivePost();
-  }, [fetchHivePost]);
+  // GIF picker functionality
+  const {
+    gifModalVisible,
+    gifSearchQuery,
+    gifResults,
+    gifLoading,
+    openGifPicker,
+    closeGifModal,
+    setGifSearchQuery,
+    searchGifs,
+    selectGif,
+  } = useGifPicker();
 
   const handleUpvotePress = useCallback(() => {
     if (!post) return;
@@ -193,8 +125,24 @@ const HivePostScreen = () => {
   }, [post, openUpvoteModal]);
 
   const handleRefresh = useCallback(() => {
-    fetchHivePost();
-  }, [fetchHivePost]);
+    refreshAll();
+  }, [refreshAll]);
+
+  // Handle reply modal opening
+  const handleOpenReplyModal = useCallback((author: string, permlink: string) => {
+    openReplyModal({ author, permlink });
+  }, [openReplyModal]);
+
+  // Handle GIF picker opening
+  const handleOpenGifPicker = useCallback((mode: GifMode) => {
+    openGifPicker(mode);
+  }, [openGifPicker]);
+
+  // Handle GIF selection
+  const handleSelectGif = useCallback((gifUrl: string) => {
+    selectGif(gifUrl);
+    addReplyGif(gifUrl);
+  }, [selectGif, addReplyGif]);
 
   const colors = {
     background: isDark ? '#15202B' : '#fff',
@@ -207,14 +155,73 @@ const HivePostScreen = () => {
     payout: '#17BF63',
   };
 
+  const windowWidth = Dimensions.get('window').width;
+
+  // Function to flatten nested comments into a flat array with level information
+  // This follows the same pattern as ConversationScreen for consistency
+  const flattenComments = (
+    commentList: any[],
+    level = 0
+  ): Array<any & { visualLevel: number }> => {
+    const flattened: Array<any & { visualLevel: number }> = [];
+
+    commentList.forEach(comment => {
+      // Add the current comment with its visual level
+      const maxVisualLevel = 2;
+      const visualLevel = Math.min(level, maxVisualLevel);
+      flattened.push({ ...comment, visualLevel });
+
+      // Recursively flatten children
+      if (comment.replies && comment.replies.length > 0) {
+        const childComments = flattenComments(comment.replies, level + 1);
+        flattened.push(...childComments);
+      }
+    });
+
+    return flattened;
+  };
+
+  // Handle comment upvote press
+  const handleCommentUpvotePress = useCallback(
+    (params: { author: string; permlink: string }) => {
+      // Find the comment in our data structure
+      const findComment = (comments: any[], author: string, permlink: string): any => {
+        for (const comment of comments) {
+          if (comment.author === author && comment.permlink === permlink) {
+            return comment;
+          }
+          if (comment.replies) {
+            const found = findComment(comment.replies, author, permlink);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+
+      const comment = findComment(comments, params.author, params.permlink);
+      if (comment) {
+        openUpvoteModal({
+          author: comment.author,
+          permlink: comment.permlink,
+          snap: comment,
+        });
+      }
+    },
+    [comments, openUpvoteModal]
+  );
+
+  // Handle image press (placeholder for now)
+  const handleImagePress = useCallback((imageUrl: string) => {
+    console.log('Image pressed:', imageUrl);
+    // TODO: Implement image viewer
+  }, []);
+
   if (loading) {
     return (
-      <SafeAreaViewSA style={{ flex: 1, backgroundColor: colors.background }}>
-        <View
-          style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
-        >
+      <SafeAreaViewSA style={[HivePostScreenStyles.safeArea, { backgroundColor: colors.background }]}>
+        <View style={HivePostScreenStyles.loadingContainer}>
           <ActivityIndicator size='large' color={colors.button} />
-          <Text style={{ color: colors.text, marginTop: 16 }}>
+          <Text style={[HivePostScreenStyles.loadingText, { color: colors.text }]}>
             Loading post...
           </Text>
         </View>
@@ -224,41 +231,21 @@ const HivePostScreen = () => {
 
   if (error || !post) {
     return (
-      <SafeAreaViewSA style={{ flex: 1, backgroundColor: colors.background }}>
-        <View
-          style={{
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: 20,
-          }}
-        >
+      <SafeAreaViewSA style={[HivePostScreenStyles.safeArea, { backgroundColor: colors.background }]}>
+        <View style={HivePostScreenStyles.errorContainer}>
           <FontAwesome
             name='exclamation-triangle'
             size={48}
             color={colors.icon}
           />
-          <Text
-            style={{
-              color: colors.text,
-              fontSize: 18,
-              marginTop: 16,
-              textAlign: 'center',
-            }}
-          >
+          <Text style={[HivePostScreenStyles.errorText, { color: colors.text }]}>
             {error || 'Post not found'}
           </Text>
           <TouchableOpacity
             onPress={handleRefresh}
-            style={{
-              backgroundColor: colors.button,
-              paddingHorizontal: 20,
-              paddingVertical: 10,
-              borderRadius: 8,
-              marginTop: 16,
-            }}
+            style={[HivePostScreenStyles.retryButton, { backgroundColor: colors.button }]}
           >
-            <Text style={{ color: colors.buttonText, fontWeight: '600' }}>
+            <Text style={[HivePostScreenStyles.retryButtonText, { color: colors.buttonText }]}>
               Retry
             </Text>
           </TouchableOpacity>
@@ -266,8 +253,6 @@ const HivePostScreen = () => {
       </SafeAreaViewSA>
     );
   }
-
-  const windowWidth = Dimensions.get('window').width;
 
   // Smart HTML detection - distinguish between HTML and markdown content
   const hasHtmlTags = /<([a-z][\s\S]*?)>/i.test(post.body);
@@ -310,30 +295,13 @@ const HivePostScreen = () => {
   });
 
   return (
-    <SafeAreaViewSA style={{ flex: 1, backgroundColor: colors.background }}>
+    <SafeAreaViewSA style={[HivePostScreenStyles.safeArea, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: 16,
-          paddingVertical: 12,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.border,
-        }}
-      >
+      <View style={[HivePostScreenStyles.header, { borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
           <FontAwesome name='arrow-left' size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text
-          style={{
-            color: colors.text,
-            fontSize: 18,
-            fontWeight: '600',
-            marginLeft: 16,
-            flex: 1,
-          }}
-        >
+        <Text style={[HivePostScreenStyles.headerTitle, { color: colors.text }]}>
           Hive Post
         </Text>
         <TouchableOpacity onPress={handleRefresh}>
@@ -341,27 +309,19 @@ const HivePostScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
+      <ScrollView style={HivePostScreenStyles.scrollContainer} contentContainerStyle={HivePostScreenStyles.contentContainer}>
         {/* Author Info */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            marginBottom: 16,
-          }}
-        >
+        <View style={HivePostScreenStyles.authorInfo}>
           <ExpoImage
             source={post.avatarUrl ? { uri: post.avatarUrl } : genericAvatar}
-            style={{ width: 48, height: 48, borderRadius: 24 }}
+            style={HivePostScreenStyles.avatar}
             contentFit='cover'
           />
-          <View style={{ marginLeft: 12, flex: 1 }}>
-            <Text
-              style={{ color: colors.text, fontSize: 16, fontWeight: '600' }}
-            >
+          <View style={HivePostScreenStyles.authorDetails}>
+            <Text style={[HivePostScreenStyles.authorName, { color: colors.text }]}>
               {post.author}
             </Text>
-            <Text style={{ color: colors.icon, fontSize: 14 }}>
+            <Text style={[HivePostScreenStyles.timestamp, { color: colors.icon }]}>
               {new Date(post.created + 'Z').toLocaleString()}
             </Text>
           </View>
@@ -369,20 +329,13 @@ const HivePostScreen = () => {
 
         {/* Title */}
         {post.title && (
-          <Text
-            style={{
-              color: colors.text,
-              fontSize: 20,
-              fontWeight: 'bold',
-              marginBottom: 16,
-            }}
-          >
+          <Text style={[HivePostScreenStyles.title, { color: colors.text }]}>
             {post.title}
           </Text>
         )}
 
         {/* Content */}
-        <View style={{ marginBottom: 20 }}>
+        <View style={HivePostScreenStyles.contentBody}>
           {isHtml ? (
             <SafeRenderHtml
               contentWidth={windowWidth - 32}
@@ -601,22 +554,13 @@ const HivePostScreen = () => {
 
         {/* Tags */}
         {post.tags && post.tags.length > 0 && (
-          <View
-            style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 20 }}
-          >
+          <View style={HivePostScreenStyles.tagsContainer}>
             {post.tags.slice(0, 5).map((tag, index) => (
               <View
                 key={index}
-                style={{
-                  backgroundColor: colors.button,
-                  paddingHorizontal: 8,
-                  paddingVertical: 4,
-                  borderRadius: 12,
-                  marginRight: 8,
-                  marginBottom: 4,
-                }}
+                style={[HivePostScreenStyles.tag, { backgroundColor: colors.button }]}
               >
-                <Text style={{ color: colors.buttonText, fontSize: 12 }}>
+                <Text style={[HivePostScreenStyles.tagText, { color: colors.buttonText }]}>
                   #{tag}
                 </Text>
               </View>
@@ -625,24 +569,15 @@ const HivePostScreen = () => {
         )}
 
         {/* Engagement Metrics */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingVertical: 16,
-            borderTopWidth: 1,
-            borderTopColor: colors.border,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View style={[HivePostScreenStyles.engagementMetrics, { borderTopColor: colors.border }]}>
+          <View style={HivePostScreenStyles.engagementLeft}>
             <TouchableOpacity
               onPress={handleUpvotePress}
               disabled={post.active_votes?.some(
                 (vote: any) =>
                   vote.voter === currentUsername && vote.percent > 0
               )}
-              style={{ marginRight: 16 }}
+              style={HivePostScreenStyles.upvoteButton}
             >
               <FontAwesome
                 name='arrow-up'
@@ -657,26 +592,153 @@ const HivePostScreen = () => {
                 }
               />
             </TouchableOpacity>
-            <Text style={{ color: colors.text, fontSize: 16, marginRight: 16 }}>
+            <Text style={[HivePostScreenStyles.engagementText, { color: colors.text }]}>
               {post.voteCount}
             </Text>
             <FontAwesome
               name='comment-o'
               size={16}
               color={colors.icon}
-              style={{ marginRight: 8 }}
+              style={HivePostScreenStyles.commentIcon}
             />
-            <Text style={{ color: colors.text, fontSize: 16, marginRight: 16 }}>
+            <Text style={[HivePostScreenStyles.engagementText, { color: colors.text }]}>
               {post.replyCount}
             </Text>
+            <TouchableOpacity
+              onPress={() => handleOpenReplyModal(post.author, post.permlink)}
+              style={HivePostScreenStyles.replyButton}
+            >
+              <FontAwesome
+                name='reply'
+                size={16}
+                color={colors.icon}
+                style={HivePostScreenStyles.replyIcon}
+              />
+              <Text style={[HivePostScreenStyles.replyText, { color: colors.text }]}>
+                Reply
+              </Text>
+            </TouchableOpacity>
           </View>
-          <Text
-            style={{ color: colors.payout, fontSize: 16, fontWeight: '600' }}
-          >
+          <Text style={[HivePostScreenStyles.payoutText, { color: colors.payout }]}>
             ${post.payout.toFixed(2)}
           </Text>
         </View>
+
+        {/* Comments Section */}
+        <View style={HivePostScreenStyles.commentsSection}>
+          <View
+            style={[
+              HivePostScreenStyles.commentsHeader,
+              { 
+                borderTopColor: colors.border,
+                borderBottomColor: colors.border,
+              }
+            ]}
+          >
+            <Text style={[HivePostScreenStyles.commentsHeaderText, { color: colors.text }]}>
+              Comments ({post.replyCount})
+            </Text>
+            {commentsLoading && (
+              <ActivityIndicator size="small" color={colors.button} />
+            )}
+          </View>
+
+          {/* Comments Error */}
+          {commentsError && (
+            <View style={HivePostScreenStyles.commentsError}>
+              <Text style={[HivePostScreenStyles.commentsErrorText, { color: colors.icon }]}>
+                {commentsError}
+              </Text>
+              <TouchableOpacity
+                onPress={refreshAll}
+                style={[HivePostScreenStyles.retryCommentsButton, { backgroundColor: colors.button }]}
+              >
+                <Text style={[HivePostScreenStyles.retryCommentsButtonText, { color: colors.buttonText }]}>
+                  Retry
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Render Comments */}
+          {!commentsLoading && !commentsError && comments.length > 0 && (
+            <View style={HivePostScreenStyles.commentsList}>
+              {flattenComments(comments).map(comment => (
+                <Reply
+                  key={comment.author + comment.permlink + '-' + comment.visualLevel}
+                  reply={comment}
+                  onUpvotePress={handleCommentUpvotePress}
+                  onReplyPress={handleOpenReplyModal}
+                  onEditPress={(comment) => {
+                    console.log('Edit comment:', comment);
+                    // TODO: Implement edit functionality
+                  }}
+                  onImagePress={handleImagePress}
+                  currentUsername={currentUsername}
+                  colors={{
+                    text: colors.text,
+                    bubble: colors.background,
+                    icon: colors.icon,
+                    payout: colors.payout,
+                    button: colors.button,
+                    buttonText: colors.buttonText,
+                  }}
+                />
+              ))}
+            </View>
+          )}
+
+          {/* No Comments State */}
+          {!commentsLoading && !commentsError && comments.length === 0 && (
+            <View style={HivePostScreenStyles.noCommentsContainer}>
+              <FontAwesome name="comment-o" size={32} color={colors.icon} />
+              <Text style={[HivePostScreenStyles.noCommentsText, { color: colors.icon }]}>
+                No comments yet. Be the first to comment!
+              </Text>
+            </View>
+          )}
+        </View>
       </ScrollView>
+
+      {/* Reply Modal */}
+      <ContentModal
+        isVisible={replyModalVisible}
+        onClose={closeReplyModal}
+        onSubmit={submitReply}
+        mode='reply'
+        target={replyTarget}
+        text={replyText}
+        onTextChange={setReplyText}
+        image={replyImage}
+        gif={replyGif}
+        onImageRemove={() => setReplyImage(null)}
+        onGifRemove={() => setReplyGif(null)}
+        onAddImage={() => addReplyImage('reply')}
+        onAddGif={() => handleOpenGifPicker('reply')}
+        posting={replyPosting}
+        uploading={replyUploading}
+        processing={replyProcessing}
+        error={replyError}
+        currentUsername={currentUsername}
+      />
+
+      {/* GIF Picker Modal */}
+      <GifPickerModal
+        visible={gifModalVisible}
+        onClose={closeGifModal}
+        onSelectGif={handleSelectGif}
+        searchQuery={gifSearchQuery}
+        onSearchQueryChange={setGifSearchQuery}
+        onSearchSubmit={searchGifs}
+        gifResults={gifResults}
+        loading={gifLoading}
+        colors={{
+          background: colors.background,
+          text: colors.text,
+          border: colors.border,
+          icon: colors.icon,
+        }}
+      />
 
       {/* Upvote Modal */}
       <UpvoteModal
