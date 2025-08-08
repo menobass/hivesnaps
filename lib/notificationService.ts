@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, AppStateStatus } from 'react-native';
 import { Client } from '@hiveio/dhive';
 
@@ -408,7 +409,7 @@ class HiveNotificationService {
   // Storage management
   private async getStorage(): Promise<NotificationStorage> {
     try {
-      const stored = await SecureStore.getItemAsync('hive_notifications');
+      const stored = await AsyncStorage.getItem('hive_notifications');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed.username === this.currentUsername) {
@@ -429,7 +430,7 @@ class HiveNotificationService {
 
   private async saveStorage(storage: NotificationStorage) {
     try {
-      await SecureStore.setItemAsync(
+      await AsyncStorage.setItem(
         'hive_notifications',
         JSON.stringify(storage)
       );
