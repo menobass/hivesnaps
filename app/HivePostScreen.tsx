@@ -13,14 +13,10 @@ import {
   ActivityIndicator,
   Linking,
   Pressable,
-  TextInput,
-  FlatList,
-  Image,
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image';
-import Modal from 'react-native-modal';
 import SafeRenderHtml from '../components/SafeRenderHtml';
 import { Dimensions } from 'react-native';
 import Markdown from 'react-native-markdown-display';
@@ -34,6 +30,7 @@ import { useGifPicker, GifMode } from '../hooks/useGifPicker';
 import UpvoteModal from '../components/UpvoteModal';
 import Reply from './components/Reply';
 import ContentModal from './components/ContentModal';
+import GifPickerModal from './components/GifPickerModal';
 import genericAvatar from '../assets/images/generic-avatar.png';
 
 const HivePostScreen = () => {
@@ -726,123 +723,22 @@ const HivePostScreen = () => {
       />
 
       {/* GIF Picker Modal */}
-      <Modal
-        isVisible={gifModalVisible}
-        onBackdropPress={closeGifModal}
-        onBackButtonPress={closeGifModal}
-        style={{ justifyContent: 'flex-start', margin: 0 }}
-        useNativeDriver
-      >
-        <View style={[HivePostScreenStyles.gifModalContainer, { backgroundColor: colors.background }]}>
-          {/* Header */}
-          <View style={[HivePostScreenStyles.gifModalHeader, { borderBottomColor: colors.border }]}>
-            <Text style={[HivePostScreenStyles.gifModalTitle, { color: colors.text }]}>
-              Choose a GIF
-            </Text>
-            <Pressable
-              onPress={closeGifModal}
-              style={({ pressed }) => ({
-                opacity: pressed ? 0.7 : 1,
-                padding: 4,
-              })}
-            >
-              <FontAwesome name='times' size={24} color={colors.text} />
-            </Pressable>
-          </View>
-
-          {/* Search Bar */}
-          <View style={[HivePostScreenStyles.gifSearchContainer, { borderBottomColor: colors.border }]}>
-            <View style={[HivePostScreenStyles.gifSearchInputContainer, { backgroundColor: isDark ? '#2a2a2a' : '#f0f0f0' }]}>
-              <FontAwesome
-                name='search'
-                size={16}
-                color={colors.text}
-                style={{ marginRight: 12 }}
-              />
-              <TextInput
-                placeholder='Search GIFs...'
-                placeholderTextColor={colors.text + '80'}
-                value={gifSearchQuery}
-                onChangeText={setGifSearchQuery}
-                onSubmitEditing={() => searchGifs(gifSearchQuery)}
-                style={[HivePostScreenStyles.gifSearchInput, { color: colors.text }]}
-                returnKeyType='search'
-              />
-              {gifSearchQuery.length > 0 && (
-                <Pressable
-                  onPress={() => {
-                    setGifSearchQuery('');
-                    searchGifs('');
-                  }}
-                  style={HivePostScreenStyles.gifClearButton}
-                >
-                  <FontAwesome
-                    name='times-circle'
-                    size={16}
-                    color={colors.text + '60'}
-                  />
-                </Pressable>
-              )}
-            </View>
-          </View>
-
-          {/* GIF Grid */}
-          <View style={HivePostScreenStyles.gifGrid}>
-            {gifLoading ? (
-              <View style={HivePostScreenStyles.gifLoadingContainer}>
-                <ActivityIndicator size='large' color={colors.icon} />
-                <Text style={[HivePostScreenStyles.gifEmptyText, { color: colors.text }]}>
-                  {gifSearchQuery.trim() ? 'Searching GIFs...' : 'Loading...'}
-                </Text>
-              </View>
-            ) : gifResults.length > 0 ? (
-              <FlatList
-                data={gifResults}
-                renderItem={({ item, index }) => {
-                  const {
-                    getBestGifUrl,
-                    getGifPreviewUrl,
-                  } = require('../utils/tenorApi');
-                  const gifUrl = getBestGifUrl(item);
-                  const previewUrl = getGifPreviewUrl(item);
-
-                  return (
-                    <Pressable
-                      onPress={() => handleSelectGif(gifUrl)}
-                      style={({ pressed }) => [
-                        HivePostScreenStyles.gifItem,
-                        { opacity: pressed ? 0.7 : 1 },
-                      ]}
-                    >
-                      <Image
-                        source={{ uri: previewUrl || gifUrl }}
-                        style={[
-                          HivePostScreenStyles.gifImage,
-                          { backgroundColor: isDark ? '#333' : '#f0f0f0' }
-                        ]}
-                        resizeMode='cover'
-                      />
-                    </Pressable>
-                  );
-                }}
-                numColumns={2}
-                keyExtractor={(item, index) => index.toString()}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={HivePostScreenStyles.gifGridContent}
-              />
-            ) : (
-              <View style={HivePostScreenStyles.gifEmptyContainer}>
-                <FontAwesome name='search' size={48} color={colors.icon} />
-                <Text style={[HivePostScreenStyles.gifEmptyText, { color: colors.text }]}>
-                  {gifSearchQuery.trim()
-                    ? 'No GIFs found. Try a different search.'
-                    : 'Search for GIFs to add to your reply'}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
+      <GifPickerModal
+        visible={gifModalVisible}
+        onClose={closeGifModal}
+        onSelectGif={handleSelectGif}
+        searchQuery={gifSearchQuery}
+        onSearchQueryChange={setGifSearchQuery}
+        onSearchSubmit={searchGifs}
+        gifResults={gifResults}
+        loading={gifLoading}
+        colors={{
+          background: colors.background,
+          text: colors.text,
+          border: colors.border,
+          icon: colors.icon,
+        }}
+      />
 
       {/* Upvote Modal */}
       <UpvoteModal
