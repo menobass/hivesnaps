@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Client } from '@hiveio/dhive';
 
 const HIVE_NODES = [
@@ -78,14 +78,14 @@ export const useHivePostData = (
     commentsError: null,
   });
 
-  // In-memory avatar/profile cache for this session
-  const avatarProfileCache: Record<string, string | undefined> = {};
+  // In-memory avatar/profile cache for this session (persists across renders)
+  const avatarProfileCache = useRef<Record<string, string | undefined>>({});
 
   // Helper function to fetch avatar for a given author
   const fetchAvatar = useCallback(async (authorName: string): Promise<string | undefined> => {
     // Check cache first
-    if (authorName in avatarProfileCache) {
-      return avatarProfileCache[authorName];
+    if (authorName in avatarProfileCache.current) {
+      return avatarProfileCache.current[authorName];
     }
 
     try {
@@ -99,7 +99,7 @@ export const useHivePostData = (
           try {
             const profile = JSON.parse(metadata).profile;
             if (profile && profile.profile_image) {
-              avatarProfileCache[authorName] = profile.profile_image;
+              avatarProfileCache.current[authorName] = profile.profile_image;
               return profile.profile_image;
             }
           } catch (e) {
@@ -111,7 +111,7 @@ export const useHivePostData = (
       // Avatar fetch failed
     }
 
-    avatarProfileCache[authorName] = undefined;
+    avatarProfileCache.current[authorName] = undefined;
     return undefined;
   }, []);
 
@@ -148,7 +148,7 @@ export const useHivePostData = (
         // Collect all unique authors for avatar batch fetch, skipping those already cached
         const authorsToFetch = Array.from(
           new Set(fullContentArr.map(c => c.author))
-        ).filter(a => !(a in avatarProfileCache));
+        ).filter(a => !(a in avatarProfileCache.current));
 
         let accountsArr: any[] = [];
         if (authorsToFetch.length > 0) {
@@ -171,12 +171,12 @@ export const useHivePostData = (
                 profile = undefined;
               }
               if (profile && profile.profile_image) {
-                avatarProfileCache[acc.name] = profile.profile_image;
+                avatarProfileCache.current[acc.name] = profile.profile_image;
               } else {
-                avatarProfileCache[acc.name] = undefined;
+                avatarProfileCache.current[acc.name] = undefined;
               }
             } else {
-              avatarProfileCache[acc.name] = undefined;
+              avatarProfileCache.current[acc.name] = undefined;
             }
           }
         }
@@ -184,7 +184,7 @@ export const useHivePostData = (
         // Build comments with avatar and recurse
         const fullComments: HiveCommentData[] = await Promise.all(
           fullContentArr.map(async fullComment => {
-            const avatarUrl = avatarProfileCache[fullComment.author];
+            const avatarUrl = avatarProfileCache.current[fullComment.author];
             const payout = parseFloat(
               fullComment.pending_payout_value
                 ? fullComment.pending_payout_value.replace(' HBD', '')
