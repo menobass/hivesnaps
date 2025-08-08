@@ -13,10 +13,14 @@ import {
   ActivityIndicator,
   Linking,
   Pressable,
+  TextInput,
+  FlatList,
+  Image,
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image';
+import Modal from 'react-native-modal';
 import SafeRenderHtml from '../components/SafeRenderHtml';
 import { Dimensions } from 'react-native';
 import Markdown from 'react-native-markdown-display';
@@ -24,8 +28,11 @@ import { useUserAuth } from '../hooks/useUserAuth';
 import { useUpvote } from '../hooks/useUpvote';
 import { useHiveData } from '../hooks/useHiveData';
 import { useHivePostData } from '../hooks/useHivePostData';
+import { useReply, ReplyTarget } from '../hooks/useReply';
+import { useGifPicker, GifMode } from '../hooks/useGifPicker';
 import UpvoteModal from '../components/UpvoteModal';
 import Reply from './components/Reply';
+import ContentModal from './components/ContentModal';
 import genericAvatar from '../assets/images/generic-avatar.png';
 
 const HivePostScreen = () => {
@@ -71,6 +78,44 @@ const HivePostScreen = () => {
     confirmUpvote,
   } = useUpvote(currentUsername, globalProps, rewardFund, hivePrice);
 
+  // Reply functionality hook
+  const {
+    replyModalVisible,
+    replyText,
+    replyImage,
+    replyGif,
+    replyTarget,
+    posting: replyPosting,
+    uploading: replyUploading,
+    processing: replyProcessing,
+    error: replyError,
+    openReplyModal,
+    closeReplyModal,
+    setReplyText,
+    setReplyImage,
+    setReplyGif,
+    submitReply,
+    addImage: addReplyImage,
+    addGif: addReplyGif,
+    clearError: clearReplyError,
+  } = useReply(currentUsername, async () => {
+    await refreshAll();
+    return true; // Always return true since we refreshed
+  });
+
+  // GIF picker functionality
+  const {
+    gifModalVisible,
+    gifSearchQuery,
+    gifResults,
+    gifLoading,
+    openGifPicker,
+    closeGifModal,
+    setGifSearchQuery,
+    searchGifs,
+    selectGif,
+  } = useGifPicker();
+
   const handleUpvotePress = useCallback(() => {
     if (!post) return;
 
@@ -84,6 +129,22 @@ const HivePostScreen = () => {
   const handleRefresh = useCallback(() => {
     refreshAll();
   }, [refreshAll]);
+
+  // Handle reply modal opening
+  const handleOpenReplyModal = useCallback((author: string, permlink: string) => {
+    openReplyModal({ author, permlink });
+  }, [openReplyModal]);
+
+  // Handle GIF picker opening
+  const handleOpenGifPicker = useCallback((mode: GifMode) => {
+    openGifPicker(mode);
+  }, [openGifPicker]);
+
+  // Handle GIF selection
+  const handleSelectGif = useCallback((gifUrl: string) => {
+    selectGif(gifUrl);
+    addReplyGif(gifUrl);
+  }, [selectGif, addReplyGif]);
 
   const colors = {
     background: isDark ? '#15202B' : '#fff',
@@ -617,6 +678,20 @@ const HivePostScreen = () => {
             <Text style={{ color: colors.text, fontSize: 16, marginRight: 16 }}>
               {post.replyCount}
             </Text>
+            <TouchableOpacity
+              onPress={() => handleOpenReplyModal(post.author, post.permlink)}
+              style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16 }}
+            >
+              <FontAwesome
+                name='reply'
+                size={16}
+                color={colors.icon}
+                style={{ marginRight: 6 }}
+              />
+              <Text style={{ color: colors.text, fontSize: 16 }}>
+                Reply
+              </Text>
+            </TouchableOpacity>
           </View>
           <Text
             style={{ color: colors.payout, fontSize: 16, fontWeight: '600' }}
@@ -690,10 +765,7 @@ const HivePostScreen = () => {
                   key={comment.author + comment.permlink + '-' + comment.visualLevel}
                   reply={comment}
                   onUpvotePress={handleCommentUpvotePress}
-                  onReplyPress={(author: string, permlink: string) => {
-                    console.log('Reply to comment:', author, permlink);
-                    // TODO: Implement reply functionality
-                  }}
+                  onReplyPress={handleOpenReplyModal}
                   onEditPress={(comment) => {
                     console.log('Edit comment:', comment);
                     // TODO: Implement edit functionality
@@ -736,6 +808,211 @@ const HivePostScreen = () => {
           )}
         </View>
       </ScrollView>
+
+      {/* Reply Modal */}
+      <ContentModal
+        isVisible={replyModalVisible}
+        onClose={closeReplyModal}
+        onSubmit={submitReply}
+        mode='reply'
+        target={replyTarget}
+        text={replyText}
+        onTextChange={setReplyText}
+        image={replyImage}
+        gif={replyGif}
+        onImageRemove={() => setReplyImage(null)}
+        onGifRemove={() => setReplyGif(null)}
+        onAddImage={() => addReplyImage('reply')}
+        onAddGif={() => handleOpenGifPicker('reply')}
+        posting={replyPosting}
+        uploading={replyUploading}
+        processing={replyProcessing}
+        error={replyError}
+        currentUsername={currentUsername}
+      />
+
+      {/* GIF Picker Modal */}
+      <Modal
+        isVisible={gifModalVisible}
+        onBackdropPress={closeGifModal}
+        onBackButtonPress={closeGifModal}
+        style={{ justifyContent: 'flex-start', margin: 0 }}
+        useNativeDriver
+      >
+        <View
+          style={{ flex: 1, backgroundColor: colors.background }}
+        >
+          {/* Header */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '600',
+                color: colors.text,
+              }}
+            >
+              Choose a GIF
+            </Text>
+            <Pressable
+              onPress={closeGifModal}
+              style={({ pressed }) => ({
+                opacity: pressed ? 0.7 : 1,
+                padding: 4,
+              })}
+            >
+              <FontAwesome name='times' size={24} color={colors.text} />
+            </Pressable>
+          </View>
+
+          {/* Search Bar */}
+          <View
+            style={{
+              padding: 16,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: isDark ? '#2a2a2a' : '#f0f0f0',
+                borderRadius: 25,
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+              }}
+            >
+              <FontAwesome
+                name='search'
+                size={16}
+                color={colors.text}
+                style={{ marginRight: 12 }}
+              />
+              <TextInput
+                placeholder='Search GIFs...'
+                placeholderTextColor={colors.text + '80'}
+                value={gifSearchQuery}
+                onChangeText={setGifSearchQuery}
+                onSubmitEditing={() => searchGifs(gifSearchQuery)}
+                style={{
+                  flex: 1,
+                  fontSize: 16,
+                  color: colors.text,
+                }}
+                returnKeyType='search'
+              />
+              {gifSearchQuery.length > 0 && (
+                <Pressable
+                  onPress={() => {
+                    setGifSearchQuery('');
+                    searchGifs('');
+                  }}
+                  style={{ marginLeft: 8 }}
+                >
+                  <FontAwesome
+                    name='times-circle'
+                    size={16}
+                    color={colors.text + '60'}
+                  />
+                </Pressable>
+              )}
+            </View>
+          </View>
+
+          {/* GIF Grid */}
+          <View style={{ flex: 1, padding: 16 }}>
+            {gifLoading ? (
+              <View
+                style={{
+                  flex: 1,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <ActivityIndicator size='large' color={colors.icon} />
+                <Text
+                  style={{ color: colors.text, marginTop: 12, fontSize: 16 }}
+                >
+                  {gifSearchQuery.trim() ? 'Searching GIFs...' : 'Loading...'}
+                </Text>
+              </View>
+            ) : gifResults.length > 0 ? (
+              <FlatList
+                data={gifResults}
+                renderItem={({ item, index }) => {
+                  const {
+                    getBestGifUrl,
+                    getGifPreviewUrl,
+                  } = require('../utils/tenorApi');
+                  const gifUrl = getBestGifUrl(item);
+                  const previewUrl = getGifPreviewUrl(item);
+
+                  return (
+                    <Pressable
+                      onPress={() => handleSelectGif(gifUrl)}
+                      style={({ pressed }) => [
+                        {
+                          flex: 1,
+                          margin: 2,
+                          borderRadius: 8,
+                          overflow: 'hidden',
+                          aspectRatio: 1,
+                          opacity: pressed ? 0.7 : 1,
+                        },
+                      ]}
+                    >
+                      <Image
+                        source={{ uri: previewUrl || gifUrl }}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          backgroundColor: isDark ? '#333' : '#f0f0f0',
+                        }}
+                        resizeMode='cover'
+                      />
+                    </Pressable>
+                  );
+                }}
+                numColumns={2}
+                keyExtractor={(item, index) => index.toString()}
+                showsVerticalScrollIndicator={false}
+              />
+            ) : (
+              <View
+                style={{
+                  flex: 1,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <FontAwesome name='search' size={48} color={colors.icon} />
+                <Text
+                  style={{
+                    color: colors.text,
+                    fontSize: 16,
+                    marginTop: 16,
+                    textAlign: 'center',
+                  }}
+                >
+                  {gifSearchQuery.trim()
+                    ? 'No GIFs found. Try a different search.'
+                    : 'Search for GIFs to add to your reply'}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Upvote Modal */}
       <UpvoteModal
