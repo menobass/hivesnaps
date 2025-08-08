@@ -224,7 +224,7 @@ export const useHivePostData = (
         return [];
       }
     },
-    [fetchAvatar]
+    []
   );
 
   // Fetch the main post
