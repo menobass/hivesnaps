@@ -194,6 +194,12 @@ export const ConversationScreenStyles = StyleSheet.create({
     fontWeight: 'bold',
     textDecorationLine: 'underline',
   },
+  // Mention link styles
+  mentionLink: {
+    fontWeight: 'bold',
+    textDecorationLine: 'underline',
+    paddingTop: 4,
+  },
   // Hashtag link styles
   hashtagLink: {
     fontWeight: 'bold',

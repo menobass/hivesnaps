@@ -175,11 +175,10 @@ const Reply: React.FC<ReplyProps> = ({
         return (
           <Text
             key={uniqueKey}
-            style={{
-              color: colors.icon,
-              fontWeight: 'bold',
-              textDecorationLine: 'underline',
-            }}
+            style={[
+              ConversationScreenStyles.profileLink,
+              { color: colors.icon }
+            ]}
             onPress={() =>
               router.push(`/ProfileScreen?username=${username}` as any)
             }
@@ -196,12 +195,10 @@ const Reply: React.FC<ReplyProps> = ({
         return (
           <Text
             key={uniqueKey}
-            style={{
-              color: colors.icon,
-              fontWeight: 'bold',
-              textDecorationLine: 'underline',
-              paddingTop: 4,
-            }}
+            style={[
+              ConversationScreenStyles.mentionLink,
+              { color: colors.icon }
+            ]}
             onPress={() =>
               router.push(`/ProfileScreen?username=${username}` as any)
             }
@@ -217,11 +214,10 @@ const Reply: React.FC<ReplyProps> = ({
         return (
           <Text
             key={uniqueKey}
-            style={{
-              color: colors.icon,
-              fontWeight: 'bold',
-              textDecorationLine: 'underline',
-            }}
+            style={[
+              ConversationScreenStyles.hashtagLink,
+              { color: colors.icon }
+            ]}
             onPress={() =>
               router.push({
                 pathname: '/DiscoveryScreen',
@@ -240,10 +236,10 @@ const Reply: React.FC<ReplyProps> = ({
         return (
           <Text
             key={uniqueKey}
-            style={{
-              color: colors.icon,
-              textDecorationLine: 'underline',
-            }}
+            style={[
+              ConversationScreenStyles.externalLink,
+              { color: colors.icon }
+            ]}
           >
             {children}
           </Text>
