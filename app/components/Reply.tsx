@@ -168,6 +168,7 @@ const Reply: React.FC<ReplyProps> = ({
     link: (node: any, children: any, parent: any, styles: any) => {
       const { href } = node.attributes;
 
+      // Handle profile:// URLs
       if (href && href.startsWith('profile://')) {
         const username = href.replace('profile://', '');
         const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
@@ -178,6 +179,28 @@ const Reply: React.FC<ReplyProps> = ({
               color: colors.icon,
               fontWeight: 'bold',
               textDecorationLine: 'underline',
+            }}
+            onPress={() =>
+              router.push(`/ProfileScreen?username=${username}` as any)
+            }
+          >
+            {children}
+          </Text>
+        );
+      }
+
+      // Handle mention links (https://peakd.com/@username)
+      if (href && href.startsWith('https://peakd.com/@')) {
+        const username = href.replace('https://peakd.com/@', '');
+        const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
+        return (
+          <Text
+            key={uniqueKey}
+            style={{
+              color: colors.icon,
+              fontWeight: 'bold',
+              textDecorationLine: 'underline',
+              paddingTop: 4,
             }}
             onPress={() =>
               router.push(`/ProfileScreen?username=${username}` as any)
@@ -205,6 +228,22 @@ const Reply: React.FC<ReplyProps> = ({
                 params: { hashtag: tag },
               })
             }
+          >
+            {children}
+          </Text>
+        );
+      }
+
+      // Handle other HTTPS links (fallback for regular URLs)
+      if (href) {
+        const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
+        return (
+          <Text
+            key={uniqueKey}
+            style={{
+              color: colors.icon,
+              textDecorationLine: 'underline',
+            }}
           >
             {children}
           </Text>
