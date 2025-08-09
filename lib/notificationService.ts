@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, AppStateStatus } from 'react-native';
 import { Client } from '@hiveio/dhive';
 
@@ -405,18 +406,25 @@ class HiveNotificationService {
     }
   }
 
-  // Storage management
+  // Storage management with enhanced error handling
   private async getStorage(): Promise<NotificationStorage> {
     try {
-      const stored = await SecureStore.getItemAsync('hive_notifications');
+      const stored = await AsyncStorage.getItem('hive_notifications');
       if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.username === this.currentUsername) {
-          return parsed;
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed.username === this.currentUsername) {
+            return parsed;
+          }
+        } catch (parseError) {
+          console.error('Error parsing notification storage JSON:', parseError);
+          // Clear corrupted data and start fresh
+          await this.clearStorageOnError();
         }
       }
     } catch (error) {
-      console.error('Error reading notification storage:', error);
+      console.error('Error reading notification storage from AsyncStorage:', error);
+      // AsyncStorage might be unavailable, continue with default
     }
 
     // Return default storage
@@ -429,12 +437,25 @@ class HiveNotificationService {
 
   private async saveStorage(storage: NotificationStorage) {
     try {
-      await SecureStore.setItemAsync(
+      await AsyncStorage.setItem(
         'hive_notifications',
         JSON.stringify(storage)
       );
     } catch (error) {
-      console.error('Error saving notification storage:', error);
+      console.error('Error saving notification storage to AsyncStorage:', error);
+      // If storage fails, we continue without saving to prevent app crashes
+      // This is acceptable for notification tracking as it's not critical data
+    }
+  }
+
+  // Helper method to clear corrupted storage
+  private async clearStorageOnError() {
+    try {
+      await AsyncStorage.removeItem('hive_notifications');
+      console.log('Cleared corrupted notification storage');
+    } catch (clearError) {
+      console.error('Error clearing notification storage:', clearError);
+      // Even if we can't clear, app continues to function
     }
   }
 
