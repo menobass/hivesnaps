@@ -33,7 +33,7 @@ export const preprocessForMarkdown = (content: string): string => {
       .replace(/<em[^>]*>(.*?)<\/em>/gs, '*$1*') // Convert <em> tags to markdown italic
       .replace(/<i[^>]*>(.*?)<\/i>/gs, '*$1*') // Convert <i> tags to markdown italic
       // Handle link tags - convert to markdown links
-      .replace(/<a[^>]*href=["']([^"']*)["'][^>]*>(.*?)<\/a>/gs, '[$2]($1)')
+      .replace(/<a\b[^>]*\bhref\s*=\s*["']([^"']*)["'][^>]*>(.*?)<\/a>/gis, '[$2]($1)')
       .replace(/<a[^>]*>(.*?)<\/a>/gs, '$1') // Remove a tags without href
       // Handle line breaks
       .replace(/<br\s*\/?>/g, '\n\n') // Convert <br> tags to double newlines for markdown
