@@ -1,6 +1,8 @@
-import React, { useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
+import { SafeAreaView as SafeAreaViewRN } from 'react-native';
 import {
   SafeAreaView as SafeAreaViewSA,
+  useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 import {
   View,
@@ -9,6 +11,8 @@ import {
   ScrollView,
   useColorScheme,
   ActivityIndicator,
+  Linking,
+  Pressable,
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -34,6 +38,7 @@ const HivePostScreen = () => {
     permlink: string;
   }>();
   const isDark = useColorScheme() === 'dark';
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { currentUsername } = useUserAuth();
   const { hivePrice, globalProps, rewardFund } = useHiveData();
@@ -123,20 +128,29 @@ const HivePostScreen = () => {
   }, [refreshAll]);
 
   // Handle reply modal opening
-  const handleOpenReplyModal = useCallback((author: string, permlink: string) => {
-    openReplyModal({ author, permlink });
-  }, [openReplyModal]);
+  const handleOpenReplyModal = useCallback(
+    (author: string, permlink: string) => {
+      openReplyModal({ author, permlink });
+    },
+    [openReplyModal]
+  );
 
   // Handle GIF picker opening
-  const handleOpenGifPicker = useCallback((mode: GifMode) => {
-    openGifPicker(mode);
-  }, [openGifPicker]);
+  const handleOpenGifPicker = useCallback(
+    (mode: GifMode) => {
+      openGifPicker(mode);
+    },
+    [openGifPicker]
+  );
 
   // Handle GIF selection
-  const handleSelectGif = useCallback((gifUrl: string) => {
-    selectGif(gifUrl);
-    addReplyGif(gifUrl);
-  }, [selectGif, addReplyGif]);
+  const handleSelectGif = useCallback(
+    (gifUrl: string) => {
+      selectGif(gifUrl);
+      addReplyGif(gifUrl);
+    },
+    [selectGif, addReplyGif]
+  );
 
   const colors = {
     background: isDark ? '#15202B' : '#fff',
@@ -179,7 +193,11 @@ const HivePostScreen = () => {
   const handleCommentUpvotePress = useCallback(
     (params: { author: string; permlink: string }) => {
       // Find the comment in our data structure
-      const findComment = (comments: any[], author: string, permlink: string): any => {
+      const findComment = (
+        comments: any[],
+        author: string,
+        permlink: string
+      ): any => {
         for (const comment of comments) {
           if (comment.author === author && comment.permlink === permlink) {
             return comment;
@@ -212,10 +230,17 @@ const HivePostScreen = () => {
 
   if (loading) {
     return (
-      <SafeAreaViewSA style={[HivePostScreenStyles.safeArea, { backgroundColor: colors.background }]}>
+      <SafeAreaViewSA
+        style={[
+          HivePostScreenStyles.safeArea,
+          { backgroundColor: colors.background },
+        ]}
+      >
         <View style={HivePostScreenStyles.loadingContainer}>
           <ActivityIndicator size='large' color={colors.button} />
-          <Text style={[HivePostScreenStyles.loadingText, { color: colors.text }]}>
+          <Text
+            style={[HivePostScreenStyles.loadingText, { color: colors.text }]}
+          >
             Loading post...
           </Text>
         </View>
@@ -225,21 +250,36 @@ const HivePostScreen = () => {
 
   if (error || !post) {
     return (
-      <SafeAreaViewSA style={[HivePostScreenStyles.safeArea, { backgroundColor: colors.background }]}>
+      <SafeAreaViewSA
+        style={[
+          HivePostScreenStyles.safeArea,
+          { backgroundColor: colors.background },
+        ]}
+      >
         <View style={HivePostScreenStyles.errorContainer}>
           <FontAwesome
             name='exclamation-triangle'
             size={48}
             color={colors.icon}
           />
-          <Text style={[HivePostScreenStyles.errorText, { color: colors.text }]}>
+          <Text
+            style={[HivePostScreenStyles.errorText, { color: colors.text }]}
+          >
             {error || 'Post not found'}
           </Text>
           <TouchableOpacity
             onPress={handleRefresh}
-            style={[HivePostScreenStyles.retryButton, { backgroundColor: colors.button }]}
+            style={[
+              HivePostScreenStyles.retryButton,
+              { backgroundColor: colors.button },
+            ]}
           >
-            <Text style={[HivePostScreenStyles.retryButtonText, { color: colors.buttonText }]}>
+            <Text
+              style={[
+                HivePostScreenStyles.retryButtonText,
+                { color: colors.buttonText },
+              ]}
+            >
               Retry
             </Text>
           </TouchableOpacity>
@@ -249,13 +289,25 @@ const HivePostScreen = () => {
   }
 
   return (
-    <SafeAreaViewSA style={[HivePostScreenStyles.safeArea, { backgroundColor: colors.background }]}>
+    <SafeAreaViewSA
+      style={[
+        HivePostScreenStyles.safeArea,
+        { backgroundColor: colors.background },
+      ]}
+    >
       {/* Header */}
-      <View style={[HivePostScreenStyles.header, { borderBottomColor: colors.border }]}>
+      <View
+        style={[
+          HivePostScreenStyles.header,
+          { borderBottomColor: colors.border },
+        ]}
+      >
         <TouchableOpacity onPress={() => router.back()}>
           <FontAwesome name='arrow-left' size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[HivePostScreenStyles.headerTitle, { color: colors.text }]}>
+        <Text
+          style={[HivePostScreenStyles.headerTitle, { color: colors.text }]}
+        >
           Hive Post
         </Text>
         <TouchableOpacity onPress={handleRefresh}>
@@ -263,7 +315,10 @@ const HivePostScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={HivePostScreenStyles.scrollContainer} contentContainerStyle={HivePostScreenStyles.contentContainer}>
+      <ScrollView
+        style={HivePostScreenStyles.scrollContainer}
+        contentContainerStyle={HivePostScreenStyles.contentContainer}
+      >
         {/* Author Info */}
         <View style={HivePostScreenStyles.authorInfo}>
           <ExpoImage
@@ -272,10 +327,14 @@ const HivePostScreen = () => {
             contentFit='cover'
           />
           <View style={HivePostScreenStyles.authorDetails}>
-            <Text style={[HivePostScreenStyles.authorName, { color: colors.text }]}>
+            <Text
+              style={[HivePostScreenStyles.authorName, { color: colors.text }]}
+            >
               {post.author}
             </Text>
-            <Text style={[HivePostScreenStyles.timestamp, { color: colors.icon }]}>
+            <Text
+              style={[HivePostScreenStyles.timestamp, { color: colors.icon }]}
+            >
               {new Date(post.created + 'Z').toLocaleString()}
             </Text>
           </View>
@@ -289,11 +348,7 @@ const HivePostScreen = () => {
         )}
 
         {/* Content */}
-        <PostBody
-          body={post.body}
-          colors={colors}
-          isDark={isDark}
-        />
+        <PostBody body={post.body} colors={colors} isDark={isDark} />
 
         {/* Tags */}
         {post.tags && post.tags.length > 0 && (
@@ -301,9 +356,17 @@ const HivePostScreen = () => {
             {post.tags.slice(0, 5).map((tag, index) => (
               <View
                 key={index}
-                style={[HivePostScreenStyles.tag, { backgroundColor: colors.button }]}
+                style={[
+                  HivePostScreenStyles.tag,
+                  { backgroundColor: colors.button },
+                ]}
               >
-                <Text style={[HivePostScreenStyles.tagText, { color: colors.buttonText }]}>
+                <Text
+                  style={[
+                    HivePostScreenStyles.tagText,
+                    { color: colors.buttonText },
+                  ]}
+                >
                   #{tag}
                 </Text>
               </View>
@@ -312,7 +375,12 @@ const HivePostScreen = () => {
         )}
 
         {/* Engagement Metrics */}
-        <View style={[HivePostScreenStyles.engagementMetrics, { borderTopColor: colors.border }]}>
+        <View
+          style={[
+            HivePostScreenStyles.engagementMetrics,
+            { borderTopColor: colors.border },
+          ]}
+        >
           <View style={HivePostScreenStyles.engagementLeft}>
             <TouchableOpacity
               onPress={handleUpvotePress}
@@ -335,7 +403,12 @@ const HivePostScreen = () => {
                 }
               />
             </TouchableOpacity>
-            <Text style={[HivePostScreenStyles.engagementText, { color: colors.text }]}>
+            <Text
+              style={[
+                HivePostScreenStyles.engagementText,
+                { color: colors.text },
+              ]}
+            >
               {post.voteCount}
             </Text>
             <FontAwesome
@@ -344,7 +417,12 @@ const HivePostScreen = () => {
               color={colors.icon}
               style={HivePostScreenStyles.commentIcon}
             />
-            <Text style={[HivePostScreenStyles.engagementText, { color: colors.text }]}>
+            <Text
+              style={[
+                HivePostScreenStyles.engagementText,
+                { color: colors.text },
+              ]}
+            >
               {post.replyCount}
             </Text>
             <TouchableOpacity
@@ -357,12 +435,16 @@ const HivePostScreen = () => {
                 color={colors.icon}
                 style={HivePostScreenStyles.replyIcon}
               />
-              <Text style={[HivePostScreenStyles.replyText, { color: colors.text }]}>
+              <Text
+                style={[HivePostScreenStyles.replyText, { color: colors.text }]}
+              >
                 Reply
               </Text>
             </TouchableOpacity>
           </View>
-          <Text style={[HivePostScreenStyles.payoutText, { color: colors.payout }]}>
+          <Text
+            style={[HivePostScreenStyles.payoutText, { color: colors.payout }]}
+          >
             ${post.payout.toFixed(2)}
           </Text>
         </View>
@@ -372,31 +454,49 @@ const HivePostScreen = () => {
           <View
             style={[
               HivePostScreenStyles.commentsHeader,
-              { 
+              {
                 borderTopColor: colors.border,
                 borderBottomColor: colors.border,
-              }
+              },
             ]}
           >
-            <Text style={[HivePostScreenStyles.commentsHeaderText, { color: colors.text }]}>
+            <Text
+              style={[
+                HivePostScreenStyles.commentsHeaderText,
+                { color: colors.text },
+              ]}
+            >
               Comments ({post.replyCount})
             </Text>
             {commentsLoading && (
-              <ActivityIndicator size="small" color={colors.button} />
+              <ActivityIndicator size='small' color={colors.button} />
             )}
           </View>
 
           {/* Comments Error */}
           {commentsError && (
             <View style={HivePostScreenStyles.commentsError}>
-              <Text style={[HivePostScreenStyles.commentsErrorText, { color: colors.icon }]}>
+              <Text
+                style={[
+                  HivePostScreenStyles.commentsErrorText,
+                  { color: colors.icon },
+                ]}
+              >
                 {commentsError}
               </Text>
               <TouchableOpacity
                 onPress={refreshAll}
-                style={[HivePostScreenStyles.retryCommentsButton, { backgroundColor: colors.button }]}
+                style={[
+                  HivePostScreenStyles.retryCommentsButton,
+                  { backgroundColor: colors.button },
+                ]}
               >
-                <Text style={[HivePostScreenStyles.retryCommentsButtonText, { color: colors.buttonText }]}>
+                <Text
+                  style={[
+                    HivePostScreenStyles.retryCommentsButtonText,
+                    { color: colors.buttonText },
+                  ]}
+                >
                   Retry
                 </Text>
               </TouchableOpacity>
@@ -408,11 +508,16 @@ const HivePostScreen = () => {
             <View style={HivePostScreenStyles.commentsList}>
               {flattenComments(comments).map(comment => (
                 <Reply
-                  key={comment.author + comment.permlink + '-' + comment.visualLevel}
+                  key={
+                    comment.author +
+                    comment.permlink +
+                    '-' +
+                    comment.visualLevel
+                  }
                   reply={comment}
                   onUpvotePress={handleCommentUpvotePress}
                   onReplyPress={handleOpenReplyModal}
-                  onEditPress={(comment) => {
+                  onEditPress={comment => {
                     console.log('Edit comment:', comment);
                     // TODO: Implement edit functionality
                   }}
@@ -434,8 +539,13 @@ const HivePostScreen = () => {
           {/* No Comments State */}
           {!commentsLoading && !commentsError && comments.length === 0 && (
             <View style={HivePostScreenStyles.noCommentsContainer}>
-              <FontAwesome name="comment-o" size={32} color={colors.icon} />
-              <Text style={[HivePostScreenStyles.noCommentsText, { color: colors.icon }]}>
+              <FontAwesome name='comment-o' size={32} color={colors.icon} />
+              <Text
+                style={[
+                  HivePostScreenStyles.noCommentsText,
+                  { color: colors.icon },
+                ]}
+              >
                 No comments yet. Be the first to comment!
               </Text>
             </View>
