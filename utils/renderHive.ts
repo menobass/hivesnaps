@@ -10,12 +10,17 @@ export interface RenderHiveOptions {
   proxifyImages?: boolean;
 }
 
-export function renderHiveToHtml(raw: string, options: RenderHiveOptions = {}): string {
+export function renderHiveToHtml(
+  raw: string,
+  options: RenderHiveOptions = {}
+): string {
   const { breaks = true, proxifyImages = false } = options;
 
   // Configure image proxy base only if requested
   if (proxifyImages) {
-    try { setProxyBase('https://images.ecency.com'); } catch {}
+    try {
+      setProxyBase('https://images.ecency.com');
+    } catch {}
   }
 
   // renderPostBody: (objOrString, forApp=true, webp=false)
@@ -27,5 +32,3 @@ export function renderHiveToHtml(raw: string, options: RenderHiveOptions = {}): 
 
   return typeof html === 'string' ? html : String(html ?? '');
 }
-
-
