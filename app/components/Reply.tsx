@@ -168,17 +168,37 @@ const Reply: React.FC<ReplyProps> = ({
     link: (node: any, children: any, parent: any, styles: any) => {
       const { href } = node.attributes;
 
+      // Handle profile:// URLs
       if (href && href.startsWith('profile://')) {
         const username = href.replace('profile://', '');
         const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
         return (
           <Text
             key={uniqueKey}
-            style={{
-              color: colors.icon,
-              fontWeight: 'bold',
-              textDecorationLine: 'underline',
-            }}
+            style={[
+              ConversationScreenStyles.profileLink,
+              { color: colors.icon }
+            ]}
+            onPress={() =>
+              router.push(`/ProfileScreen?username=${username}` as any)
+            }
+          >
+            {children}
+          </Text>
+        );
+      }
+
+      // Handle mention links (https://peakd.com/@username)
+      if (href && href.startsWith('https://peakd.com/@')) {
+        const username = href.replace('https://peakd.com/@', '');
+        const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
+        return (
+          <Text
+            key={uniqueKey}
+            style={[
+              ConversationScreenStyles.mentionLink,
+              { color: colors.icon }
+            ]}
             onPress={() =>
               router.push(`/ProfileScreen?username=${username}` as any)
             }
@@ -194,17 +214,32 @@ const Reply: React.FC<ReplyProps> = ({
         return (
           <Text
             key={uniqueKey}
-            style={{
-              color: colors.icon,
-              fontWeight: 'bold',
-              textDecorationLine: 'underline',
-            }}
+            style={[
+              ConversationScreenStyles.hashtagLink,
+              { color: colors.icon }
+            ]}
             onPress={() =>
               router.push({
                 pathname: '/DiscoveryScreen',
                 params: { hashtag: tag },
               })
             }
+          >
+            {children}
+          </Text>
+        );
+      }
+
+      // Handle other HTTPS links (fallback for regular URLs)
+      if (href) {
+        const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
+        return (
+          <Text
+            key={uniqueKey}
+            style={[
+              ConversationScreenStyles.externalLink,
+              { color: colors.icon }
+            ]}
           >
             {children}
           </Text>
