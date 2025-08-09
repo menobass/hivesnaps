@@ -14,7 +14,6 @@ import {
   TextInput,
   ScrollView,
   BackHandler,
-  ToastAndroid,
   KeyboardAvoidingView,
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
@@ -189,7 +188,6 @@ const FeedScreenRefactored = () => {
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [modalImages, setModalImages] = useState<Array<{ uri: string }>>([]);
   const [modalImageIndex, setModalImageIndex] = useState(0);
-  const [exitTimestamp, setExitTimestamp] = useState<number | null>(null);
 
   // Refs
   const flatListRef = useRef<FlatList<any>>(null);
@@ -262,29 +260,13 @@ const FeedScreenRefactored = () => {
     await handleSearch(searchTerm);
   };
 
-  // Handle back button for exit confirmation
+  // Handle back button - minimize app instead of logout
   useFocusEffect(
     React.useCallback(() => {
       const backAction = () => {
-        const now = Date.now();
-
-        if (exitTimestamp && now - exitTimestamp < 2000) {
-          logout();
-          return true;
-        } else {
-          setExitTimestamp(now);
-
-          if (Platform.OS === 'android') {
-            ToastAndroid.show(
-              'Press back again to log out',
-              ToastAndroid.SHORT
-            );
-          }
-
-          setTimeout(() => {
-            setExitTimestamp(null);
-          }, 2000);
-
+        // On Android, minimize the app when back is pressed on main feed
+        if (Platform.OS === 'android') {
+          BackHandler.exitApp();
           return true;
         }
       };
@@ -294,7 +276,7 @@ const FeedScreenRefactored = () => {
         backAction
       );
       return () => backHandler.remove();
-    }, [exitTimestamp, logout])
+    }, [])
   );
 
   // Viewability config for FlatList
