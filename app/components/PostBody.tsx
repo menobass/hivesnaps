@@ -9,6 +9,10 @@ import {
   extractVideoInfo,
   removeVideoUrls,
 } from '../../utils/extractVideoInfo';
+import {
+  preprocessForMarkdown,
+  checkForLeftoverHtmlTags,
+} from '../../utils/htmlPreprocessing';
 import IPFSVideoPlayer from './IPFSVideoPlayer';
 import TwitterEmbed from './TwitterEmbed';
 import YouTubeEmbed from './YouTubeEmbed';
@@ -72,50 +76,6 @@ const PostBody: React.FC<PostBodyProps> = ({ body, colors, isDark }) => {
   const shouldUseMarkdown =
     !isHtml || !processedHtml || processedHtml.trim().length === 0;
 
-  // Preprocess content for markdown rendering - convert HTML tags to markdown format
-  const preprocessForMarkdown = (content: string) => {
-    return (
-      content
-        // Convert HTML tags to markdown equivalents
-        .replace(/<u>(.*?)<\/u>/g, '___$1___') // Convert <u> tags to markdown underlines
-        .replace(/<strong>(.*?)<\/strong>/g, '**$1**') // Convert <strong> tags to markdown bold
-        .replace(/<b>(.*?)<\/b>/g, '**$1**') // Convert <b> tags to markdown bold
-        .replace(/<em>(.*?)<\/em>/g, '*$1*') // Convert <em> tags to markdown italic
-        .replace(/<i>(.*?)<\/i>/g, '*$1*') // Convert <i> tags to markdown italic
-        // Handle line breaks
-        .replace(/<br\s*\/?>/g, '\n\n') // Convert <br> tags to double newlines for markdown
-        .replace(/<\/p>\s*<p>/g, '\n\n') // Convert paragraph breaks to double newlines
-        .replace(/<p>(.*?)<\/p>/g, '$1\n\n') // Convert <p> tags to content with double newlines
-        // Handle headers
-        .replace(/<h1>(.*?)<\/h1>/g, '# $1\n\n')
-        .replace(/<h2>(.*?)<\/h2>/g, '## $1\n\n')
-        .replace(/<h3>(.*?)<\/h3>/g, '### $1\n\n')
-        .replace(/<h4>(.*?)<\/h4>/g, '#### $1\n\n')
-        .replace(/<h5>(.*?)<\/h5>/g, '##### $1\n\n')
-        .replace(/<h6>(.*?)<\/h6>/g, '###### $1\n\n')
-        // Handle center tags (just remove them for markdown)
-        .replace(/<center>(.*?)<\/center>/gs, '$1')
-        // Handle images - convert HTML img tags to markdown format
-        .replace(
-          /<img[^>]*src=["']([^"']*)["'][^>]*alt=["']([^"']*)["'][^>]*\/?>/g,
-          '![$2]($1)'
-        )
-        .replace(
-          /<img[^>]*alt=["']([^"']*)["'][^>]*src=["']([^"']*)["'][^>]*\/?>/g,
-          '![$1]($2)'
-        )
-        .replace(/<img[^>]*src=["']([^"']*)["'][^>]*\/?>/g, '![]($1)')
-        // Convert @usernames to clickable links
-        .replace(
-          /(^|[^\w/@])@([a-z0-9\-\.]{3,16})(?![a-z0-9\-\.])/gi,
-          '$1[**@$2**](profile://$2)'
-        )
-        // Clean up excessive whitespace
-        .replace(/\n{3,}/g, '\n\n') // Replace 3+ newlines with just 2
-        .trim()
-    );
-  };
-
   console.log('[PostBody] Content type detection:', {
     isHtml,
     hasComplexHtml,
@@ -139,6 +99,59 @@ const PostBody: React.FC<PostBodyProps> = ({ body, colors, isDark }) => {
     htmlProcessingFailed:
       isHtml && (!processedHtml || processedHtml.trim().length === 0),
   });
+
+  // Additional debug logging for HTML tags
+  console.log('[PostBody] HTML tag detection:', {
+    hasDiv: body.includes('<div'),
+    hasP: body.includes('<p'),
+    hasSpan: body.includes('<span'),
+    hasImg: body.includes('<img'),
+    hasA: body.includes('<a'),
+    hasH: body.includes('<h'),
+    hasUl: body.includes('<ul'),
+    hasOl: body.includes('<ol'),
+    hasLi: body.includes('<li'),
+    hasBr: body.includes('<br'),
+    hasHr: body.includes('<hr'),
+    hasCenter: body.includes('<center'),
+    hasEm: body.includes('<em'),
+    hasStrong: body.includes('<strong'),
+    hasB: body.includes('<b'),
+    hasI: body.includes('<i'),
+    hasU: body.includes('<u'),
+  });
+
+  // Log the full HTML content for debugging
+  if (body.length < 2000) {
+    console.log('[PostBody] Full body content:', body);
+  } else {
+    console.log(
+      '[PostBody] Body content (first 1000 chars):',
+      body.substring(0, 1000)
+    );
+    console.log(
+      '[PostBody] Body content (last 1000 chars):',
+      body.substring(body.length - 1000)
+    );
+  }
+
+  // Log the preprocessed content
+  if (shouldUseMarkdown) {
+    const preprocessed = preprocessForMarkdown(contentToRender);
+    console.log(
+      '[PostBody] Preprocessed markdown content:',
+      preprocessed.substring(0, 500)
+    );
+
+    // Check for leftover HTML tags after preprocessing
+    const foundLeftovers = checkForLeftoverHtmlTags(preprocessed);
+    if (foundLeftovers.length > 0) {
+      console.warn(
+        '[PostBody] Leftover HTML tags found after preprocessing:',
+        foundLeftovers
+      );
+    }
+  }
 
   // Safety check - ensure we have content to render
   if (!contentToRender || contentToRender.trim().length === 0) {
@@ -528,46 +541,37 @@ const PostBody: React.FC<PostBodyProps> = ({ body, colors, isDark }) => {
               if (href && href.startsWith('profile://')) {
                 const username = href.replace('profile://', '');
                 return (
-                  <Pressable
+                  <Text
                     key={node.key}
                     onPress={() =>
                       router.push(`/ProfileScreen?username=${username}` as any)
                     }
-                    style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+                    style={{
+                      color: colors.button,
+                      fontWeight: 'bold',
+                    }}
                     accessibilityRole='link'
                     accessibilityLabel={`View @${username}'s profile`}
                   >
-                    <Text
-                      style={{
-                        color: colors.button,
-                        fontWeight: 'bold',
-                        transform: [{ translateY: 4 }], // hack to move down
-                      }}
-                    >
-                      @{username}
-                    </Text>
-                  </Pressable>
+                    @{username}
+                  </Text>
                 );
               }
 
               // Handle regular links
               return (
-                <Pressable
+                <Text
                   key={node.key}
                   onPress={() => Linking.openURL(href)}
-                  style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+                  style={{
+                    color: colors.button,
+                    textDecorationLine: 'underline',
+                  }}
                   accessibilityRole='link'
                   accessibilityLabel={`Open link: ${href}`}
                 >
-                  <Text
-                    style={{
-                      color: colors.button,
-                      textDecorationLine: 'underline',
-                    }}
-                  >
-                    {children}
-                  </Text>
-                </Pressable>
+                  {children}
+                </Text>
               );
             },
           }}
