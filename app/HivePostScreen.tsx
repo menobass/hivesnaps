@@ -17,9 +17,8 @@ import {
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image';
-import SafeRenderHtml from '../components/SafeRenderHtml';
+import PostBody from './components/PostBody';
 import { Dimensions } from 'react-native';
-import Markdown from 'react-native-markdown-display';
 import { useUserAuth } from '../hooks/useUserAuth';
 import { useUpvote } from '../hooks/useUpvote';
 import { useHiveData } from '../hooks/useHiveData';
@@ -129,20 +128,29 @@ const HivePostScreen = () => {
   }, [refreshAll]);
 
   // Handle reply modal opening
-  const handleOpenReplyModal = useCallback((author: string, permlink: string) => {
-    openReplyModal({ author, permlink });
-  }, [openReplyModal]);
+  const handleOpenReplyModal = useCallback(
+    (author: string, permlink: string) => {
+      openReplyModal({ author, permlink });
+    },
+    [openReplyModal]
+  );
 
   // Handle GIF picker opening
-  const handleOpenGifPicker = useCallback((mode: GifMode) => {
-    openGifPicker(mode);
-  }, [openGifPicker]);
+  const handleOpenGifPicker = useCallback(
+    (mode: GifMode) => {
+      openGifPicker(mode);
+    },
+    [openGifPicker]
+  );
 
   // Handle GIF selection
-  const handleSelectGif = useCallback((gifUrl: string) => {
-    selectGif(gifUrl);
-    addReplyGif(gifUrl);
-  }, [selectGif, addReplyGif]);
+  const handleSelectGif = useCallback(
+    (gifUrl: string) => {
+      selectGif(gifUrl);
+      addReplyGif(gifUrl);
+    },
+    [selectGif, addReplyGif]
+  );
 
   const colors = {
     background: isDark ? '#15202B' : '#fff',
@@ -185,7 +193,11 @@ const HivePostScreen = () => {
   const handleCommentUpvotePress = useCallback(
     (params: { author: string; permlink: string }) => {
       // Find the comment in our data structure
-      const findComment = (comments: any[], author: string, permlink: string): any => {
+      const findComment = (
+        comments: any[],
+        author: string,
+        permlink: string
+      ): any => {
         for (const comment of comments) {
           if (comment.author === author && comment.permlink === permlink) {
             return comment;
@@ -218,10 +230,17 @@ const HivePostScreen = () => {
 
   if (loading) {
     return (
-      <SafeAreaViewSA style={[HivePostScreenStyles.safeArea, { backgroundColor: colors.background }]}>
+      <SafeAreaViewSA
+        style={[
+          HivePostScreenStyles.safeArea,
+          { backgroundColor: colors.background },
+        ]}
+      >
         <View style={HivePostScreenStyles.loadingContainer}>
           <ActivityIndicator size='large' color={colors.button} />
-          <Text style={[HivePostScreenStyles.loadingText, { color: colors.text }]}>
+          <Text
+            style={[HivePostScreenStyles.loadingText, { color: colors.text }]}
+          >
             Loading post...
           </Text>
         </View>
@@ -231,21 +250,36 @@ const HivePostScreen = () => {
 
   if (error || !post) {
     return (
-      <SafeAreaViewSA style={[HivePostScreenStyles.safeArea, { backgroundColor: colors.background }]}>
+      <SafeAreaViewSA
+        style={[
+          HivePostScreenStyles.safeArea,
+          { backgroundColor: colors.background },
+        ]}
+      >
         <View style={HivePostScreenStyles.errorContainer}>
           <FontAwesome
             name='exclamation-triangle'
             size={48}
             color={colors.icon}
           />
-          <Text style={[HivePostScreenStyles.errorText, { color: colors.text }]}>
+          <Text
+            style={[HivePostScreenStyles.errorText, { color: colors.text }]}
+          >
             {error || 'Post not found'}
           </Text>
           <TouchableOpacity
             onPress={handleRefresh}
-            style={[HivePostScreenStyles.retryButton, { backgroundColor: colors.button }]}
+            style={[
+              HivePostScreenStyles.retryButton,
+              { backgroundColor: colors.button },
+            ]}
           >
-            <Text style={[HivePostScreenStyles.retryButtonText, { color: colors.buttonText }]}>
+            <Text
+              style={[
+                HivePostScreenStyles.retryButtonText,
+                { color: colors.buttonText },
+              ]}
+            >
               Retry
             </Text>
           </TouchableOpacity>
@@ -254,54 +288,26 @@ const HivePostScreen = () => {
     );
   }
 
-  // Smart HTML detection - distinguish between HTML and markdown content
-  const hasHtmlTags = /<([a-z][\s\S]*?)>/i.test(post.body);
-  const hasComplexHtml =
-    post.body.includes('<div') ||
-    post.body.includes('<p') ||
-    post.body.includes('<span') ||
-    post.body.includes('<img') ||
-    post.body.includes('<a') ||
-    post.body.includes('<h') ||
-    post.body.includes('<ul') ||
-    post.body.includes('<ol') ||
-    post.body.includes('<li') ||
-    post.body.includes('<br') ||
-    post.body.includes('<hr');
-
-  // Use HTML renderer only for complex HTML, use markdown for simple formatting tags
-  const isHtml = hasComplexHtml;
-
-  // Preprocess content for markdown rendering - convert <u> tags to markdown format
-  const preprocessForMarkdown = (content: string) => {
-    return content
-      .replace(/<u>(.*?)<\/u>/g, '___$1___') // Convert <u> tags to markdown underlines
-      .replace(/<strong>(.*?)<\/strong>/g, '**$1**') // Convert <strong> tags to markdown bold
-      .replace(/<em>(.*?)<\/em>/g, '*$1*') // Convert <em> tags to markdown italic
-      .replace(
-        /(^|[^\w/@])@([a-z0-9\-\.]{3,16})(?![a-z0-9\-\.])/gi,
-        '$1[**@$2**](profile://$2)'
-      ); // Convert @usernames to clickable links
-  };
-
-  console.log('[HivePostScreen] Content type detection:', {
-    isHtml,
-    bodyLength: post.body.length,
-    bodyPreview: post.body.substring(0, 200),
-    hasMarkdownHeaders: /^#{1,6}\s/.test(post.body),
-    hasMarkdownBold: /\*\*.*\*\*/.test(post.body),
-    hasMarkdownItalic: /\*.*\*/.test(post.body),
-    hasUTags: post.body.includes('<u>'),
-  });
-
   return (
-    <SafeAreaViewSA style={[HivePostScreenStyles.safeArea, { backgroundColor: colors.background }]}>
+    <SafeAreaViewSA
+      style={[
+        HivePostScreenStyles.safeArea,
+        { backgroundColor: colors.background },
+      ]}
+    >
       {/* Header */}
-      <View style={[HivePostScreenStyles.header, { borderBottomColor: colors.border }]}>
+      <View
+        style={[
+          HivePostScreenStyles.header,
+          { borderBottomColor: colors.border },
+        ]}
+      >
         <TouchableOpacity onPress={() => router.back()}>
           <FontAwesome name='arrow-left' size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[HivePostScreenStyles.headerTitle, { color: colors.text }]}>
+        <Text
+          style={[HivePostScreenStyles.headerTitle, { color: colors.text }]}
+        >
           Hive Post
         </Text>
         <TouchableOpacity onPress={handleRefresh}>
@@ -309,7 +315,10 @@ const HivePostScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={HivePostScreenStyles.scrollContainer} contentContainerStyle={HivePostScreenStyles.contentContainer}>
+      <ScrollView
+        style={HivePostScreenStyles.scrollContainer}
+        contentContainerStyle={HivePostScreenStyles.contentContainer}
+      >
         {/* Author Info */}
         <View style={HivePostScreenStyles.authorInfo}>
           <ExpoImage
@@ -318,10 +327,14 @@ const HivePostScreen = () => {
             contentFit='cover'
           />
           <View style={HivePostScreenStyles.authorDetails}>
-            <Text style={[HivePostScreenStyles.authorName, { color: colors.text }]}>
+            <Text
+              style={[HivePostScreenStyles.authorName, { color: colors.text }]}
+            >
               {post.author}
             </Text>
-            <Text style={[HivePostScreenStyles.timestamp, { color: colors.icon }]}>
+            <Text
+              style={[HivePostScreenStyles.timestamp, { color: colors.icon }]}
+            >
               {new Date(post.created + 'Z').toLocaleString()}
             </Text>
           </View>
@@ -335,222 +348,7 @@ const HivePostScreen = () => {
         )}
 
         {/* Content */}
-        <View style={HivePostScreenStyles.contentBody}>
-          {isHtml ? (
-            <SafeRenderHtml
-              contentWidth={windowWidth - 32}
-              source={{ html: post.body }}
-              baseStyle={{
-                color: colors.text,
-                fontSize: 16,
-                lineHeight: 24,
-              }}
-              tagsStyles={{
-                a: { color: colors.button },
-                p: { marginBottom: 16 },
-                h1: {
-                  color: colors.text,
-                  fontSize: 24,
-                  fontWeight: 'bold',
-                  marginBottom: 16,
-                },
-                h2: {
-                  color: colors.text,
-                  fontSize: 20,
-                  fontWeight: 'bold',
-                  marginBottom: 12,
-                },
-                h3: {
-                  color: colors.text,
-                  fontSize: 18,
-                  fontWeight: 'bold',
-                  marginBottom: 10,
-                },
-                u: { textDecorationLine: 'underline' },
-              }}
-            />
-          ) : (
-            <Markdown
-              style={{
-                body: {
-                  color: colors.text,
-                  fontSize: 16,
-                  lineHeight: 24,
-                  fontFamily: 'System',
-                },
-                paragraph: {
-                  marginBottom: 16,
-                  color: colors.text,
-                },
-                heading1: {
-                  color: colors.text,
-                  fontSize: 24,
-                  fontWeight: 'bold',
-                  marginBottom: 16,
-                  marginTop: 24,
-                },
-                heading2: {
-                  color: colors.text,
-                  fontSize: 20,
-                  fontWeight: 'bold',
-                  marginBottom: 12,
-                  marginTop: 20,
-                },
-                heading3: {
-                  color: colors.text,
-                  fontSize: 18,
-                  fontWeight: 'bold',
-                  marginBottom: 10,
-                  marginTop: 16,
-                },
-                heading4: {
-                  color: colors.text,
-                  fontSize: 16,
-                  fontWeight: 'bold',
-                  marginBottom: 8,
-                  marginTop: 12,
-                },
-                heading5: {
-                  color: colors.text,
-                  fontSize: 14,
-                  fontWeight: 'bold',
-                  marginBottom: 6,
-                  marginTop: 10,
-                },
-                heading6: {
-                  color: colors.text,
-                  fontSize: 12,
-                  fontWeight: 'bold',
-                  marginBottom: 4,
-                  marginTop: 8,
-                },
-                link: {
-                  color: colors.button,
-                  textDecorationLine: 'underline',
-                },
-                strong: {
-                  fontWeight: 'bold',
-                  color: colors.text,
-                },
-                em: {
-                  fontStyle: 'italic',
-                  color: colors.text,
-                },
-                // Add styling for markdown underlines (___text___)
-                underline: {
-                  textDecorationLine: 'underline',
-                  color: colors.text,
-                },
-                u: {
-                  textDecorationLine: 'underline',
-                  color: colors.text,
-                },
-
-                code_inline: {
-                  backgroundColor: isDark ? '#2C3E50' : '#F8F9FA',
-                  color: isDark ? '#E74C3C' : '#E74C3C',
-                  paddingHorizontal: 4,
-                  paddingVertical: 2,
-                  borderRadius: 4,
-                  fontFamily: 'monospace',
-                  fontSize: 14,
-                },
-                code_block: {
-                  backgroundColor: isDark ? '#2C3E50' : '#F8F9FA',
-                  color: isDark ? '#E74C3C' : '#E74C3C',
-                  padding: 12,
-                  borderRadius: 8,
-                  fontFamily: 'monospace',
-                  fontSize: 14,
-                  marginVertical: 8,
-                },
-                blockquote: {
-                  borderLeftWidth: 4,
-                  borderLeftColor: colors.button,
-                  paddingLeft: 16,
-                  marginVertical: 8,
-                  backgroundColor: isDark ? '#2C3E50' : '#F8F9FA',
-                  paddingVertical: 8,
-                  paddingRight: 12,
-                },
-                list_item: {
-                  marginBottom: 4,
-                  color: colors.text,
-                },
-                bullet_list: {
-                  marginBottom: 16,
-                  paddingLeft: 16,
-                },
-                ordered_list: {
-                  marginBottom: 16,
-                  paddingLeft: 16,
-                },
-                hr: {
-                  backgroundColor: colors.border,
-                  height: 1,
-                  marginVertical: 16,
-                },
-              }}
-              rules={{
-                link: (node, children, parent, styles) => {
-                  const { href } = node.attributes;
-
-                  // Handle profile:// links for mentions
-                  if (href && href.startsWith('profile://')) {
-                    const username = href.replace('profile://', '');
-                    return (
-                      <Pressable
-                        key={node.key}
-                        onPress={() =>
-                          router.push(
-                            `/ProfileScreen?username=${username}` as any
-                          )
-                        }
-                        style={({ pressed }) => [
-                          { opacity: pressed ? 0.6 : 1 },
-                        ]}
-                        accessibilityRole='link'
-                        accessibilityLabel={`View @${username}'s profile`}
-                      >
-                        <Text
-                          style={{
-                            color: colors.button,
-                            fontWeight: 'bold',
-                            transform: [{ translateY: 4 }] // hack to move down
-                          }}
-                        >
-                          @{username}
-                        </Text>
-                      </Pressable>
-                    );
-                  }
-
-                  // Handle regular links
-                  return (
-                    <Pressable
-                      key={node.key}
-                      onPress={() => Linking.openURL(href)}
-                      style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-                      accessibilityRole='link'
-                      accessibilityLabel={`Open link: ${href}`}
-                    >
-                      <Text
-                        style={{
-                          color: colors.button,
-                          textDecorationLine: 'underline',
-                        }}
-                      >
-                        {children}
-                      </Text>
-                    </Pressable>
-                  );
-                },
-              }}
-            >
-              {preprocessForMarkdown(post.body)}
-            </Markdown>
-          )}
-        </View>
+        <PostBody body={post.body} colors={colors} isDark={isDark} />
 
         {/* Tags */}
         {post.tags && post.tags.length > 0 && (
@@ -558,9 +356,17 @@ const HivePostScreen = () => {
             {post.tags.slice(0, 5).map((tag, index) => (
               <View
                 key={index}
-                style={[HivePostScreenStyles.tag, { backgroundColor: colors.button }]}
+                style={[
+                  HivePostScreenStyles.tag,
+                  { backgroundColor: colors.button },
+                ]}
               >
-                <Text style={[HivePostScreenStyles.tagText, { color: colors.buttonText }]}>
+                <Text
+                  style={[
+                    HivePostScreenStyles.tagText,
+                    { color: colors.buttonText },
+                  ]}
+                >
                   #{tag}
                 </Text>
               </View>
@@ -569,7 +375,12 @@ const HivePostScreen = () => {
         )}
 
         {/* Engagement Metrics */}
-        <View style={[HivePostScreenStyles.engagementMetrics, { borderTopColor: colors.border }]}>
+        <View
+          style={[
+            HivePostScreenStyles.engagementMetrics,
+            { borderTopColor: colors.border },
+          ]}
+        >
           <View style={HivePostScreenStyles.engagementLeft}>
             <TouchableOpacity
               onPress={handleUpvotePress}
@@ -592,7 +403,12 @@ const HivePostScreen = () => {
                 }
               />
             </TouchableOpacity>
-            <Text style={[HivePostScreenStyles.engagementText, { color: colors.text }]}>
+            <Text
+              style={[
+                HivePostScreenStyles.engagementText,
+                { color: colors.text },
+              ]}
+            >
               {post.voteCount}
             </Text>
             <FontAwesome
@@ -601,7 +417,12 @@ const HivePostScreen = () => {
               color={colors.icon}
               style={HivePostScreenStyles.commentIcon}
             />
-            <Text style={[HivePostScreenStyles.engagementText, { color: colors.text }]}>
+            <Text
+              style={[
+                HivePostScreenStyles.engagementText,
+                { color: colors.text },
+              ]}
+            >
               {post.replyCount}
             </Text>
             <TouchableOpacity
@@ -614,12 +435,16 @@ const HivePostScreen = () => {
                 color={colors.icon}
                 style={HivePostScreenStyles.replyIcon}
               />
-              <Text style={[HivePostScreenStyles.replyText, { color: colors.text }]}>
+              <Text
+                style={[HivePostScreenStyles.replyText, { color: colors.text }]}
+              >
                 Reply
               </Text>
             </TouchableOpacity>
           </View>
-          <Text style={[HivePostScreenStyles.payoutText, { color: colors.payout }]}>
+          <Text
+            style={[HivePostScreenStyles.payoutText, { color: colors.payout }]}
+          >
             ${post.payout.toFixed(2)}
           </Text>
         </View>
@@ -629,31 +454,49 @@ const HivePostScreen = () => {
           <View
             style={[
               HivePostScreenStyles.commentsHeader,
-              { 
+              {
                 borderTopColor: colors.border,
                 borderBottomColor: colors.border,
-              }
+              },
             ]}
           >
-            <Text style={[HivePostScreenStyles.commentsHeaderText, { color: colors.text }]}>
+            <Text
+              style={[
+                HivePostScreenStyles.commentsHeaderText,
+                { color: colors.text },
+              ]}
+            >
               Comments ({post.replyCount})
             </Text>
             {commentsLoading && (
-              <ActivityIndicator size="small" color={colors.button} />
+              <ActivityIndicator size='small' color={colors.button} />
             )}
           </View>
 
           {/* Comments Error */}
           {commentsError && (
             <View style={HivePostScreenStyles.commentsError}>
-              <Text style={[HivePostScreenStyles.commentsErrorText, { color: colors.icon }]}>
+              <Text
+                style={[
+                  HivePostScreenStyles.commentsErrorText,
+                  { color: colors.icon },
+                ]}
+              >
                 {commentsError}
               </Text>
               <TouchableOpacity
                 onPress={refreshAll}
-                style={[HivePostScreenStyles.retryCommentsButton, { backgroundColor: colors.button }]}
+                style={[
+                  HivePostScreenStyles.retryCommentsButton,
+                  { backgroundColor: colors.button },
+                ]}
               >
-                <Text style={[HivePostScreenStyles.retryCommentsButtonText, { color: colors.buttonText }]}>
+                <Text
+                  style={[
+                    HivePostScreenStyles.retryCommentsButtonText,
+                    { color: colors.buttonText },
+                  ]}
+                >
                   Retry
                 </Text>
               </TouchableOpacity>
@@ -665,11 +508,16 @@ const HivePostScreen = () => {
             <View style={HivePostScreenStyles.commentsList}>
               {flattenComments(comments).map(comment => (
                 <Reply
-                  key={comment.author + comment.permlink + '-' + comment.visualLevel}
+                  key={
+                    comment.author +
+                    comment.permlink +
+                    '-' +
+                    comment.visualLevel
+                  }
                   reply={comment}
                   onUpvotePress={handleCommentUpvotePress}
                   onReplyPress={handleOpenReplyModal}
-                  onEditPress={(comment) => {
+                  onEditPress={comment => {
                     console.log('Edit comment:', comment);
                     // TODO: Implement edit functionality
                   }}
@@ -691,8 +539,13 @@ const HivePostScreen = () => {
           {/* No Comments State */}
           {!commentsLoading && !commentsError && comments.length === 0 && (
             <View style={HivePostScreenStyles.noCommentsContainer}>
-              <FontAwesome name="comment-o" size={32} color={colors.icon} />
-              <Text style={[HivePostScreenStyles.noCommentsText, { color: colors.icon }]}>
+              <FontAwesome name='comment-o' size={32} color={colors.icon} />
+              <Text
+                style={[
+                  HivePostScreenStyles.noCommentsText,
+                  { color: colors.icon },
+                ]}
+              >
                 No comments yet. Be the first to comment!
               </Text>
             </View>
