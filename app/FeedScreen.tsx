@@ -129,6 +129,7 @@ const FeedScreenRefactored = () => {
     avatarUrl,
     hasUnclaimedRewards,
     loading: userLoading,
+    refreshProfile,
   } = useUserProfile(username);
 
   const { votingPower, loading: vpLoading, refreshVotingPower } = useVotingPower(username);
@@ -624,6 +625,7 @@ const FeedScreenRefactored = () => {
                 refreshVotingPower(),
                 refreshResourceCredits(),
                 refreshNotifications(),
+                refreshProfile(),
               ]);
             }}
             onScrollToIndexFailed={({ index }) => {
