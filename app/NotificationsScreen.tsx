@@ -306,13 +306,17 @@ const NotificationsScreen = () => {
   const handleMarkAsRead = useCallback(
     async (notificationId: number) => {
       await markAsRead(notificationId);
+      // Refresh to ensure unread count updates immediately
+      refresh();
     },
-    [markAsRead]
+    [markAsRead, refresh]
   );
 
   const handleMarkAllAsRead = useCallback(async () => {
     await markAllAsRead();
-  }, [markAllAsRead]);
+    // Refresh to ensure unread count updates immediately
+    refresh();
+  }, [markAllAsRead, refresh]);
 
   const handleRefresh = () => {
     refresh();

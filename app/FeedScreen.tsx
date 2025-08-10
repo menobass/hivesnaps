@@ -178,7 +178,7 @@ const FeedScreenRefactored = () => {
     loadRecentSearches,
   } = useSearch();
 
-  const { unreadCount } = useNotifications(username || null);
+  const { unreadCount, refresh: refreshNotifications } = useNotifications(username || null);
 
   // Local UI state
   const [activeFilter, setActiveFilter] = useState<FeedFilter>('newest');
@@ -623,6 +623,7 @@ const FeedScreenRefactored = () => {
                 refreshSnaps(activeFilter),
                 refreshVotingPower(),
                 refreshResourceCredits(),
+                refreshNotifications(),
               ]);
             }}
             onScrollToIndexFailed={({ index }) => {
