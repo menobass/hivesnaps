@@ -131,8 +131,8 @@ const FeedScreenRefactored = () => {
     loading: userLoading,
   } = useUserProfile(username);
 
-  const { votingPower, loading: vpLoading } = useVotingPower(username);
-  const { resourceCredits, loading: rcLoading } = useResourceCredits(username);
+  const { votingPower, loading: vpLoading, refreshVotingPower } = useVotingPower(username);
+  const { resourceCredits, loading: rcLoading, refreshResourceCredits } = useResourceCredits(username);
 
   const {
     snaps,
@@ -619,7 +619,11 @@ const FeedScreenRefactored = () => {
             style={{ width: '100%' }}
             refreshing={feedLoading}
             onRefresh={async () => {
-              await refreshSnaps(activeFilter);
+              await Promise.all([
+                refreshSnaps(activeFilter),
+                refreshVotingPower(),
+                refreshResourceCredits(),
+              ]);
             }}
             onScrollToIndexFailed={({ index }) => {
               flatListRef.current?.scrollToOffset({
