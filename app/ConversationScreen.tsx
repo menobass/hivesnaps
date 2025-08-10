@@ -1377,6 +1377,8 @@ const ConversationScreenRefactored = () => {
                   });
                 }}
                 currentUsername={currentUsername}
+                posting={posting} // Pass posting state to disable reply button
+                editing={editing} // Pass editing state to disable buttons during edit
               />
             )}
             <View style={ConversationScreenStyles.repliesList}>
@@ -1398,6 +1400,8 @@ const ConversationScreenRefactored = () => {
                   }
                   onImagePress={handleImagePress}
                   currentUsername={currentUsername}
+                  posting={posting} // Pass posting state to disable reply buttons
+                  editing={editing} // Pass editing state to disable buttons during edit
                   colors={colors}
                 />
               ))}

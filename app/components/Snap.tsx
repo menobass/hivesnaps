@@ -84,6 +84,8 @@ interface SnapProps {
   }) => void; // NEW: handler for edit button
   onResnapPress?: (author: string, permlink: string) => void; // NEW: handler for resnap button
   currentUsername?: string | null; // NEW: current user to check if they can edit
+  posting?: boolean; // To disable buttons during reply posting
+  editing?: boolean; // To disable buttons during edit submission
 }
 
 // Utility to extract raw image URLs from text (not in markdown or html)
@@ -469,6 +471,8 @@ const Snap: React.FC<SnapProps> = ({
   onEditPress,
   onResnapPress,
   currentUsername,
+  posting = false, // Default to false
+  editing = false, // Default to false
 }) => {
   // Process hashtags in text, converting them to clickable markdown links
   function processHashtags(text: string): string {
@@ -864,8 +868,10 @@ const Snap: React.FC<SnapProps> = ({
               paddingVertical: 7,
               borderRadius: 20,
               backgroundColor: 'transparent',
+              opacity: posting || editing ? 0.5 : 1, // Dim when disabled
             }}
             onPress={() => onEditPress({ author, permlink, body })}
+            disabled={posting || editing}
             accessibilityRole='button'
             accessibilityLabel='Edit this snap'
           >
@@ -893,8 +899,10 @@ const Snap: React.FC<SnapProps> = ({
               paddingVertical: 7,
               borderRadius: 20,
               backgroundColor: 'transparent',
+              opacity: posting || editing ? 0.5 : 1, // Dim when disabled
             }}
             onPress={() => onReplyPress(author, permlink)}
+            disabled={posting || editing}
             accessibilityRole='button'
             accessibilityLabel='Reply to this snap'
           >
