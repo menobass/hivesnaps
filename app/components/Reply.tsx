@@ -42,6 +42,8 @@ interface ReplyProps {
   onEditPress: (reply: ReplyData) => void;
   onImagePress: (imageUrl: string) => void;
   currentUsername?: string | null;
+  posting?: boolean; // To disable buttons during reply posting
+  editing?: boolean; // To disable buttons during edit submission
   colors: {
     text: string;
     bubble: string;
@@ -59,6 +61,8 @@ const Reply: React.FC<ReplyProps> = ({
   onEditPress,
   onImagePress,
   currentUsername,
+  posting = false, // Default to false
+  editing = false, // Default to false
   colors,
 }) => {
   const router = useRouter();
@@ -177,7 +181,7 @@ const Reply: React.FC<ReplyProps> = ({
             key={uniqueKey}
             style={[
               ConversationScreenStyles.profileLink,
-              { color: colors.icon }
+              { color: colors.icon },
             ]}
             onPress={() =>
               router.push(`/ProfileScreen?username=${username}` as any)
@@ -197,7 +201,7 @@ const Reply: React.FC<ReplyProps> = ({
             key={uniqueKey}
             style={[
               ConversationScreenStyles.mentionLink,
-              { color: colors.icon }
+              { color: colors.icon },
             ]}
             onPress={() =>
               router.push(`/ProfileScreen?username=${username}` as any)
@@ -216,7 +220,7 @@ const Reply: React.FC<ReplyProps> = ({
             key={uniqueKey}
             style={[
               ConversationScreenStyles.hashtagLink,
-              { color: colors.icon }
+              { color: colors.icon },
             ]}
             onPress={() =>
               router.push({
@@ -238,7 +242,7 @@ const Reply: React.FC<ReplyProps> = ({
             key={uniqueKey}
             style={[
               ConversationScreenStyles.externalLink,
-              { color: colors.icon }
+              { color: colors.icon },
             ]}
           >
             {children}
@@ -472,8 +476,12 @@ const Reply: React.FC<ReplyProps> = ({
           {/* Edit button - only show for own replies */}
           {reply.author === currentUsername && (
             <TouchableOpacity
-              style={ConversationScreenStyles.replyButton}
+              style={[
+                ConversationScreenStyles.replyButton,
+                (posting || editing) && { opacity: 0.5 }, // Dim when disabled
+              ]}
               onPress={() => onEditPress(reply)}
+              disabled={posting || editing}
             >
               <FontAwesome name='edit' size={14} color={colors.icon} />
               <Text
@@ -488,8 +496,12 @@ const Reply: React.FC<ReplyProps> = ({
           )}
 
           <TouchableOpacity
-            style={ConversationScreenStyles.replyButton}
+            style={[
+              ConversationScreenStyles.replyButton,
+              (posting || editing) && { opacity: 0.5 }, // Dim when disabled
+            ]}
             onPress={() => onReplyPress(reply.author, reply.permlink || '')}
+            disabled={posting || editing}
           >
             <FontAwesome name='reply' size={16} color={colors.icon} />
             <Text

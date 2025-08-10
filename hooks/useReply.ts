@@ -200,7 +200,7 @@ export const useReply = (
       // Close modal and reset state
       closeReplyModal();
 
-      // Set processing state to true
+      // Set processing state to true (keep posting true until we confirm success or timeout)
       setState(prev => ({ ...prev, processing: true }));
 
       // Notify that submission has started
@@ -217,7 +217,11 @@ export const useReply = (
           onRefresh?.().then(contentFound => {
             if (contentFound) {
               console.log('Content found, stopping polling early');
-              setState(prev => ({ ...prev, processing: false })); // Clear processing state
+              setState(prev => ({
+                ...prev,
+                processing: false,
+                posting: false,
+              })); // Clear both states
               return;
             }
             retryCount++;
@@ -227,7 +231,11 @@ export const useReply = (
               setTimeout(pollForContent, 1000); // Poll again in 1 second
             } else {
               console.log('Max retries reached, stopping polling');
-              setState(prev => ({ ...prev, processing: false })); // Clear processing state after max retries
+              setState(prev => ({
+                ...prev,
+                processing: false,
+                posting: false,
+              })); // Clear both states after timeout
             }
           });
         };
