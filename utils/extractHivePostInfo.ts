@@ -103,9 +103,9 @@ export function parseHivePostUrl(
       const author = authorPermlinkMatch[1];
       const permlink = authorPermlinkMatch[2];
 
-      // Validate permlink format - should be longer than just a single word
-      if (permlink.length < 8) {
-        console.log('[extractHivePostInfo] Rejecting short permlink:', {
+      // Basic validation - permlink should be at least 3 characters and contain valid characters
+      if (permlink.length < 3) {
+        console.log('[extractHivePostInfo] Rejecting too short permlink:', {
           permlink,
           length: permlink.length,
           url,
@@ -113,9 +113,8 @@ export function parseHivePostUrl(
         return null;
       }
 
-      // Check if permlink looks like a valid post permlink (not just a category/page)
-      const validPermlinkPattern =
-        /^[a-z0-9-]+(?:-\d{4}-\d{2}-\d{2}|-\d{10,}|-[a-z0-9-]{8,})$/;
+      // Check if permlink contains only valid characters (letters, numbers, hyphens)
+      const validPermlinkPattern = /^[a-z0-9-]+$/i;
       if (!validPermlinkPattern.test(permlink)) {
         console.log(
           '[extractHivePostInfo] Rejecting invalid permlink format:',
@@ -271,7 +270,7 @@ export async function fetchHivePostInfo(
     });
 
     // Validate parameters before making API call
-    if (!author || !permlink || author.length < 3 || permlink.length < 5) {
+    if (!author || !permlink || author.length < 3 || permlink.length < 3) {
       console.warn('[extractHivePostInfo] Invalid parameters:', {
         author,
         permlink,
