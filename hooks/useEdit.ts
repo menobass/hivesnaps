@@ -220,7 +220,7 @@ export const useEdit = (
       // Close modal and reset state
       closeEditModal();
 
-      // Set processing state to true
+      // Set processing state to true (keep editing true until we confirm success or timeout)
       setState(prev => ({ ...prev, processing: true }));
 
       // Notify that submission has started
@@ -237,7 +237,11 @@ export const useEdit = (
           onRefresh?.().then(found => {
             if (found) {
               console.log('Edited content found, stopping polling early');
-              setState(prev => ({ ...prev, processing: false })); // Clear processing state
+              setState(prev => ({
+                ...prev,
+                processing: false,
+                editing: false,
+              })); // Clear both states
               return;
             }
             retryCount++;
@@ -248,7 +252,11 @@ export const useEdit = (
               setTimeout(pollForContent, 1000); // Poll again in 1 second
             } else {
               console.log('Max retries reached, stopping edit polling');
-              setState(prev => ({ ...prev, processing: false })); // Clear processing state after max retries
+              setState(prev => ({
+                ...prev,
+                processing: false,
+                editing: false,
+              })); // Clear both states after timeout
             }
           });
         };
