@@ -194,40 +194,70 @@ const FeedScreenRefactored = () => {
 
   // Refs
   const flatListRef = useRef<FlatList<any>>(null);
+  const hasInitialFetch = useRef(false);
 
   // Load recent searches on mount
   useEffect(() => {
     loadRecentSearches();
   }, [loadRecentSearches]);
 
-  // Initial data fetch on mount
+  // Initial data fetch on mount - only once
   useEffect(() => {
-    fetchSnaps('newest', false); // Force fresh fetch on mount
-  }, [fetchSnaps]); // Include fetchSnaps for proper dependency
+    if (!hasInitialFetch.current) {
+      console.log(`🎬 [FeedScreen] Initial mount - fetching data once`);
+      hasInitialFetch.current = true;
+      fetchSnaps('newest', false); // Force fresh fetch on mount
+    }
+  }, []); // Empty deps - only run once on mount
 
   // Fetch snaps when filter changes (client-side filtering for cached data)
   useEffect(() => {
-    fetchSnaps(activeFilter, true);
-  }, [activeFilter, fetchSnaps]); // Keep all dependencies for proper hooks behavior
-
-  // Enable "load more" when we have a good amount of snaps
-  useEffect(() => {
-    if (snaps.length >= 10) {
-      setHasMore(true);
+    // Skip if this is the initial render or no data loaded yet
+    if (!hasInitialFetch.current || snaps.length === 0) {
+      console.log(
+        `⏭️ [FeedScreen] Skipping filter change - no data loaded yet`
+      );
+      return;
     }
-  }, [snaps.length, setHasMore]);
+
+    console.log(`🔄 [FeedScreen] Filter changed to: ${activeFilter}`);
+    fetchSnaps(activeFilter, true);
+  }, [activeFilter]); // Only depend on activeFilter
 
   // Handle when user reaches near the end of the list
   const handleEndReached = () => {
-    console.log('End reached, loading more snaps...');
+    console.log(`\n📜 [FeedScreen] User scrolled to end of list`);
+    console.log(
+      `📊 [FeedScreen] Current state: ${snaps.length} snaps, hasMore=${hasMore}, loading=${feedLoading}`
+    );
+
     if (hasMore && !feedLoading) {
+      console.log(
+        `🔄 [FeedScreen] Triggering loadMoreSnaps for filter: ${activeFilter}`
+      );
       loadMoreSnaps(activeFilter);
+    } else {
+      console.log(
+        `⏹️ [FeedScreen] Not loading more - hasMore: ${hasMore}, loading: ${feedLoading}`
+      );
     }
   };
 
   // Handle filter button presses
   const handleFilterPress = (filter: FeedFilter) => {
-    console.log(`🔄 Switching to "${filter}" filter - this will use client-side filtering if data is cached!`);
+    console.log(`\n🎯 [FeedScreen] User tapped "${filter}" filter button`);
+    console.log(
+      `� [FeedScreen] Current filter: "${activeFilter}" → New filter: "${filter}"`
+    );
+
+    if (filter === activeFilter) {
+      console.log(`ℹ️ [FeedScreen] Same filter selected - no action needed`);
+      return;
+    }
+
+    console.log(
+      `🔄 [FeedScreen] Switching filters - this should use client-side filtering if data is cached!`
+    );
     setActiveFilter(filter);
   };
 
