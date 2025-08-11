@@ -136,6 +136,7 @@ const FeedScreenRefactored = () => {
 
   const {
     snaps,
+    allSnaps,
     loading: feedLoading,
     error: feedError,
     hasMore,
@@ -215,9 +216,9 @@ const FeedScreenRefactored = () => {
   // Fetch snaps when filter changes (client-side filtering for cached data)
   useEffect(() => {
     // Skip if this is the initial render or no data loaded yet
-    if (!hasInitialFetch.current || snaps.length === 0) {
+    if (!hasInitialFetch.current || (allSnaps && allSnaps.length === 0)) {
       console.log(
-        `⏭️ [FeedScreen] Skipping filter change - no data loaded yet`
+        `⏭️ [FeedScreen] Skipping filter change - no data loaded yet (allSnaps: ${allSnaps?.length || 0})`
       );
       return;
     }
