@@ -158,7 +158,13 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
               console.log(
                 `✅ [EnsureFollowing] Following list fetch completed for ${username}`
               );
-              resolve();
+              // Add a small delay to ensure state update is processed
+              setTimeout(() => {
+                console.log(
+                  `✅ [EnsureFollowing] State update delay complete - resolving promise`
+                );
+                resolve();
+              }, 50);
             });
           } else {
             console.log(
