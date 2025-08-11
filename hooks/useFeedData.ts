@@ -447,10 +447,24 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
             `📚 [Load More] Appending ${newSnaps.length} snaps to existing ${prev.allSnaps?.length || 0} (total: ${updatedAllSnaps.length})`
           );
 
+          // Apply current filter to the updated allSnaps to get the correct filtered snaps
+          console.log(
+            `🔍 [Load More] Applying "${filter}" filter to ${updatedAllSnaps.length} total snaps after loading more...`
+          );
+          const filteredSnaps = applyFilter(
+            updatedAllSnaps,
+            filter,
+            prev.followingList
+          );
+
+          console.log(
+            `✅ [Load More] After filtering: ${filteredSnaps.length} snaps for "${filter}" filter`
+          );
+
           return {
             ...prev,
             allSnaps: updatedAllSnaps,
-            snaps: [...prev.snaps, ...newSnaps], // For now, just append - could apply filter here
+            snaps: filteredSnaps, // Use filtered snaps instead of just appending
             lastContainerAuthor: lastContainer.author,
             lastContainerPermlink: lastContainer.permlink,
             hasMore: newSnaps.length > 0, // Has more if we got snaps
@@ -489,7 +503,7 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
 
       return newSnaps;
     },
-    [] // Remove all dependencies to avoid loops
+    [applyFilter] // Add applyFilter since we use it in load more
   );
 
   // Strategy 2: Hybrid Caching + Batching - SIMPLIFIED
