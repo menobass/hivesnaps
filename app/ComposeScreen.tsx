@@ -26,7 +26,6 @@ import { Client, PrivateKey } from '@hiveio/dhive';
 import { uploadImageToCloudinaryFixed } from '@/utils/cloudinaryImageUploadFixed';
 import { useSharedContent } from '@/hooks/useSharedContent';
 import { useShare } from '@/context/ShareContext';
-import { useNotifications } from '@/context/NotificationContext';
 import ReactNativeModal from 'react-native-modal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -48,7 +47,6 @@ export default function ComposeScreen() {
   const { sharedContent, hasSharedContent, clearSharedContent } =
     useSharedContent();
   const shareContext = useShare();
-  const notifications = useNotifications();
 
   // Component state
   const [text, setText] = useState('');
@@ -765,55 +763,6 @@ export default function ComposeScreen() {
                     Share Multiple
                   </Text>
                 </TouchableOpacity>
-              </View>
-
-              <Text
-                style={[
-                  styles.sectionTitle,
-                  { color: colors.info, marginTop: 20 },
-                ]}
-              >
-                🔔 Test Notifications
-              </Text>
-              <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.testButton,
-                    { backgroundColor: colors.inputBg },
-                  ]}
-                  onPress={notifications.sendTestNotification}
-                >
-                  <Text
-                    style={[styles.testButtonText, { color: colors.button }]}
-                  >
-                    Test Notification
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.testButton,
-                    { backgroundColor: colors.inputBg },
-                  ]}
-                  onPress={notifications.clearAllNotifications}
-                >
-                  <Text
-                    style={[styles.testButtonText, { color: colors.button }]}
-                  >
-                    Clear All
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.notificationStatus}>
-                <Text style={[styles.testButtonText, { color: colors.text }]}>
-                  🔔 Status: {notifications.isEnabled ? 'Enabled' : 'Disabled'}
-                </Text>
-                {notifications.currentUsername && (
-                  <Text style={[styles.testButtonText, { color: colors.text }]}>
-                    👤 User: @{notifications.currentUsername}
-                  </Text>
-                )}
               </View>
             </View>
           )}

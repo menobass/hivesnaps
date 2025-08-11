@@ -42,3 +42,8 @@ Thumbs.db
 *.tsbuildinfo
 
 # Misc
+# Development backup and test files
+*BACKUP*
+*backup*
+test-*.js
+test-*.ts
