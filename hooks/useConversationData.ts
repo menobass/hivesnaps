@@ -70,6 +70,12 @@ export const useConversationData = (
   // In-memory avatar/profile cache for this session
   const avatarProfileCache: Record<string, string | undefined> = {};
 
+  // Helper function to check if current user has upvoted
+  const checkHasUpvoted = useCallback((activeVotes: any[]): boolean => {
+    if (!currentUsername || !Array.isArray(activeVotes)) return false;
+    return activeVotes.some((v: any) => v.voter === currentUsername && v.percent > 0);
+  }, [currentUsername]);
+
   // Recursively fetch replies, ensuring each reply has full content
   const fetchRepliesTreeWithContent = useCallback(
     async (
@@ -165,6 +171,7 @@ export const useConversationData = (
               replyCount: fullReply.children,
               payout,
               permlink: fullReply.permlink,
+              hasUpvoted: checkHasUpvoted(fullReply.active_votes),
               active_votes: fullReply.active_votes,
               json_metadata: fullReply.json_metadata,
               replies: childrenReplies,
@@ -240,6 +247,7 @@ export const useConversationData = (
             : '0'
         ),
         permlink: post.permlink,
+        hasUpvoted: checkHasUpvoted(post.active_votes),
         active_votes: post.active_votes,
         json_metadata: post.json_metadata,
         parent_author: post.parent_author,
@@ -266,7 +274,7 @@ export const useConversationData = (
             : 'Failed to fetch conversation data',
       }));
     }
-  }, [author, permlink, currentUsername, fetchRepliesTreeWithContent]);
+  }, [author, permlink, currentUsername, fetchRepliesTreeWithContent, checkHasUpvoted]);
 
   const refreshConversation = useCallback(async () => {
     await fetchSnapAndReplies();
@@ -345,6 +353,7 @@ export const useConversationData = (
                 : '0'
             ),
             permlink: post.permlink,
+            hasUpvoted: checkHasUpvoted(post.active_votes),
             active_votes: post.active_votes,
             json_metadata: post.json_metadata,
             parent_author: post.parent_author,
@@ -367,6 +376,7 @@ export const useConversationData = (
     state.replies.length,
     state.snap?.body,
     checkForReplyChanges,
+    checkHasUpvoted,
   ]);
 
   const clearError = useCallback(() => {

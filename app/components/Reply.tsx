@@ -421,24 +421,12 @@ const Reply: React.FC<ReplyProps> = ({
                 permlink: reply.permlink || '',
               })
             }
-            disabled={
-              Array.isArray(reply.active_votes) &&
-              reply.active_votes.some(
-                (v: any) => v.voter === currentUsername && v.percent > 0
-              )
-            }
+            disabled={reply.hasUpvoted}
           >
             <FontAwesome
               name='arrow-up'
               size={16}
-              color={
-                Array.isArray(reply.active_votes) &&
-                reply.active_votes.some(
-                  (v: any) => v.voter === currentUsername && v.percent > 0
-                )
-                  ? '#8e44ad'
-                  : colors.icon
-              }
+              color={reply.hasUpvoted ? '#8e44ad' : colors.icon}
             />
           </TouchableOpacity>
           <Text
