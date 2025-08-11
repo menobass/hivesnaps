@@ -6,6 +6,10 @@
 import { Client } from '@hiveio/dhive';
 import { detectPostType, type PostInfo } from './postTypeDetector';
 
+// Constants for validation
+const MIN_USERNAME_LENGTH = 3;
+const MIN_PERMLINK_LENGTH = 3;
+
 const client = new Client([
   'https://api.hive.blog',
   'https://api.hivekings.com',
@@ -103,8 +107,8 @@ export function parseHivePostUrl(
       const author = authorPermlinkMatch[1];
       const permlink = authorPermlinkMatch[2];
 
-      // Basic validation - permlink should be at least 3 characters and contain valid characters
-      if (permlink.length < 3) {
+      // Basic validation - permlink should be at least minimum length and contain valid characters
+      if (permlink.length < MIN_PERMLINK_LENGTH) {
         console.log('[extractHivePostInfo] Rejecting too short permlink:', {
           permlink,
           length: permlink.length,
@@ -271,7 +275,7 @@ export async function fetchHivePostInfo(
     });
 
     // Validate parameters before making API call
-    if (!author || !permlink || author.length < 3 || permlink.length < 3) {
+    if (!author || !permlink || author.length < MIN_USERNAME_LENGTH || permlink.length < MIN_PERMLINK_LENGTH) {
       console.warn('[extractHivePostInfo] Invalid parameters:', {
         author,
         permlink,
