@@ -138,9 +138,12 @@ const FeedScreenRefactored = () => {
     snaps,
     loading: feedLoading,
     error: feedError,
+    hasMore,
     fetchSnaps,
     refreshSnaps,
+    loadMoreSnaps,
     updateSnap,
+    setHasMore,
   } = useFeedData(username);
 
   const { hivePrice, globalProps, rewardFund } = useHiveData();
@@ -197,13 +200,34 @@ const FeedScreenRefactored = () => {
     loadRecentSearches();
   }, [loadRecentSearches]);
 
-  // Fetch snaps when filter changes
+  // Initial data fetch on mount
+  useEffect(() => {
+    fetchSnaps('newest', false); // Force fresh fetch on mount
+  }, [fetchSnaps]); // Include fetchSnaps for proper dependency
+
+  // Fetch snaps when filter changes (client-side filtering for cached data)
   useEffect(() => {
     fetchSnaps(activeFilter, true);
-  }, [activeFilter, fetchSnaps]);
+  }, [activeFilter, fetchSnaps]); // Keep all dependencies for proper hooks behavior
+
+  // Enable "load more" when we have a good amount of snaps
+  useEffect(() => {
+    if (snaps.length >= 10) {
+      setHasMore(true);
+    }
+  }, [snaps.length, setHasMore]);
+
+  // Handle when user reaches near the end of the list
+  const handleEndReached = () => {
+    console.log('End reached, loading more snaps...');
+    if (hasMore && !feedLoading) {
+      loadMoreSnaps(activeFilter);
+    }
+  };
 
   // Handle filter button presses
   const handleFilterPress = (filter: FeedFilter) => {
+    console.log(`🔄 Switching to "${filter}" filter - this will use client-side filtering if data is cached!`);
     setActiveFilter(filter);
   };
 
@@ -621,6 +645,8 @@ const FeedScreenRefactored = () => {
             onRefresh={async () => {
               await refreshSnaps(activeFilter);
             }}
+            onEndReached={handleEndReached}
+            onEndReachedThreshold={0.3}
             onScrollToIndexFailed={({ index }) => {
               flatListRef.current?.scrollToOffset({
                 offset: Math.max(0, index - 2) * 220,
