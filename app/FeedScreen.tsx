@@ -304,10 +304,12 @@ const FeedScreenRefactored = () => {
         console.log(
           `👥 [FeedScreen] Following list is now cached, proceeding with filter change`
         );
+        setActiveFilter(filter);
       });
+    } else {
+      // For other filters, change immediately
+      setActiveFilter(filter);
     }
-
-    setActiveFilter(filter);
   };
 
   // Handle upvote press
