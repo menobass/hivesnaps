@@ -144,6 +144,8 @@ const FeedScreenRefactored = () => {
     loadMoreSnaps,
     updateSnap,
     setHasMore,
+    fetchAndCacheFollowingList,
+    ensureFollowingListCached,
   } = useFeedData(username);
 
   const { hivePrice, globalProps, rewardFund } = useHiveData();
@@ -224,6 +226,28 @@ const FeedScreenRefactored = () => {
     fetchSnaps(activeFilter, true);
   }, [activeFilter]); // Only depend on activeFilter
 
+  // Fetch following list when username becomes available
+  useEffect(() => {
+    if (username) {
+      console.log(`👤 [FeedScreen] Username became available: ${username}`);
+      console.log(
+        `👤 [FeedScreen] Fetching following list for offline filtering...`
+      );
+
+      // Call both functions to ensure following list is cached
+      fetchAndCacheFollowingList(username);
+
+      // Also ensure it's cached (this will check if it's already there)
+      ensureFollowingListCached(username).then(() => {
+        console.log(`👤 [FeedScreen] Following list ensured for ${username}`);
+      });
+    } else {
+      console.log(
+        `👤 [FeedScreen] No username yet - waiting for authentication...`
+      );
+    }
+  }, [username, fetchAndCacheFollowingList, ensureFollowingListCached]);
+
   // Handle when user reaches near the end of the list
   const handleEndReached = () => {
     console.log(`\n📜 [FeedScreen] User scrolled to end of list`);
@@ -258,6 +282,19 @@ const FeedScreenRefactored = () => {
     console.log(
       `🔄 [FeedScreen] Switching filters - this should use client-side filtering if data is cached!`
     );
+
+    // If switching to "following" filter, ensure following list is cached
+    if (filter === 'following' && username) {
+      console.log(
+        `👥 [FeedScreen] Switching to following filter - ensuring following list is cached...`
+      );
+      ensureFollowingListCached(username).then(() => {
+        console.log(
+          `👥 [FeedScreen] Following list is now cached, proceeding with filter change`
+        );
+      });
+    }
+
     setActiveFilter(filter);
   };
 

@@ -81,6 +81,8 @@ interface UseFeedDataReturn extends FeedState {
     updates: Partial<Snap>
   ) => void;
   setHasMore: (hasMore: boolean) => void; // Add function to control hasMore
+  fetchAndCacheFollowingList: (username: string) => Promise<string[]>; // Add this function
+  ensureFollowingListCached: (username: string) => Promise<void>; // Add this function too
 }
 
 export const useFeedData = (username: string | null): UseFeedDataReturn => {
@@ -97,6 +99,81 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
     containerFreshness: {},
   });
 
+  // Function to fetch and cache following list - to be called from FeedScreen
+  const fetchAndCacheFollowingList = useCallback(async (username: string) => {
+    console.log(
+      `👤 [FetchFollowing] ===== FETCHING FOLLOWING LIST FOR ${username} =====`
+    );
+
+    try {
+      const following = await client.database.call('get_following', [
+        username,
+        '',
+        'blog',
+        100,
+      ]);
+      const followingList = following.map((f: any) => f.following);
+
+      console.log(
+        `✅ [FetchFollowing] Fetched ${followingList.length} followed users for ${username}`
+      );
+
+      setState(prev => ({
+        ...prev,
+        followingList: followingList,
+      }));
+
+      console.log(
+        `✅ [FetchFollowing] ===== FOLLOWING LIST STORED IN STATE =====`
+      );
+
+      return followingList;
+    } catch (error) {
+      console.error(
+        `❌ [FetchFollowing] Failed to fetch following list for ${username}:`,
+        error
+      );
+      return [];
+    }
+  }, []);
+
+  // Function to check if following list needs to be fetched
+  const ensureFollowingListCached = useCallback(
+    async (username: string) => {
+      return new Promise<void>(resolve => {
+        setState(prev => {
+          const hasFollowingList =
+            prev.followingList && prev.followingList.length > 0;
+
+          console.log(
+            `🔍 [EnsureFollowing] Checking following list for ${username}: ${hasFollowingList ? 'CACHED' : 'MISSING'}`
+          );
+
+          if (!hasFollowingList) {
+            console.log(
+              `📞 [EnsureFollowing] Following list missing - triggering fetch...`
+            );
+            // Trigger fetch asynchronously
+            fetchAndCacheFollowingList(username).then(() => {
+              console.log(
+                `✅ [EnsureFollowing] Following list fetch completed for ${username}`
+              );
+              resolve();
+            });
+          } else {
+            console.log(
+              `✅ [EnsureFollowing] Following list already cached (${prev.followingList?.length} users)`
+            );
+            resolve();
+          }
+
+          return prev; // Don't modify state here
+        });
+      });
+    },
+    [fetchAndCacheFollowingList]
+  );
+
   // Client-side filtering functions
   const applyFilter = useCallback(
     (
@@ -104,6 +181,10 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
       filter: FeedFilter,
       followingList?: string[]
     ): Snap[] => {
+      console.log(
+        `\n🔍 [Filter] ===== APPLYING FILTER: ${filter.toUpperCase()} =====`
+      );
+
       if (!allSnaps || allSnaps.length === 0) {
         console.log(
           `⚠️ [Filter] No snaps available to filter - need to fetch more data!`
@@ -112,7 +193,7 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
       }
 
       console.log(
-        `🔍 [Filter] Applying ${filter} filter to ${allSnaps.length} cached snaps`
+        `🔍 [Filter] Input: ${allSnaps.length} cached snaps, ${followingList?.length || 0} following list`
       );
 
       let filteredSnaps: Snap[] = [];
@@ -121,17 +202,34 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
         case 'newest':
           // Show all snaps without any filtering (they're already sorted newest first from API)
           console.log(
-            `✅ [Filter] Showing all ${allSnaps.length} snaps (no filtering applied)`
+            `✅ [Filter] NEWEST: Showing all ${allSnaps.length} snaps (no filtering applied)`
           );
           filteredSnaps = allSnaps;
           break;
 
         case 'following':
           // Show only snaps from users you follow
+          console.log(
+            `🔍 [Filter] FOLLOWING: Filtering ${allSnaps.length} snaps for followed users...`
+          );
           if (!username || !followingList || followingList.length === 0) {
             console.log(
-              '⚠️ [Filter] No following list available for filtering - may need to fetch following data'
+              '⚠️ [Filter] FOLLOWING: No following list available for filtering - may need to fetch following data'
             );
+            console.log(
+              `⚠️ [Filter] FOLLOWING: username=${username}, followingList.length=${followingList?.length || 0}`
+            );
+
+            // If username is available but following list is empty, we should trigger a fetch
+            if (username && (!followingList || followingList.length === 0)) {
+              console.log(
+                `🚨 [Filter] FOLLOWING: Username available but no following list! This suggests the following list hasn't been fetched yet.`
+              );
+              console.log(
+                `💡 [Filter] FOLLOWING: Consider calling fetchAndCacheFollowingList("${username}") from FeedScreen`
+              );
+            }
+
             filteredSnaps = [];
           } else {
             filteredSnaps = allSnaps
@@ -141,12 +239,12 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
                   new Date(b.created).getTime() - new Date(a.created).getTime()
               );
             console.log(
-              `✅ [Filter] Filtered to ${filteredSnaps.length} snaps from ${followingList.length} followed users`
+              `✅ [Filter] FOLLOWING: Found ${filteredSnaps.length} snaps from ${followingList.length} followed users`
             );
 
             if (filteredSnaps.length === 0) {
               console.log(
-                `⚠️ [Filter] No snaps found from followed users - might need more containers or no followed users have posted`
+                `⚠️ [Filter] FOLLOWING: No snaps found from followed users - might need more containers or no followed users have posted`
               );
             }
           }
@@ -210,7 +308,10 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
       }
 
       console.log(
-        `📊 [Filter] ${filter} filter result: ${filteredSnaps.length} snaps`
+        `📊 [Filter] ===== FILTER RESULT: ${filter.toUpperCase()} =====`
+      );
+      console.log(
+        `📊 [Filter] ${filter} filter result: ${filteredSnaps.length} snaps (from ${allSnaps.length} total)`
       );
 
       if (filteredSnaps.length < 5) {
@@ -219,42 +320,22 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
         );
       }
 
+      console.log(`✅ [Filter] ===== FILTER COMPLETE =====\n`);
+
       return filteredSnaps;
     },
     [username]
   );
 
-  // Fetch following list if needed
-  const fetchFollowingList = useCallback(async (): Promise<string[]> => {
-    if (!username) return [];
-
-    try {
-      console.log('[Following] Fetching following list...');
-      const followingResult = await client.call(
-        'condenser_api',
-        'get_following',
-        [username, '', 'blog', 100]
-      );
-
-      const following = Array.isArray(followingResult)
-        ? followingResult.map((f: any) => f.following)
-        : followingResult && followingResult.following
-          ? followingResult.following
-          : [];
-
-      console.log(`[Following] Found ${following.length} followed users`);
-      return following;
-    } catch (err) {
-      console.error('[Following] Error fetching following list:', err);
-      return [];
-    }
-  }, [username]);
-
   // Strategy 1: Container-Based Pagination - SIMPLIFIED
   const fetchSnapsContainerPagination = useCallback(
     async (filter: FeedFilter, isLoadMore = false) => {
+      console.log(`\n� [API CALL] ===== CONTAINER PAGINATION API CALL =====`);
       console.log(
-        `🔄 [Container Pagination] Fetching ${filter} - Load more: ${isLoadMore}`
+        `📡 [API CALL] Making API call for ${filter} - Load more: ${isLoadMore}`
+      );
+      console.log(
+        `📡 [API CALL] This should only happen on initial load or load more!`
       );
 
       let startAuthor = '';
@@ -378,15 +459,32 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
         });
       } else {
         // Fresh load - replace existing data
-        setState(prev => ({
-          ...prev,
-          allSnaps: newSnaps,
-          snaps: newSnaps,
-          lastContainerAuthor: lastContainer.author,
-          lastContainerPermlink: lastContainer.permlink,
-          hasMore: true, // Always assume there's more after first load
-          loading: false,
-        }));
+        setState(prev => {
+          console.log(
+            `📦 [Container Pagination] Fresh load - preserving followingList: ${prev.followingList?.length || 0} users`
+          );
+          if (prev.followingList && prev.followingList.length > 0) {
+            console.log(
+              `👥 [Debug] Preserving following users: ${prev.followingList.slice(0, 3).join(', ')}`
+            );
+          } else {
+            console.log(
+              `❌ [Debug] No following list to preserve in container pagination!`
+            );
+          }
+
+          return {
+            ...prev,
+            allSnaps: newSnaps,
+            snaps: newSnaps,
+            lastContainerAuthor: lastContainer.author,
+            lastContainerPermlink: lastContainer.permlink,
+            hasMore: true, // Always assume there's more after first load
+            loading: false,
+            // Preserve the following list from previous state
+            followingList: prev.followingList || [],
+          };
+        });
       }
 
       return newSnaps;
@@ -580,77 +678,125 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
   // Main fetch function that delegates to the selected strategy
   const fetchSnaps = useCallback(
     async (filter: FeedFilter, useCache = true) => {
+      console.log(`\n🔄 [FetchSnaps] ===== FILTER SWITCH DEBUG =====`);
       console.log(
-        `\n🔄 [FetchSnaps] Called with filter: "${filter}", useCache: ${useCache}`
+        `🎯 [FetchSnaps] Called with filter: "${filter}", useCache: ${useCache}`
+      );
+      console.log(
+        `📍 [FetchSnaps] This should use CLIENT-SIDE filtering if switching between cached filters`
       );
 
-      // Prevent concurrent calls by checking if already loading
-      if (state.loading) {
+      // Check for client-side filtering first (before loading check)
+      let canUseClientSideFiltering = false;
+      let currentAllSnaps: Snap[] = [];
+      let currentFollowingList: string[] = [];
+      let isCurrentlyLoading = false;
+
+      // Use setState callback to get the most current state
+      await new Promise<void>(resolve => {
+        setState(prev => {
+          console.log(`📊 [FetchSnaps] ===== CACHE STATE ANALYSIS =====`);
+          console.log(
+            `📊 [FetchSnaps] Current cache state: ${prev.allSnaps?.length || 0} total snaps, ${prev.followingList?.length || 0} following, loading: ${prev.loading}`
+          );
+          console.log(
+            `📊 [FetchSnaps] useCache: ${useCache}, has allSnaps: ${!!(prev.allSnaps && prev.allSnaps.length > 0)}`
+          );
+
+          // Store the current loading state for later use
+          isCurrentlyLoading = prev.loading;
+
+          // Check if we can use client-side filtering
+          if (useCache && prev.allSnaps && prev.allSnaps.length > 0) {
+            console.log(
+              `✅ [FetchSnaps] ===== CAN USE CLIENT-SIDE FILTERING! =====`
+            );
+            canUseClientSideFiltering = true;
+            currentAllSnaps = prev.allSnaps;
+            currentFollowingList = prev.followingList || [];
+            console.log(
+              `📋 [FetchSnaps] Captured for filtering: ${currentAllSnaps.length} snaps, ${currentFollowingList.length} following`
+            );
+
+            // Debug: Log some of the following list
+            if (currentFollowingList.length > 0) {
+              console.log(
+                `👥 [Debug] First few followed users: ${currentFollowingList.slice(0, 3).join(', ')}`
+              );
+            } else {
+              console.log(
+                `❌ [Debug] Following list is empty in state! This is the problem.`
+              );
+            }
+          } else {
+            console.log(
+              `❌ [FetchSnaps] ===== CANNOT USE CLIENT-SIDE FILTERING =====`
+            );
+            console.log(
+              `❌ [FetchSnaps] Reason: useCache=${useCache}, allSnaps.length=${prev.allSnaps?.length || 0}`
+            );
+          }
+
+          resolve();
+          return prev; // Don't modify state
+        });
+      });
+
+      // If we can use client-side filtering, do it immediately
+      if (canUseClientSideFiltering) {
         console.log(
-          `⏸️ [FetchSnaps] Already loading, skipping concurrent call`
+          `\n🚀 [FetchSnaps] ===== USING CLIENT-SIDE FILTERING =====`
         );
+        console.log(
+          `🚀 [FetchSnaps] GREAT! Filter "${filter}" will use ${currentAllSnaps.length} cached snaps`
+        );
+        console.log(`🎯 [FetchSnaps] ===== NO API CALL NEEDED! =====`);
+
+        const filteredSnaps = applyFilter(
+          currentAllSnaps,
+          filter,
+          currentFollowingList
+        );
+
+        console.log(
+          `✅ [FetchSnaps] CLIENT-SIDE filter complete: ${filteredSnaps.length} snaps for "${filter}"`
+        );
+        console.log(
+          `✅ [FetchSnaps] ===== FILTER SWITCH SUCCESSFUL - NO API CALL! =====\n`
+        );
+
+        // Update only the filtered snaps, don't change loading state
+        setState(prev => ({
+          ...prev,
+          snaps: filteredSnaps,
+        }));
+
+        console.log(
+          `🚀 [FetchSnaps] ===== EARLY RETURN - SKIPPING ALL API CALLS =====`
+        );
+        return; // Exit early - no API call needed
+      }
+
+      // If we can't use client-side filtering, check if we're already loading
+      if (isCurrentlyLoading) {
+        console.log(`⏸️ [FetchSnaps] ===== ALREADY LOADING =====`);
+        console.log(
+          `⏸️ [FetchSnaps] Already loading and no cache available, skipping concurrent call`
+        );
+        console.log(`⏸️ [FetchSnaps] ===== SKIPPING API CALL =====\n`);
         return;
       }
 
-      // Access current state inside the function to avoid stale closures
-      setState(prev => {
-        const currentState = prev;
+      console.log(`\n📡 [FetchSnaps] ===== CACHE MISS - NEED API CALL =====`);
+      console.log(
+        `📡 [FetchSnaps] WARNING: Making API call for filter "${filter}"`
+      );
+      console.log(
+        `📡 [FetchSnaps] This should only happen on first load or refresh!`
+      );
 
-        console.log(
-          `📊 [FetchSnaps] Current cache state: ${currentState.allSnaps?.length || 0} total snaps, ${currentState.followingList?.length || 0} following, loading: ${currentState.loading}`
-        );
-
-        // If we have cached data and just switching filters, apply filter only
-        if (
-          useCache &&
-          currentState.allSnaps &&
-          currentState.allSnaps.length > 0 &&
-          !currentState.loading
-        ) {
-          console.log(
-            `\n=== 🚀 CLIENT-SIDE FILTERING: ${filter} (using ${currentState.allSnaps.length} cached snaps) ===`
-          );
-          console.log(
-            `💡 [Cache Hit] No API call needed - filtering cached data instantly!`
-          );
-
-          const filteredSnaps = applyFilter(
-            currentState.allSnaps,
-            filter,
-            currentState.followingList
-          );
-
-          console.log(
-            `✅ Filter applied instantly - showing ${filteredSnaps.length} snaps for "${filter}" filter`
-          );
-
-          // Return updated state
-          return {
-            ...prev,
-            snaps: filteredSnaps,
-            loading: false,
-          };
-        } else {
-          console.log(`\n=== 📡 CACHE MISS: Need to fetch fresh data ===`);
-          console.log(
-            `🔍 [Cache Miss Reason] useCache: ${useCache}, allSnaps: ${currentState.allSnaps?.length || 0}, loading: ${currentState.loading}, filter: ${filter}`
-          );
-        }
-
-        // Mark as loading for fresh fetch
-        return { ...prev, loading: true, error: null };
-      });
-
-      // Check if we already applied the filter above
-      let shouldFetch = true;
-      setState(prev => {
-        if (useCache && prev.allSnaps && prev.allSnaps.length > 0) {
-          shouldFetch = false;
-        }
-        return prev;
-      });
-
-      if (!shouldFetch) return;
+      // Mark as loading for fresh fetch
+      setState(prev => ({ ...prev, loading: true, error: null }));
 
       // Otherwise, fetch fresh data
       try {
@@ -661,23 +807,25 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
           `🏗️ [Fresh Fetch] About to call API to get more containers...`
         );
 
-        // Get current following list
+        // Get current following list from state
         let followingList: string[] = [];
-        setState(prev => {
-          followingList = prev.followingList || [];
-          return prev;
+
+        await new Promise<void>(resolve => {
+          setState(prev => {
+            followingList = prev.followingList || [];
+            resolve();
+            return prev; // Don't modify state
+          });
         });
 
-        // Fetch following list if needed and not cached
-        if (filter === 'following' && followingList.length === 0) {
-          console.log(
-            `👥 [Following] Need to fetch following list for ${username}...`
-          );
-          followingList = await fetchFollowingList();
-          console.log(
-            `✅ [Following] Cached ${followingList.length} followed users`
-          );
-        }
+        // Note: Following list is now handled by useEffect when username becomes available
+        // This ensures it's fetched only when needed and username is set
+        console.log(
+          `👥 [Following] Following list will be handled by useEffect when username is available`
+        );
+        console.log(
+          `👥 [Following] Current following list length: ${followingList.length}`
+        );
 
         let allSnaps: Snap[] = [];
 
@@ -688,6 +836,25 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
         switch (strategy) {
           case 'container-pagination':
             allSnaps = await fetchSnapsContainerPagination(filter, false);
+            console.log(
+              `🔍 [Debug] After container pagination, checking state preservation...`
+            );
+            // Check if following list is still in state
+            setState(prev => {
+              console.log(
+                `🔍 [Debug] Post-container state: ${prev.allSnaps?.length || 0} snaps, ${prev.followingList?.length || 0} following`
+              );
+              if (prev.followingList && prev.followingList.length > 0) {
+                console.log(
+                  `✅ [Debug] Following list preserved: ${prev.followingList.slice(0, 3).join(', ')}`
+                );
+              } else {
+                console.log(
+                  `❌ [Debug] Following list LOST after container pagination!`
+                );
+              }
+              return prev; // Don't modify state
+            });
             break;
           case 'hybrid-caching':
             allSnaps = await fetchSnapsHybridCaching(filter, false);
@@ -716,13 +883,21 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
         const filteredSnaps = applyFilter(allSnaps, filter, followingList);
 
         // Update state with both all snaps and filtered snaps
-        setState(prev => ({
-          ...prev,
-          allSnaps: allSnaps,
-          snaps: filteredSnaps,
-          followingList: followingList,
-          loading: false,
-        }));
+        setState(prev => {
+          console.log(
+            `💾 [Cache] Storing ${allSnaps.length} snaps and ${followingList.length} following users in state`
+          );
+          console.log(
+            `🔍 [Cache] About to store following list: ${followingList.slice(0, 3).join(', ')}${followingList.length > 3 ? '...' : ''}`
+          );
+          return {
+            ...prev,
+            allSnaps: allSnaps,
+            snaps: filteredSnaps,
+            followingList: followingList,
+            loading: false,
+          };
+        });
 
         console.log(
           `🎉 [${FETCH_STRATEGY}] Final result: ${filteredSnaps.length} snaps after ${filter} filter`
@@ -730,6 +905,28 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
         console.log(
           `💾 [Cache] Stored ${allSnaps.length} snaps for future client-side filtering`
         );
+
+        // Final state verification - what's actually in state after everything is done?
+        setTimeout(() => {
+          setState(prev => {
+            console.log(
+              `🔍 [Final State Check] After initial load completion:`
+            );
+            console.log(
+              `🔍 [Final State] allSnaps: ${prev.allSnaps?.length || 0}, followingList: ${prev.followingList?.length || 0}, loading: ${prev.loading}`
+            );
+            if (prev.followingList && prev.followingList.length > 0) {
+              console.log(
+                `✅ [Final State] Following list is preserved: ${prev.followingList.slice(0, 3).join(', ')}`
+              );
+            } else {
+              console.log(
+                `❌ [Final State] Following list is MISSING from final state!`
+              );
+            }
+            return prev; // Don't modify state
+          });
+        }, 100); // Small delay to ensure all state updates are complete
       } catch (err) {
         console.error(`Error with strategy ${FETCH_STRATEGY}:`, err);
         setState(prev => ({
@@ -742,7 +939,6 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
     [
       FETCH_STRATEGY,
       applyFilter,
-      fetchFollowingList,
       fetchSnapsContainerPagination,
       fetchSnapsHybridCaching,
       fetchSnapsSmartContainer,
@@ -870,5 +1066,7 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
     clearError,
     updateSnap,
     setHasMore,
+    fetchAndCacheFollowingList,
+    ensureFollowingListCached,
   };
 };
