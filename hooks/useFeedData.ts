@@ -418,13 +418,16 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
       });
 
       const snapResults = await Promise.allSettled(snapPromises);
-      const newSnaps = snapResults
+      const rawSnaps = snapResults
         .filter(
           (result): result is PromiseFulfilledResult<Snap[]> =>
             result.status === 'fulfilled'
         )
         .map(result => result.value)
         .flat();
+
+      // Deduplicate snaps before sorting
+      const newSnaps = deduplicateSnaps(rawSnaps);
 
       // Sort by creation time
       newSnaps.sort(
@@ -441,10 +444,11 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
       if (isLoadMore) {
         // Append to existing snaps and allSnaps
         setState(prev => {
-          const updatedAllSnaps = [...(prev.allSnaps || []), ...newSnaps];
+          const combinedSnaps = [...(prev.allSnaps || []), ...newSnaps];
+          const updatedAllSnaps = deduplicateSnaps(combinedSnaps);
 
           console.log(
-            `📚 [Load More] Appending ${newSnaps.length} snaps to existing ${prev.allSnaps?.length || 0} (total: ${updatedAllSnaps.length})`
+            `📚 [Load More] Appending ${newSnaps.length} snaps to existing ${prev.allSnaps?.length || 0} (total before dedupe: ${combinedSnaps.length}, after dedupe: ${updatedAllSnaps.length})`
           );
 
           // Apply current filter to the updated allSnaps to get the correct filtered snaps
@@ -568,13 +572,16 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
       });
 
       const snapResults = await Promise.allSettled(snapPromises);
-      const allSnaps = snapResults
+      const rawSnaps = snapResults
         .filter(
           (result): result is PromiseFulfilledResult<Snap[]> =>
             result.status === 'fulfilled'
         )
         .map(result => result.value)
         .flat();
+
+      // Deduplicate snaps before sorting
+      const allSnaps = deduplicateSnaps(rawSnaps);
 
       // Sort
       allSnaps.sort(
@@ -669,7 +676,8 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
       );
 
       // Combine all replies from top containers
-      const allSnaps = containerAnalysis.map(c => c.replies).flat();
+      const rawSnaps = containerAnalysis.map(c => c.replies).flat();
+      const allSnaps = deduplicateSnaps(rawSnaps);
 
       allSnaps.sort(
         (a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()
@@ -1070,6 +1078,25 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
 
   const setHasMore = useCallback((hasMore: boolean) => {
     setState(prev => ({ ...prev, hasMore }));
+  }, []);
+
+  // Utility function to deduplicate snaps by author+permlink
+  const deduplicateSnaps = useCallback((snaps: Snap[]): Snap[] => {
+    const seen = new Set<string>();
+    const deduplicated: Snap[] = [];
+
+    for (const snap of snaps) {
+      const key = `${snap.author}-${snap.permlink}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduplicated.push(snap);
+      }
+    }
+
+    console.log(
+      `🔄 [Dedupe] Removed ${snaps.length - deduplicated.length} duplicate snaps (${snaps.length} → ${deduplicated.length})`
+    );
+    return deduplicated;
   }, []);
 
   return {

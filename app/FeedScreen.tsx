@@ -215,15 +215,26 @@ const FeedScreenRefactored = () => {
 
   // Fetch snaps when filter changes (client-side filtering for cached data)
   useEffect(() => {
+    console.log(`\n🎯 [FeedScreen] ===== FILTER CHANGE EFFECT =====`);
+    console.log(`🎯 [FeedScreen] Filter: ${activeFilter}`);
+    console.log(`🎯 [FeedScreen] hasInitialFetch: ${hasInitialFetch.current}`);
+    console.log(`🎯 [FeedScreen] allSnaps length: ${allSnaps?.length || 0}`);
+    console.log(`🎯 [FeedScreen] snaps length: ${snaps.length}`);
+
     // Skip if this is the initial render or no data loaded yet
     if (!hasInitialFetch.current || (allSnaps && allSnaps.length === 0)) {
       console.log(
         `⏭️ [FeedScreen] Skipping filter change - no data loaded yet (allSnaps: ${allSnaps?.length || 0})`
       );
+      console.log(`⏭️ [FeedScreen] ===== FILTER CHANGE SKIPPED =====\n`);
       return;
     }
 
     console.log(`🔄 [FeedScreen] Filter changed to: ${activeFilter}`);
+    console.log(
+      `✅ [FeedScreen] Proceeding with filter change - using cached data!`
+    );
+    console.log(`✅ [FeedScreen] ===== FILTER CHANGE PROCEEDING =====\n`);
     fetchSnaps(activeFilter, true);
   }, [activeFilter]); // Only depend on activeFilter
 
@@ -648,7 +659,9 @@ const FeedScreenRefactored = () => {
           <FlatList
             ref={flatListRef}
             data={snaps}
-            keyExtractor={item => item.author + '-' + item.permlink}
+            keyExtractor={(item, index) =>
+              `${item.author}-${item.permlink}-${index}`
+            }
             renderItem={({ item }) => (
               <Snap
                 author={item.author}
