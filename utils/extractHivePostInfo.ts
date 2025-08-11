@@ -114,7 +114,8 @@ export function parseHivePostUrl(
       }
 
       // Check if permlink contains only valid characters (letters, numbers, hyphens)
-      const validPermlinkPattern = /^[a-z0-9-]+$/i;
+      // Hyphens must only appear between alphanumeric characters, not at beginning or end
+      const validPermlinkPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/i;
       if (!validPermlinkPattern.test(permlink)) {
         console.log(
           '[extractHivePostInfo] Rejecting invalid permlink format:',
