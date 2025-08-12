@@ -54,6 +54,202 @@ export interface Snap {
 
 export type FeedFilter = 'following' | 'newest' | 'trending' | 'my';
 
+interface ContainerMetadata {
+  author: string;
+  permlink: string;
+  snaps: Snap[];
+  index: number; // Position in the sequence (0, 1, 2, 3, ...)
+  timestamp: number; // When it was fetched
+}
+
+// Linked list node for efficient prepending/appending
+interface ContainerNode {
+  data: ContainerMetadata;
+  next: ContainerNode | null;
+  prev: ContainerNode | null;
+}
+
+// Doubly-linked list for container management
+class ContainerList {
+  private head: ContainerNode | null = null;
+  private tail: ContainerNode | null = null;
+  private size = 0;
+  private maxSize: number;
+
+  constructor(maxSize: number = 4) {
+    this.maxSize = maxSize;
+  }
+
+  // Add container to the end (most recent)
+  append(container: ContainerMetadata): void {
+    const newNode: ContainerNode = {
+      data: container,
+      next: null,
+      prev: this.tail,
+    };
+
+    if (this.tail) {
+      this.tail.next = newNode;
+    } else {
+      this.head = newNode;
+    }
+    this.tail = newNode;
+    this.size++;
+
+    console.log(
+      `📦 [LinkedList] Appended container ${container.index} (${container.author}/${container.permlink}) with ${container.snaps.length} snaps`
+    );
+
+    this.enforceSizeLimit();
+  }
+
+  // Add container to the beginning (older content)
+  prepend(container: ContainerMetadata): void {
+    const newNode: ContainerNode = {
+      data: container,
+      next: this.head,
+      prev: null,
+    };
+
+    if (this.head) {
+      this.head.prev = newNode;
+    } else {
+      this.tail = newNode;
+    }
+    this.head = newNode;
+    this.size++;
+
+    console.log(
+      `📦 [LinkedList] Prepended container ${container.index} (${container.author}/${container.permlink}) with ${container.snaps.length} snaps`
+    );
+
+    this.enforceSizeLimit();
+  }
+
+  // Enforce size limit by removing from the head (oldest container)
+  private enforceSizeLimit(): void {
+    if (this.size > this.maxSize) {
+      // Since we append new containers to the tail, the head contains the oldest container
+      // Remove the head to keep the most recent containers in memory
+      this.removeHead();
+    }
+  }
+
+  // Remove the tail (newest container since we append new ones to tail)
+  private removeTail(): ContainerNode | null {
+    if (!this.tail) return null;
+
+    const removed = this.tail;
+
+    console.log(
+      `🗑️ [LinkedList] MEMORY CLEANUP: Removing tail container ${removed.data.index} (${removed.data.author}/${removed.data.permlink}) with ${removed.data.snaps.length} snaps`
+    );
+
+    if (this.tail.prev) {
+      this.tail.prev.next = null;
+      this.tail = this.tail.prev;
+    } else {
+      this.head = null;
+      this.tail = null;
+    }
+    this.size--;
+
+    console.log(
+      `💾 [LinkedList] Memory optimization: size reduced to ${this.size}/${this.maxSize}`
+    );
+
+    return removed;
+  }
+
+  // Remove the head (oldest container since we append new ones to tail)
+  private removeHead(): ContainerNode | null {
+    if (!this.head) return null;
+
+    const removed = this.head;
+
+    console.log(
+      `🗑️ [LinkedList] MEMORY CLEANUP: Removing head container ${removed.data.index} (${removed.data.author}/${removed.data.permlink}) with ${removed.data.snaps.length} snaps`
+    );
+
+    if (this.head.next) {
+      this.head.next.prev = null;
+      this.head = this.head.next;
+    } else {
+      this.head = null;
+      this.tail = null;
+    }
+    this.size--;
+
+    console.log(
+      `💾 [LinkedList] Memory optimization: size reduced to ${this.size}/${this.maxSize}`
+    );
+
+    return removed;
+  }
+
+  // Convert to array for compatibility (ordered from oldest to newest)
+  toArray(): ContainerMetadata[] {
+    const result: ContainerMetadata[] = [];
+    let current = this.head;
+    while (current) {
+      result.push(current.data);
+      current = current.next;
+    }
+    return result;
+  }
+
+  // Get all snaps from all containers
+  getAllSnaps(): Snap[] {
+    const allSnaps: Snap[] = [];
+    let current = this.head;
+    while (current) {
+      allSnaps.push(...current.data.snaps);
+      current = current.next;
+    }
+    return allSnaps;
+  }
+
+  // Get size
+  getSize(): number {
+    return this.size;
+  }
+
+  // Get oldest container (head)
+  getOldest(): ContainerMetadata | null {
+    return this.head?.data || null;
+  }
+
+  // Get newest container (tail)
+  getNewest(): ContainerMetadata | null {
+    return this.tail?.data || null;
+  }
+
+  // Clear all containers
+  clear(): void {
+    this.head = null;
+    this.tail = null;
+    this.size = 0;
+    console.log(`🗑️ [LinkedList] Cleared all containers`);
+  }
+
+  // Get memory stats
+  getStats(): {
+    containersInMemory: number;
+    totalSnaps: number;
+    memoryUsage: string;
+  } {
+    const totalSnaps = this.getAllSnaps().length;
+    const avgSnapsPerContainer =
+      this.size > 0 ? Math.round(totalSnaps / this.size) : 0;
+
+    return {
+      containersInMemory: this.size,
+      totalSnaps,
+      memoryUsage: `${this.size}/${this.maxSize} containers, ~${avgSnapsPerContainer} snaps/container`,
+    };
+  }
+}
+
 interface FeedState {
   snaps: Snap[];
   loading: boolean;
@@ -68,6 +264,11 @@ interface FeedState {
   lastContainerPermlink?: string;
   cacheTimestamp?: number;
   containerFreshness?: Record<string, number>;
+  // Memory management for containers
+  containerList: ContainerList; // Linked list for efficient prepending/appending
+  maxContainers: number; // Maximum containers to keep in memory
+  currentPosition: number; // Current scroll position indicator
+  currentFilter?: FeedFilter; // Track current filter for prefetching
 }
 
 interface UseFeedDataReturn extends FeedState {
@@ -83,6 +284,13 @@ interface UseFeedDataReturn extends FeedState {
   setHasMore: (hasMore: boolean) => void; // Add function to control hasMore
   fetchAndCacheFollowingList: (username: string) => Promise<string[]>; // Add this function
   ensureFollowingListCached: (username: string) => Promise<void>; // Add this function too
+  // Memory management functions
+  onScrollPositionChange: (index: number) => void; // Track scroll position for prefetching
+  getMemoryStats: () => {
+    containersInMemory: number;
+    totalSnaps: number;
+    memoryUsage: string;
+  }; // Debug info
 }
 
 export const useFeedData = (username: string | null): UseFeedDataReturn => {
@@ -97,6 +305,10 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
     lastContainerIndex: 0,
     cacheTimestamp: 0,
     containerFreshness: {},
+    containerList: new ContainerList(4), // Initialize with max 4 containers
+    maxContainers: 4, // Keep max 4 containers in memory
+    currentPosition: 0, // Initialize current position
+    currentFilter: 'newest', // Default filter
   });
 
   // Function to fetch and cache following list - to be called from FeedScreen
@@ -333,32 +545,36 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
     [username]
   );
 
-  // Strategy 1: Container-Based Pagination - SIMPLIFIED
+  // Strategy 1: Container-Based Pagination with Memory Management
   const fetchSnapsContainerPagination = useCallback(
     async (filter: FeedFilter, isLoadMore = false) => {
-      console.log(`\n� [API CALL] ===== CONTAINER PAGINATION API CALL =====`);
       console.log(
-        `📡 [API CALL] Making API call for ${filter} - Load more: ${isLoadMore}`
+        `\n📦 [Memory Pagination] ===== CONTAINER PAGINATION API CALL =====`
       );
       console.log(
-        `📡 [API CALL] This should only happen on initial load or load more!`
+        `📡 [Memory Pagination] Making API call for ${filter} - Load more: ${isLoadMore}`
+      );
+      console.log(
+        `🧠 [Memory Pagination] Current containers in memory: ${state.containerList.getSize()}/${state.maxContainers}`
       );
 
       let startAuthor = '';
       let startPermlink = '';
+      let containerIndex = 0;
 
       // For load more, use pagination from the last container
       if (isLoadMore) {
         setState(prev => {
           startAuthor = prev.lastContainerAuthor || '';
           startPermlink = prev.lastContainerPermlink || '';
+          containerIndex = (prev.lastContainerIndex || 0) + 1;
           console.log(
-            `📄 [Pagination] Loading more from: ${startAuthor}/${startPermlink}`
+            `📄 [Memory Pagination] Loading more from: ${startAuthor}/${startPermlink} (index: ${containerIndex})`
           );
           return prev;
         });
       } else {
-        console.log(`🔄 [Fresh Load] Starting from beginning`);
+        console.log(`🔄 [Memory Pagination] Starting from beginning`);
       }
 
       // Get containers with pagination
@@ -375,11 +591,11 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
       );
 
       console.log(
-        `📦 [Container Pagination] Found ${discussions.length} containers`
+        `📦 [Memory Pagination] Found ${discussions.length} containers`
       );
 
       if (!discussions || discussions.length === 0) {
-        console.log(`⏹️ [Container Pagination] No more containers available`);
+        console.log(`⏹️ [Memory Pagination] No more containers available`);
         setState(prev => ({ ...prev, hasMore: false, loading: false }));
         return [];
       }
@@ -394,13 +610,13 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
       ) {
         containersToProcess = discussions.slice(1);
         console.log(
-          `⏭️ [Pagination] Skipped duplicate container, processing ${containersToProcess.length} new containers`
+          `⏭️ [Memory Pagination] Skipped duplicate container, processing ${containersToProcess.length} new containers`
         );
       }
 
       if (containersToProcess.length === 0) {
         console.log(
-          `⏹️ [Container Pagination] No new containers after pagination skip`
+          `⏹️ [Memory Pagination] No new containers after pagination skip`
         );
         setState(prev => ({ ...prev, hasMore: false, loading: false }));
         return [];
@@ -416,104 +632,105 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
           console.log(
             `📝 Container ${post.permlink} has ${replies.length} replies`
           );
-          return replies;
+          return { post, replies };
         } catch (err) {
           console.error('❌ Error fetching replies:', err);
-          return [];
+          return { post, replies: [] };
         }
       });
 
       const snapResults = await Promise.allSettled(snapPromises);
-      const rawSnaps = snapResults
+      const containerResults = snapResults
         .filter(
-          (result): result is PromiseFulfilledResult<Snap[]> =>
+          (
+            result
+          ): result is PromiseFulfilledResult<{ post: any; replies: Snap[] }> =>
             result.status === 'fulfilled'
         )
-        .map(result => result.value)
-        .flat();
-
-      // Deduplicate snaps before sorting
-      const newSnaps = deduplicateSnaps(rawSnaps);
-
-      // Sort by creation time
-      newSnaps.sort(
-        (a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()
-      );
-
-      console.log(
-        `📈 [Container Pagination] Found ${newSnaps.length} new snaps`
-      );
+        .map(result => result.value);
 
       // Update pagination markers for next load
       const lastContainer = containersToProcess[containersToProcess.length - 1];
 
-      if (isLoadMore) {
-        // Append to existing snaps and allSnaps
-        setState(prev => {
-          const combinedSnaps = [...(prev.allSnaps || []), ...newSnaps];
-          const updatedAllSnaps = deduplicateSnaps(combinedSnaps);
+      // Create container metadata and update state with memory management
+      setState(prev => {
+        console.log(
+          `🔍 [Container Processing] Initial prev.followingList: ${prev.followingList?.length || 0} users`
+        );
+        let updatedState = { ...prev };
+        console.log(
+          `🔍 [Container Processing] Initial updatedState.followingList: ${updatedState.followingList?.length || 0} users`
+        );
 
-          console.log(
-            `📚 [Load More] Appending ${newSnaps.length} snaps to existing ${prev.allSnaps?.length || 0} (total before dedupe: ${combinedSnaps.length}, after dedupe: ${updatedAllSnaps.length})`
-          );
+        // Process each container
+        containerResults.forEach((containerResult, idx) => {
+          const { post, replies } = containerResult;
+          const currentIndex = isLoadMore ? containerIndex + idx : idx;
 
-          // Apply current filter to the updated allSnaps to get the correct filtered snaps
-          console.log(
-            `🔍 [Load More] Applying "${filter}" filter to ${updatedAllSnaps.length} total snaps after loading more...`
-          );
-          const filteredSnaps = applyFilter(
-            updatedAllSnaps,
-            filter,
-            prev.followingList
-          );
+          // Deduplicate snaps for this container
+          const dedupedSnaps = deduplicateSnaps(replies);
 
-          console.log(
-            `✅ [Load More] After filtering: ${filteredSnaps.length} snaps for "${filter}" filter`
-          );
-
-          return {
-            ...prev,
-            allSnaps: updatedAllSnaps,
-            snaps: filteredSnaps, // Use filtered snaps instead of just appending
-            lastContainerAuthor: lastContainer.author,
-            lastContainerPermlink: lastContainer.permlink,
-            hasMore: newSnaps.length > 0, // Has more if we got snaps
-            loading: false,
+          // Create container metadata
+          const containerMetadata: ContainerMetadata = {
+            author: post.author,
+            permlink: post.permlink,
+            snaps: dedupedSnaps,
+            index: currentIndex,
+            timestamp: Date.now(),
           };
-        });
-      } else {
-        // Fresh load - replace existing data
-        setState(prev => {
-          console.log(
-            `📦 [Container Pagination] Fresh load - preserving followingList: ${prev.followingList?.length || 0} users`
-          );
-          if (prev.followingList && prev.followingList.length > 0) {
-            console.log(
-              `👥 [Debug] Preserving following users: ${prev.followingList.slice(0, 3).join(', ')}`
-            );
-          } else {
-            console.log(
-              `❌ [Debug] No following list to preserve in container pagination!`
-            );
-          }
 
-          return {
-            ...prev,
-            allSnaps: newSnaps,
-            snaps: newSnaps,
-            lastContainerAuthor: lastContainer.author,
-            lastContainerPermlink: lastContainer.permlink,
-            hasMore: true, // Always assume there's more after first load
-            loading: false,
-            // Preserve the following list from previous state
-            followingList: prev.followingList || [],
-          };
+          // Add container using memory management
+          updatedState = addContainer(containerMetadata, updatedState);
         });
-      }
 
-      return newSnaps;
+        console.log(
+          `🔍 [Container Processing] After all containers, updatedState.followingList: ${updatedState.followingList?.length || 0} users`
+        );
+
+        // Get current snaps from all containers in memory
+        const currentSnaps = getCurrentSnapsFromContainers(
+          updatedState.containerList,
+          filter,
+          prev.followingList
+        );
+
+        console.log(
+          `🧠 [Memory Pagination] Memory state: ${updatedState.containerList.getSize()} containers, ${currentSnaps.length} total snaps`
+        );
+
+        // Update allSnaps for backward compatibility with other parts of the code
+        const allSnapsFromContainers = updatedState.containerList.getAllSnaps();
+
+        console.log(
+          `🔍 [Final Container State] Before return, updatedState.followingList: ${updatedState.followingList?.length || 0} users`
+        );
+        console.log(
+          `🔍 [Final Container State] Before return, prev.followingList: ${prev.followingList?.length || 0} users`
+        );
+
+        return {
+          ...updatedState,
+          snaps: currentSnaps,
+          allSnaps: deduplicateSnaps(allSnapsFromContainers),
+          lastContainerAuthor: lastContainer.author,
+          lastContainerPermlink: lastContainer.permlink,
+          lastContainerIndex: isLoadMore
+            ? containerIndex + containerResults.length - 1
+            : containerResults.length - 1,
+          hasMore: containerResults.length > 0,
+          loading: false,
+          currentFilter: filter,
+          // Explicitly preserve the following list
+          followingList: updatedState.followingList || prev.followingList,
+        };
+      });
+
+      // Return the snaps for backward compatibility
+      const allNewSnaps = containerResults.map(r => r.replies).flat();
+      return deduplicateSnaps(allNewSnaps);
     },
-    [applyFilter] // Add applyFilter since we use it in load more
+    []
+    // Note: Dependencies will be added when functions are defined
   );
 
   // Strategy 2: Hybrid Caching + Batching - SIMPLIFIED
@@ -867,21 +1084,32 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
             console.log(
               `🔍 [Debug] After container pagination, checking state preservation...`
             );
-            // Check if following list is still in state
-            setState(prev => {
-              console.log(
-                `🔍 [Debug] Post-container state: ${prev.allSnaps?.length || 0} snaps, ${prev.followingList?.length || 0} following`
-              );
-              if (prev.followingList && prev.followingList.length > 0) {
+
+            // Get the updated following list from state after container pagination
+            await new Promise<void>(resolve => {
+              setState(prev => {
                 console.log(
-                  `✅ [Debug] Following list preserved: ${prev.followingList.slice(0, 3).join(', ')}`
+                  `🔍 [Debug] Post-container state: ${prev.allSnaps?.length || 0} snaps, ${prev.followingList?.length || 0} following`
                 );
-              } else {
+
+                // Update followingList variable with the current state
+                followingList = prev.followingList || [];
                 console.log(
-                  `❌ [Debug] Following list LOST after container pagination!`
+                  `🔧 [Debug] Updated followingList variable to: ${followingList.length} users`
                 );
-              }
-              return prev; // Don't modify state
+
+                if (prev.followingList && prev.followingList.length > 0) {
+                  console.log(
+                    `✅ [Debug] Following list preserved: ${prev.followingList.slice(0, 3).join(', ')}`
+                  );
+                } else {
+                  console.log(
+                    `❌ [Debug] Following list LOST after container pagination!`
+                  );
+                }
+                resolve();
+                return prev; // Don't modify state
+              });
             });
             break;
           case 'hybrid-caching':
@@ -908,6 +1136,9 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
         console.log(
           `🔍 [Fresh Data] Now applying "${filter}" filter to ${allSnaps.length} newly fetched snaps...`
         );
+        console.log(
+          `🔍 [Fresh Data] Using followingList with ${followingList.length} users for filtering`
+        );
         const filteredSnaps = applyFilter(allSnaps, filter, followingList);
 
         // Update state with both all snaps and filtered snaps
@@ -924,6 +1155,7 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
             snaps: filteredSnaps,
             followingList: followingList,
             loading: false,
+            currentFilter: filter,
           };
         });
 
@@ -1048,17 +1280,45 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
         `🗑️ [Refresh] Clearing all cached data for filter: ${filter}`
       );
 
+      // Check current following list before refresh
+      let currentFollowingCount = 0;
+      setState(prev => {
+        currentFollowingCount = prev.followingList?.length || 0;
+        console.log(
+          `🔍 [Refresh] Following list before clear: ${currentFollowingCount} users`
+        );
+        return prev;
+      });
+
       // Reset pagination state and fetch fresh
       setState(prev => ({
         ...prev,
         allSnaps: [], // Clear cached snaps
-        followingList: [], // Clear following cache
+        // DON'T clear followingList - it's user's social graph, not content cache
+        // followingList: [], // REMOVED - this was causing the bug!
         lastContainerIndex: 0,
         lastContainerAuthor: undefined,
         lastContainerPermlink: undefined,
         cacheTimestamp: 0,
         containerCache: undefined,
+        // Clear container list for fresh start
+        containerList: new ContainerList(prev.maxContainers),
       }));
+
+      // Verify following list is preserved
+      setState(prev => {
+        console.log(
+          `✅ [Refresh] Following list after clear: ${prev.followingList?.length || 0} users (should be ${currentFollowingCount})`
+        );
+        if ((prev.followingList?.length || 0) !== currentFollowingCount) {
+          console.log(`❌ [Refresh] Following list was accidentally cleared!`);
+        } else {
+          console.log(
+            `✅ [Refresh] Following list correctly preserved during refresh`
+          );
+        }
+        return prev;
+      });
 
       console.log(`📡 [Refresh] Forcing fresh fetch (useCache=false)...`);
       await fetchSnaps(filter, false);
@@ -1066,43 +1326,340 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
     [fetchSnaps]
   );
 
-  const clearError = useCallback(() => {
-    setState(prev => ({ ...prev, error: null }));
-  }, []);
+  // ===== MEMORY MANAGEMENT UTILITY FUNCTIONS =====
 
-  const { updateSnapInArray } = useOptimisticUpdates();
+  // Utility function to create a unique key for snaps
+  const getSnapKey = (snap: Snap): string => {
+    return `${snap.author}-${snap.permlink}`;
+  };
 
-  const updateSnap = useCallback(
-    (author: string, permlink: string, updates: Partial<Snap>) => {
-      setState(prev => ({
-        ...prev,
-        snaps: updateSnapInArray(prev.snaps, author, permlink, updates),
-      }));
-    },
-    [updateSnapInArray]
-  );
-
-  const setHasMore = useCallback((hasMore: boolean) => {
-    setState(prev => ({ ...prev, hasMore }));
-  }, []);
-
-  // Utility function to deduplicate snaps by author+permlink
-  const deduplicateSnaps = useCallback((snaps: Snap[]): Snap[] => {
+  // Utility function to deduplicate snaps with minimal logging
+  const deduplicateSnaps = (snaps: Snap[]): Snap[] => {
     const seen = new Set<string>();
     const deduplicated: Snap[] = [];
 
     for (const snap of snaps) {
-      const key = `${snap.author}-${snap.permlink}`;
+      const key = getSnapKey(snap);
       if (!seen.has(key)) {
         seen.add(key);
         deduplicated.push(snap);
       }
     }
 
-    console.log(
-      `🔄 [Dedupe] Removed ${snaps.length - deduplicated.length} duplicate snaps (${snaps.length} → ${deduplicated.length})`
-    );
+    // Only log when duplicates are actually found
+    const duplicatesRemoved = snaps.length - deduplicated.length;
+    if (duplicatesRemoved > 0) {
+      console.log(
+        `🔧 [Dedup] Removed ${duplicatesRemoved} duplicates: ${snaps.length} → ${deduplicated.length} snaps`
+      );
+    }
+
     return deduplicated;
+  };
+
+  // Add a new container to the sliding window (returns updated state)
+  const addContainer = useCallback(
+    (
+      containerMetadata: ContainerMetadata,
+      currentState: FeedState
+    ): FeedState => {
+      console.log(
+        `🔍 [addContainer] Input state followingList: ${currentState.followingList?.length || 0} users`
+      );
+
+      // Create new container list to maintain immutability
+      const newContainerList = new ContainerList(currentState.maxContainers);
+
+      // Copy existing containers to new list
+      const existingContainers = currentState.containerList.toArray();
+      existingContainers.forEach(container => {
+        newContainerList.append(container);
+      });
+
+      // Add the new container
+      newContainerList.append(containerMetadata);
+
+      const stats = newContainerList.getStats();
+      console.log(
+        `💾 [Memory] Total containers in memory: ${stats.containersInMemory}/${currentState.maxContainers}`
+      );
+      console.log(
+        `📊 [Memory] Total snaps in memory: ${stats.totalSnaps} across ${stats.containersInMemory} containers`
+      );
+
+      const newState = {
+        ...currentState,
+        containerList: newContainerList,
+        // Explicitly preserve important state that should not be lost
+        followingList: currentState.followingList,
+        allSnaps: currentState.allSnaps,
+      };
+
+      console.log(
+        `🔍 [addContainer] Output state followingList: ${newState.followingList?.length || 0} users`
+      );
+
+      return newState;
+    },
+    []
+  );
+
+  // Get current snaps from all containers in memory with filtering (minimal logging)
+  const getCurrentSnapsFromContainers = useCallback(
+    (
+      containerList: ContainerList,
+      filter?: FeedFilter,
+      followingList?: string[]
+    ): Snap[] => {
+      // Get all snaps from the linked list
+      const allSnaps = containerList.getAllSnaps();
+
+      // Deduplicate the combined snaps
+      const deduplicated = deduplicateSnaps(allSnaps);
+
+      // Apply filter if specified
+      if (filter === 'following' && followingList && followingList.length > 0) {
+        const filtered = deduplicated.filter(snap =>
+          followingList.includes(snap.author)
+        );
+        return filtered;
+      }
+
+      return deduplicated;
+    },
+    []
+  );
+
+  // Fetch and prepend older containers when scrolling up
+  const fetchOlderContainers = useCallback(
+    async (filter: FeedFilter) => {
+      console.log(`\n⬆️ [Prepend] ===== FETCHING OLDER CONTAINERS =====`);
+
+      const oldestContainer = state.containerList.getOldest();
+      if (!oldestContainer || oldestContainer.index === 0) {
+        console.log(
+          `⬆️ [Prepend] No older containers to fetch (already at beginning)`
+        );
+        return;
+      }
+
+      console.log(
+        `⬆️ [Prepend] Fetching containers older than index ${oldestContainer.index}`
+      );
+
+      setState(prev => ({ ...prev, loading: true }));
+
+      try {
+        // Calculate the target container index (older than current oldest)
+        const targetIndex = Math.max(0, oldestContainer.index - 1);
+
+        console.log(`⬆️ [Prepend] Target container index: ${targetIndex}`);
+
+        // Use the oldest container's start point for pagination
+        const startAuthor = oldestContainer.author;
+        const startPermlink = oldestContainer.permlink;
+
+        const response = await client.database.getDiscussions('created', {
+          tag: '',
+          limit: 30, // Fetch one container worth of posts
+          start_author: startAuthor,
+          start_permlink: startPermlink,
+        });
+
+        console.log(
+          `⬆️ [Prepend] API Response: ${response.length} posts fetched`
+        );
+
+        if (response.length === 0) {
+          console.log(`⬆️ [Prepend] No older posts found`);
+          setState(prev => ({ ...prev, loading: false }));
+          return;
+        }
+
+        // Remove the first post if it's the same as our reference point
+        let filteredPosts = response;
+        if (
+          response.length > 0 &&
+          response[0].author === startAuthor &&
+          response[0].permlink === startPermlink
+        ) {
+          filteredPosts = response.slice(1);
+          console.log(
+            `⬆️ [Prepend] Removed duplicate reference post, ${filteredPosts.length} new posts`
+          );
+        }
+
+        if (filteredPosts.length === 0) {
+          console.log(`⬆️ [Prepend] No new posts after deduplication`);
+          setState(prev => ({ ...prev, loading: false }));
+          return;
+        }
+
+        // Create container metadata for the older content
+        const containerMetadata: ContainerMetadata = {
+          author: filteredPosts[0].author,
+          permlink: filteredPosts[0].permlink,
+          snaps: filteredPosts,
+          index: targetIndex,
+          timestamp: Date.now(),
+        };
+
+        setState(prev => {
+          // Create new container list and prepend the older container
+          const newContainerList = new ContainerList(prev.maxContainers);
+
+          // Add the new older container first
+          newContainerList.prepend(containerMetadata);
+
+          // Add existing containers (this will trigger automatic size management)
+          const existingContainers = prev.containerList.toArray();
+          existingContainers.forEach(container => {
+            newContainerList.append(container);
+          });
+
+          // Get updated snaps for display
+          const updatedSnaps = getCurrentSnapsFromContainers(
+            newContainerList,
+            filter,
+            prev.followingList
+          );
+
+          console.log(`⬆️ [Prepend] Container prepended successfully:`);
+          console.log(
+            `   📦 [Prepend] - Container ${containerMetadata.index} with ${containerMetadata.snaps.length} snaps`
+          );
+          console.log(
+            `   📊 [Prepend] - Total: ${newContainerList.getSize()} containers, ${updatedSnaps.length} snaps`
+          );
+
+          return {
+            ...prev,
+            containerList: newContainerList,
+            snaps: updatedSnaps,
+            allSnaps: newContainerList.getAllSnaps(),
+            loading: false,
+          };
+        });
+      } catch (error) {
+        console.error(`❌ [Prepend] Failed to fetch older containers:`, error);
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          error: `Failed to load older content: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        }));
+      }
+    },
+    [state.containerList, getCurrentSnapsFromContainers]
+  );
+
+  // Enhanced check scroll bounds with actual prefetching
+  const checkScrollBounds = useCallback(
+    (currentIndex: number, totalItems: number) => {
+      // Don't check boundaries if there are no items or very few items
+      if (totalItems === 0 || totalItems < 20) {
+        return; // Skip prefetch checks for empty or very small lists
+      }
+
+      const prefetchThreshold = 10; // Prefetch when within 10 items of boundary
+
+      const nearTop = currentIndex < prefetchThreshold;
+      const nearBottom = currentIndex > totalItems - prefetchThreshold;
+
+      if (nearTop && state.containerList.getSize() > 0) {
+        const oldestContainer = state.containerList.getOldest();
+        if (oldestContainer && oldestContainer.index > 0) {
+          console.log(
+            `⬆️ [Prefetch] User near top (index ${currentIndex}) - triggering fetch for older content before container ${oldestContainer.index}`
+          );
+          // Fetch older containers using the current filter
+          fetchOlderContainers(state.currentFilter || 'newest');
+        }
+      }
+
+      if (nearBottom) {
+        console.log(
+          `⬇️ [Prefetch] User near bottom (index ${currentIndex}/${totalItems}) - could prefetch newer content`
+        );
+        // TODO: Implement prefetching newer containers when reaching bottom
+      }
+    },
+    [state.containerList, state.currentFilter, fetchOlderContainers]
+  );
+
+  // Track scroll position for memory management (throttled)
+  const onScrollPositionChange = useCallback(
+    (index: number) => {
+      setState(prev => {
+        // Only update if the position changed significantly (avoid excessive calls)
+        if (Math.abs(index - prev.currentPosition) < 5) {
+          return prev; // Don't update state for small changes
+        }
+
+        return {
+          ...prev,
+          currentPosition: index,
+        };
+      });
+
+      // Only check bounds occasionally, not on every scroll
+      if (index % 10 === 0) {
+        const totalItems = getCurrentSnapsFromContainers(
+          state.containerList
+        ).length;
+        checkScrollBounds(index, totalItems);
+      }
+    },
+    [state.containerList, getCurrentSnapsFromContainers, checkScrollBounds]
+  );
+
+  // Get memory statistics for debugging (no automatic logging)
+  const getMemoryStats = useCallback(() => {
+    return state.containerList.getStats();
+  }, [state.containerList]);
+
+  // ===== END MEMORY MANAGEMENT UTILITY FUNCTIONS =====
+
+  const { updateSnapInArray } = useOptimisticUpdates();
+
+  const updateSnap = useCallback(
+    (author: string, permlink: string, updates: Partial<Snap>) => {
+      setState(prev => {
+        // Create new container list with updated snaps
+        const newContainerList = new ContainerList(prev.maxContainers);
+        const existingContainers = prev.containerList.toArray();
+
+        existingContainers.forEach(container => {
+          const updatedContainer = {
+            ...container,
+            snaps: updateSnapInArray(
+              container.snaps,
+              author,
+              permlink,
+              updates
+            ),
+          };
+          newContainerList.append(updatedContainer);
+        });
+
+        return {
+          ...prev,
+          snaps: updateSnapInArray(prev.snaps, author, permlink, updates),
+          allSnaps: prev.allSnaps
+            ? updateSnapInArray(prev.allSnaps, author, permlink, updates)
+            : prev.allSnaps,
+          containerList: newContainerList,
+        };
+      });
+    },
+    [updateSnapInArray]
+  );
+
+  const clearError = useCallback(() => {
+    setState(prev => ({ ...prev, error: null }));
+  }, []);
+
+  const setHasMore = useCallback((hasMore: boolean) => {
+    setState(prev => ({ ...prev, hasMore }));
   }, []);
 
   return {
@@ -1115,5 +1672,7 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
     setHasMore,
     fetchAndCacheFollowingList,
     ensureFollowingListCached,
+    onScrollPositionChange,
+    getMemoryStats,
   };
 };

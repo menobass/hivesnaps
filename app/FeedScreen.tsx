@@ -147,6 +147,8 @@ const FeedScreenRefactored = () => {
     setHasMore,
     fetchAndCacheFollowingList,
     ensureFollowingListCached,
+    onScrollPositionChange,
+    getMemoryStats,
   } = useFeedData(username);
 
   const { hivePrice, globalProps, rewardFund } = useHiveData();
@@ -207,9 +209,33 @@ const FeedScreenRefactored = () => {
   // Initial data fetch on mount - only once
   useEffect(() => {
     if (!hasInitialFetch.current) {
+      console.log(
+        `🎬 [FeedScreen] ===== APP STARTUP - MEMORY MANAGEMENT INITIALIZED =====`
+      );
       console.log(`🎬 [FeedScreen] Initial mount - fetching data once`);
+      const initialStats = getMemoryStats();
+      console.log(
+        `📊 [FeedScreen] Initial memory state: ${initialStats.memoryUsage}`
+      );
+      console.log(
+        `🏗️ [FeedScreen] About to fetch snaps using container-pagination strategy...`
+      );
       hasInitialFetch.current = true;
-      fetchSnaps('newest', false); // Force fresh fetch on mount
+      fetchSnaps('newest', false).then(() => {
+        // Log memory state after initial fetch
+        const postFetchStats = getMemoryStats();
+        console.log(
+          `📊 [FeedScreen] After initial fetch: ${postFetchStats.memoryUsage}`
+        );
+        console.log(
+          `📊 [FeedScreen] Snaps loaded: ${snaps.length}, AllSnaps: ${allSnaps?.length || 0}`
+        );
+        if (postFetchStats.containersInMemory === 0) {
+          console.log(
+            `⚠️ [FeedScreen] WARNING: No containers created after initial fetch! Container system may not be working.`
+          );
+        }
+      }); // Force fresh fetch on mount
     }
   }, []); // Empty deps - only run once on mount
 
@@ -262,16 +288,28 @@ const FeedScreenRefactored = () => {
 
   // Handle when user reaches near the end of the list
   const handleEndReached = () => {
-    console.log(`\n📜 [FeedScreen] User scrolled to end of list`);
+    console.log(`\n📜 [FeedScreen] ===== USER REACHED END OF LIST =====`);
     console.log(
       `📊 [FeedScreen] Current state: ${snaps.length} snaps, hasMore=${hasMore}, loading=${feedLoading}`
     );
 
+    // Show current memory stats before loading more
+    const currentStats = getMemoryStats();
+    console.log(
+      `📊 [FeedScreen] Memory before load more: ${currentStats.memoryUsage}`
+    );
+
     if (hasMore && !feedLoading) {
       console.log(
-        `🔄 [FeedScreen] Triggering loadMoreSnaps for filter: ${activeFilter}`
+        `🔄 [FeedScreen] Triggering loadMoreSnaps for filter: ${activeFilter} - this may trigger memory cleanup!`
       );
-      loadMoreSnaps(activeFilter);
+      loadMoreSnaps(activeFilter).then(() => {
+        // Log memory stats after loading more
+        const newStats = getMemoryStats();
+        console.log(
+          `📊 [FeedScreen] Memory after load more: ${newStats.memoryUsage}`
+        );
+      });
     } else {
       console.log(
         `⏹️ [FeedScreen] Not loading more - hasMore: ${hasMore}, loading: ${feedLoading}`
@@ -391,9 +429,73 @@ const FeedScreenRefactored = () => {
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: any[] }) => {
-      // Track visible items if needed
+      // Track the first visible item for scroll position
+      if (viewableItems.length > 0) {
+        const firstVisibleIndex = viewableItems[0].index || 0;
+        onScrollPositionChange(firstVisibleIndex);
+      }
     }
   ).current;
+
+  // Track scroll position for memory management and prefetching (throttled)
+  const handleScroll = useRef((event: any) => {
+    const { contentOffset, layoutMeasurement, contentSize } = event.nativeEvent;
+    const scrollY = contentOffset.y;
+    const screenHeight = layoutMeasurement.height;
+    const totalHeight = contentSize.height;
+
+    // Calculate approximate current item index based on scroll position
+    // Assuming each item is roughly 200-300px tall
+    const estimatedItemHeight = 250;
+    const currentIndex = Math.floor(scrollY / estimatedItemHeight);
+
+    // Call the memory management function with current index (now throttled internally)
+    onScrollPositionChange(currentIndex);
+
+    // Log memory stats much less frequently - every 50 items and only when containers exist
+    if (__DEV__ && currentIndex % 50 === 0 && currentIndex > 0) {
+      const stats = getMemoryStats();
+      if (stats.containersInMemory > 0) {
+        const scrollPercent = Math.round(
+          (scrollY / (totalHeight - screenHeight)) * 100
+        );
+        console.log(
+          `📊 [Scroll] Item ${currentIndex}, ${scrollPercent}% scrolled, Memory: ${stats.memoryUsage}`
+        );
+        console.log(
+          `📊 [Scroll] Containers: ${stats.containersInMemory}, Total snaps: ${stats.totalSnaps}`
+        );
+      }
+    }
+  }).current;
+
+  // Debug function to manually check memory stats (can be called from console)
+  const logMemoryStats = () => {
+    const stats = getMemoryStats();
+    console.log(`\n🔍 [DEBUG] ===== MANUAL MEMORY STATS CHECK =====`);
+    console.log(
+      `🔍 [DEBUG] Containers in memory: ${stats.containersInMemory}/${3}`
+    );
+    console.log(`🔍 [DEBUG] Total snaps: ${stats.totalSnaps}`);
+    console.log(`🔍 [DEBUG] Memory usage: ${stats.memoryUsage}`);
+    console.log(`🔍 [DEBUG] Current snaps shown: ${snaps.length}`);
+    console.log(`🔍 [DEBUG] All snaps cached: ${allSnaps?.length || 0}`);
+    console.log(`🔍 [DEBUG] ===== END MEMORY STATS =====\n`);
+    return stats;
+  };
+
+  // Make the debug function globally available in development
+  if (__DEV__) {
+    (globalThis as any).logMemoryStats = logMemoryStats;
+    // Also add explicit stats logging
+    (globalThis as any).showMemoryStats = () => {
+      const stats = getMemoryStats();
+      console.log(
+        `📊 [Manual] ${stats.memoryUsage}, total snaps: ${stats.totalSnaps}`
+      );
+      return stats;
+    };
+  }
 
   return (
     <View style={styles.container}>
@@ -738,6 +840,8 @@ const FeedScreenRefactored = () => {
             }}
             viewabilityConfig={viewabilityConfig}
             onViewableItemsChanged={onViewableItemsChanged}
+            onScroll={handleScroll}
+            scrollEventThrottle={16} // Throttle scroll events for performance
           />
         )}
       </View>
