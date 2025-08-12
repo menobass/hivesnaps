@@ -44,6 +44,7 @@
     "expo-status-bar": "~2.2.3",
     "expo-system-ui": "~5.0.9",
     "expo-web-browser": "~14.2.0",
+    "js-sha256": "^0.11.1",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-native": "0.79.5",
