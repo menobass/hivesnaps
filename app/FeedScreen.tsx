@@ -37,6 +37,9 @@ import { useVotingPower } from '../hooks/useVotingPower';
 import { useResourceCredits } from '../hooks/useResourceCredits';
 import { useUserProfile } from '../hooks/useUserProfile';
 
+// Shared state management
+import { useAppStore, useCurrentUser, useAppDebug } from '../store/context';
+
 // Components
 import Snap from './components/Snap';
 import NotificationBadge from './components/NotificationBadge';
@@ -100,6 +103,11 @@ const FeedScreenRefactored = () => {
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
   const router = useRouter();
+
+  // Shared state integration
+  const { selectors } = useAppStore();
+  const currentUser = useCurrentUser();
+  const { cacheStats, isAnyLoading: isAppLoading } = useAppDebug();
 
   // Theme colors
   const colors = {
