@@ -136,18 +136,17 @@ const FeedScreenRefactored = () => {
 
   const {
     snaps,
-    allSnaps,
     loading: feedLoading,
     error: feedError,
-    hasMore,
+    currentFilter,
     fetchSnaps,
     refreshSnaps,
     loadMoreSnaps,
     updateSnap,
-    setHasMore,
     fetchAndCacheFollowingList,
     ensureFollowingListCached,
     onScrollPositionChange,
+    setFilter,
     getMemoryStats,
   } = useFeedData(username);
 
@@ -188,8 +187,6 @@ const FeedScreenRefactored = () => {
 
   const { unreadCount } = useNotifications(username || null);
 
-  // Local UI state
-  const [activeFilter, setActiveFilter] = useState<FeedFilter>('newest');
   const [isSearchModalVisible, setIsSearchModalVisible] = useState(false);
   const [vpInfoModalVisible, setVpInfoModalVisible] = useState(false);
   const [rcInfoModalVisible, setRcInfoModalVisible] = useState(false);
@@ -221,15 +218,13 @@ const FeedScreenRefactored = () => {
         `🏗️ [FeedScreen] About to fetch snaps using container-pagination strategy...`
       );
       hasInitialFetch.current = true;
-      fetchSnaps('newest', false).then(() => {
+      fetchSnaps(false).then(() => {
         // Log memory state after initial fetch
         const postFetchStats = getMemoryStats();
         console.log(
           `📊 [FeedScreen] After initial fetch: ${postFetchStats.memoryUsage}`
         );
-        console.log(
-          `📊 [FeedScreen] Snaps loaded: ${snaps.length}, AllSnaps: ${allSnaps?.length || 0}`
-        );
+     
         if (postFetchStats.containersInMemory === 0) {
           console.log(
             `⚠️ [FeedScreen] WARNING: No containers created after initial fetch! Container system may not be working.`
@@ -239,30 +234,10 @@ const FeedScreenRefactored = () => {
     }
   }, []); // Empty deps - only run once on mount
 
-  // Fetch snaps when filter changes (client-side filtering for cached data)
+  // Log filter changes (client-side filtering happens automatically in useFeedData)
   useEffect(() => {
-    console.log(`\n🎯 [FeedScreen] ===== FILTER CHANGE EFFECT =====`);
-    console.log(`🎯 [FeedScreen] Filter: ${activeFilter}`);
-    console.log(`🎯 [FeedScreen] hasInitialFetch: ${hasInitialFetch.current}`);
-    console.log(`🎯 [FeedScreen] allSnaps length: ${allSnaps?.length || 0}`);
-    console.log(`🎯 [FeedScreen] snaps length: ${snaps.length}`);
-
-    // Skip if this is the initial render or no data loaded yet
-    if (!hasInitialFetch.current || (allSnaps && allSnaps.length === 0)) {
-      console.log(
-        `⏭️ [FeedScreen] Skipping filter change - no data loaded yet (allSnaps: ${allSnaps?.length || 0})`
-      );
-      console.log(`⏭️ [FeedScreen] ===== FILTER CHANGE SKIPPED =====\n`);
-      return;
-    }
-
-    console.log(`🔄 [FeedScreen] Filter changed to: ${activeFilter}`);
-    console.log(
-      `✅ [FeedScreen] Proceeding with filter change - using cached data!`
-    );
-    console.log(`✅ [FeedScreen] ===== FILTER CHANGE PROCEEDING =====\n`);
-    fetchSnaps(activeFilter, true);
-  }, [activeFilter]); // Only depend on activeFilter
+    console.log(`🎯 [FeedScreen] Filter changed to: ${currentFilter} (client-side filtering)`);
+  }, [currentFilter]);
 
   // Fetch following list when username becomes available
   useEffect(() => {
@@ -289,21 +264,18 @@ const FeedScreenRefactored = () => {
   // Handle when user reaches near the end of the list
   const handleEndReached = () => {
     console.log(`\n📜 [FeedScreen] ===== USER REACHED END OF LIST =====`);
-    console.log(
-      `📊 [FeedScreen] Current state: ${snaps.length} snaps, hasMore=${hasMore}, loading=${feedLoading}`
-    );
-
+   
     // Show current memory stats before loading more
     const currentStats = getMemoryStats();
     console.log(
       `📊 [FeedScreen] Memory before load more: ${currentStats.memoryUsage}`
     );
 
-    if (hasMore && !feedLoading) {
+    if (!feedLoading) {
       console.log(
-        `🔄 [FeedScreen] Triggering loadMoreSnaps for filter: ${activeFilter} - this may trigger memory cleanup!`
+        `🔄 [FeedScreen] Triggering loadMoreSnaps for filter: ${currentFilter} - this may trigger memory cleanup!`
       );
-      loadMoreSnaps(activeFilter).then(() => {
+      loadMoreSnaps().then(() => {
         // Log memory stats after loading more
         const newStats = getMemoryStats();
         console.log(
@@ -312,7 +284,7 @@ const FeedScreenRefactored = () => {
       });
     } else {
       console.log(
-        `⏹️ [FeedScreen] Not loading more - hasMore: ${hasMore}, loading: ${feedLoading}`
+        `⏹️ [FeedScreen] Not loading more, loading: ${feedLoading}`
       );
     }
   };
@@ -321,10 +293,10 @@ const FeedScreenRefactored = () => {
   const handleFilterPress = (filter: FeedFilter) => {
     console.log(`\n🎯 [FeedScreen] User tapped "${filter}" filter button`);
     console.log(
-      `� [FeedScreen] Current filter: "${activeFilter}" → New filter: "${filter}"`
+      `� [FeedScreen] Current filter: "${currentFilter}" → New filter: "${filter}"`
     );
 
-    if (filter === activeFilter) {
+    if (filter === currentFilter) {
       console.log(`ℹ️ [FeedScreen] Same filter selected - no action needed`);
       return;
     }
@@ -342,11 +314,11 @@ const FeedScreenRefactored = () => {
         console.log(
           `👥 [FeedScreen] Following list is now cached, proceeding with filter change`
         );
-        setActiveFilter(filter);
+        setFilter(filter);
       });
     } else {
       // For other filters, change immediately
-      setActiveFilter(filter);
+      setFilter(filter);
     }
   };
 
@@ -474,12 +446,21 @@ const FeedScreenRefactored = () => {
     const stats = getMemoryStats();
     console.log(`\n🔍 [DEBUG] ===== MANUAL MEMORY STATS CHECK =====`);
     console.log(
-      `🔍 [DEBUG] Containers in memory: ${stats.containersInMemory}/${3}`
+      `🔍 [DEBUG] Containers in memory: ${stats.containersInMemory}/4`
     );
     console.log(`🔍 [DEBUG] Total snaps: ${stats.totalSnaps}`);
     console.log(`🔍 [DEBUG] Memory usage: ${stats.memoryUsage}`);
     console.log(`🔍 [DEBUG] Current snaps shown: ${snaps.length}`);
-    console.log(`🔍 [DEBUG] All snaps cached: ${allSnaps?.length || 0}`);
+    
+    // Add registry information
+    if (stats.registryInfo) {
+      console.log(`📝 [DEBUG] === CONTAINER REGISTRY ===`);
+      console.log(`📝 [DEBUG] Total tracked: ${stats.registryInfo.totalTracked}`);
+      console.log(`📝 [DEBUG] In memory: ${stats.registryInfo.inMemory}`);
+      console.log(`📝 [DEBUG] Freed: ${stats.registryInfo.freed}`);
+      console.log(`📝 [DEBUG] Registry snaps: ${stats.registryInfo.snapsInRegistry}`);
+    }
+    
     console.log(`🔍 [DEBUG] ===== END MEMORY STATS =====\n`);
     return stats;
   };
@@ -699,7 +680,7 @@ const FeedScreenRefactored = () => {
                   styles.filterBtnScrollable,
                   {
                     backgroundColor:
-                      activeFilter === filter.key
+                      currentFilter === filter.key
                         ? colors.button
                         : colors.buttonInactive,
                     marginLeft: index === 0 ? 0 : 8,
@@ -713,7 +694,7 @@ const FeedScreenRefactored = () => {
                   name={filter.icon as any}
                   size={16}
                   color={
-                    activeFilter === filter.key
+                    currentFilter === filter.key
                       ? colors.buttonText
                       : colors.text
                   }
@@ -724,7 +705,7 @@ const FeedScreenRefactored = () => {
                     styles.filterTextScrollable,
                     {
                       color:
-                        activeFilter === filter.key
+                        currentFilter === filter.key
                           ? colors.buttonText
                           : colors.text,
                     },
@@ -828,7 +809,7 @@ const FeedScreenRefactored = () => {
             style={{ width: '100%' }}
             refreshing={feedLoading}
             onRefresh={async () => {
-              await refreshSnaps(activeFilter);
+              await refreshSnaps();
             }}
             onEndReached={handleEndReached}
             onEndReachedThreshold={0.3}
