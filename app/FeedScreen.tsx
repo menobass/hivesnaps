@@ -156,7 +156,7 @@ const FeedScreenRefactored = () => {
     onScrollPositionChange,
     setFilter,
     getMemoryStats,
-  } = useFeedData(username);
+  } = useFeedData();
 
   const { hivePrice, globalProps, rewardFund } = useHiveData();
 
