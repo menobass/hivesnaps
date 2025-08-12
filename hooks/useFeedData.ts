@@ -1,9 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Client } from '@hiveio/dhive';
-import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
+import { useFollowingList, useCurrentUser } from '../store/context';
 
 /**
- * Refactored Feed Data Hook with Ordered Container Map
+ * Refactored Feed Data Hook with Ordered Container Map and Shared State Integration
  * 
  * This hook manages Hive snaps using a clean, robust ordered dictionary structure:
  * - OrderedContainerMap: Map keyed by permlink, value is container metadata with snaps
@@ -12,6 +12,7 @@ import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
  * - For initial fetch: omits start_permlink (API best practice)
  * - For pagination: includes start_permlink from last container
  * - Memory efficient with configurable max containers
+ * - Integrates with shared state management for following lists (eliminates redundant API calls)
  */
 
 const HIVE_NODES = [
@@ -145,12 +146,12 @@ interface FeedState {
   snaps: Snap[];
   loading: boolean;
   error: string | null;
-  followingList: string[];
   containerMap: OrderedContainerMap;
   currentFilter: FeedFilter; // Add internal filter state
 }
 
 interface UseFeedDataReturn extends FeedState {
+  followingList: string[]; // From shared state
   fetchSnaps: (useCache?: boolean) => Promise<void>; // Remove filter parameter
   refreshSnaps: () => Promise<void>; // Remove filter parameter
   loadMoreSnaps: () => Promise<void>; // Remove filter parameter
@@ -173,15 +174,30 @@ interface UseFeedDataReturn extends FeedState {
   };
 }
 
-export const useFeedData = (username: string | null): UseFeedDataReturn => {
+// Remove username param from useFeedData
+export function useFeedData(): UseFeedDataReturn {
+  const username = useCurrentUser();
   const [state, setState] = useState<FeedState>({
     snaps: [],
     loading: false,
     error: null,
-    followingList: [],
     containerMap: new OrderedContainerMap(4),
     currentFilter: 'newest', // Default filter
   });
+
+  // Use shared state for following list (eliminates redundant API calls)
+  const { 
+    followingList, 
+    needsRefresh: needsFollowingRefresh,
+    setFollowingList,
+    setLoading: setFollowingLoading,
+    setError: setFollowingError 
+  } = useFollowingList(username || '');
+
+  const followingListRef = useRef(followingList);
+  useEffect(() => {
+    followingListRef.current = followingList;
+  }, [followingList]);
 
   // Utility function to apply filtering to snaps
   const applyFilter = useCallback((snaps: Snap[], filter: FeedFilter, followingList: string[], currentUsername: string | null): Snap[] => {
@@ -262,7 +278,7 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
         setState(prev => ({
           ...prev,
           loading: false,
-          snaps: prev.containerMap.getAllSnaps(), // Keep existing snaps
+          snaps: prev.snaps
         }));
         return;
       }
@@ -304,8 +320,8 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
         // Get all snaps from the ordered dictionary (flattened)
         const allSnaps = prev.containerMap.getAllSnaps();
         
-        // Apply current filter to the updated snap list
-        const filteredSnaps = applyFilter(allSnaps, prev.currentFilter, prev.followingList, username);
+        // Apply current filter to the updated snap list using shared state
+        const filteredSnaps = applyFilter(allSnaps, prev.currentFilter, followingListRef.current || [], username);
 
         console.log('✅ [FetchSnaps] Stored in ordered dictionary:', {
           containerPermlink: containerPost.permlink,
@@ -380,13 +396,50 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
 
   const fetchAndCacheFollowingList = useCallback(async (username: string): Promise<string[]> => {
     console.log('👤 [useFeedData] fetchAndCacheFollowingList called for', username);
-    return [];
-  }, []);
+    
+    // Check if we already have cached data and don't need refresh
+    if (followingList && !needsFollowingRefresh) {
+      console.log('👤 [fetchAndCacheFollowingList] Using cached following list:', followingList.length, 'users');
+      return followingList;
+    }
+
+    try {
+      setFollowingLoading(true);
+      
+      // Fetch following list from Hive blockchain
+      const following = await client.database.call(
+        'get_following',
+        [username, '', 'blog', 1000]
+      );
+
+      const followingUsernames = following.map((f: any) => f.following);
+      console.log('👤 [fetchAndCacheFollowingList] Fetched', followingUsernames.length, 'users from blockchain');
+
+      // Cache in shared state
+      setFollowingList(followingUsernames);
+      setFollowingError(null);
+      
+      return followingUsernames;
+    } catch (error) {
+      console.error('❌ [fetchAndCacheFollowingList] Error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch following list';
+      setFollowingError(errorMessage);
+      return [];
+    } finally {
+      setFollowingLoading(false);
+    }
+  }, [followingList, needsFollowingRefresh, setFollowingList, setFollowingLoading, setFollowingError]);
 
   const ensureFollowingListCached = useCallback(async (username: string) => {
     console.log('👤 [useFeedData] ensureFollowingListCached called for', username);
-    // Do nothing - just log
-  }, []);
+    
+    // Only fetch if we don't have cached data or it needs refresh
+    if (!followingList || needsFollowingRefresh) {
+      await fetchAndCacheFollowingList(username);
+    } else {
+      console.log('👤 [ensureFollowingListCached] Using cached data:', followingList.length, 'users');
+    }
+  }, [followingList, needsFollowingRefresh, fetchAndCacheFollowingList]);
 
   const onScrollPositionChange = useCallback((index: number) => {
     console.log('📜 [useFeedData] onScrollPositionChange called with index:', index);
@@ -402,7 +455,12 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
     
     setState(prev => {
       const allSnaps = prev.containerMap.getAllSnaps();
-      const filteredSnaps = applyFilter(allSnaps, filter, prev.followingList, username);
+      const filteredSnaps = applyFilter(
+        allSnaps,
+        filter,
+        followingListRef.current || [],
+        username
+      );
       
       console.log(`🎯 [setFilter] Filter "${filter}": ${allSnaps.length} → ${filteredSnaps.length} snaps`);
       
@@ -412,10 +470,11 @@ export const useFeedData = (username: string | null): UseFeedDataReturn => {
         snaps: filteredSnaps
       };
     });
-  }, [username, applyFilter]);
+  }, [username, applyFilter, followingList]);
 
   return {
     ...state,
+    followingList: followingList || [], // Include following list from shared state
     fetchSnaps,
     refreshSnaps,
     loadMoreSnaps,
