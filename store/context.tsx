@@ -240,18 +240,23 @@ export function useUserProfile(username: string) {
 
 export function useFollowingList(username: string) {
   const { selectors, setFollowingList, setUserLoading, setUserError } = useAppStore();
-  
+
+  // Memoize the setters so their reference never changes for a given username
+  const stableSetFollowingList = React.useCallback((following: string[]) => setFollowingList(username, following), [setFollowingList, username]);
+  const stableSetLoading = React.useCallback((loading: boolean) => setUserLoading('following', username, loading), [setUserLoading, username]);
+  const stableSetError = React.useCallback((error: string | null) => setUserError('following', username, error), [setUserError, username]);
+
   const followingList = selectors.getFollowingList(username);
   const needsRefresh = selectors.needsUserRefresh.following(username);
   const isLoading = selectors.isUserLoading('following', username);
-  
+
   return {
     followingList,
     needsRefresh,
     isLoading,
-    setFollowingList: (following: string[]) => setFollowingList(username, following),
-    setLoading: (loading: boolean) => setUserLoading('following', username, loading),
-    setError: (error: string | null) => setUserError('following', username, error),
+    setFollowingList: stableSetFollowingList,
+    setLoading: stableSetLoading,
+    setError: stableSetError,
   };
 }
 

@@ -130,7 +130,9 @@ const FeedScreenRefactored = () => {
   const styles = createFeedScreenStyles(colors, isDark);
 
   // Custom hooks for business logic
-  const { currentUsername: username, handleLogout: logout } = useUserAuth();
+  // Always use the context username for all logic
+  const username = useCurrentUser();
+  const { handleLogout: logout } = useUserAuth();
 
   // User profile and voting power data
   const {
@@ -142,6 +144,7 @@ const FeedScreenRefactored = () => {
   const { votingPower, loading: vpLoading } = useVotingPower(username);
   const { resourceCredits, loading: rcLoading } = useResourceCredits(username);
 
+  // Feed data and related functions
   const {
     snaps,
     loading: feedLoading,
@@ -156,7 +159,19 @@ const FeedScreenRefactored = () => {
     onScrollPositionChange,
     setFilter,
     getMemoryStats,
+    canFetchMore
   } = useFeedData();
+
+  // Debug: Track function references and username on every render
+  if (__DEV__) {
+    console.log('[FeedScreen][DEBUG] Render:', {
+      username,
+      fetchAndCacheFollowingList,
+      ensureFollowingListCached,
+      fetchAndCacheFollowingList_id: fetchAndCacheFollowingList && fetchAndCacheFollowingList.toString().slice(0, 60),
+      ensureFollowingListCached_id: ensureFollowingListCached && ensureFollowingListCached.toString().slice(0, 60),
+    });
+  }
 
   const { hivePrice, globalProps, rewardFund } = useHiveData();
 
@@ -248,7 +263,21 @@ const FeedScreenRefactored = () => {
   }, [currentFilter]);
 
   // Fetch following list when username becomes available
+  const prevDepsRef = useRef({ username, fetchAndCacheFollowingList, ensureFollowingListCached });
   useEffect(() => {
+    if (__DEV__) {
+      const prev = prevDepsRef.current;
+      if (prev.username !== username) {
+        console.log('[FeedScreen][DEBUG] username changed:', prev.username, '→', username);
+      }
+      if (prev.fetchAndCacheFollowingList !== fetchAndCacheFollowingList) {
+        console.log('[FeedScreen][DEBUG] fetchAndCacheFollowingList function reference changed');
+      }
+      if (prev.ensureFollowingListCached !== ensureFollowingListCached) {
+        console.log('[FeedScreen][DEBUG] ensureFollowingListCached function reference changed');
+      }
+      prevDepsRef.current = { username, fetchAndCacheFollowingList, ensureFollowingListCached };
+    }
     if (username) {
       console.log(`👤 [FeedScreen] Username became available: ${username}`);
       console.log(
@@ -272,6 +301,10 @@ const FeedScreenRefactored = () => {
   // Handle when user reaches near the end of the list
   const handleEndReached = () => {
     console.log(`\n📜 [FeedScreen] ===== USER REACHED END OF LIST =====`);
+    if (!canFetchMore()) {
+      console.log(`⏹️ [FeedScreen] Not fetching more snaps, limit reached`);
+      return;
+    }
    
     // Show current memory stats before loading more
     const currentStats = getMemoryStats();
@@ -817,6 +850,7 @@ const FeedScreenRefactored = () => {
             style={{ width: '100%' }}
             refreshing={feedLoading}
             onRefresh={async () => {
+              console.log(`🔄 [FeedScreen] User initiated pull-to-refresh`);
               await refreshSnaps();
             }}
             onEndReached={handleEndReached}
