@@ -597,20 +597,21 @@ export function useFeedData(): UseFeedDataReturn {
     const maxSize = state.containerMap.getMaxSize();
     if (containerCount >= maxSize) return false;
 
+    // Debug: Check if last container was fetched recently commented out
     // Get the most recently fetched container (last in insertion order)
-    const keys = state.containerMap.getKeys();
-    if (keys.length > 0) {
-      const lastPermlink = keys[keys.length - 1];
-      const lastContainer = (state.containerMap as any).containers.get(lastPermlink) as ContainerMetadata | undefined;
-      if (lastContainer && lastContainer.fetchedAt) {
-        const now = Date.now();
-        const FIVE_MINUTES = 5 * 60 * 1000;
-        if (now - lastContainer.fetchedAt < FIVE_MINUTES) {
-          console.log('[canFetchMore] Rate limit: last container fetched less than 5 minutes ago');
-          return false;
-        }
-      }
-    }
+    // const keys = state.containerMap.getKeys();
+    // if (keys.length > 0) {
+    //   const lastPermlink = keys[keys.length - 1];
+    //   const lastContainer = (state.containerMap as any).containers.get(lastPermlink) as ContainerMetadata | undefined;
+    //   if (lastContainer && lastContainer.fetchedAt) {
+    //     const now = Date.now();
+    //     const FIVE_MINUTES = 5 * 60 * 1000;
+    //     if (now - lastContainer.fetchedAt < FIVE_MINUTES) {
+    //       console.log('[canFetchMore] Rate limit: last container fetched less than 5 minutes ago');
+    //       return false;
+    //     }
+    //   }
+    // }
     return true;
   }, [state.containerMap]);
 
