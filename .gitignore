@@ -8,6 +8,9 @@ node_modules/
 dist/
 web-build/
 expo-env.d.ts
+
+# Development backup files
+PAGINATION_SOLUTION_BACKUP.txt
 .expo-shared/
 
 # Native
