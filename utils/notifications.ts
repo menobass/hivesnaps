@@ -256,25 +256,36 @@ export function filterNotificationsBySettings(
   settings: ReturnType<typeof getDefaultNotificationSettings>
 ): ParsedNotification[] {
   return notifications.filter(notification => {
+    let shouldInclude: boolean;
     switch (notification.type) {
       case 'vote':
-        return settings.votes;
+        shouldInclude = settings.votes;
+        break;
       case 'reply':
-        return settings.replies;
+      case 'reply_comment':
+        shouldInclude = settings.replies;
+        break;
       case 'reblog':
-        return settings.reblogs;
+        shouldInclude = settings.reblogs;
+        break;
       case 'follow':
-        return settings.follows;
+        shouldInclude = settings.follows;
+        break;
       case 'mention':
-        return settings.mentions;
+        shouldInclude = settings.mentions;
+        break;
       case 'subscribe':
       case 'set_role':
       case 'set_label':
       case 'new_community':
-        return settings.communityUpdates;
+        shouldInclude = settings.communityUpdates;
+        break;
       default:
-        return true;
+        shouldInclude = true;
+        break;
     }
+    
+    return shouldInclude;
   });
 }
 
