@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Client, PrivateKey } from '@hiveio/dhive';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
-import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
+import { uploadImageSmart } from '../utils/imageUploadService';
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -210,8 +210,9 @@ export const useAvatarManagement = (currentUsername: string | null) => {
           name: `avatar-${currentUsername}-${Date.now()}.jpg`,
           type: 'image/jpeg',
         };
-        const cloudinaryUrl = await uploadImageToCloudinaryFixed(fileToUpload);
-        setNewAvatarImage(cloudinaryUrl);
+        const uploadResult = await uploadImageSmart(fileToUpload, currentUsername);
+        console.log(`[useAvatarManagement] Avatar uploaded via ${uploadResult.provider} (cost: $${uploadResult.cost})`);
+        setNewAvatarImage(uploadResult.url);
       } catch (err) {
         console.error('Image upload error:', err);
         const errorMessage =

@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Client, PrivateKey } from '@hiveio/dhive';
 import * as SecureStore from 'expo-secure-store';
-import { uploadImageToCloudinaryFixed } from '../utils/cloudinaryImageUploadFixed';
+import { uploadImageSmart } from '../utils/imageUploadService';
 import { stripImageTags, getFirstImageUrl } from '../utils/extractImageInfo';
 
 const HIVE_NODES = [
@@ -125,8 +125,9 @@ export const useEdit = (
           type: 'image/jpeg',
         };
 
-        const cloudinaryUrl = await uploadImageToCloudinaryFixed(fileToUpload);
-        setState(prev => ({ ...prev, editImage: cloudinaryUrl }));
+        const uploadResult = await uploadImageSmart(fileToUpload, currentUsername);
+        console.log(`[useEdit] Image uploaded via ${uploadResult.provider} (cost: $${uploadResult.cost})`);
+        setState(prev => ({ ...prev, editImage: uploadResult.url }));
       }
     } catch (error) {
       console.error('Image upload error:', error);
