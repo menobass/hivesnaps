@@ -23,7 +23,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as ImagePicker from 'expo-image-picker';
 import { FontAwesome } from '@expo/vector-icons';
 import { Client, PrivateKey } from '@hiveio/dhive';
-import { uploadImageToCloudinaryFixed } from '@/utils/cloudinaryImageUploadFixed';
+import { uploadImageSmart } from '../utils/imageUploadService';
 import { useSharedContent } from '@/hooks/useSharedContent';
 import { useShare } from '@/context/ShareContext';
 import ReactNativeModal from 'react-native-modal';
@@ -307,11 +307,13 @@ export default function ComposeScreen() {
             name: `compose-${Date.now()}-${index}.jpg`,
             type: 'image/jpeg',
           };
-          return await uploadImageToCloudinaryFixed(fileToUpload);
+          const uploadResult = await uploadImageSmart(fileToUpload, currentUsername);
+          console.log(`[ComposeScreen] Image ${index + 1} uploaded via ${uploadResult.provider} (cost: $${uploadResult.cost})`);
+          return uploadResult.url;
         });
 
-        const cloudinaryUrls = await Promise.all(uploadPromises);
-        setImages(prev => [...prev, ...cloudinaryUrls]);
+        const imageUrls = await Promise.all(uploadPromises);
+        setImages(prev => [...prev, ...imageUrls]);
       } catch (err) {
         console.error('Image upload error:', err);
         Alert.alert(
