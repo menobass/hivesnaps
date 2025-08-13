@@ -37,6 +37,9 @@ import { useVotingPower } from '../hooks/useVotingPower';
 import { useResourceCredits } from '../hooks/useResourceCredits';
 import { useUserProfile } from '../hooks/useUserProfile';
 
+// Shared state management
+import { useAppStore, useCurrentUser, useAppDebug } from '../store/context';
+
 // Components
 import Snap from './components/Snap';
 import NotificationBadge from './components/NotificationBadge';
@@ -101,6 +104,11 @@ const FeedScreenRefactored = () => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
+  // Shared state integration
+  const { selectors } = useAppStore();
+  const currentUser = useCurrentUser();
+  const { cacheStats, isAnyLoading: isAppLoading } = useAppDebug();
+
   // Theme colors
   const colors = {
     background: isDark
@@ -122,7 +130,9 @@ const FeedScreenRefactored = () => {
   const styles = createFeedScreenStyles(colors, isDark);
 
   // Custom hooks for business logic
-  const { currentUsername: username, handleLogout: logout } = useUserAuth();
+  // Always use the context username for all logic
+  const username = useCurrentUser();
+  const { handleLogout: logout } = useUserAuth();
 
   // User profile and voting power data
   const {
@@ -134,14 +144,34 @@ const FeedScreenRefactored = () => {
   const { votingPower, loading: vpLoading } = useVotingPower(username);
   const { resourceCredits, loading: rcLoading } = useResourceCredits(username);
 
+  // Feed data and related functions
   const {
     snaps,
     loading: feedLoading,
     error: feedError,
+    currentFilter,
     fetchSnaps,
     refreshSnaps,
+    loadMoreSnaps,
     updateSnap,
-  } = useFeedData(username);
+    fetchAndCacheFollowingList,
+    ensureFollowingListCached,
+    onScrollPositionChange,
+    setFilter,
+    getMemoryStats,
+    canFetchMore
+  } = useFeedData();
+
+  // Debug: Track function references and username on every render
+  if (__DEV__) {
+    console.log('[FeedScreen][DEBUG] Render:', {
+      username,
+      fetchAndCacheFollowingList,
+      ensureFollowingListCached,
+      fetchAndCacheFollowingList_id: fetchAndCacheFollowingList && fetchAndCacheFollowingList.toString().slice(0, 60),
+      ensureFollowingListCached_id: ensureFollowingListCached && ensureFollowingListCached.toString().slice(0, 60),
+    });
+  }
 
   const { hivePrice, globalProps, rewardFund } = useHiveData();
 
@@ -180,8 +210,6 @@ const FeedScreenRefactored = () => {
 
   const { unreadCount } = useNotifications(username || null);
 
-  // Local UI state
-  const [activeFilter, setActiveFilter] = useState<FeedFilter>('newest');
   const [isSearchModalVisible, setIsSearchModalVisible] = useState(false);
   const [vpInfoModalVisible, setVpInfoModalVisible] = useState(false);
   const [rcInfoModalVisible, setRcInfoModalVisible] = useState(false);
@@ -191,20 +219,148 @@ const FeedScreenRefactored = () => {
 
   // Refs
   const flatListRef = useRef<FlatList<any>>(null);
+  const hasInitialFetch = useRef(false);
 
   // Load recent searches on mount
   useEffect(() => {
     loadRecentSearches();
   }, [loadRecentSearches]);
 
-  // Fetch snaps when filter changes
+  // Initial data fetch on mount - only once
   useEffect(() => {
-    fetchSnaps(activeFilter, true);
-  }, [activeFilter, fetchSnaps]);
+    if (!hasInitialFetch.current) {
+      console.log(
+        `🎬 [FeedScreen] ===== APP STARTUP - MEMORY MANAGEMENT INITIALIZED =====`
+      );
+      console.log(`🎬 [FeedScreen] Initial mount - fetching data once`);
+      const initialStats = getMemoryStats();
+      console.log(
+        `📊 [FeedScreen] Initial memory state: ${initialStats.memoryUsage}`
+      );
+      console.log(
+        `🏗️ [FeedScreen] About to fetch snaps using container-pagination strategy...`
+      );
+      hasInitialFetch.current = true;
+      fetchSnaps(false).then(() => {
+        // Log memory state after initial fetch
+        const postFetchStats = getMemoryStats();
+        console.log(
+          `📊 [FeedScreen] After initial fetch: ${postFetchStats.memoryUsage}`
+        );
+     
+        if (postFetchStats.containersInMemory === 0) {
+          console.log(
+            `⚠️ [FeedScreen] WARNING: No containers created after initial fetch! Container system may not be working.`
+          );
+        }
+      }); // Force fresh fetch on mount
+    }
+  }, []); // Empty deps - only run once on mount
+
+  // Log filter changes (client-side filtering happens automatically in useFeedData)
+  useEffect(() => {
+    console.log(`🎯 [FeedScreen] Filter changed to: ${currentFilter} (client-side filtering)`);
+  }, [currentFilter]);
+
+  // Fetch following list when username becomes available
+  const prevDepsRef = useRef({ username, fetchAndCacheFollowingList, ensureFollowingListCached });
+  useEffect(() => {
+    if (__DEV__) {
+      const prev = prevDepsRef.current;
+      if (prev.username !== username) {
+        console.log('[FeedScreen][DEBUG] username changed:', prev.username, '→', username);
+      }
+      if (prev.fetchAndCacheFollowingList !== fetchAndCacheFollowingList) {
+        console.log('[FeedScreen][DEBUG] fetchAndCacheFollowingList function reference changed');
+      }
+      if (prev.ensureFollowingListCached !== ensureFollowingListCached) {
+        console.log('[FeedScreen][DEBUG] ensureFollowingListCached function reference changed');
+      }
+      prevDepsRef.current = { username, fetchAndCacheFollowingList, ensureFollowingListCached };
+    }
+    if (username) {
+      console.log(`👤 [FeedScreen] Username became available: ${username}`);
+      console.log(
+        `👤 [FeedScreen] Fetching following list for offline filtering...`
+      );
+
+      // Call both functions to ensure following list is cached
+      fetchAndCacheFollowingList(username);
+
+      // Also ensure it's cached (this will check if it's already there)
+      ensureFollowingListCached(username).then(() => {
+        console.log(`👤 [FeedScreen] Following list ensured for ${username}`);
+      });
+    } else {
+      console.log(
+        `👤 [FeedScreen] No username yet - waiting for authentication...`
+      );
+    }
+  }, [username, fetchAndCacheFollowingList, ensureFollowingListCached]);
+
+  // Handle when user reaches near the end of the list
+  const handleEndReached = () => {
+    console.log(`\n📜 [FeedScreen] ===== USER REACHED END OF LIST =====`);
+    if (!canFetchMore()) {
+      console.log(`⏹️ [FeedScreen] Not fetching more snaps, limit reached`);
+      return;
+    }
+   
+    // Show current memory stats before loading more
+    const currentStats = getMemoryStats();
+    console.log(
+      `📊 [FeedScreen] Memory before load more: ${currentStats.memoryUsage}`
+    );
+
+    if (!feedLoading) {
+      console.log(
+        `🔄 [FeedScreen] Triggering loadMoreSnaps for filter: ${currentFilter} - this may trigger memory cleanup!`
+      );
+      loadMoreSnaps().then(() => {
+        // Log memory stats after loading more
+        const newStats = getMemoryStats();
+        console.log(
+          `📊 [FeedScreen] Memory after load more: ${newStats.memoryUsage}`
+        );
+      });
+    } else {
+      console.log(
+        `⏹️ [FeedScreen] Not loading more, loading: ${feedLoading}`
+      );
+    }
+  };
 
   // Handle filter button presses
   const handleFilterPress = (filter: FeedFilter) => {
-    setActiveFilter(filter);
+    console.log(`\n🎯 [FeedScreen] User tapped "${filter}" filter button`);
+    console.log(
+      `� [FeedScreen] Current filter: "${currentFilter}" → New filter: "${filter}"`
+    );
+
+    if (filter === currentFilter) {
+      console.log(`ℹ️ [FeedScreen] Same filter selected - no action needed`);
+      return;
+    }
+
+    console.log(
+      `🔄 [FeedScreen] Switching filters - this should use client-side filtering if data is cached!`
+    );
+
+    // If switching to "following" filter, ensure following list is cached
+    if (filter === 'following' && username) {
+      console.log(
+        `👥 [FeedScreen] Switching to following filter - ensuring following list is cached...`
+      );
+      ensureFollowingListCached(username).then(() => {
+        console.log(
+          `👥 [FeedScreen] Following list is now cached, proceeding with filter change`
+        );
+        setFilter(filter);
+      });
+    } else {
+      // For other filters, change immediately
+      setFilter(filter);
+    }
   };
 
   // Handle upvote press
@@ -286,9 +442,82 @@ const FeedScreenRefactored = () => {
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: any[] }) => {
-      // Track visible items if needed
+      // Track the first visible item for scroll position
+      if (viewableItems.length > 0) {
+        const firstVisibleIndex = viewableItems[0].index || 0;
+        onScrollPositionChange(firstVisibleIndex);
+      }
     }
   ).current;
+
+  // Track scroll position for memory management and prefetching (throttled)
+  const handleScroll = useRef((event: any) => {
+    const { contentOffset, layoutMeasurement, contentSize } = event.nativeEvent;
+    const scrollY = contentOffset.y;
+    const screenHeight = layoutMeasurement.height;
+    const totalHeight = contentSize.height;
+
+    // Calculate approximate current item index based on scroll position
+    // Assuming each item is roughly 200-300px tall
+    const estimatedItemHeight = 250;
+    const currentIndex = Math.floor(scrollY / estimatedItemHeight);
+
+    // Call the memory management function with current index (now throttled internally)
+    onScrollPositionChange(currentIndex);
+
+    // Log memory stats much less frequently - every 50 items and only when containers exist
+    if (__DEV__ && currentIndex % 50 === 0 && currentIndex > 0) {
+      const stats = getMemoryStats();
+      if (stats.containersInMemory > 0) {
+        const scrollPercent = Math.round(
+          (scrollY / (totalHeight - screenHeight)) * 100
+        );
+        console.log(
+          `📊 [Scroll] Item ${currentIndex}, ${scrollPercent}% scrolled, Memory: ${stats.memoryUsage}`
+        );
+        console.log(
+          `📊 [Scroll] Containers: ${stats.containersInMemory}, Total snaps: ${stats.totalSnaps}`
+        );
+      }
+    }
+  }).current;
+
+  // Debug function to manually check memory stats (can be called from console)
+  const logMemoryStats = () => {
+    const stats = getMemoryStats();
+    console.log(`\n🔍 [DEBUG] ===== MANUAL MEMORY STATS CHECK =====`);
+    console.log(
+      `🔍 [DEBUG] Containers in memory: ${stats.containersInMemory}/4`
+    );
+    console.log(`🔍 [DEBUG] Total snaps: ${stats.totalSnaps}`);
+    console.log(`🔍 [DEBUG] Memory usage: ${stats.memoryUsage}`);
+    console.log(`🔍 [DEBUG] Current snaps shown: ${snaps.length}`);
+    
+    // Add registry information
+    if (stats.registryInfo) {
+      console.log(`📝 [DEBUG] === CONTAINER REGISTRY ===`);
+      console.log(`📝 [DEBUG] Total tracked: ${stats.registryInfo.totalTracked}`);
+      console.log(`📝 [DEBUG] In memory: ${stats.registryInfo.inMemory}`);
+      console.log(`📝 [DEBUG] Freed: ${stats.registryInfo.freed}`);
+      console.log(`📝 [DEBUG] Registry snaps: ${stats.registryInfo.snapsInRegistry}`);
+    }
+    
+    console.log(`🔍 [DEBUG] ===== END MEMORY STATS =====\n`);
+    return stats;
+  };
+
+  // Make the debug function globally available in development
+  if (__DEV__) {
+    (globalThis as any).logMemoryStats = logMemoryStats;
+    // Also add explicit stats logging
+    (globalThis as any).showMemoryStats = () => {
+      const stats = getMemoryStats();
+      console.log(
+        `📊 [Manual] ${stats.memoryUsage}, total snaps: ${stats.totalSnaps}`
+      );
+      return stats;
+    };
+  }
 
   return (
     <View style={styles.container}>
@@ -492,7 +721,7 @@ const FeedScreenRefactored = () => {
                   styles.filterBtnScrollable,
                   {
                     backgroundColor:
-                      activeFilter === filter.key
+                      currentFilter === filter.key
                         ? colors.button
                         : colors.buttonInactive,
                     marginLeft: index === 0 ? 0 : 8,
@@ -506,7 +735,7 @@ const FeedScreenRefactored = () => {
                   name={filter.icon as any}
                   size={16}
                   color={
-                    activeFilter === filter.key
+                    currentFilter === filter.key
                       ? colors.buttonText
                       : colors.text
                   }
@@ -517,7 +746,7 @@ const FeedScreenRefactored = () => {
                     styles.filterTextScrollable,
                     {
                       color:
-                        activeFilter === filter.key
+                        currentFilter === filter.key
                           ? colors.buttonText
                           : colors.text,
                     },
@@ -556,7 +785,9 @@ const FeedScreenRefactored = () => {
           <FlatList
             ref={flatListRef}
             data={snaps}
-            keyExtractor={item => item.author + '-' + item.permlink}
+            keyExtractor={(item, index) =>
+              `${item.author}-${item.permlink}-${index}`
+            }
             renderItem={({ item }) => (
               <Snap
                 author={item.author}
@@ -619,8 +850,11 @@ const FeedScreenRefactored = () => {
             style={{ width: '100%' }}
             refreshing={feedLoading}
             onRefresh={async () => {
-              await refreshSnaps(activeFilter);
+              console.log(`🔄 [FeedScreen] User initiated pull-to-refresh`);
+              await refreshSnaps();
             }}
+            onEndReached={handleEndReached}
+            onEndReachedThreshold={0.3}
             onScrollToIndexFailed={({ index }) => {
               flatListRef.current?.scrollToOffset({
                 offset: Math.max(0, index - 2) * 220,
@@ -629,6 +863,8 @@ const FeedScreenRefactored = () => {
             }}
             viewabilityConfig={viewabilityConfig}
             onViewableItemsChanged={onViewableItemsChanged}
+            onScroll={handleScroll}
+            scrollEventThrottle={16} // Throttle scroll events for performance
           />
         )}
       </View>

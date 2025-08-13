@@ -13,6 +13,7 @@ import 'react-native-reanimated';
 import { useColorScheme } from '@/components/useColorScheme';
 import { HivePostPreviewProvider } from '../context/HivePostPreviewContext';
 import { ShareProvider } from '../context/ShareContext';
+import { AppProvider } from '../store/context';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -55,11 +56,12 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   return (
-    <ShareProvider>
-      <HivePostPreviewProvider>
-        <ThemeProvider
-          value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
-        >
+    <AppProvider>
+      <ShareProvider>
+        <HivePostPreviewProvider>
+          <ThemeProvider
+            value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
+          >
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name='(tabs)' />
               <Stack.Screen name='FeedScreen' />
@@ -71,7 +73,8 @@ function RootLayoutNav() {
               <Stack.Screen name='modal' options={{ presentation: 'modal' }} />
             </Stack>
           </ThemeProvider>
-      </HivePostPreviewProvider>
-    </ShareProvider>
+        </HivePostPreviewProvider>
+      </ShareProvider>
+    </AppProvider>
   );
 }
