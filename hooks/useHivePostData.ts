@@ -19,6 +19,7 @@ export interface HivePostData {
   replyCount: number;
   payout: number;
   avatarUrl?: string;
+  hasUpvoted?: boolean;
   active_votes?: any[];
   json_metadata?: string;
   category?: string;
@@ -34,6 +35,7 @@ export interface HiveCommentData {
   replyCount: number;
   payout: number;
   avatarUrl?: string;
+  hasUpvoted?: boolean;
   active_votes?: any[];
   json_metadata?: string;
   parent_author: string;
@@ -80,6 +82,12 @@ export const useHivePostData = (
 
   // In-memory avatar/profile cache for this session (persists across renders)
   const avatarProfileCache = useRef<Record<string, string | undefined>>({});
+
+  // Helper function to check if current user has upvoted
+  const checkHasUpvoted = useCallback((activeVotes: any[]): boolean => {
+    if (!currentUsername || !Array.isArray(activeVotes)) return false;
+    return activeVotes.some((v: any) => v.voter === currentUsername && v.percent > 0);
+  }, [currentUsername]);
 
   // Helper function to fetch avatar for a given author
   const fetchAvatar = useCallback(async (authorName: string): Promise<string | undefined> => {
@@ -208,6 +216,7 @@ export const useHivePostData = (
               replyCount: fullComment.children || 0,
               payout,
               avatarUrl,
+              hasUpvoted: checkHasUpvoted(fullComment.active_votes),
               active_votes: fullComment.active_votes,
               json_metadata: fullComment.json_metadata,
               parent_author: fullComment.parent_author,
@@ -237,6 +246,9 @@ export const useHivePostData = (
       }));
       return;
     }
+
+    // Capture currentUsername at the start of the async operation
+    const userAtFetchTime = currentUsername;
 
     setState(prev => ({ ...prev, loading: true, error: null }));
 
@@ -269,6 +281,13 @@ export const useHivePostData = (
         // Invalid JSON metadata
       }
 
+      // Create a local version of checkHasUpvoted using the captured username
+      const checkHasUpvotedLocal = (activeVotes: any[]): boolean => {
+        if (!userAtFetchTime || !Array.isArray(activeVotes)) return false;
+        const hasUpvoted = activeVotes.some((v: any) => v.voter === userAtFetchTime && v.percent > 0);
+        return hasUpvoted;
+      };
+
       const hivePostData: HivePostData = {
         author: postData.author,
         permlink: postData.permlink,
@@ -283,6 +302,7 @@ export const useHivePostData = (
             : '0'
         ),
         avatarUrl,
+        hasUpvoted: checkHasUpvotedLocal(postData.active_votes),
         active_votes: postData.active_votes,
         json_metadata: postData.json_metadata,
         category: postData.category,
@@ -303,7 +323,7 @@ export const useHivePostData = (
         error: 'Failed to load post',
       }));
     }
-  }, [author, permlink, fetchAvatar]);
+  }, [author, permlink, currentUsername, fetchAvatar]);
 
   // Fetch comments
   const fetchComments = useCallback(async () => {
@@ -311,6 +331,9 @@ export const useHivePostData = (
       console.log('[useHivePostData] Missing parameters for comments');
       return;
     }
+
+    // Capture currentUsername at the start of the async operation
+    const userAtFetchTime = currentUsername;
 
     setState(prev => ({ ...prev, commentsLoading: true, commentsError: null }));
 
@@ -320,12 +343,29 @@ export const useHivePostData = (
       // Fetch the comments tree
       const commentsTree = await fetchCommentsTreeWithContent(author, permlink);
 
+      // Create a local version of checkHasUpvoted using the captured username
+      const checkHasUpvotedLocal = (activeVotes: any[]): boolean => {
+        if (!userAtFetchTime || !Array.isArray(activeVotes)) return false;
+        return activeVotes.some((v: any) => v.voter === userAtFetchTime && v.percent > 0);
+      };
+
+      // Recursively update hasUpvoted for all comments
+      const updateCommentsHasUpvoted = (comments: any[]): any[] => {
+        return comments.map(comment => ({
+          ...comment,
+          hasUpvoted: checkHasUpvotedLocal(comment.active_votes || []),
+          replies: comment.replies ? updateCommentsHasUpvoted(comment.replies) : undefined
+        }));
+      };
+
+      const updatedCommentsTree = updateCommentsHasUpvoted(commentsTree);
+
       // Sort comments by creation date (newest first)
-      commentsTree.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
+      updatedCommentsTree.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
 
       setState(prev => ({
         ...prev,
-        comments: commentsTree,
+        comments: updatedCommentsTree,
         commentsLoading: false,
         commentsError: null,
       }));
@@ -337,7 +377,7 @@ export const useHivePostData = (
         commentsError: 'Failed to load comments',
       }));
     }
-  }, [author, permlink, fetchCommentsTreeWithContent]);
+  }, [author, permlink, currentUsername, fetchCommentsTreeWithContent]);
 
   // Refresh both post and comments
   const refreshAll = useCallback(async () => {
@@ -382,13 +422,13 @@ export const useHivePostData = (
     []
   );
 
-  // Auto-fetch on component mount and when params change
+  // Auto-fetch on component mount and when params change (wait for currentUsername like ConversationScreen)
   useEffect(() => {
-    if (author && permlink) {
+    if (author && permlink && currentUsername) {
       fetchPost();
       fetchComments();
     }
-  }, [author, permlink, fetchPost, fetchComments]);
+  }, [author, permlink, currentUsername, fetchPost, fetchComments]);
 
   return {
     ...state,

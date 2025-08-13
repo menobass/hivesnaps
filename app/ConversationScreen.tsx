@@ -828,24 +828,12 @@ const ConversationScreenRefactored = () => {
                   permlink: reply.permlink!,
                 })
               }
-              disabled={
-                Array.isArray(reply.active_votes) &&
-                reply.active_votes.some(
-                  (v: any) => v.voter === currentUsername && v.percent > 0
-                )
-              }
+              disabled={reply.hasUpvoted}
             >
               <FontAwesome
                 name='arrow-up'
                 size={16}
-                color={
-                  Array.isArray(reply.active_votes) &&
-                  reply.active_votes.some(
-                    (v: any) => v.voter === currentUsername && v.percent > 0
-                  )
-                    ? '#8e44ad'
-                    : colors.icon
-                }
+                color={reply.hasUpvoted ? '#8e44ad' : colors.icon}
               />
             </TouchableOpacity>
             <Text
@@ -1105,24 +1093,12 @@ const ConversationScreenRefactored = () => {
                 permlink: snap.permlink!,
               })
             }
-            disabled={
-              Array.isArray(snap.active_votes) &&
-              snap.active_votes.some(
-                (v: any) => v.voter === currentUsername && v.percent > 0
-              )
-            }
+            disabled={snap.hasUpvoted}
           >
             <FontAwesome
               name='arrow-up'
               size={18}
-              color={
-                Array.isArray(snap.active_votes) &&
-                snap.active_votes.some(
-                  (v: any) => v.voter === currentUsername && v.percent > 0
-                )
-                  ? '#8e44ad'
-                  : colors.icon
-              }
+              color={snap.hasUpvoted ? '#8e44ad' : colors.icon}
             />
           </TouchableOpacity>
           <Text

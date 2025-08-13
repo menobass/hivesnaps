@@ -61,6 +61,11 @@ const HivePostScreen = () => {
     updateComment,
   } = useHivePostData(author, permlink, currentUsername);
 
+  // Create wrapper functions for useUpvote that match expected signatures
+  const handleUpdatePost = useCallback((author: string, permlink: string, updates: any) => {
+    updatePost(updates);
+  }, [updatePost]);
+
   const {
     upvoteModalVisible,
     upvoteTarget,
@@ -73,7 +78,7 @@ const HivePostScreen = () => {
     closeUpvoteModal,
     setVoteWeight,
     confirmUpvote,
-  } = useUpvote(currentUsername, globalProps, rewardFund, hivePrice);
+  } = useUpvote(currentUsername, globalProps, rewardFund, hivePrice, handleUpdatePost, updateComment);
 
   // Reply functionality hook
   const {
@@ -384,23 +389,13 @@ const HivePostScreen = () => {
           <View style={HivePostScreenStyles.engagementLeft}>
             <TouchableOpacity
               onPress={handleUpvotePress}
-              disabled={post.active_votes?.some(
-                (vote: any) =>
-                  vote.voter === currentUsername && vote.percent > 0
-              )}
+              disabled={post.hasUpvoted}
               style={HivePostScreenStyles.upvoteButton}
             >
               <FontAwesome
                 name='arrow-up'
                 size={20}
-                color={
-                  post.active_votes?.some(
-                    (vote: any) =>
-                      vote.voter === currentUsername && vote.percent > 0
-                  )
-                    ? '#8e44ad'
-                    : colors.icon
-                }
+                color={post.hasUpvoted ? '#8e44ad' : colors.icon}
               />
             </TouchableOpacity>
             <Text
