@@ -6,6 +6,10 @@
 import { Client } from '@hiveio/dhive';
 import { detectPostType, type PostInfo } from './postTypeDetector';
 
+// Constants for validation
+const MIN_USERNAME_LENGTH = 3;
+const MIN_PERMLINK_LENGTH = 3;
+
 const client = new Client([
   'https://api.hive.blog',
   'https://api.hivekings.com',
@@ -103,9 +107,9 @@ export function parseHivePostUrl(
       const author = authorPermlinkMatch[1];
       const permlink = authorPermlinkMatch[2];
 
-      // Validate permlink format - should be longer than just a single word
-      if (permlink.length < 8) {
-        console.log('[extractHivePostInfo] Rejecting short permlink:', {
+      // Basic validation - permlink should be at least minimum length and contain valid characters
+      if (permlink.length < MIN_PERMLINK_LENGTH) {
+        console.log('[extractHivePostInfo] Rejecting too short permlink:', {
           permlink,
           length: permlink.length,
           url,
@@ -113,9 +117,9 @@ export function parseHivePostUrl(
         return null;
       }
 
-      // Check if permlink looks like a valid post permlink (not just a category/page)
-      const validPermlinkPattern =
-        /^[a-z0-9-]+(?:-\d{4}-\d{2}-\d{2}|-\d{10,}|-[a-z0-9-]{8,})$/;
+      // Check if permlink contains only valid characters (letters, numbers, hyphens)
+      // Hyphens must only appear between alphanumeric characters, not at beginning or end
+      const validPermlinkPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/i;
       if (!validPermlinkPattern.test(permlink)) {
         console.log(
           '[extractHivePostInfo] Rejecting invalid permlink format:',
@@ -271,7 +275,7 @@ export async function fetchHivePostInfo(
     });
 
     // Validate parameters before making API call
-    if (!author || !permlink || author.length < 3 || permlink.length < 5) {
+    if (!author || !permlink || author.length < MIN_USERNAME_LENGTH || permlink.length < MIN_PERMLINK_LENGTH) {
       console.warn('[extractHivePostInfo] Invalid parameters:', {
         author,
         permlink,
