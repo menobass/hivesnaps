@@ -455,6 +455,13 @@ export function useFeedData(): UseFeedDataReturn {
           map.set(containerPost.permlink, containerMetadata);
         } else {
           // Prepend new container, discard oldest if over maxSize
+          if (typeof prev.maxContainers === 'number' && map.size >= prev.maxContainers) {
+            // Remove the oldest container (assumes map keeps insertion order)
+            const oldestKey = Array.from(map.keys()).pop();
+            if (oldestKey !== undefined) {
+              map.delete(oldestKey);
+            }
+          }
           map.prepend(containerPost.permlink, containerMetadata);
         }
         map.logState();
