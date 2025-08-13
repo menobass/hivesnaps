@@ -138,7 +138,7 @@ export const selectFollowingList = (state: UserState, username: string) =>
   state.followingLists[username] || [];
 
 export const selectUserProfile = (state: UserState, username: string) => 
-  state.profiles[username];
+  state.users[username];
 
 export const selectIsFollowingListCached = (state: UserState, username: string) => {
   const lastFetched = state.lastFetched.following[username];
