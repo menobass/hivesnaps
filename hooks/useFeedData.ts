@@ -58,6 +58,11 @@ class OrderedContainerMap {
 
   // Set a container (maintains insertion order)
   set(permlink: string, container: ContainerMetadata): void {
+    if (this.containers.size >= this.maxSize) {
+      // Temporary solution: warn if max size reached
+      console.warn('📦 [OrderedContainerMap] Max size reached, cannot add more containers');
+      return;
+    }
     this.containers.set(permlink, container);
     console.log('📦 [ContainerMap] Set container', permlink, 'with', container.snaps.length, 'snaps');
   }
@@ -140,6 +145,42 @@ class OrderedContainerMap {
     }
     return undefined;
   }
+
+  // Add public method to get keys in insertion order
+  getKeys(): string[] {
+    return Array.from(this.containers.keys());
+  }
+
+  // Add public method to delete a container by key
+  delete(key: string): void {
+    this.containers.delete(key);
+  }
+
+  // Add public method to get max size
+  getMaxSize(): number {
+    return this.maxSize;
+  }
+
+  // Add public method to check if a key exists
+  has(key: string): boolean {
+    return this.containers.has(key);
+  }
+
+  // Add public method to prepend a container and handle max size
+  prepend(permlink: string, container: ContainerMetadata): void {
+     if (this.containers.size >= this.maxSize) {
+       console.warn('📦 [OrderedContainerMap] Max size reached, cannot add more containers');
+       return;
+    }
+  
+    // TODO: Implement a more robust prepend logic, and shift out the oldest if needed
+    const entries = Array.from(this.containers.entries());
+    // if (this.containers.size >= this.maxSize) {
+    //   // Remove the oldest (first) entry
+    //   entries.shift();
+    // }
+    this.containers = new Map([[permlink, container], ...entries]);
+  }
 }
 
 interface FeedState {
@@ -172,10 +213,12 @@ interface UseFeedDataReturn extends FeedState {
       snapsInRegistry: number;
     };
   };
+  canFetchMore: () => boolean; // Check if more snaps can be fetched
 }
 
 // Remove username param from useFeedData
 export function useFeedData(): UseFeedDataReturn {
+  // Always use the context username
   const username = useCurrentUser();
   const [state, setState] = useState<FeedState>({
     snaps: [],
@@ -195,9 +238,22 @@ export function useFeedData(): UseFeedDataReturn {
   } = useFollowingList(username || '');
 
   const followingListRef = useRef(followingList);
+  const needsFollowingRefreshRef = useRef(needsFollowingRefresh);
   useEffect(() => {
     followingListRef.current = followingList;
-  }, [followingList]);
+    needsFollowingRefreshRef.current = needsFollowingRefresh;
+  }, [followingList, needsFollowingRefresh]);
+
+  // Debug: Track username changes
+  const prevUsernameRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (prevUsernameRef.current !== username) {
+      console.log('[useFeedData] username changed:', prevUsernameRef.current, '→', username);
+      prevUsernameRef.current = username;
+    } else {
+      console.log('[useFeedData] username did NOT change:', username);
+    }
+  }, [username]);
 
   // Utility function to apply filtering to snaps
   const applyFilter = useCallback((snaps: Snap[], filter: FeedFilter, followingList: string[], currentUsername: string | null): Snap[] => {
@@ -217,6 +273,7 @@ export function useFeedData(): UseFeedDataReturn {
         
       case 'my':
         // Filter snaps from current user
+        console.log('🔍 [applyFilter] Current user:', currentUsername);
         filteredSnaps = snaps.filter(snap => 
           snap.author === currentUsername
         );
@@ -249,7 +306,7 @@ export function useFeedData(): UseFeedDataReturn {
     }
     
     return filteredSnaps;
-  }, []);
+  }, []); // Remove dependencies for stability
 
   // Fetch snaps from containers and store in ordered dictionary
   const fetchSnaps = useCallback(async (useCache = false) => {
@@ -349,18 +406,71 @@ export function useFeedData(): UseFeedDataReturn {
   }, [applyFilter, username]);
 
   const refreshSnaps = useCallback(async () => {
-    console.log('🔄 [useFeedData] refreshSnaps called with currentFilter:', state.currentFilter);
-    
-    // Clear the container map and reset state
-    setState(prev => ({
-      ...prev,
-      containerMap: new OrderedContainerMap(4),
-      error: null,
-    }));
+    console.log('🔄 [useFeedData] refreshSnaps called');
 
-    // Fetch fresh data
-    await fetchSnaps(false); // useCache = false for fresh data
-  }, [fetchSnaps]);
+    // Fetch the latest container
+    try {
+      const discussions = await client.database.call(
+        'get_discussions_by_blog',
+        [
+          {
+            tag: 'peak.snaps',
+            limit: 1
+          }
+        ]
+      );
+      if (!discussions || discussions.length === 0) {
+        setState(prev => ({ ...prev, loading: false }));
+        return;
+      }
+      const containerPost = discussions[0];
+      const replies: Snap[] = await client.database.call(
+        'get_content_replies',
+        [containerPost.author, containerPost.permlink]
+      );
+      const sortedSnaps = replies.sort(
+        (a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()
+      );
+      const containerMetadata: ContainerMetadata = {
+        permlink: containerPost.permlink,
+        snaps: sortedSnaps,
+        created: containerPost.created,
+        author: containerPost.author,
+        fetchedAt: Date.now(),
+      };
+      setState(prev => {
+        const map = prev.containerMap;
+        // Find the most recent container by created date
+        let mostRecentKey: string | undefined;
+        let mostRecentDate = 0;
+        for (const [key, c] of map.entries()) {
+          const d = new Date(c.created).getTime();
+          if (d > mostRecentDate) {
+            mostRecentDate = d;
+            mostRecentKey = key;
+          }
+        }
+        if (mostRecentKey && map.has(containerPost.permlink)) {
+          // Update the latest container
+          map.set(containerPost.permlink, containerMetadata);
+        } else {
+          // Prepend new container, discard oldest if over maxSize
+          map.prepend(containerPost.permlink, containerMetadata);
+        }
+        map.logState();
+        const allSnaps = map.getAllSnaps();
+        const filteredSnaps = applyFilter(allSnaps, prev.currentFilter, followingListRef.current || [], username);
+        return {
+          ...prev,
+          snaps: filteredSnaps,
+          loading: false,
+        };
+      });
+    } catch (error) {
+      console.error('❌ [refreshSnaps] Error refreshing snaps:', error);
+      setState(prev => ({ ...prev, loading: false, error: 'Failed to refresh snaps' }));
+    }
+  }, [applyFilter, fetchSnaps]);
 
   const loadMoreSnaps = useCallback(async () => {
     console.log('📄 [useFeedData] loadMoreSnaps called with currentFilter:', state.currentFilter);
@@ -394,31 +504,25 @@ export function useFeedData(): UseFeedDataReturn {
     // Do nothing - just log
   }, []);
 
+  // Fetch and cache following list (stable reference)
   const fetchAndCacheFollowingList = useCallback(async (username: string): Promise<string[]> => {
     console.log('👤 [useFeedData] fetchAndCacheFollowingList called for', username);
-    
-    // Check if we already have cached data and don't need refresh
-    if (followingList && !needsFollowingRefresh) {
-      console.log('👤 [fetchAndCacheFollowingList] Using cached following list:', followingList.length, 'users');
-      return followingList;
+    const cachedList = followingListRef.current;
+    const needsRefresh = needsFollowingRefreshRef.current;
+    if (cachedList && !needsRefresh) {
+      console.log('👤 [fetchAndCacheFollowingList] Using cached following list:', cachedList.length, 'users');
+      return cachedList;
     }
-
     try {
       setFollowingLoading(true);
-      
-      // Fetch following list from Hive blockchain
       const following = await client.database.call(
         'get_following',
         [username, '', 'blog', 1000]
       );
-
       const followingUsernames = following.map((f: any) => f.following);
       console.log('👤 [fetchAndCacheFollowingList] Fetched', followingUsernames.length, 'users from blockchain');
-
-      // Cache in shared state
       setFollowingList(followingUsernames);
       setFollowingError(null);
-      
       return followingUsernames;
     } catch (error) {
       console.error('❌ [fetchAndCacheFollowingList] Error:', error);
@@ -428,18 +532,33 @@ export function useFeedData(): UseFeedDataReturn {
     } finally {
       setFollowingLoading(false);
     }
-  }, [followingList, needsFollowingRefresh, setFollowingList, setFollowingLoading, setFollowingError]);
+  }, [setFollowingList, setFollowingLoading, setFollowingError]);
 
+  // Ensure following list is cached (stable reference)
   const ensureFollowingListCached = useCallback(async (username: string) => {
     console.log('👤 [useFeedData] ensureFollowingListCached called for', username);
-    
-    // Only fetch if we don't have cached data or it needs refresh
-    if (!followingList || needsFollowingRefresh) {
+    const cachedList = followingListRef.current;
+    const needsRefresh = needsFollowingRefreshRef.current;
+    if (!cachedList || needsRefresh) {
       await fetchAndCacheFollowingList(username);
     } else {
-      console.log('👤 [ensureFollowingListCached] Using cached data:', followingList.length, 'users');
+      console.log('👤 [ensureFollowingListCached] Using cached data:', cachedList.length, 'users');
     }
-  }, [followingList, needsFollowingRefresh, fetchAndCacheFollowingList]);
+  }, [fetchAndCacheFollowingList]);
+
+  // Debug: Track function reference changes (after functions are defined)
+  const prevFetchAndCacheRef = useRef<any>(fetchAndCacheFollowingList);
+  const prevEnsureFollowingRef = useRef<any>(ensureFollowingListCached);
+  useEffect(() => {
+    if (prevFetchAndCacheRef.current !== fetchAndCacheFollowingList) {
+      console.log('[useFeedData] fetchAndCacheFollowingList reference changed');
+      prevFetchAndCacheRef.current = fetchAndCacheFollowingList;
+    }
+    if (prevEnsureFollowingRef.current !== ensureFollowingListCached) {
+      console.log('[useFeedData] ensureFollowingListCached reference changed');
+      prevEnsureFollowingRef.current = ensureFollowingListCached;
+    }
+  }, [fetchAndCacheFollowingList, ensureFollowingListCached]);
 
   const onScrollPositionChange = useCallback((index: number) => {
     console.log('📜 [useFeedData] onScrollPositionChange called with index:', index);
@@ -472,6 +591,29 @@ export function useFeedData(): UseFeedDataReturn {
     });
   }, [username, applyFilter, followingList]);
 
+  // Add a function to check if we can fetch more containers (internal only)
+  const canFetchMore = useCallback(() => {
+    const containerCount = state.containerMap.getKeys().length;
+    const maxSize = state.containerMap.getMaxSize();
+    if (containerCount >= maxSize) return false;
+
+    // Get the most recently fetched container (last in insertion order)
+    const keys = state.containerMap.getKeys();
+    if (keys.length > 0) {
+      const lastPermlink = keys[keys.length - 1];
+      const lastContainer = (state.containerMap as any).containers.get(lastPermlink) as ContainerMetadata | undefined;
+      if (lastContainer && lastContainer.fetchedAt) {
+        const now = Date.now();
+        const FIVE_MINUTES = 5 * 60 * 1000;
+        if (now - lastContainer.fetchedAt < FIVE_MINUTES) {
+          console.log('[canFetchMore] Rate limit: last container fetched less than 5 minutes ago');
+          return false;
+        }
+      }
+    }
+    return true;
+  }, [state.containerMap]);
+
   return {
     ...state,
     followingList: followingList || [], // Include following list from shared state
@@ -485,5 +627,7 @@ export function useFeedData(): UseFeedDataReturn {
     onScrollPositionChange,
     getMemoryStats,
     setFilter,
+    canFetchMore,
+
   };
 };
