@@ -39,6 +39,7 @@ import { extractHivePostUrls } from '../../utils/extractHivePostInfo';
 import { OptimizedHivePostPreviewRenderer } from '../../components/OptimizedHivePostPreviewRenderer';
 import { classifyUrl, extractAndClassifyUrls } from '../../utils/urlClassifier';
 import { canBeResnapped } from '../../utils/postTypeDetector';
+import { buildMarkdownStyles } from '../../utils/markdownStyles';
 
 const twitterColors = {
   light: {
@@ -526,6 +527,17 @@ const Snap: React.FC<SnapProps> = ({
   (globalThis as any)._snapOnImagePress = onImagePress;
   (globalThis as any)._snapOnHashtagPress = onHashtagPress;
 
+  // Map current colors to ThemeColors expected by buildMarkdownStyles
+  const markdownThemeColors = {
+    text: colors.text,
+    button: (colors as any).button || colors.icon || '#3b82f6',
+    border: colors.border,
+    card: (colors as any).card || colors.background,
+    icon: colors.icon,
+    background: colors.background,
+  };
+  const markdownDisplayStyles = buildMarkdownStyles({ isDark, colors: markdownThemeColors });
+
   return (
     <View
       style={[
@@ -727,14 +739,7 @@ const Snap: React.FC<SnapProps> = ({
                   />
                 ) : (
                   <Markdown
-                    style={{
-                      body: {
-                        color: colors.text,
-                        fontSize: 15,
-                        marginBottom: 8,
-                      },
-                      link: { color: colors.icon },
-                    }}
+                    style={markdownDisplayStyles}
                     rules={markdownRules}
                   >
                     {cleanTextBody}
@@ -772,10 +777,7 @@ const Snap: React.FC<SnapProps> = ({
               />
             ) : (
               <Markdown
-                style={{
-                  body: { color: colors.text, fontSize: 15, marginBottom: 8 },
-                  link: { color: colors.icon },
-                }}
+                style={markdownDisplayStyles}
                 rules={markdownRules}
               >
                 {cleanTextBody}
