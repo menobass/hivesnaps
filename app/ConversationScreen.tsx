@@ -339,6 +339,19 @@ const ConversationScreenRefactored = () => {
       permlink: correctPermlink,
       snap: targetSnap,
     });
+    // Optimistic UI tweak: immediately mark as upvoted visually if not already
+    if (!targetSnap.hasUpvoted) {
+      const optimisticUpdate = { hasUpvoted: true } as any;
+      if (
+        snap &&
+        snap.author === correctAuthor &&
+        snap.permlink === correctPermlink
+      ) {
+        updateSnap(correctAuthor, correctPermlink, optimisticUpdate);
+      } else {
+        updateReply(correctAuthor, correctPermlink, optimisticUpdate);
+      }
+    }
   };
 
   const handleOpenReplyModal = (author: string, permlink: string) => {
