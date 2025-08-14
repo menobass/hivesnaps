@@ -101,6 +101,6 @@ export function buildMarkdownStyles({ isDark, colors }: MarkdownStylesOptions) {
 // React hook variant (optional usage) to memoize styles by theme
 export function useMarkdownStyles(colors: ThemeColors) {
   const scheme = Appearance.getColorScheme();
-  const isDark = scheme === 'dark' || colors.background?.toLowerCase?.() === '#000';
+  const isDark = scheme === 'dark' || colors.background?.toLowerCase() === '#000';
   return useMemo(() => buildMarkdownStyles({ isDark, colors }), [isDark, colors]);
 }
