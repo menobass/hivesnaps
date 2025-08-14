@@ -35,6 +35,7 @@ import {
   containsHtml,
 } from '../../utils/contentProcessing';
 import { buildMarkdownStyles } from '../../utils/markdownStyles';
+import { applyMultiParagraphBlockquotes } from '../../utils/markdownPreprocess';
 
 interface ReplyProps {
   reply: ReplyData & { visualLevel: number };
@@ -264,6 +265,9 @@ const Reply: React.FC<ReplyProps> = ({
     background: (colors as any).background || (colors as any).bubble || '#000',
   };
   const markdownDisplayStyles = buildMarkdownStyles({ isDark, colors: markdownThemeColors });
+
+  // After textBody final transformations just before rendering
+  textBody = applyMultiParagraphBlockquotes(textBody);
 
   return (
     <View
