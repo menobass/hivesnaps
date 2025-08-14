@@ -40,6 +40,7 @@ import { OptimizedHivePostPreviewRenderer } from '../../components/OptimizedHive
 import { classifyUrl, extractAndClassifyUrls } from '../../utils/urlClassifier';
 import { canBeResnapped } from '../../utils/postTypeDetector';
 import { buildMarkdownStyles } from '../../utils/markdownStyles';
+import { applyMultiParagraphBlockquotes } from '../../utils/markdownPreprocess';
 
 const twitterColors = {
   light: {
@@ -538,6 +539,10 @@ const Snap: React.FC<SnapProps> = ({
   };
   const markdownDisplayStyles = buildMarkdownStyles({ isDark, colors: markdownThemeColors });
 
+  // Where cleanTextBody is derived before rendering Markdown/HTML
+  const processedForQuotes = applyMultiParagraphBlockquotes(cleanTextBody);
+  const finalRenderedBody = processedForQuotes;
+
   return (
     <View
       style={[
@@ -742,7 +747,7 @@ const Snap: React.FC<SnapProps> = ({
                     style={markdownDisplayStyles}
                     rules={markdownRules}
                   >
-                    {cleanTextBody}
+                    {finalRenderedBody}
                   </Markdown>
                 )}
               </Pressable>
@@ -780,7 +785,7 @@ const Snap: React.FC<SnapProps> = ({
                 style={markdownDisplayStyles}
                 rules={markdownRules}
               >
-                {cleanTextBody}
+                {finalRenderedBody}
               </Markdown>
             );
           }
