@@ -50,3 +50,5 @@ Thumbs.db
 *backup*
 test-*.js
 test-*.ts
+/test
+/docs
