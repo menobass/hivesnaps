@@ -34,6 +34,7 @@ import {
   linkifyHashtags,
   containsHtml,
 } from '../../utils/contentProcessing';
+import { buildMarkdownStyles } from '../../utils/markdownStyles';
 
 interface ReplyProps {
   reply: ReplyData & { visualLevel: number };
@@ -254,6 +255,16 @@ const Reply: React.FC<ReplyProps> = ({
     },
   };
 
+  const markdownThemeColors = {
+    text: colors.text,
+    button: (colors as any).button || colors.icon || '#3b82f6',
+    border: (colors as any).border || (colors as any).bubble || '#444',
+    card: (colors as any).card || (colors as any).bubble || '#222',
+    icon: colors.icon,
+    background: (colors as any).background || (colors as any).bubble || '#000',
+  };
+  const markdownDisplayStyles = buildMarkdownStyles({ isDark, colors: markdownThemeColors });
+
   return (
     <View
       key={reply.author + reply.permlink + '-' + reply.visualLevel}
@@ -390,17 +401,7 @@ const Reply: React.FC<ReplyProps> = ({
               />
             ) : (
               <Markdown
-                style={{
-                  body: { color: colors.text, fontSize: 14, marginBottom: 4 },
-                  paragraph: {
-                    color: colors.text,
-                    fontSize: 14,
-                    marginBottom: 12,
-                    lineHeight: 20,
-                    flexWrap: 'wrap',
-                  },
-                  link: { color: colors.icon },
-                }}
+                style={markdownDisplayStyles}
                 rules={markdownRules}
               >
                 {textBody}
