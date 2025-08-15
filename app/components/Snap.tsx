@@ -114,24 +114,29 @@ function extractRawImageUrls(text: string): string[] {
 
 // Utility to remove raw image URLs from text
 function removeRawImageUrls(text: string): string {
-  return text
-    .replace(
-      /(?:^|\s)(https?:\/\/(?:[\w.-]+)\/(?:[\w\-./%]+)\.(?:jpg|jpeg|png|gif|webp|bmp|svg))(?:\s|$)/gi,
-      ' '
-    )
-    .replace(/\s{2,}/g, ' ')
-    .trim();
+  const replaced = text.replace(
+    /(?:^|\s)(https?:\/\/(?:[\w.-]+)\/(?:[\w\-./%]+)\.(?:jpg|jpeg|png|gif|webp|bmp|svg))(?:\s|$)/gi,
+    ' '
+  );
+  // Collapse only horizontal spaces within each line; preserve blank lines & newlines
+  return replaced
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map(l => l.replace(/[ \t]{2,}/g, ' ').replace(/ +$/,''))
+    .join('\n');
 }
 
 const removeYouTubeUrl = (text: string): string => {
   // Remove all YouTube links (youtube.com/watch?v=, youtu.be/, youtube.com/shorts/, etc.)
-  return text
-    .replace(
-      /(?:https?:\/\/(?:www\.)?)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)[\w-]{11}(\S*)?/gi,
-      ''
-    )
-    .replace(/\s{2,}/g, ' ')
-    .trim();
+  const removed = text.replace(
+    /(?:https?:\/\/(?:www\.)?)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)[\w-]{11}(\S*)?/gi,
+    ''
+  );
+  return removed
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map(l => l.replace(/[ \t]{2,}/g, ' ').replace(/ +$/,''))
+    .join('\n');
 };
 
 // Utility to check if a string contains HTML tags
@@ -547,8 +552,12 @@ const Snap: React.FC<SnapProps> = ({
     hivePostUrls.forEach(url => {
       textBody = textBody.replace(url, '').trim();
     });
-    // Clean up any double spaces
-    textBody = textBody.replace(/\s{2,}/g, ' ').trim();
+    // Clean up horizontal double spaces only, preserving paragraph breaks
+    textBody = textBody
+      .replace(/\r\n/g,'\n')
+      .split('\n')
+      .map(l => l.replace(/[ \t]{2,}/g,' ').replace(/ +$/,''))
+      .join('\n');
   }
 
   // Process spoiler syntax first, before other text processing
