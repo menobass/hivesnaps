@@ -564,7 +564,7 @@ export async function getHivePostPreviewNavigationInfo(url: string): Promise<{
     let isSnap = false;
 
     // Check for explicit snap permlink pattern
-    if (postInfo.permlink.startsWith('snap-')) {
+    if (postInfo.permlink.startsWith('snap-') || postInfo.permlink.startsWith('re-')) {
       isSnap = true;
       console.log('[extractHivePostInfo] Detected snap by permlink pattern');
     } else {
