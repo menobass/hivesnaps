@@ -1,7 +1,7 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, TextStyle } from 'react-native';
 import { useMemo } from 'react';
 
-// Shared link styles for inline links in markdown/HTML renderers
+// Centralized link styles for inline links used across components
 export const linkStyles = StyleSheet.create({
   base: {
     textDecorationLine: 'underline',
@@ -13,13 +13,27 @@ export const linkStyles = StyleSheet.create({
   external: {},
 });
 
-// Hook to memoize color/size/lineHeight per theme and context (reply vs. main)
+export type MinimalThemeColors = { icon: string };
+
+// Pure builder for theme/contextual link text style
+export function buildLinkTextStyle(
+  colors: MinimalThemeColors,
+  isReply: boolean
+): TextStyle {
+  return {
+    color: colors.icon,
+    fontSize: isReply ? 14 : 15,
+    ...(isReply ? { lineHeight: 20 } : {}),
+  };
+}
+
+// Hook to memoize link text style per theme and context
 export function useLinkTextStyle(iconColor: string, isReply: boolean) {
   return useMemo(
     () => ({
       color: iconColor,
       fontSize: isReply ? 14 : 15,
-      ...(isReply ? { lineHeight: 20 } : null),
+      ...(isReply ? { lineHeight: 20 } : {}),
     }),
     [iconColor, isReply]
   );
