@@ -40,7 +40,6 @@ import { extractHivePostUrls } from '../../utils/extractHivePostInfo';
 import { OptimizedHivePostPreviewRenderer } from '../../components/OptimizedHivePostPreviewRenderer';
 import { classifyUrl, extractAndClassifyUrls } from '../../utils/urlClassifier';
 import { canBeResnapped } from '../../utils/postTypeDetector';
-import { buildMarkdownStyles } from '../../utils/markdownStyles';
 import { getMarkdownStyles } from '../../styles/markdownStyles';
 import {
   preprocessForMarkdown,
