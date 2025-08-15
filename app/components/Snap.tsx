@@ -134,7 +134,7 @@ function linkifyMentions(text: string): string {
   // Negative lookbehind for '/': (?<!/)
   // Hive usernames: 3-16 chars, a-z, 0-9, dash, dot (no @ in username)
   // Avoid emails and already-linked mentions
-  return text.replace(
+  return text.replace( 
     /(^|[^\w/@])@([a-z0-9\-\.]{3,16})(?![a-z0-9\-\.])/gi,
     (match, pre, username, offset, string) => {
       // Don't process if we're inside a markdown link [text](url)
@@ -151,7 +151,7 @@ function linkifyMentions(text: string): string {
         return match; // Don't modify if inside a markdown link
       }
 
-      return `${pre}[**@${username}**](profile://${username})`;
+  return `${pre}[@${username}](profile://${username})`;
     }
   );
 }
@@ -272,96 +272,66 @@ const markdownRules = {
     if (mp4Match) {
       return renderMp4Video(href, href);
     }
-    // Handle profile:// links for mentions
+    const currentColors = (globalThis as any)._snapColors || twitterColors.light;
+    // Mentions
     if (href && href.startsWith('profile://')) {
       const username = href.replace('profile://', '');
-      // Generate unique key to avoid React key conflicts when same user is mentioned multiple times
       const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
-      // Use global onUserPress from Snap props
       return (
-        <Pressable
+        <Text
           key={uniqueKey}
           onPress={() => {
             const handler = (globalThis as any)._snapOnUserPress;
             if (typeof handler === 'function') handler(username);
           }}
-          style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+          style={[linkStyles.base, linkStyles.mention, { color: currentColors.icon }]}
           accessibilityRole='link'
           accessibilityLabel={`View @${username}'s profile`}
         >
-          <Text
-            style={{
-              color: twitterColors.light.icon,
-              fontWeight: 'bold',
-              textDecorationLine: 'underline',
-            }}
-          >
-            {children}
-          </Text>
-        </Pressable>
+          {children}
+        </Text>
       );
     }
-    // Handle hashtag:// links for hashtags
+    // Hashtags
     if (href && href.startsWith('hashtag://')) {
       const tag = href.replace('hashtag://', '');
-      // Generate unique key to avoid React key conflicts when same hashtag appears multiple times
       const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
-      // Use global onHashtagPress from Snap props
       return (
-        <Pressable
+        <Text
           key={uniqueKey}
           onPress={() => {
             const handler = (globalThis as any)._snapOnHashtagPress;
             if (typeof handler === 'function') handler(tag);
           }}
-          style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+          style={[linkStyles.base, linkStyles.hashtag, { color: currentColors.icon }]}
           accessibilityRole='link'
           accessibilityLabel={`View #${tag} hashtag`}
         >
-          <Text style={{ color: '#1DA1F2', textDecorationLine: 'underline' }}>
-            {children}
-          </Text>
-        </Pressable>
+          {children}
+        </Text>
       );
     }
-    // Default: open external link
-    const uniqueKey = href
-      ? `${href}-${Math.random().toString(36).substr(2, 9)}`
-      : Math.random().toString(36).substr(2, 9);
+    // External or normal link
+    const uniqueKey = href ? `${href}-${Math.random().toString(36).substr(2, 9)}` : Math.random().toString(36).substr(2, 9);
     return (
       <Text
         key={uniqueKey}
-        style={{
-          color: twitterColors.light.icon,
-          textDecorationLine: 'underline',
-        }}
         onPress={() => {
-          if (href) {
-            // Validate the URL before opening
-            try {
-              // Ensure the URL has a proper protocol
-              const urlToOpen =
-                href.startsWith('http://') || href.startsWith('https://')
-                  ? href
-                  : `https://${href}`;
-
-              // Validate it's a proper URL and has a valid domain
-              const urlObj = new URL(urlToOpen);
-
-              // Basic validation: must have a hostname with at least one dot (for TLD)
-              if (!urlObj.hostname || !urlObj.hostname.includes('.')) {
-                throw new Error('Invalid domain');
-              }
-
-              // Open the URL
-              Linking.openURL(urlToOpen).catch(error => {
-                console.error('Error opening URL:', urlToOpen, error);
-              });
-            } catch (error) {
-              console.error('Invalid URL:', href, error);
-            }
+          if (!href) return;
+          try {
+            const urlToOpen = href.startsWith('http://') || href.startsWith('https://') ? href : `https://${href}`;
+            const urlObj = new URL(urlToOpen);
+            if (!urlObj.hostname || !urlObj.hostname.includes('.')) throw new Error('Invalid domain');
+            Linking.openURL(urlToOpen).catch(error => {
+              console.error('Error opening URL:', urlToOpen, error);
+            });
+          } catch (error) {
+            console.error('Invalid URL:', href, error);
           }
         }}
+        style={[linkStyles.base, linkStyles.external, { color: currentColors.icon }]}
+        accessibilityRole='link'
+        accessibilityLabel={href ? `Open link ${href}` : 'Open link'}
       >
         {children}
       </Text>
@@ -484,6 +454,8 @@ const Snap: React.FC<SnapProps> = ({
   const colorScheme = useColorScheme() || 'light';
   const isDark = colorScheme === 'dark';
   const colors = twitterColors[colorScheme];
+  // Expose current colors so markdown rule can access dynamic theme
+  (globalThis as any)._snapColors = colors;
   const upvoteColor = hasUpvoted ? '#8e44ad' : colors.icon; // purple if upvoted
   const imageUrls = extractImageUrls(body);
   const rawImageUrls = extractRawImageUrls(body);
@@ -1028,6 +1000,23 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 12,
+  },
+});
+
+// Dedicated link styles to keep inline tokens aligned and consistent
+const linkStyles = StyleSheet.create({
+  base: {
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  mention: {
+    fontWeight: '600',
+  },
+  hashtag: {
+    fontWeight: '600',
+  },
+  external: {
+    textDecorationLine: 'underline',
   },
 });
 
