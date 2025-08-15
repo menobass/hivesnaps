@@ -34,6 +34,7 @@ import { OptimizedHivePostPreviewRenderer } from '../../components/OptimizedHive
 import { classifyUrl } from '../../utils/urlClassifier';
 import { canBeResnapped } from '../../utils/postTypeDetector';
 import { getMarkdownStyles } from '../../styles/markdownStyles';
+import { linkStyles, buildLinkTextStyle } from '../../styles/linkStyles';
 
 const twitterColors = {
   light: {
@@ -525,14 +526,7 @@ const Snap: React.FC<SnapProps> = ({
   // (globalThis references deleted)
 
   // Memoized link text style uses theme + reply sizing
-  const linkTextStyle = useMemo(
-    () => ({
-      color: colors.icon,
-      fontSize: isReply ? 14 : 15,
-      ...(isReply ? { lineHeight: 20 } : {}),
-    }),
-    [colors.icon, isReply]
-  );
+  const linkTextStyle = useMemo(() => buildLinkTextStyle(colors, isReply), [colors, isReply]);
 
   // Map current colors to ThemeColors expected by buildMarkdownStyles
   const markdownThemeColors = {
@@ -1152,15 +1146,3 @@ const styles = StyleSheet.create({
 });
 
 export default Snap;
-
-// Unified link styles
-const linkStyles = StyleSheet.create({
-  base: {
-    textDecorationLine: 'underline',
-  },
-  mention: {
-    fontWeight: 'bold',
-  },
-  hashtag: {},
-  external: {},
-});
