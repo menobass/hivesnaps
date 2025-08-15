@@ -27,7 +27,7 @@ import { HivePostScreenStyles } from '../styles/HivePostScreenStyles';
 import { useReply, ReplyTarget } from '../hooks/useReply';
 import { useGifPicker, GifMode } from '../hooks/useGifPicker';
 import UpvoteModal from '../components/UpvoteModal';
-import Reply from './components/Reply';
+import Snap from './components/Snap';
 import ContentModal from './components/ContentModal';
 import GifPickerModal from './components/GifPickerModal';
 import genericAvatar from '../assets/images/generic-avatar.png';
@@ -502,30 +502,35 @@ const HivePostScreen = () => {
           {!commentsLoading && !commentsError && comments.length > 0 && (
             <View style={HivePostScreenStyles.commentsList}>
               {flattenComments(comments).map(comment => (
-                <Reply
+                <Snap
                   key={
                     comment.author +
                     comment.permlink +
                     '-' +
                     comment.visualLevel
                   }
-                  reply={comment}
+                  author={comment.author}
+                  avatarUrl={comment.avatarUrl}
+                  body={comment.body}
+                  created={comment.created}
+                  voteCount={comment.voteCount}
+                  replyCount={comment.replyCount}
+                  payout={comment.payout}
+                  permlink={comment.permlink}
+                  hasUpvoted={comment.hasUpvoted}
                   onUpvotePress={handleCommentUpvotePress}
                   onReplyPress={handleOpenReplyModal}
-                  onEditPress={comment => {
-                    console.log('Edit comment:', comment);
+                  onEditPress={(snapData: { author: string; permlink: string; body: string }) => {
+                    console.log('Edit comment:', snapData);
                     // TODO: Implement edit functionality
                   }}
                   onImagePress={handleImagePress}
                   currentUsername={currentUsername}
-                  colors={{
-                    text: colors.text,
-                    bubble: colors.background,
-                    icon: colors.icon,
-                    payout: colors.payout,
-                    button: colors.button,
-                    buttonText: colors.buttonText,
-                  }}
+                  // Reply-specific props
+                  visualLevel={comment.visualLevel}
+                  isReply={true}
+                  compactMode={true}
+                  showAuthor={true}
                 />
               ))}
             </View>
