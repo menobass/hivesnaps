@@ -88,28 +88,50 @@ interface SnapProps {
   editing?: boolean; // To disable buttons during edit submission
 }
 
-// Utility to extract raw image URLs from text (not in markdown or html)
+// Enhanced: extract raw image URLs (including Hive proxy "double" URLs) not already inside markdown/image tags
+// Supports patterns like:
+// https://example.com/path/image.png
+// https://images.hive.blog/0x0/https://files.peakd-hive/user/image.png
+// Trailing punctuation like . , ) will be ignored.
+const RAW_IMAGE_URL_GLOBAL = /(?:^|[\s(])((https?:\/\/\S+?\.(?:jpe?g|png|gif|webp|bmp|svg)(?:\?[^\s)]*)?))(?:[)\]\s,.!?]|$)/gi;
+
 function extractRawImageUrls(text: string): string[] {
-  // Match URLs ending with image extensions, not inside markdown or html tags
-  const regex =
-    /(?:^|\s)(https?:\/\/(?:[\w.-]+)\/(?:[\w\-./%]+)\.(?:jpg|jpeg|png|gif|webp|bmp|svg))(?:\s|$)/gi;
-  const matches = [];
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    matches.push(match[1]);
-  }
-  return matches;
+  const found = new Set<string>();
+  text.replace(RAW_IMAGE_URL_GLOBAL, (full, url: string) => {
+    // Strip trailing punctuation that slipped through (common when sentence ends with the URL)
+    const cleaned = url.replace(/[),.!]+$/g, '');
+    found.add(cleaned);
+    return full;
+  });
+  // Filter out cases where the URL is already part of markdown image syntax ![alt](url)
+  return Array.from(found).filter(u => {
+    // Escape the URL for safe insertion into a RegExp
+    const escaped = u.replace(/[.*+?^${}()|[\]\\]/g, match => `\\${match}`);
+    const markdownImagePattern = new RegExp(`!\\[[^\\]]*\\]\\(${escaped}\\)`);
+    return !markdownImagePattern.test(text);
+  });
 }
 
-// Utility to remove raw image URLs from text
+// Remove the discovered raw image URLs from the text while preserving line breaks and paragraph spacing
 function removeRawImageUrls(text: string): string {
-  return text
-    .replace(
-      /(?:^|\s)(https?:\/\/(?:[\w.-]+)\/(?:[\w\-./%]+)\.(?:jpg|jpeg|png|gif|webp|bmp|svg))(?:\s|$)/gi,
-      ' '
-    )
-    .replace(/\s{2,}/g, ' ')
+  if (!text) return text;
+  let result = text;
+  // Replace matches with a single space (to keep separation) but keep newlines intact
+  result = result.replace(RAW_IMAGE_URL_GLOBAL, (full, url: string, offset: number, whole: string) => {
+    // Preserve leading character if it was a newline or parenthesis
+    const leading = full[0];
+    const replacementPrefix = /[\s(]/.test(leading) ? leading : ' ';
+    return replacementPrefix; // drop the URL itself
+  });
+  // Normalize horizontal whitespace per line without collapsing blank lines
+  result = result
+    .split('\n')
+    .map(line => line.replace(/[ \t]{2,}/g, ' ').trimEnd())
+    .join('\n')
+    // Collapse 3+ blank lines to at most 2
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
+  return result;
 }
 
 const removeYouTubeUrl = (text: string): string => {
