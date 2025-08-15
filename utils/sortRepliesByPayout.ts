@@ -13,7 +13,7 @@ export function sortByPayoutRecursive<T extends HasPayoutAndReplies<T>>(items: T
   const cloned = items.map(item => ({ ...item }));
   for (const item of cloned) {
     if (item.replies && item.replies.length > 0) {
-      item.replies = sortByPayoutRecursive(item.replies as T[]);
+      item.replies = sortByPayoutRecursive(item.replies);
     }
   }
   cloned.sort((a, b) => {
