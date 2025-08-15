@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -34,7 +34,6 @@ import { OptimizedHivePostPreviewRenderer } from '../../components/OptimizedHive
 import { classifyUrl } from '../../utils/urlClassifier';
 import { canBeResnapped } from '../../utils/postTypeDetector';
 import { getMarkdownStyles } from '../../styles/markdownStyles';
-import { linkStyles, useLinkTextStyle } from '../../styles/linkStyles';
 
 const twitterColors = {
   light: {
@@ -146,7 +145,6 @@ function linkifyMentions(text: string): string {
       const beforeMatch = string.substring(0, offset);
       const afterMatch = string.substring(offset + match.length);
 
-      // Check if we're inside a markdown link by looking for unmatched brackets
       const openBrackets = (beforeMatch.match(/\[/g) || []).length;
       const closeBrackets = (beforeMatch.match(/\]/g) || []).length;
       const isInsideMarkdownLink =
@@ -156,7 +154,8 @@ function linkifyMentions(text: string): string {
         return match; // Don't modify if inside a markdown link
       }
 
-      return `${pre}[**@${username}**](profile://${username})`;
+      // Return non-bold markdown link; bold is applied via linkStyles.mention
+      return `${pre}[@${username}](profile://${username})`;
     }
   );
 }
@@ -254,10 +253,7 @@ const Snap: React.FC<SnapProps> = ({
   const hivePostUrls = extractHivePostUrls(body); // Extract Hive post URLs for previews
   const router = useRouter(); // For navigation in reply mode
 
-  // Centralized link text style (color, size, lineHeight) from styles/linkStyles
-  const linkTextStyle = useLinkTextStyle(colors.icon, isReply);
-
-  // Calculate indentation for replies
+  // Calculate indentation and content width for replies
   const maxVisualLevel = 2;
   const effectiveVisualLevel = isReply ? Math.min(visualLevel, maxVisualLevel) : 0;
   const marginLeft = effectiveVisualLevel * 18;
@@ -269,20 +265,16 @@ const Snap: React.FC<SnapProps> = ({
     image: (node: any, children: any, parent: any, styles: any) => {
       const { src, alt } = node.attributes;
 
-      // Only process actual image URLs, ignore hashtag/profile links
       if (!src || src.startsWith('hashtag://') || src.startsWith('profile://')) {
         return null;
       }
 
-      // Check if it's actually an image URL
       const isImageUrl =
         /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i.test(src) ||
         src.startsWith('data:image/') ||
         src.includes('image');
 
-      if (!isImageUrl) {
-        return null;
-      }
+      if (!isImageUrl) return null;
 
       const uniqueKey = `${src || alt}-${Math.random().toString(36).substr(2, 9)}`;
       return (
@@ -292,7 +284,6 @@ const Snap: React.FC<SnapProps> = ({
             if (onImagePress) {
               onImagePress(src);
             } else {
-              // Fallback to local modal preview instead of global handler
               setModalImageUrl(src);
               setModalVisible(true);
             }
@@ -533,7 +524,15 @@ const Snap: React.FC<SnapProps> = ({
   // Remove global side-effects previously used for handlers
   // (globalThis references deleted)
 
-  // dynamic link text handled by useLinkTextStyle
+  // Memoized link text style uses theme + reply sizing
+  const linkTextStyle = useMemo(
+    () => ({
+      color: colors.icon,
+      fontSize: isReply ? 14 : 15,
+      ...(isReply ? { lineHeight: 20 } : {}),
+    }),
+    [colors.icon, isReply]
+  );
 
   // Map current colors to ThemeColors expected by buildMarkdownStyles
   const markdownThemeColors = {
@@ -1153,3 +1152,15 @@ const styles = StyleSheet.create({
 });
 
 export default Snap;
+
+// Unified link styles
+const linkStyles = StyleSheet.create({
+  base: {
+    textDecorationLine: 'underline',
+  },
+  mention: {
+    fontWeight: 'bold',
+  },
+  hashtag: {},
+  external: {},
+});
