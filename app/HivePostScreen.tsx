@@ -140,6 +140,13 @@ const HivePostScreen = () => {
     [openReplyModal]
   );
 
+  // Handle resnap from a Hive Post (same behavior as in Snap/Feed/Conversation)
+  const handleResnap = useCallback(() => {
+    if (!post?.author || !post?.permlink) return;
+    const snapUrl = `https://hive.blog/@${post.author}/${post.permlink}`;
+    router.push({ pathname: '/ComposeScreen', params: { resnapUrl: snapUrl } });
+  }, [post, router]);
+
   // Handle GIF picker opening
   const handleOpenGifPicker = useCallback(
     (mode: GifMode) => {
@@ -435,6 +442,15 @@ const HivePostScreen = () => {
               >
                 Reply
               </Text>
+            </TouchableOpacity>
+            {/* Resnap button - follow same order as elsewhere: after Reply */}
+            <TouchableOpacity
+              onPress={handleResnap}
+              accessibilityRole='button'
+              accessibilityLabel='Resnap this post'
+              style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16 }}
+            >
+              <FontAwesome name='retweet' size={18} color={colors.icon} />
             </TouchableOpacity>
           </View>
           <Text
