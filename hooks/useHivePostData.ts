@@ -288,10 +288,43 @@ export const useHivePostData = (
         return hasUpvoted;
       };
 
+      // Improved fallback title logic
+      let computedTitle = postData.title;
+      if (!computedTitle || !computedTitle.trim()) {
+        // Determine if this is likely a snap
+        let isSnap = false;
+        try {
+          if (
+            postData.permlink?.startsWith('snap-') ||
+            postData.parent_author === 'peak.snaps'
+          ) {
+            isSnap = true;
+          } else if (postData.json_metadata) {
+            try {
+              const md = JSON.parse(postData.json_metadata);
+              if (
+                (md.app && String(md.app).includes('hivesnaps')) ||
+                (Array.isArray(md.tags) && md.tags.includes('hivesnaps'))
+              ) {
+                isSnap = true;
+              }
+            } catch (e) {}
+          }
+        } catch (e) {}
+
+        if (isSnap) {
+          computedTitle = 'Resnap';
+        } else if (postData.parent_author) {
+          computedTitle = 'Reply to Post';
+        } else {
+          computedTitle = 'Untitled Post';
+        }
+      }
+
       const hivePostData: HivePostData = {
         author: postData.author,
         permlink: postData.permlink,
-        title: postData.title || 'Untitled Post',
+        title: computedTitle,
         body: postData.body,
         created: postData.created,
         voteCount: postData.net_votes || 0,

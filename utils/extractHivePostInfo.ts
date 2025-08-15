@@ -342,7 +342,12 @@ export async function fetchHivePostInfo(
       const postType = await detectPostType(postInfo);
 
       // Return appropriate label based on type
-      return postType === 'snap' ? 'Resnap' : 'Untitled Post';
+      if (postType === 'snap') return 'Resnap';
+      // If it's a reply (has parent_author) but no title, label clearly
+      if (postData.parent_author && postData.parent_author.length > 0) {
+        return 'Reply to Post';
+      }
+      return 'Untitled Post';
     };
 
     return {
