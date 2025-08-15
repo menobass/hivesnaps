@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { sortByPayoutRecursive } from '../utils/sortRepliesByPayout';
 import { Client } from '@hiveio/dhive';
 import { useOptimisticUpdates } from './useOptimisticUpdates';
 
@@ -257,9 +258,10 @@ export const useConversationData = (
       // Fetch replies tree with full content
       const tree = await fetchRepliesTreeWithContent(author, permlink);
 
+      const sortedTree = sortByPayoutRecursive(tree);
       setState({
         snap: snapData,
-        replies: tree,
+        replies: sortedTree,
         loading: false,
         error: null,
       });
@@ -324,7 +326,8 @@ export const useConversationData = (
       ]);
 
       // Fetch replies tree without setting loading state
-      const tree = await fetchRepliesTreeWithContent(author, permlink);
+  const tree = await fetchRepliesTreeWithContent(author, permlink);
+  const sortedTree = sortByPayoutRecursive(tree);
 
       // Check if we have new content
       const hasNewReplies = tree.length > state.replies.length;
@@ -359,7 +362,7 @@ export const useConversationData = (
             parent_author: post.parent_author,
             parent_permlink: post.parent_permlink,
           },
-          replies: tree,
+          replies: sortedTree,
         }));
       }
 
