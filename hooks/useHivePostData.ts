@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { sortByPayoutRecursive } from '../utils/sortRepliesByPayout';
 import { Client } from '@hiveio/dhive';
 
 const HIVE_NODES = [
@@ -393,12 +394,12 @@ export const useHivePostData = (
 
       const updatedCommentsTree = updateCommentsHasUpvoted(commentsTree);
 
-      // Sort comments by creation date (newest first)
-      updatedCommentsTree.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
+  // Sort comments by payout (desc) then created (asc) recursively
+  const sortedTree = sortByPayoutRecursive(updatedCommentsTree);
 
       setState(prev => ({
         ...prev,
-        comments: updatedCommentsTree,
+  comments: sortedTree,
         commentsLoading: false,
         commentsError: null,
       }));
