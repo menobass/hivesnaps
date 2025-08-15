@@ -12,6 +12,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { extractImageUrls } from '../../utils/extractImageUrls';
 import { uploadImageToCloudinaryFixed } from '../../utils/cloudinaryImageUploadFixed';
 import { stripImageTags } from '../../utils/stripImageTags';
@@ -39,6 +40,11 @@ import { extractHivePostUrls } from '../../utils/extractHivePostInfo';
 import { OptimizedHivePostPreviewRenderer } from '../../components/OptimizedHivePostPreviewRenderer';
 import { classifyUrl, extractAndClassifyUrls } from '../../utils/urlClassifier';
 import { canBeResnapped } from '../../utils/postTypeDetector';
+import { getMarkdownStyles } from '../../styles/markdownStyles';
+import {
+  preprocessForMarkdown,
+  checkForLeftoverHtmlTags,
+} from '../../utils/htmlPreprocessing';
 
 const twitterColors = {
   light: {
@@ -86,6 +92,10 @@ interface SnapProps {
   currentUsername?: string | null; // NEW: current user to check if they can edit
   posting?: boolean; // To disable buttons during reply posting
   editing?: boolean; // To disable buttons during edit submission
+  // Reply-specific props
+  visualLevel?: number; // For reply indentation
+  isReply?: boolean; // To enable reply-specific styling and behavior
+  compactMode?: boolean; // For more compact button layout
 }
 
 // Utility to extract raw image URLs from text (not in markdown or html)
@@ -103,24 +113,29 @@ function extractRawImageUrls(text: string): string[] {
 
 // Utility to remove raw image URLs from text
 function removeRawImageUrls(text: string): string {
-  return text
-    .replace(
-      /(?:^|\s)(https?:\/\/(?:[\w.-]+)\/(?:[\w\-./%]+)\.(?:jpg|jpeg|png|gif|webp|bmp|svg))(?:\s|$)/gi,
-      ' '
-    )
-    .replace(/\s{2,}/g, ' ')
-    .trim();
+  const replaced = text.replace(
+    /(?:^|\s)(https?:\/\/(?:[\w.-]+)\/(?:[\w\-./%]+)\.(?:jpg|jpeg|png|gif|webp|bmp|svg))(?:\s|$)/gi,
+    ' '
+  );
+  // Collapse only horizontal spaces within each line; preserve blank lines & newlines
+  return replaced
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map(l => l.replace(/[ \t]{2,}/g, ' ').replace(/ +$/,''))
+    .join('\n');
 }
 
 const removeYouTubeUrl = (text: string): string => {
   // Remove all YouTube links (youtube.com/watch?v=, youtu.be/, youtube.com/shorts/, etc.)
-  return text
-    .replace(
-      /(?:https?:\/\/(?:www\.)?)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)[\w-]{11}(\S*)?/gi,
-      ''
-    )
-    .replace(/\s{2,}/g, ' ')
-    .trim();
+  const removed = text.replace(
+    /(?:https?:\/\/(?:www\.)?)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)[\w-]{11}(\S*)?/gi,
+    ''
+  );
+  return removed
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map(l => l.replace(/[ \t]{2,}/g, ' ').replace(/ +$/,''))
+    .join('\n');
 };
 
 // Utility to check if a string contains HTML tags
@@ -203,252 +218,6 @@ const renderMp4Video = (uri: string, key?: string | number) => (
 );
 
 // Custom markdown rules for mp4 and video support
-const markdownRules = {
-  image: (node: any, children: any, parent: any, styles: any) => {
-    const { src, alt } = node.attributes;
-
-    // Only process actual image URLs, ignore hashtag/profile links
-    if (!src || src.startsWith('hashtag://') || src.startsWith('profile://')) {
-      return null;
-    }
-
-    // Check if it's actually an image URL
-    const isImageUrl =
-      /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i.test(src) ||
-      src.startsWith('data:image/') ||
-      src.includes('image');
-
-    if (!isImageUrl) {
-      return null;
-    }
-
-    const uniqueKey = `${src || alt}-${Math.random().toString(36).substr(2, 9)}`;
-    return (
-      <Pressable
-        key={uniqueKey}
-        onPress={() => {
-          const handler = (globalThis as any)._snapOnImagePress;
-          if (typeof handler === 'function') {
-            handler(src);
-          }
-        }}
-      >
-        <Image
-          source={{ uri: src }}
-          style={{
-            width: '100%',
-            aspectRatio: 1.2,
-            maxHeight: 340,
-            borderRadius: 14,
-            marginVertical: 10,
-            alignSelf: 'center',
-            backgroundColor: '#eee',
-          }}
-          resizeMode='cover'
-          accessibilityLabel={alt || 'image'}
-        />
-      </Pressable>
-    );
-  },
-  link: (node: any, children: any, parent: any, styles: any) => {
-    let { href } = node.attributes;
-
-    // Safety check: if href contains markdown syntax, extract the actual URL
-    if (href && (href.includes('%5B') || href.includes('['))) {
-      let textToProcess = href;
-
-      // If URL is encoded, decode it first
-      if (href.includes('%5B')) {
-        textToProcess = decodeURIComponent(href);
-      }
-
-      // Extract URL from markdown link syntax [text](url)
-      const markdownMatch = textToProcess.match(/\[([^\]]+)\]\(([^)]+)\)/);
-      if (markdownMatch) {
-        href = markdownMatch[2]; // Extract the URL part
-      }
-    }
-    const mp4Match = href && href.match(/\.mp4($|\?)/i);
-    if (mp4Match) {
-      return renderMp4Video(href, href);
-    }
-    // Handle profile:// links for mentions
-    if (href && href.startsWith('profile://')) {
-      const username = href.replace('profile://', '');
-      // Generate unique key to avoid React key conflicts when same user is mentioned multiple times
-      const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
-      // Use global onUserPress from Snap props
-      return (
-        <Pressable
-          key={uniqueKey}
-          onPress={() => {
-            const handler = (globalThis as any)._snapOnUserPress;
-            if (typeof handler === 'function') handler(username);
-          }}
-          style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-          accessibilityRole='link'
-          accessibilityLabel={`View @${username}'s profile`}
-        >
-          <Text
-            style={{
-              color: twitterColors.light.icon,
-              fontWeight: 'bold',
-              textDecorationLine: 'underline',
-            }}
-          >
-            {children}
-          </Text>
-        </Pressable>
-      );
-    }
-    // Handle hashtag:// links for hashtags
-    if (href && href.startsWith('hashtag://')) {
-      const tag = href.replace('hashtag://', '');
-      // Generate unique key to avoid React key conflicts when same hashtag appears multiple times
-      const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
-      // Use global onHashtagPress from Snap props
-      return (
-        <Pressable
-          key={uniqueKey}
-          onPress={() => {
-            const handler = (globalThis as any)._snapOnHashtagPress;
-            if (typeof handler === 'function') handler(tag);
-          }}
-          style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-          accessibilityRole='link'
-          accessibilityLabel={`View #${tag} hashtag`}
-        >
-          <Text style={{ color: '#1DA1F2', textDecorationLine: 'underline' }}>
-            {children}
-          </Text>
-        </Pressable>
-      );
-    }
-    // Default: open external link
-    const uniqueKey = href
-      ? `${href}-${Math.random().toString(36).substr(2, 9)}`
-      : Math.random().toString(36).substr(2, 9);
-    return (
-      <Text
-        key={uniqueKey}
-        style={{
-          color: twitterColors.light.icon,
-          textDecorationLine: 'underline',
-        }}
-        onPress={() => {
-          if (href) {
-            // Validate the URL before opening
-            try {
-              // Ensure the URL has a proper protocol
-              const urlToOpen =
-                href.startsWith('http://') || href.startsWith('https://')
-                  ? href
-                  : `https://${href}`;
-
-              // Validate it's a proper URL and has a valid domain
-              const urlObj = new URL(urlToOpen);
-
-              // Basic validation: must have a hostname with at least one dot (for TLD)
-              if (!urlObj.hostname || !urlObj.hostname.includes('.')) {
-                throw new Error('Invalid domain');
-              }
-
-              // Open the URL
-              Linking.openURL(urlToOpen).catch(error => {
-                console.error('Error opening URL:', urlToOpen, error);
-              });
-            } catch (error) {
-              console.error('Invalid URL:', href, error);
-            }
-          }
-        }}
-      >
-        {children}
-      </Text>
-    );
-  },
-  html: (node: any, children: any, parent: any, styles: any) => {
-    const htmlContent = node.content || '';
-
-    // Handle <video> tags for mp4
-    const videoTagMatch = htmlContent.match(
-      /<video[^>]*src=["']([^"']+\.mp4)["'][^>]*>(.*?)<\/video>/i
-    );
-    if (videoTagMatch) {
-      const mp4Url = videoTagMatch[1];
-      return renderMp4Video(mp4Url, mp4Url);
-    }
-
-    // Handle 3Speak iframe embeds
-    const threeSpeakIframeMatch = htmlContent.match(
-      /<iframe[^>]+src=["']https:\/\/3speak\.tv\/embed\?v=([^\/\s"']+)\/([a-zA-Z0-9_-]+)["'][^>]*>/i
-    );
-    if (threeSpeakIframeMatch) {
-      const username = threeSpeakIframeMatch[1];
-      const videoId = threeSpeakIframeMatch[2];
-      const uniqueKey = `3speak-${username}-${videoId}-${Math.random().toString(36).substr(2, 9)}`;
-      return (
-        <View
-          key={uniqueKey}
-          style={{
-            width: '100%',
-            aspectRatio: 16 / 9,
-            borderRadius: 12,
-            overflow: 'hidden',
-            position: 'relative',
-            marginVertical: 10,
-          }}
-        >
-          <WebView
-            source={{
-              uri: `https://3speak.tv/embed?v=${username}/${videoId}&autoplay=0`,
-            }}
-            style={{ flex: 1, backgroundColor: '#000' }}
-            allowsFullscreenVideo
-            javaScriptEnabled
-            domStorageEnabled
-            mediaPlaybackRequiresUserAction={true}
-            allowsInlineMediaPlayback={true}
-          />
-          {/* Video type indicator */}
-          <View
-            style={{
-              position: 'absolute',
-              top: 8,
-              right: 8,
-              backgroundColor: 'rgba(0,0,0,0.7)',
-              paddingHorizontal: 6,
-              paddingVertical: 2,
-              borderRadius: 4,
-            }}
-          >
-            <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
-              3SPEAK
-            </Text>
-          </View>
-        </View>
-      );
-    }
-
-    // Handle IPFS iframe embeds
-    const ipfsIframeMatch = htmlContent.match(
-      /<iframe[^>]+src=["']([^"']*\/ipfs\/([A-Za-z0-9]+)[^"']*?)["'][^>]*>/i
-    );
-    if (ipfsIframeMatch) {
-      const ipfsUrl = ipfsIframeMatch[1];
-      const uniqueKey = `ipfs-${ipfsIframeMatch[2]}-${Math.random().toString(36).substr(2, 9)}`;
-      return (
-        <View key={uniqueKey} style={{ marginVertical: 10 }}>
-          <IPFSVideoPlayer ipfsUrl={ipfsUrl} isDark={false} />
-        </View>
-      );
-    }
-
-    // Default HTML rendering (let markdown handle it)
-    return null;
-  },
-  // ...existing code...
-};
 
 const Snap: React.FC<SnapProps> = ({
   author,
@@ -473,6 +242,10 @@ const Snap: React.FC<SnapProps> = ({
   currentUsername,
   posting = false, // Default to false
   editing = false, // Default to false
+  // Reply-specific props
+  visualLevel = 0,
+  isReply = false,
+  compactMode = false,
 }) => {
   // Process hashtags in text, converting them to clickable markdown links
   function processHashtags(text: string): string {
@@ -489,6 +262,280 @@ const Snap: React.FC<SnapProps> = ({
   const rawImageUrls = extractRawImageUrls(body);
   const embeddedContent = extractVideoInfo(body); // Renamed from videoInfo to be more accurate
   const hivePostUrls = extractHivePostUrls(body); // Extract Hive post URLs for previews
+  const router = useRouter(); // For navigation in reply mode
+
+  // Calculate indentation for replies
+  const maxVisualLevel = 2;
+  const effectiveVisualLevel = isReply ? Math.min(visualLevel, maxVisualLevel) : 0;
+  const marginLeft = effectiveVisualLevel * 18;
+  const windowWidth = Dimensions.get('window').width;
+  const contentWidth = isReply ? Math.max(windowWidth - marginLeft - 32, 200) : windowWidth - 32;
+
+  // Custom markdown rules (defined inside component to access isReply and router)
+  const markdownRules = {
+    image: (node: any, children: any, parent: any, styles: any) => {
+      const { src, alt } = node.attributes;
+
+      // Only process actual image URLs, ignore hashtag/profile links
+      if (!src || src.startsWith('hashtag://') || src.startsWith('profile://')) {
+        return null;
+      }
+
+      // Check if it's actually an image URL
+      const isImageUrl =
+        /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i.test(src) ||
+        src.startsWith('data:image/') ||
+        src.includes('image');
+
+      if (!isImageUrl) {
+        return null;
+      }
+
+      const uniqueKey = `${src || alt}-${Math.random().toString(36).substr(2, 9)}`;
+      return (
+        <Pressable
+          key={uniqueKey}
+          onPress={() => {
+            if (onImagePress) {
+              onImagePress(src);
+            } else {
+              const handler = (globalThis as any)._snapOnImagePress;
+              if (typeof handler === 'function') {
+                handler(src);
+              }
+            }
+          }}
+        >
+          <Image
+            source={{ uri: src }}
+            style={{
+              width: '100%',
+              aspectRatio: 1.2,
+              maxHeight: 340,
+              borderRadius: 14,
+              marginVertical: 10,
+              alignSelf: 'center',
+              backgroundColor: '#eee',
+            }}
+            resizeMode='cover'
+            accessibilityLabel={alt || 'image'}
+          />
+        </Pressable>
+      );
+    },
+    link: (node: any, children: any, parent: any, styles: any) => {
+      let { href } = node.attributes;
+
+      // Safety check: if href contains markdown syntax, extract the actual URL
+      if (href && (href.includes('%5B') || href.includes('['))) {
+        let textToProcess = href;
+
+        // If URL is encoded, decode it first
+        if (href.includes('%5B')) {
+          textToProcess = decodeURIComponent(href);
+        }
+
+        // Extract URL from markdown link syntax [text](url)
+        const markdownMatch = textToProcess.match(/\[([^\]]+)\]\(([^)]+)\)/);
+        if (markdownMatch) {
+          href = markdownMatch[2]; // Extract the URL part
+        }
+      }
+      const mp4Match = href && href.match(/\.mp4($|\?)/i);
+      if (mp4Match) {
+        return renderMp4Video(href, href);
+      }
+      // Handle profile:// links for mentions
+      if (href && href.startsWith('profile://')) {
+        const username = href.replace('profile://', '');
+        // Generate unique key to avoid React key conflicts when same user is mentioned multiple times
+        const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
+        // Use router for direct navigation in reply mode, or global handler for normal mode
+        return (
+          <Pressable
+            key={uniqueKey}
+            onPress={() => {
+              if (isReply) {
+                // Direct router navigation for replies
+                router.push(`/ProfileScreen?username=${username}` as any);
+              } else {
+                // Use global handler for normal snaps
+                const handler = (globalThis as any)._snapOnUserPress;
+                if (typeof handler === 'function') handler(username);
+              }
+            }}
+            style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+            accessibilityRole='link'
+            accessibilityLabel={`View @${username}'s profile`}
+          >
+            <Text
+              style={{
+                color: twitterColors.light.icon,
+                fontWeight: 'bold',
+                textDecorationLine: 'underline',
+              }}
+            >
+              {children}
+            </Text>
+          </Pressable>
+        );
+      }
+      // Handle hashtag:// links for hashtags
+      if (href && href.startsWith('hashtag://')) {
+        const tag = href.replace('hashtag://', '');
+        // Generate unique key to avoid React key conflicts when same hashtag appears multiple times
+        const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
+        // Use router for direct navigation in reply mode, or global handler for normal mode
+        return (
+          <Pressable
+            key={uniqueKey}
+            onPress={() => {
+              if (isReply) {
+                // Direct router navigation for replies
+                router.push({
+                  pathname: '/DiscoveryScreen',
+                  params: { hashtag: tag },
+                });
+              } else {
+                // Use global handler for normal snaps
+                const handler = (globalThis as any)._snapOnHashtagPress;
+                if (typeof handler === 'function') handler(tag);
+              }
+            }}
+            style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+            accessibilityRole='link'
+            accessibilityLabel={`View #${tag} hashtag`}
+          >
+            <Text style={{ color: '#1DA1F2', textDecorationLine: 'underline' }}>
+              {children}
+            </Text>
+          </Pressable>
+        );
+      }
+      // Default: open external link
+      const uniqueKey = href
+        ? `${href}-${Math.random().toString(36).substr(2, 9)}`
+        : Math.random().toString(36).substr(2, 9);
+      return (
+        <Text
+          key={uniqueKey}
+          style={{
+            color: twitterColors.light.icon,
+            textDecorationLine: 'underline',
+          }}
+          onPress={() => {
+            if (href) {
+              // Validate the URL before opening
+              try {
+                // Ensure the URL has a proper protocol
+                const urlToOpen =
+                  href.startsWith('http://') || href.startsWith('https://')
+                    ? href
+                    : `https://${href}`;
+
+                // Validate it's a proper URL and has a valid domain
+                const urlObj = new URL(urlToOpen);
+
+                // Basic validation: must have a hostname with at least one dot (for TLD)
+                if (!urlObj.hostname || !urlObj.hostname.includes('.')) {
+                  throw new Error('Invalid domain');
+                }
+
+                // Open the URL
+                Linking.openURL(urlToOpen).catch(error => {
+                  console.error('Error opening URL:', urlToOpen, error);
+                });
+              } catch (error) {
+                console.error('Invalid URL:', href, error);
+              }
+            }
+          }}
+        >
+          {children}
+        </Text>
+      );
+    },
+    html: (node: any, children: any, parent: any, styles: any) => {
+      const htmlContent = node.content || '';
+
+      // Handle <video> tags for mp4
+      const videoTagMatch = htmlContent.match(
+        /<video[^>]*src=["']([^"']+\.mp4)["'][^>]*>(.*?)<\/video>/i
+      );
+      if (videoTagMatch) {
+        const mp4Url = videoTagMatch[1];
+        return renderMp4Video(mp4Url, mp4Url);
+      }
+
+      // Handle 3Speak iframe embeds
+      const threeSpeakIframeMatch = htmlContent.match(
+        /<iframe[^>]+src=["']https:\/\/3speak\.tv\/embed\?v=([^\/\s"']+)\/([a-zA-Z0-9_-]+)["'][^>]*>/i
+      );
+      if (threeSpeakIframeMatch) {
+        const username = threeSpeakIframeMatch[1];
+        const videoId = threeSpeakIframeMatch[2];
+        const uniqueKey = `3speak-${username}-${videoId}-${Math.random().toString(36).substr(2, 9)}`;
+        return (
+          <View
+            key={uniqueKey}
+            style={{
+              width: '100%',
+              aspectRatio: 16 / 9,
+              borderRadius: 12,
+              overflow: 'hidden',
+              position: 'relative',
+              marginVertical: 10,
+            }}
+          >
+            <WebView
+              source={{
+                uri: `https://3speak.tv/embed?v=${username}/${videoId}&autoplay=0`,
+              }}
+              style={{ flex: 1, backgroundColor: '#000' }}
+              allowsFullscreenVideo
+              javaScriptEnabled
+              domStorageEnabled
+              mediaPlaybackRequiresUserAction={true}
+              allowsInlineMediaPlayback={true}
+            />
+            {/* Video type indicator */}
+            <View
+              style={{
+                position: 'absolute',
+                top: 8,
+                right: 8,
+                backgroundColor: 'rgba(0,0,0,0.7)',
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+                borderRadius: 4,
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+                3SPEAK
+              </Text>
+            </View>
+          </View>
+        );
+      }
+
+      // Handle IPFS iframe embeds
+      const ipfsIframeMatch = htmlContent.match(
+        /<iframe[^>]+src=["']([^"']*\/ipfs\/([A-Za-z0-9]+)[^"']*?)["'][^>]*>/i
+      );
+      if (ipfsIframeMatch) {
+        const ipfsUrl = ipfsIframeMatch[1];
+        const uniqueKey = `ipfs-${ipfsIframeMatch[2]}-${Math.random().toString(36).substr(2, 9)}`;
+        return (
+          <View key={uniqueKey} style={{ marginVertical: 10 }}>
+            <IPFSVideoPlayer ipfsUrl={ipfsUrl} isDark={false} />
+          </View>
+        );
+      }
+
+      // Default HTML rendering (let markdown handle it)
+      return null;
+    },
+  };
 
   // Remove embedded content URLs and image URLs from text body if present
   let textBody = stripImageTags(body);
@@ -504,8 +551,12 @@ const Snap: React.FC<SnapProps> = ({
     hivePostUrls.forEach(url => {
       textBody = textBody.replace(url, '').trim();
     });
-    // Clean up any double spaces
-    textBody = textBody.replace(/\s{2,}/g, ' ').trim();
+    // Clean up horizontal double spaces only, preserving paragraph breaks
+    textBody = textBody
+      .replace(/\r\n/g,'\n')
+      .split('\n')
+      .map(l => l.replace(/[ \t]{2,}/g,' ').replace(/ +$/,''))
+      .join('\n');
   }
 
   // Process spoiler syntax first, before other text processing
@@ -526,18 +577,39 @@ const Snap: React.FC<SnapProps> = ({
   (globalThis as any)._snapOnImagePress = onImagePress;
   (globalThis as any)._snapOnHashtagPress = onHashtagPress;
 
+  // Map current colors to ThemeColors expected by buildMarkdownStyles
+  const markdownThemeColors = {
+    text: colors.text,
+    button: (colors as any).button || colors.icon || '#3b82f6',
+    border: colors.border,
+    card: (colors as any).card || colors.background,
+    icon: colors.icon,
+    background: colors.background,
+  };
+
+  const markdownDisplayStyles = getMarkdownStyles(colors, isDark);
+
+  // Where cleanTextBody is derived before rendering Markdown/HTML
+  const finalRenderedBody = cleanTextBody;
+
   return (
     <View
-      style={[
-        styles.bubble,
-        {
-          backgroundColor: colors.bubble,
-          borderColor: colors.border,
-          width: '100%',
-          alignSelf: 'stretch',
-        },
-      ]}
+      style={{
+        marginLeft: marginLeft,
+        marginBottom: isReply ? 10 : undefined,
+      }}
     >
+      <View
+        style={[
+          styles.bubble,
+          {
+            backgroundColor: colors.bubble,
+            borderColor: colors.border,
+            width: '100%',
+            alignSelf: 'stretch',
+          },
+        ]}
+      >
       {/* Image Modal */}
       <Modal
         visible={modalVisible}
@@ -564,7 +636,7 @@ const Snap: React.FC<SnapProps> = ({
         </View>
       </Modal>
       {/* Top row: avatar, username, timestamp (conditionally rendered) */}
-      {showAuthor && (
+      {(showAuthor || isReply) && (
         <View style={styles.topRow}>
           <Pressable
             onPress={() => onUserPress && onUserPress(author)}
@@ -700,17 +772,19 @@ const Snap: React.FC<SnapProps> = ({
               >
                 {isHtml ? (
                   <RenderHtml
-                    contentWidth={windowWidth - 32}
+                    contentWidth={contentWidth}
                     source={{ html: cleanTextBody }}
                     baseStyle={{
                       color: colors.text,
-                      fontSize: 15,
+                      fontSize: isReply ? 14 : 15,
                       marginBottom: 8,
+                      lineHeight: isReply ? 20 : undefined,
                     }}
                     enableExperimentalMarginCollapsing
                     tagsStyles={{
                       a: { color: colors.icon },
                       u: { textDecorationLine: 'underline' },
+                      ...(isReply && { p: { marginBottom: 12, lineHeight: 20 } }),
                     }}
                     renderers={{
                       video: (props: any) => {
@@ -727,17 +801,10 @@ const Snap: React.FC<SnapProps> = ({
                   />
                 ) : (
                   <Markdown
-                    style={{
-                      body: {
-                        color: colors.text,
-                        fontSize: 15,
-                        marginBottom: 8,
-                      },
-                      link: { color: colors.icon },
-                    }}
+                    style={markdownDisplayStyles}
                     rules={markdownRules}
                   >
-                    {cleanTextBody}
+                    {finalRenderedBody}
                   </Markdown>
                 )}
               </Pressable>
@@ -745,17 +812,19 @@ const Snap: React.FC<SnapProps> = ({
           } else {
             return isHtml ? (
               <RenderHtml
-                contentWidth={windowWidth - 32}
+                contentWidth={contentWidth}
                 source={{ html: cleanTextBody }}
                 baseStyle={{
                   color: colors.text,
-                  fontSize: 15,
+                  fontSize: isReply ? 14 : 15,
                   marginBottom: 8,
+                  lineHeight: isReply ? 20 : undefined,
                 }}
                 enableExperimentalMarginCollapsing
                 tagsStyles={{
                   a: { color: colors.icon },
                   u: { textDecorationLine: 'underline' },
+                  ...(isReply && { p: { marginBottom: 12, lineHeight: 20 } }),
                 }}
                 renderers={{
                   video: (props: any) => {
@@ -772,154 +841,247 @@ const Snap: React.FC<SnapProps> = ({
               />
             ) : (
               <Markdown
-                style={{
-                  body: { color: colors.text, fontSize: 15, marginBottom: 8 },
-                  link: { color: colors.icon },
-                }}
+                style={markdownDisplayStyles}
                 rules={markdownRules}
               >
-                {cleanTextBody}
+                {finalRenderedBody}
               </Markdown>
             );
           }
         })()}
-      {/* VoteReplyBar - only upvote icon is interactive */}
-      <View style={styles.voteBar}>
-        {onUpvotePress && permlink ? (
-          <Pressable
-            onPress={() => onUpvotePress({ author, permlink })}
-            style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-            accessibilityRole='button'
-            accessibilityLabel='Upvote this snap'
-          >
+      {/* VoteReplyBar - different layouts for compact mode (replies) vs normal mode */}
+      {compactMode || isReply ? (
+        // Compact mode for replies
+        <View style={[styles.voteBar, { marginTop: 8 }]}>
+          {onUpvotePress && permlink ? (
+            <Pressable
+              onPress={() => onUpvotePress({ author, permlink })}
+              style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1, marginRight: 4 }]}
+              accessibilityRole='button'
+              accessibilityLabel='Upvote this snap'
+            >
+              <FontAwesome
+                name='arrow-up'
+                size={16}
+                color={upvoteColor}
+              />
+            </Pressable>
+          ) : (
+            <FontAwesome
+              name='arrow-up'
+              size={16}
+              color={upvoteColor}
+              style={{ marginRight: 4 }}
+            />
+          )}
+          <Text style={[styles.voteCount, { color: colors.text, fontSize: 14 }]}>
+            {voteCount}
+          </Text>
+          
+          <FontAwesome
+            name='comment-o'
+            size={16}
+            color={colors.icon}
+            style={{ marginLeft: 12, marginRight: 4 }}
+          />
+          <Text style={[styles.replyCount, { color: colors.text, fontSize: 14 }]}>
+            {replyCount}
+          </Text>
+          
+          <Text style={[styles.payout, { color: colors.payout, marginLeft: 12, fontSize: 14 }]}>
+            ${payout.toFixed(2)}
+          </Text>
+          
+          <View style={{ flex: 1 }} />
+          
+          {/* Edit button - only show for own snaps */}
+          {onEditPress && permlink && author === currentUsername && (
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginLeft: 8,
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                borderRadius: 12,
+                backgroundColor: 'transparent',
+                opacity: posting || editing ? 0.5 : 1,
+              }}
+              onPress={() => onEditPress({ author, permlink, body })}
+              disabled={posting || editing}
+              accessibilityRole='button'
+              accessibilityLabel='Edit this snap'
+            >
+              <FontAwesome name='edit' size={14} color={colors.icon} />
+              <Text style={{ marginLeft: 4, fontWeight: 'bold', fontSize: 12, color: colors.icon }}>
+                Edit
+              </Text>
+            </TouchableOpacity>
+          )}
+          
+          {onReplyPress && permlink && (
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginLeft: 8,
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                borderRadius: 12,
+                backgroundColor: 'transparent',
+                opacity: posting || editing ? 0.5 : 1,
+              }}
+              onPress={() => onReplyPress(author, permlink)}
+              disabled={posting || editing}
+              accessibilityRole='button'
+              accessibilityLabel='Reply to this snap'
+            >
+              <FontAwesome name='reply' size={16} color={colors.icon} />
+              <Text style={{ marginLeft: 4, fontWeight: 'bold', fontSize: 12, color: colors.icon }}>
+                Reply
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      ) : (
+        // Normal mode for main snaps
+        <View style={styles.voteBar}>
+          {onUpvotePress && permlink ? (
+            <Pressable
+              onPress={() => onUpvotePress({ author, permlink })}
+              style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+              accessibilityRole='button'
+              accessibilityLabel='Upvote this snap'
+            >
+              <FontAwesome
+                name='arrow-up'
+                size={18}
+                color={upvoteColor}
+                style={styles.icon}
+              />
+            </Pressable>
+          ) : (
             <FontAwesome
               name='arrow-up'
               size={18}
               color={upvoteColor}
               style={styles.icon}
             />
-          </Pressable>
-        ) : (
-          <FontAwesome
-            name='arrow-up'
-            size={18}
-            color={upvoteColor}
-            style={styles.icon}
-          />
-        )}
-        <Text style={[styles.voteCount, { color: colors.text }]}>
-          {voteCount}
-        </Text>
-        {onSpeechBubblePress ? (
-          <Pressable
-            onPress={onSpeechBubblePress}
-            style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-            accessibilityRole='button'
-            accessibilityLabel='View conversation'
-          >
+          )}
+          <Text style={[styles.voteCount, { color: colors.text }]}>
+            {voteCount}
+          </Text>
+          {onSpeechBubblePress ? (
+            <Pressable
+              onPress={onSpeechBubblePress}
+              style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+              accessibilityRole='button'
+              accessibilityLabel='View conversation'
+            >
+              <FontAwesome
+                name='comment-o'
+                size={18}
+                color={colors.icon}
+                style={styles.icon}
+              />
+            </Pressable>
+          ) : (
             <FontAwesome
               name='comment-o'
               size={18}
               color={colors.icon}
               style={styles.icon}
             />
-          </Pressable>
-        ) : (
-          <FontAwesome
-            name='comment-o'
-            size={18}
-            color={colors.icon}
-            style={styles.icon}
-          />
-        )}
-        <Text style={[styles.replyCount, { color: colors.text }]}>
-          {replyCount}
-        </Text>
-        {/* Resnap button */}
-        {onResnapPress && permlink && canBeResnapped({ author, permlink }) && (
-          <Pressable
-            onPress={() => onResnapPress(author, permlink)}
-            style={({ pressed }) => [
-              {
-                opacity: pressed ? 0.6 : 1,
+          )}
+          <Text style={[styles.replyCount, { color: colors.text }]}>
+            {replyCount}
+          </Text>
+          {/* Resnap button */}
+          {onResnapPress && permlink && canBeResnapped({ author, permlink }) && (
+            <Pressable
+              onPress={() => onResnapPress(author, permlink)}
+              style={({ pressed }) => [
+                {
+                  opacity: pressed ? 0.6 : 1,
+                  marginLeft: 12,
+                  padding: 4,
+                },
+              ]}
+              accessibilityRole='button'
+              accessibilityLabel='Resnap this post'
+            >
+              <FontAwesome name='retweet' size={18} color={colors.icon} />
+            </Pressable>
+          )}
+          <View style={{ flex: 1 }} />
+          <Text style={[styles.payout, { color: colors.payout }]}>
+            ${payout.toFixed(2)}
+          </Text>
+          {/* Edit button - only show for own snaps */}
+          {onEditPress && permlink && author === currentUsername && (
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                alignSelf: 'auto',
                 marginLeft: 12,
-                padding: 4,
-              },
-            ]}
-            accessibilityRole='button'
-            accessibilityLabel='Resnap this post'
-          >
-            <FontAwesome name='retweet' size={18} color={colors.icon} />
-          </Pressable>
-        )}
-        <View style={{ flex: 1 }} />
-        <Text style={[styles.payout, { color: colors.payout }]}>
-          ${payout.toFixed(2)}
-        </Text>
-        {/* Edit button - only show for own snaps */}
-        {onEditPress && permlink && author === currentUsername && (
-          <TouchableOpacity
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              alignSelf: 'auto',
-              marginLeft: 12,
-              paddingHorizontal: 14,
-              paddingVertical: 7,
-              borderRadius: 20,
-              backgroundColor: 'transparent',
-              opacity: posting || editing ? 0.5 : 1, // Dim when disabled
-            }}
-            onPress={() => onEditPress({ author, permlink, body })}
-            disabled={posting || editing}
-            accessibilityRole='button'
-            accessibilityLabel='Edit this snap'
-          >
-            <FontAwesome name='edit' size={16} color={colors.icon} />
-            <Text
-              style={{
-                marginLeft: 6,
-                fontWeight: 'bold',
-                fontSize: 15,
-                color: colors.icon,
+                paddingHorizontal: 14,
+                paddingVertical: 7,
+                borderRadius: 20,
+                backgroundColor: 'transparent',
+                opacity: posting || editing ? 0.5 : 1, // Dim when disabled
               }}
+              onPress={() => onEditPress({ author, permlink, body })}
+              disabled={posting || editing}
+              accessibilityRole='button'
+              accessibilityLabel='Edit this snap'
             >
-              Edit
-            </Text>
-          </TouchableOpacity>
-        )}
-        {onReplyPress && permlink && (
-          <TouchableOpacity
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              alignSelf: 'auto',
-              marginLeft: 12,
-              paddingHorizontal: 14,
-              paddingVertical: 7,
-              borderRadius: 20,
-              backgroundColor: 'transparent',
-              opacity: posting || editing ? 0.5 : 1, // Dim when disabled
-            }}
-            onPress={() => onReplyPress(author, permlink)}
-            disabled={posting || editing}
-            accessibilityRole='button'
-            accessibilityLabel='Reply to this snap'
-          >
-            <FontAwesome name='reply' size={16} color={colors.icon} />
-            <Text
+              <FontAwesome name='edit' size={16} color={colors.icon} />
+              <Text
+                style={{
+                  marginLeft: 6,
+                  fontWeight: 'bold',
+                  fontSize: 15,
+                  color: colors.icon,
+                }}
+              >
+                Edit
+              </Text>
+            </TouchableOpacity>
+          )}
+          {onReplyPress && permlink && (
+            <TouchableOpacity
               style={{
-                marginLeft: 6,
-                fontWeight: 'bold',
-                fontSize: 15,
-                color: colors.icon,
+                flexDirection: 'row',
+                alignItems: 'center',
+                alignSelf: 'auto',
+                marginLeft: 12,
+                paddingHorizontal: 14,
+                paddingVertical: 7,
+                borderRadius: 20,
+                backgroundColor: 'transparent',
+                opacity: posting || editing ? 0.5 : 1, // Dim when disabled
               }}
+              onPress={() => onReplyPress(author, permlink)}
+              disabled={posting || editing}
+              accessibilityRole='button'
+              accessibilityLabel='Reply to this snap'
             >
-              Reply
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
+              <FontAwesome name='reply' size={16} color={colors.icon} />
+              <Text
+                style={{
+                  marginLeft: 6,
+                  fontWeight: 'bold',
+                  fontSize: 15,
+                  color: colors.icon,
+                }}
+              >
+                Reply
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {/* Hive Post Previews - Footer Style */}
       {hivePostUrls.length > 0 && (
@@ -937,6 +1099,7 @@ const Snap: React.FC<SnapProps> = ({
           />
         </View>
       )}
+      </View>
     </View>
   );
 };

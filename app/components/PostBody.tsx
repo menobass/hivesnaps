@@ -17,6 +17,8 @@ import IPFSVideoPlayer from './IPFSVideoPlayer';
 import TwitterEmbed from './TwitterEmbed';
 import YouTubeEmbed from './YouTubeEmbed';
 import ThreeSpeakEmbed from './ThreeSpeakEmbed';
+import { getMarkdownStyles } from '../../styles/markdownStyles';
+import { buildMarkdownStyles } from '../../utils/markdownStyles';
 
 interface PostBodyProps {
   body: string;
@@ -175,15 +177,7 @@ const PostBody: React.FC<PostBodyProps> = ({ body, colors, isDark }) => {
           </View>
         )}
         <Markdown
-          style={{
-            body: {
-              color: colors.text,
-              fontSize: 16,
-              lineHeight: 24,
-              fontFamily: 'System',
-            },
-            paragraph: { marginBottom: 16, color: colors.text },
-          }}
+          style={getMarkdownStyles(colors, isDark)}
           rules={{
             image: (node, children, parent, styles) => {
               const { src, alt } = node.attributes || {};
@@ -286,163 +280,7 @@ const PostBody: React.FC<PostBodyProps> = ({ body, colors, isDark }) => {
         />
       ) : (
         <Markdown
-          style={{
-            body: {
-              color: colors.text,
-              fontSize: 16,
-              lineHeight: 24,
-              fontFamily: 'System',
-              overflow: 'visible',
-            },
-            paragraph: {
-              marginBottom: 16,
-              color: colors.text,
-              overflow: 'visible',
-            },
-            heading1: {
-              color: colors.text,
-              fontSize: 24,
-              fontWeight: 'bold',
-              lineHeight: 40,
-              marginBottom: 16,
-              marginTop: 24,
-              paddingTop: 12,
-              paddingBottom: 8,
-              overflow: 'visible',
-              includeFontPadding: false,
-              textAlignVertical: 'center',
-            },
-            heading2: {
-              color: colors.text,
-              fontSize: 20,
-              fontWeight: 'bold',
-              lineHeight: 36,
-              marginBottom: 12,
-              marginTop: 20,
-              paddingTop: 12,
-              paddingBottom: 6,
-              overflow: 'visible',
-              includeFontPadding: false,
-              textAlignVertical: 'center',
-            },
-            heading3: {
-              color: colors.text,
-              fontSize: 18,
-              fontWeight: 'bold',
-              lineHeight: 34,
-              marginBottom: 10,
-              marginTop: 16,
-              paddingTop: 10,
-              paddingBottom: 5,
-              overflow: 'visible',
-              includeFontPadding: false,
-              textAlignVertical: 'center',
-            },
-            heading4: {
-              color: colors.text,
-              fontSize: 16,
-              fontWeight: 'bold',
-              lineHeight: 32,
-              marginBottom: 8,
-              marginTop: 12,
-              paddingTop: 8,
-              paddingBottom: 4,
-              overflow: 'visible',
-              includeFontPadding: false,
-              textAlignVertical: 'center',
-            },
-            heading5: {
-              color: colors.text,
-              fontSize: 14,
-              fontWeight: 'bold',
-              lineHeight: 30,
-              marginBottom: 6,
-              marginTop: 10,
-              paddingTop: 6,
-              paddingBottom: 3,
-              overflow: 'visible',
-              includeFontPadding: false,
-              textAlignVertical: 'center',
-            },
-            heading6: {
-              color: colors.text,
-              fontSize: 12,
-              fontWeight: 'bold',
-              lineHeight: 28,
-              marginBottom: 4,
-              marginTop: 8,
-              paddingTop: 6,
-              paddingBottom: 3,
-              overflow: 'visible',
-              includeFontPadding: false,
-              textAlignVertical: 'center',
-            },
-            link: {
-              color: colors.button,
-              textDecorationLine: 'underline',
-            },
-            strong: {
-              fontWeight: 'bold',
-              color: colors.text,
-            },
-            em: {
-              fontStyle: 'italic',
-              color: colors.text,
-            },
-            // Add styling for markdown underlines (___text___)
-            underline: {
-              textDecorationLine: 'underline',
-              color: colors.text,
-            },
-            u: {
-              textDecorationLine: 'underline',
-              color: colors.text,
-            },
-            code_inline: {
-              backgroundColor: isDark ? '#2C3E50' : '#F8F9FA',
-              color: isDark ? '#E74C3C' : '#E74C3C',
-              paddingHorizontal: 4,
-              paddingVertical: 2,
-              borderRadius: 4,
-              fontFamily: 'monospace',
-              fontSize: 14,
-            },
-            code_block: {
-              backgroundColor: isDark ? '#2C3E50' : '#F8F9FA',
-              color: isDark ? '#E74C3C' : '#E74C3C',
-              padding: 12,
-              borderRadius: 8,
-              fontFamily: 'monospace',
-              fontSize: 14,
-              marginVertical: 8,
-            },
-            blockquote: {
-              borderLeftWidth: 4,
-              borderLeftColor: colors.button,
-              paddingLeft: 16,
-              marginVertical: 8,
-              backgroundColor: isDark ? '#2C3E50' : '#F8F9FA',
-              paddingVertical: 8,
-              paddingRight: 12,
-            },
-            list_item: {
-              marginBottom: 4,
-              color: colors.text,
-            },
-            bullet_list: {
-              marginBottom: 16,
-              paddingLeft: 16,
-            },
-            ordered_list: {
-              marginBottom: 16,
-              paddingLeft: 16,
-            },
-            hr: {
-              backgroundColor: colors.border,
-              height: 1,
-              marginVertical: 16,
-            },
-          }}
+          style={getMarkdownStyles(colors, isDark)}
           rules={{
             heading1: (node, children, parent, styles) => {
               return (

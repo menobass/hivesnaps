@@ -50,7 +50,6 @@ import SpoilerText from './components/SpoilerText';
 import TwitterEmbed from './components/TwitterEmbed';
 import UpvoteModal from '../components/UpvoteModal';
 import Snap from './components/Snap';
-import Reply from './components/Reply';
 
 import ContentModal from './components/ContentModal';
 
@@ -1372,26 +1371,31 @@ const ConversationScreenRefactored = () => {
             )}
             <View style={ConversationScreenStyles.repliesList}>
               {flattenReplies(replies).map(reply => (
-                <Reply
+                <Snap
                   key={reply.author + reply.permlink + '-' + reply.visualLevel}
-                  reply={reply}
+                  author={reply.author}
+                  avatarUrl={reply.avatarUrl}
+                  body={reply.body}
+                  created={reply.created}
+                  voteCount={reply.voteCount}
+                  replyCount={reply.replyCount}
+                  payout={reply.payout}
+                  permlink={reply.permlink}
+                  hasUpvoted={reply.hasUpvoted}
                   onUpvotePress={handleUpvotePress}
                   onReplyPress={handleOpenReplyModal}
-                  onEditPress={replyData =>
-                    handleOpenEditModal(
-                      {
-                        author: replyData.author,
-                        permlink: replyData.permlink || '',
-                        body: replyData.body,
-                      },
-                      'reply'
-                    )
+                  onEditPress={(snapData: { author: string; permlink: string; body: string }) =>
+                    handleOpenEditModal(snapData, 'reply')
                   }
                   onImagePress={handleImagePress}
                   currentUsername={currentUsername}
-                  posting={posting} // Pass posting state to disable reply buttons
-                  editing={editing} // Pass editing state to disable buttons during edit
-                  colors={colors}
+                  posting={posting}
+                  editing={editing}
+                  // Reply-specific props
+                  visualLevel={reply.visualLevel}
+                  isReply={true}
+                  compactMode={true}
+                  showAuthor={true}
                 />
               ))}
             </View>
