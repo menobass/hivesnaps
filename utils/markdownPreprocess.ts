@@ -28,14 +28,8 @@ export function applyMultiParagraphBlockquotes(text: string): string {
     if (inQuote) {
       if (trimmed === '') {
         // Blank line inside quote: normalize as '> ' to preserve paragraph break
-        blankCountInQuote += 1;
-        // If more than one consecutive blank, treat as end of quote
-        if (blankCountInQuote > 1) {
-          inQuote = false;
-          out.push(line); // emit actual blank line ending quote
-        } else {
-          out.push('> '); // single blank inside keeps quote open
-        }
+        out.push('> '); // always output '> ' for a single blank
+        inQuote = false; // end quote after a single blank line
         continue;
       }
       // Stop extending if structural block starts
