@@ -34,7 +34,7 @@ import { OptimizedHivePostPreviewRenderer } from '../../components/OptimizedHive
 import { classifyUrl } from '../../utils/urlClassifier';
 import { canBeResnapped } from '../../utils/postTypeDetector';
 import { getMarkdownStyles } from '../../styles/markdownStyles';
-import { linkStyles, buildLinkTextStyle } from '../../styles/linkStyles';
+import { linkStyles, useLinkTextStyle } from '../../styles/linkStyles';
 
 const twitterColors = {
   light: {
@@ -526,7 +526,7 @@ const Snap: React.FC<SnapProps> = ({
   // (globalThis references deleted)
 
   // Memoized link text style uses theme + reply sizing
-  const linkTextStyle = useMemo(() => buildLinkTextStyle(colors, isReply), [colors, isReply]);
+  const linkTextStyle = useLinkTextStyle(colors.icon, isReply);
 
   // Map current colors to ThemeColors expected by buildMarkdownStyles
   const markdownThemeColors = {
