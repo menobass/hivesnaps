@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -14,15 +14,8 @@ import {
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { extractImageUrls } from '../../utils/extractImageUrls';
-import { uploadImageToCloudinaryFixed } from '../../utils/cloudinaryImageUploadFixed';
 import { stripImageTags } from '../../utils/stripImageTags';
-import {
-  extractVideoInfo,
-  removeVideoUrls,
-  removeEmbedUrls,
-  extractYouTubeId,
-} from '../../utils/extractVideoInfo';
-import { extractExternalLinks } from '../../utils/extractExternalLinks';
+import { extractVideoInfo, removeVideoUrls } from '../../utils/extractVideoInfo';
 import IPFSVideoPlayer from './IPFSVideoPlayer';
 import { WebView } from 'react-native-webview';
 import Markdown from 'react-native-markdown-display';
@@ -38,13 +31,10 @@ import YouTubeEmbed from './YouTubeEmbed';
 import ThreeSpeakEmbed from './ThreeSpeakEmbed';
 import { extractHivePostUrls } from '../../utils/extractHivePostInfo';
 import { OptimizedHivePostPreviewRenderer } from '../../components/OptimizedHivePostPreviewRenderer';
-import { classifyUrl, extractAndClassifyUrls } from '../../utils/urlClassifier';
+import { classifyUrl } from '../../utils/urlClassifier';
 import { canBeResnapped } from '../../utils/postTypeDetector';
 import { getMarkdownStyles } from '../../styles/markdownStyles';
-import {
-  preprocessForMarkdown,
-  checkForLeftoverHtmlTags,
-} from '../../utils/htmlPreprocessing';
+import { linkStyles, useLinkTextStyle } from '../../styles/linkStyles';
 
 const twitterColors = {
   light: {
@@ -156,7 +146,6 @@ function linkifyMentions(text: string): string {
       const beforeMatch = string.substring(0, offset);
       const afterMatch = string.substring(offset + match.length);
 
-      // Check if we're inside a markdown link by looking for unmatched brackets
       const openBrackets = (beforeMatch.match(/\[/g) || []).length;
       const closeBrackets = (beforeMatch.match(/\]/g) || []).length;
       const isInsideMarkdownLink =
@@ -166,7 +155,8 @@ function linkifyMentions(text: string): string {
         return match; // Don't modify if inside a markdown link
       }
 
-      return `${pre}[**@${username}**](profile://${username})`;
+      // Return non-bold markdown link; bold is applied via linkStyles.mention
+      return `${pre}[@${username}](profile://${username})`;
     }
   );
 }
@@ -264,7 +254,7 @@ const Snap: React.FC<SnapProps> = ({
   const hivePostUrls = extractHivePostUrls(body); // Extract Hive post URLs for previews
   const router = useRouter(); // For navigation in reply mode
 
-  // Calculate indentation for replies
+  // Calculate indentation and content width for replies
   const maxVisualLevel = 2;
   const effectiveVisualLevel = isReply ? Math.min(visualLevel, maxVisualLevel) : 0;
   const marginLeft = effectiveVisualLevel * 18;
@@ -276,20 +266,16 @@ const Snap: React.FC<SnapProps> = ({
     image: (node: any, children: any, parent: any, styles: any) => {
       const { src, alt } = node.attributes;
 
-      // Only process actual image URLs, ignore hashtag/profile links
       if (!src || src.startsWith('hashtag://') || src.startsWith('profile://')) {
         return null;
       }
 
-      // Check if it's actually an image URL
       const isImageUrl =
         /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i.test(src) ||
         src.startsWith('data:image/') ||
         src.includes('image');
 
-      if (!isImageUrl) {
-        return null;
-      }
+      if (!isImageUrl) return null;
 
       const uniqueKey = `${src || alt}-${Math.random().toString(36).substr(2, 9)}`;
       return (
@@ -299,10 +285,8 @@ const Snap: React.FC<SnapProps> = ({
             if (onImagePress) {
               onImagePress(src);
             } else {
-              const handler = (globalThis as any)._snapOnImagePress;
-              if (typeof handler === 'function') {
-                handler(src);
-              }
+              setModalImageUrl(src);
+              setModalVisible(true);
             }
           }}
         >
@@ -348,68 +332,45 @@ const Snap: React.FC<SnapProps> = ({
       // Handle profile:// links for mentions
       if (href && href.startsWith('profile://')) {
         const username = href.replace('profile://', '');
-        // Generate unique key to avoid React key conflicts when same user is mentioned multiple times
         const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
-        // Use router for direct navigation in reply mode, or global handler for normal mode
         return (
-          <Pressable
+          <Text
             key={uniqueKey}
             onPress={() => {
               if (isReply) {
-                // Direct router navigation for replies
                 router.push(`/ProfileScreen?username=${username}` as any);
               } else {
-                // Use global handler for normal snaps
-                const handler = (globalThis as any)._snapOnUserPress;
-                if (typeof handler === 'function') handler(username);
+                onUserPress && onUserPress(username);
               }
             }}
-            style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
             accessibilityRole='link'
             accessibilityLabel={`View @${username}'s profile`}
+            style={[linkStyles.base, linkStyles.mention, linkTextStyle]}
           >
-            <Text
-              style={{
-                color: twitterColors.light.icon,
-                fontWeight: 'bold',
-                textDecorationLine: 'underline',
-              }}
-            >
-              {children}
-            </Text>
-          </Pressable>
+            {children}
+          </Text>
         );
       }
       // Handle hashtag:// links for hashtags
       if (href && href.startsWith('hashtag://')) {
         const tag = href.replace('hashtag://', '');
-        // Generate unique key to avoid React key conflicts when same hashtag appears multiple times
         const uniqueKey = `${href}-${Math.random().toString(36).substr(2, 9)}`;
-        // Use router for direct navigation in reply mode, or global handler for normal mode
         return (
-          <Pressable
+          <Text
             key={uniqueKey}
             onPress={() => {
               if (isReply) {
-                // Direct router navigation for replies
-                router.push({
-                  pathname: '/DiscoveryScreen',
-                  params: { hashtag: tag },
-                });
+                router.push({ pathname: '/DiscoveryScreen', params: { hashtag: tag } } as any);
               } else {
-                // Use global handler for normal snaps
-                const handler = (globalThis as any)._snapOnHashtagPress;
-                if (typeof handler === 'function') handler(tag);
+                onHashtagPress && onHashtagPress(tag);
               }
             }}
-            style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
             accessibilityRole='link'
             accessibilityLabel={`View #${tag} hashtag`}
+            style={[linkStyles.base, linkStyles.hashtag, linkTextStyle]}
           >
-            <Text style={{ color: '#1DA1F2', textDecorationLine: 'underline' }}>
-              {children}
-            </Text>
-          </Pressable>
+            {children}
+          </Text>
         );
       }
       // Default: open external link
@@ -419,29 +380,18 @@ const Snap: React.FC<SnapProps> = ({
       return (
         <Text
           key={uniqueKey}
-          style={{
-            color: twitterColors.light.icon,
-            textDecorationLine: 'underline',
-          }}
+          style={[linkStyles.base, linkStyles.external, linkTextStyle]}
           onPress={() => {
             if (href) {
-              // Validate the URL before opening
               try {
-                // Ensure the URL has a proper protocol
                 const urlToOpen =
                   href.startsWith('http://') || href.startsWith('https://')
                     ? href
                     : `https://${href}`;
-
-                // Validate it's a proper URL and has a valid domain
                 const urlObj = new URL(urlToOpen);
-
-                // Basic validation: must have a hostname with at least one dot (for TLD)
                 if (!urlObj.hostname || !urlObj.hostname.includes('.')) {
                   throw new Error('Invalid domain');
                 }
-
-                // Open the URL
                 Linking.openURL(urlToOpen).catch(error => {
                   console.error('Error opening URL:', urlToOpen, error);
                 });
@@ -572,10 +522,11 @@ const Snap: React.FC<SnapProps> = ({
   const [modalVisible, setModalVisible] = useState(false);
   const [modalImageUrl, setModalImageUrl] = useState<string | null>(null);
 
-  // Expose onUserPress globally for markdownRules
-  (globalThis as any)._snapOnUserPress = onUserPress;
-  (globalThis as any)._snapOnImagePress = onImagePress;
-  (globalThis as any)._snapOnHashtagPress = onHashtagPress;
+  // Remove global side-effects previously used for handlers
+  // (globalThis references deleted)
+
+  // Memoized link text style uses theme + reply sizing
+  const linkTextStyle = useLinkTextStyle(colors.icon, isReply);
 
   // Map current colors to ThemeColors expected by buildMarkdownStyles
   const markdownThemeColors = {
