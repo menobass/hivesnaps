@@ -1384,9 +1384,11 @@ const ConversationScreenRefactored = () => {
                   hasUpvoted={reply.hasUpvoted}
                   onUpvotePress={handleUpvotePress}
                   onReplyPress={handleOpenReplyModal}
-                  onEditPress={(snapData: { author: string; permlink: string; body: string }) =>
-                    handleOpenEditModal(snapData, 'reply')
-                  }
+                  onEditPress={(snapData: {
+                    author: string;
+                    permlink: string;
+                    body: string;
+                  }) => handleOpenEditModal(snapData, 'reply')}
                   onImagePress={handleImagePress}
                   currentUsername={currentUsername}
                   posting={posting}

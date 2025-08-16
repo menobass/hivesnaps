@@ -15,7 +15,10 @@ import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { extractImageUrls } from '../../utils/extractImageUrls';
 import { stripImageTags } from '../../utils/stripImageTags';
-import { extractVideoInfo, removeVideoUrls } from '../../utils/extractVideoInfo';
+import {
+  extractVideoInfo,
+  removeVideoUrls,
+} from '../../utils/extractVideoInfo';
 import IPFSVideoPlayer from './IPFSVideoPlayer';
 import { WebView } from 'react-native-webview';
 import Markdown from 'react-native-markdown-display';
@@ -111,7 +114,7 @@ function removeRawImageUrls(text: string): string {
   return replaced
     .replace(/\r\n/g, '\n')
     .split('\n')
-    .map(l => l.replace(/[ \t]{2,}/g, ' ').replace(/ +$/,''))
+    .map(l => l.replace(/[ \t]{2,}/g, ' ').replace(/ +$/, ''))
     .join('\n');
 }
 
@@ -124,7 +127,7 @@ const removeYouTubeUrl = (text: string): string => {
   return removed
     .replace(/\r\n/g, '\n')
     .split('\n')
-    .map(l => l.replace(/[ \t]{2,}/g, ' ').replace(/ +$/,''))
+    .map(l => l.replace(/[ \t]{2,}/g, ' ').replace(/ +$/, ''))
     .join('\n');
 };
 
@@ -256,17 +259,25 @@ const Snap: React.FC<SnapProps> = ({
 
   // Calculate indentation and content width for replies
   const maxVisualLevel = 2;
-  const effectiveVisualLevel = isReply ? Math.min(visualLevel, maxVisualLevel) : 0;
+  const effectiveVisualLevel = isReply
+    ? Math.min(visualLevel, maxVisualLevel)
+    : 0;
   const marginLeft = effectiveVisualLevel * 18;
   const windowWidth = Dimensions.get('window').width;
-  const contentWidth = isReply ? Math.max(windowWidth - marginLeft - 32, 200) : windowWidth - 32;
+  const contentWidth = isReply
+    ? Math.max(windowWidth - marginLeft - 32, 200)
+    : windowWidth - 32;
 
   // Custom markdown rules (defined inside component to access isReply and router)
   const markdownRules = {
     image: (node: any, children: any, parent: any, styles: any) => {
       const { src, alt } = node.attributes;
 
-      if (!src || src.startsWith('hashtag://') || src.startsWith('profile://')) {
+      if (
+        !src ||
+        src.startsWith('hashtag://') ||
+        src.startsWith('profile://')
+      ) {
         return null;
       }
 
@@ -360,7 +371,10 @@ const Snap: React.FC<SnapProps> = ({
             key={uniqueKey}
             onPress={() => {
               if (isReply) {
-                router.push({ pathname: '/DiscoveryScreen', params: { hashtag: tag } } as any);
+                router.push({
+                  pathname: '/DiscoveryScreen',
+                  params: { hashtag: tag },
+                } as any);
               } else {
                 onHashtagPress && onHashtagPress(tag);
               }
@@ -503,9 +517,9 @@ const Snap: React.FC<SnapProps> = ({
     });
     // Clean up horizontal double spaces only, preserving paragraph breaks
     textBody = textBody
-      .replace(/\r\n/g,'\n')
+      .replace(/\r\n/g, '\n')
       .split('\n')
-      .map(l => l.replace(/[ \t]{2,}/g,' ').replace(/ +$/,''))
+      .map(l => l.replace(/[ \t]{2,}/g, ' ').replace(/ +$/, ''))
       .join('\n');
   }
 
@@ -561,495 +575,523 @@ const Snap: React.FC<SnapProps> = ({
           },
         ]}
       >
-      {/* Image Modal */}
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType='fade'
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setModalVisible(false)}
-            >
-              <FontAwesome name='close' size={28} color='#fff' />
-            </TouchableOpacity>
-            {modalImageUrl && (
-              <Image
-                source={{ uri: modalImageUrl }}
-                style={styles.fullImage}
-                resizeMode='contain'
-              />
-            )}
+        {/* Image Modal */}
+        <Modal
+          visible={modalVisible}
+          transparent
+          animationType='fade'
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setModalVisible(false)}
+              >
+                <FontAwesome name='close' size={28} color='#fff' />
+              </TouchableOpacity>
+              {modalImageUrl && (
+                <Image
+                  source={{ uri: modalImageUrl }}
+                  style={styles.fullImage}
+                  resizeMode='contain'
+                />
+              )}
+            </View>
           </View>
-        </View>
-      </Modal>
-      {/* Top row: avatar, username, timestamp (conditionally rendered) */}
-      {(showAuthor || isReply) && (
-        <View style={styles.topRow}>
-          <Pressable
-            onPress={() => onUserPress && onUserPress(author)}
-            style={({ pressed }) => [
-              {
-                opacity: pressed ? 0.7 : 1,
-                flexDirection: 'row',
-                alignItems: 'center',
-              },
-            ]}
-            disabled={!onUserPress}
-            accessibilityRole='button'
-            accessibilityLabel={`View ${author}'s profile`}
-          >
-            <Image
-              source={
-                avatarUrl
-                  ? { uri: avatarUrl }
-                  : require('../../assets/images/generic-avatar.png')
-              }
-              style={styles.avatar}
-            />
-            <Text style={[styles.username, { color: colors.text }]}>
-              {author}
-            </Text>
-          </Pressable>
-          <Text style={[styles.timestamp, { color: colors.text }]}>
-            {new Date(created + 'Z').toLocaleString()}
-          </Text>
-        </View>
-      )}
-      {/* Embedded Content (Videos, Twitter posts, etc.) */}
-      {embeddedContent && (
-        <View style={{ marginBottom: 8 }}>
-          {embeddedContent.type === 'ipfs' ? (
-            <IPFSVideoPlayer
-              ipfsUrl={embeddedContent.embedUrl}
-              isDark={isDark}
-            />
-          ) : embeddedContent.type === 'twitter' ? (
-            <TwitterEmbed embedUrl={embeddedContent.embedUrl} isDark={isDark} />
-          ) : embeddedContent.type === 'youtube' ? (
-            <YouTubeEmbed embedUrl={embeddedContent.embedUrl} isDark={isDark} />
-          ) : embeddedContent.type === '3speak' ? (
-            <ThreeSpeakEmbed
-              embedUrl={embeddedContent.embedUrl}
-              isDark={isDark}
-            />
-          ) : null}
-        </View>
-      )}
-
-      {/* Images from markdown/html */}
-      {imageUrls.length > 0 && (
-        <View style={{ marginBottom: 8 }}>
-          {imageUrls.map((url, idx) => (
+        </Modal>
+        {/* Top row: avatar, username, timestamp (conditionally rendered) */}
+        {(showAuthor || isReply) && (
+          <View style={styles.topRow}>
             <Pressable
-              key={url + idx}
-              onPress={() => {
-                if (onImagePress) {
-                  onImagePress(url);
-                } else {
-                  setModalImageUrl(url);
-                  setModalVisible(true);
-                }
-              }}
-            >
-              <Image
-                source={{ uri: url }}
-                style={{
-                  width: '100%',
-                  height: 200,
-                  borderRadius: 12,
-                  marginBottom: 6,
-                  backgroundColor: '#eee',
-                }}
-                resizeMode='cover'
-              />
-            </Pressable>
-          ))}
-        </View>
-      )}
-      {/* Images from raw URLs */}
-      {rawImageUrls.length > 0 && (
-        <View style={{ marginBottom: 8 }}>
-          {rawImageUrls.map((url, idx) => (
-            <Pressable
-              key={url + idx}
-              onPress={() => {
-                if (onImagePress) {
-                  onImagePress(url);
-                } else {
-                  setModalImageUrl(url);
-                  setModalVisible(true);
-                }
-              }}
-            >
-              <Image
-                source={{ uri: url }}
-                style={{
-                  width: '100%',
-                  height: 200,
-                  borderRadius: 12,
-                  marginBottom: 6,
-                  backgroundColor: '#eee',
-                }}
-                resizeMode='cover'
-              />
-            </Pressable>
-          ))}
-        </View>
-      )}
-
-      {/* Spoiler Components */}
-      {spoilerData.spoilers.map((spoiler: SpoilerData, index: number) => (
-        <SpoilerText key={`spoiler-${index}`} buttonText={spoiler.buttonText}>
-          {spoiler.content}
-        </SpoilerText>
-      ))}
-
-      {/* Body */}
-      {cleanTextBody.length > 0 &&
-        (() => {
-          const windowWidth = Dimensions.get('window').width;
-          const isHtml = containsHtml(cleanTextBody);
-          if (onContentPress) {
-            return (
-              <Pressable
-                onPress={onContentPress}
-                style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
-                accessibilityRole='button'
-                accessibilityLabel='View conversation'
-              >
-                {isHtml ? (
-                  <RenderHtml
-                    contentWidth={contentWidth}
-                    source={{ html: cleanTextBody }}
-                    baseStyle={{
-                      color: colors.text,
-                      fontSize: isReply ? 14 : 15,
-                      marginBottom: 8,
-                      lineHeight: isReply ? 20 : undefined,
-                    }}
-                    enableExperimentalMarginCollapsing
-                    tagsStyles={{
-                      a: { color: colors.icon },
-                      u: { textDecorationLine: 'underline' },
-                      ...(isReply && { p: { marginBottom: 12, lineHeight: 20 } }),
-                    }}
-                    renderers={{
-                      video: (props: any) => {
-                        const src = props?.tnode?.attributes?.src;
-                        const TDefaultRenderer = props?.TDefaultRenderer;
-                        if (src && src.endsWith('.mp4')) {
-                          return renderMp4Video(src);
-                        }
-                        return TDefaultRenderer ? (
-                          <TDefaultRenderer {...props} />
-                        ) : null;
-                      },
-                    }}
-                  />
-                ) : (
-                  <Markdown
-                    style={markdownDisplayStyles}
-                    rules={markdownRules}
-                  >
-                    {finalRenderedBody}
-                  </Markdown>
-                )}
-              </Pressable>
-            );
-          } else {
-            return isHtml ? (
-              <RenderHtml
-                contentWidth={contentWidth}
-                source={{ html: cleanTextBody }}
-                baseStyle={{
-                  color: colors.text,
-                  fontSize: isReply ? 14 : 15,
-                  marginBottom: 8,
-                  lineHeight: isReply ? 20 : undefined,
-                }}
-                enableExperimentalMarginCollapsing
-                tagsStyles={{
-                  a: { color: colors.icon },
-                  u: { textDecorationLine: 'underline' },
-                  ...(isReply && { p: { marginBottom: 12, lineHeight: 20 } }),
-                }}
-                renderers={{
-                  video: (props: any) => {
-                    const src = props?.tnode?.attributes?.src;
-                    const TDefaultRenderer = props?.TDefaultRenderer;
-                    if (src && src.endsWith('.mp4')) {
-                      return renderMp4Video(src);
-                    }
-                    return TDefaultRenderer ? (
-                      <TDefaultRenderer {...props} />
-                    ) : null;
-                  },
-                }}
-              />
-            ) : (
-              <Markdown
-                style={markdownDisplayStyles}
-                rules={markdownRules}
-              >
-                {finalRenderedBody}
-              </Markdown>
-            );
-          }
-        })()}
-      {/* VoteReplyBar - different layouts for compact mode (replies) vs normal mode */}
-      {compactMode || isReply ? (
-        // Compact mode for replies
-        <View style={[styles.voteBar, { marginTop: 8 }]}>
-          {onUpvotePress && permlink ? (
-            <Pressable
-              onPress={() => onUpvotePress({ author, permlink })}
-              style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1, marginRight: 4 }]}
+              onPress={() => onUserPress && onUserPress(author)}
+              style={({ pressed }) => [
+                {
+                  opacity: pressed ? 0.7 : 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                },
+              ]}
+              disabled={!onUserPress}
               accessibilityRole='button'
-              accessibilityLabel='Upvote this snap'
+              accessibilityLabel={`View ${author}'s profile`}
             >
+              <Image
+                source={
+                  avatarUrl
+                    ? { uri: avatarUrl }
+                    : require('../../assets/images/generic-avatar.png')
+                }
+                style={styles.avatar}
+              />
+              <Text style={[styles.username, { color: colors.text }]}>
+                {author}
+              </Text>
+            </Pressable>
+            <Text style={[styles.timestamp, { color: colors.text }]}>
+              {new Date(created + 'Z').toLocaleString()}
+            </Text>
+          </View>
+        )}
+        {/* Embedded Content (Videos, Twitter posts, etc.) */}
+        {embeddedContent && (
+          <View style={{ marginBottom: 8 }}>
+            {embeddedContent.type === 'ipfs' ? (
+              <IPFSVideoPlayer
+                ipfsUrl={embeddedContent.embedUrl}
+                isDark={isDark}
+              />
+            ) : embeddedContent.type === 'twitter' ? (
+              <TwitterEmbed
+                embedUrl={embeddedContent.embedUrl}
+                isDark={isDark}
+              />
+            ) : embeddedContent.type === 'youtube' ? (
+              <YouTubeEmbed
+                embedUrl={embeddedContent.embedUrl}
+                isDark={isDark}
+              />
+            ) : embeddedContent.type === '3speak' ? (
+              <ThreeSpeakEmbed
+                embedUrl={embeddedContent.embedUrl}
+                isDark={isDark}
+              />
+            ) : null}
+          </View>
+        )}
+
+        {/* Images from markdown/html */}
+        {imageUrls.length > 0 && (
+          <View style={{ marginBottom: 8 }}>
+            {imageUrls.map((url, idx) => (
+              <Pressable
+                key={url + idx}
+                onPress={() => {
+                  if (onImagePress) {
+                    onImagePress(url);
+                  } else {
+                    setModalImageUrl(url);
+                    setModalVisible(true);
+                  }
+                }}
+              >
+                <Image
+                  source={{ uri: url }}
+                  style={{
+                    width: '100%',
+                    height: 200,
+                    borderRadius: 12,
+                    marginBottom: 6,
+                    backgroundColor: '#eee',
+                  }}
+                  resizeMode='cover'
+                />
+              </Pressable>
+            ))}
+          </View>
+        )}
+        {/* Images from raw URLs */}
+        {rawImageUrls.length > 0 && (
+          <View style={{ marginBottom: 8 }}>
+            {rawImageUrls.map((url, idx) => (
+              <Pressable
+                key={url + idx}
+                onPress={() => {
+                  if (onImagePress) {
+                    onImagePress(url);
+                  } else {
+                    setModalImageUrl(url);
+                    setModalVisible(true);
+                  }
+                }}
+              >
+                <Image
+                  source={{ uri: url }}
+                  style={{
+                    width: '100%',
+                    height: 200,
+                    borderRadius: 12,
+                    marginBottom: 6,
+                    backgroundColor: '#eee',
+                  }}
+                  resizeMode='cover'
+                />
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {/* Spoiler Components */}
+        {spoilerData.spoilers.map((spoiler: SpoilerData, index: number) => (
+          <SpoilerText key={`spoiler-${index}`} buttonText={spoiler.buttonText}>
+            {spoiler.content}
+          </SpoilerText>
+        ))}
+
+        {/* Body */}
+        {cleanTextBody.length > 0 &&
+          (() => {
+            const windowWidth = Dimensions.get('window').width;
+            const isHtml = containsHtml(cleanTextBody);
+            if (onContentPress) {
+              return (
+                <Pressable
+                  onPress={onContentPress}
+                  style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+                  accessibilityRole='button'
+                  accessibilityLabel='View conversation'
+                >
+                  {isHtml ? (
+                    <RenderHtml
+                      contentWidth={contentWidth}
+                      source={{ html: cleanTextBody }}
+                      baseStyle={{
+                        color: colors.text,
+                        fontSize: isReply ? 14 : 15,
+                        marginBottom: 8,
+                        lineHeight: isReply ? 20 : undefined,
+                      }}
+                      enableExperimentalMarginCollapsing
+                      tagsStyles={{
+                        a: { color: colors.icon },
+                        u: { textDecorationLine: 'underline' },
+                        ...(isReply && {
+                          p: { marginBottom: 12, lineHeight: 20 },
+                        }),
+                      }}
+                      renderers={{
+                        video: (props: any) => {
+                          const src = props?.tnode?.attributes?.src;
+                          const TDefaultRenderer = props?.TDefaultRenderer;
+                          if (src && src.endsWith('.mp4')) {
+                            return renderMp4Video(src);
+                          }
+                          return TDefaultRenderer ? (
+                            <TDefaultRenderer {...props} />
+                          ) : null;
+                        },
+                      }}
+                    />
+                  ) : (
+                    <Markdown
+                      style={markdownDisplayStyles}
+                      rules={markdownRules}
+                    >
+                      {finalRenderedBody}
+                    </Markdown>
+                  )}
+                </Pressable>
+              );
+            } else {
+              return isHtml ? (
+                <RenderHtml
+                  contentWidth={contentWidth}
+                  source={{ html: cleanTextBody }}
+                  baseStyle={{
+                    color: colors.text,
+                    fontSize: isReply ? 14 : 15,
+                    marginBottom: 8,
+                    lineHeight: isReply ? 20 : undefined,
+                  }}
+                  enableExperimentalMarginCollapsing
+                  tagsStyles={{
+                    a: { color: colors.icon },
+                    u: { textDecorationLine: 'underline' },
+                    ...(isReply && { p: { marginBottom: 12, lineHeight: 20 } }),
+                  }}
+                  renderers={{
+                    video: (props: any) => {
+                      const src = props?.tnode?.attributes?.src;
+                      const TDefaultRenderer = props?.TDefaultRenderer;
+                      if (src && src.endsWith('.mp4')) {
+                        return renderMp4Video(src);
+                      }
+                      return TDefaultRenderer ? (
+                        <TDefaultRenderer {...props} />
+                      ) : null;
+                    },
+                  }}
+                />
+              ) : (
+                <Markdown style={markdownDisplayStyles} rules={markdownRules}>
+                  {finalRenderedBody}
+                </Markdown>
+              );
+            }
+          })()}
+        {/* VoteReplyBar - different layouts for compact mode (replies) vs normal mode */}
+        {compactMode || isReply ? (
+          // Compact mode for replies
+          <View style={[styles.voteBar, { marginTop: 8 }]}>
+            {onUpvotePress && permlink ? (
+              <Pressable
+                onPress={() => onUpvotePress({ author, permlink })}
+                style={({ pressed }) => [
+                  { opacity: pressed ? 0.6 : 1, marginRight: 4 },
+                ]}
+                accessibilityRole='button'
+                accessibilityLabel='Upvote this snap'
+              >
+                <FontAwesome name='arrow-up' size={16} color={upvoteColor} />
+              </Pressable>
+            ) : (
               <FontAwesome
                 name='arrow-up'
                 size={16}
                 color={upvoteColor}
+                style={{ marginRight: 4 }}
               />
-            </Pressable>
-          ) : (
+            )}
+            <Text
+              style={[styles.voteCount, { color: colors.text, fontSize: 14 }]}
+            >
+              {voteCount}
+            </Text>
+
             <FontAwesome
-              name='arrow-up'
+              name='comment-o'
               size={16}
-              color={upvoteColor}
-              style={{ marginRight: 4 }}
+              color={colors.icon}
+              style={{ marginLeft: 12, marginRight: 4 }}
             />
-          )}
-          <Text style={[styles.voteCount, { color: colors.text, fontSize: 14 }]}>
-            {voteCount}
-          </Text>
-          
-          <FontAwesome
-            name='comment-o'
-            size={16}
-            color={colors.icon}
-            style={{ marginLeft: 12, marginRight: 4 }}
-          />
-          <Text style={[styles.replyCount, { color: colors.text, fontSize: 14 }]}>
-            {replyCount}
-          </Text>
-          
-          <Text style={[styles.payout, { color: colors.payout, marginLeft: 12, fontSize: 14 }]}>
-            ${payout.toFixed(2)}
-          </Text>
-          
-          <View style={{ flex: 1 }} />
-          
-          {/* Edit button - only show for own snaps */}
-          {onEditPress && permlink && author === currentUsername && (
-            <TouchableOpacity
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginLeft: 8,
-                paddingHorizontal: 8,
-                paddingVertical: 4,
-                borderRadius: 12,
-                backgroundColor: 'transparent',
-                opacity: posting || editing ? 0.5 : 1,
-              }}
-              onPress={() => onEditPress({ author, permlink, body })}
-              disabled={posting || editing}
-              accessibilityRole='button'
-              accessibilityLabel='Edit this snap'
+            <Text
+              style={[styles.replyCount, { color: colors.text, fontSize: 14 }]}
             >
-              <FontAwesome name='edit' size={14} color={colors.icon} />
-              <Text style={{ marginLeft: 4, fontWeight: 'bold', fontSize: 12, color: colors.icon }}>
-                Edit
-              </Text>
-            </TouchableOpacity>
-          )}
-          
-          {onReplyPress && permlink && (
-            <TouchableOpacity
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginLeft: 8,
-                paddingHorizontal: 8,
-                paddingVertical: 4,
-                borderRadius: 12,
-                backgroundColor: 'transparent',
-                opacity: posting || editing ? 0.5 : 1,
-              }}
-              onPress={() => onReplyPress(author, permlink)}
-              disabled={posting || editing}
-              accessibilityRole='button'
-              accessibilityLabel='Reply to this snap'
+              {replyCount}
+            </Text>
+
+            <Text
+              style={[
+                styles.payout,
+                { color: colors.payout, marginLeft: 12, fontSize: 14 },
+              ]}
             >
-              <FontAwesome name='reply' size={16} color={colors.icon} />
-              <Text style={{ marginLeft: 4, fontWeight: 'bold', fontSize: 12, color: colors.icon }}>
-                Reply
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      ) : (
-        // Normal mode for main snaps
-        <View style={styles.voteBar}>
-          {onUpvotePress && permlink ? (
-            <Pressable
-              onPress={() => onUpvotePress({ author, permlink })}
-              style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-              accessibilityRole='button'
-              accessibilityLabel='Upvote this snap'
-            >
+              ${payout.toFixed(2)}
+            </Text>
+
+            <View style={{ flex: 1 }} />
+
+            {/* Edit button - only show for own snaps */}
+            {onEditPress && permlink && author === currentUsername && (
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginLeft: 8,
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                  backgroundColor: 'transparent',
+                  opacity: posting || editing ? 0.5 : 1,
+                }}
+                onPress={() => onEditPress({ author, permlink, body })}
+                disabled={posting || editing}
+                accessibilityRole='button'
+                accessibilityLabel='Edit this snap'
+              >
+                <FontAwesome name='edit' size={14} color={colors.icon} />
+                <Text
+                  style={{
+                    marginLeft: 4,
+                    fontWeight: 'bold',
+                    fontSize: 12,
+                    color: colors.icon,
+                  }}
+                >
+                  Edit
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {onReplyPress && permlink && (
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginLeft: 8,
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                  backgroundColor: 'transparent',
+                  opacity: posting || editing ? 0.5 : 1,
+                }}
+                onPress={() => onReplyPress(author, permlink)}
+                disabled={posting || editing}
+                accessibilityRole='button'
+                accessibilityLabel='Reply to this snap'
+              >
+                <FontAwesome name='reply' size={16} color={colors.icon} />
+                <Text
+                  style={{
+                    marginLeft: 4,
+                    fontWeight: 'bold',
+                    fontSize: 12,
+                    color: colors.icon,
+                  }}
+                >
+                  Reply
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          // Normal mode for main snaps
+          <View style={styles.voteBar}>
+            {onUpvotePress && permlink ? (
+              <Pressable
+                onPress={() => onUpvotePress({ author, permlink })}
+                style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+                accessibilityRole='button'
+                accessibilityLabel='Upvote this snap'
+              >
+                <FontAwesome
+                  name='arrow-up'
+                  size={18}
+                  color={upvoteColor}
+                  style={styles.icon}
+                />
+              </Pressable>
+            ) : (
               <FontAwesome
                 name='arrow-up'
                 size={18}
                 color={upvoteColor}
                 style={styles.icon}
               />
-            </Pressable>
-          ) : (
-            <FontAwesome
-              name='arrow-up'
-              size={18}
-              color={upvoteColor}
-              style={styles.icon}
-            />
-          )}
-          <Text style={[styles.voteCount, { color: colors.text }]}>
-            {voteCount}
-          </Text>
-          {onSpeechBubblePress ? (
-            <Pressable
-              onPress={onSpeechBubblePress}
-              style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-              accessibilityRole='button'
-              accessibilityLabel='View conversation'
-            >
+            )}
+            <Text style={[styles.voteCount, { color: colors.text }]}>
+              {voteCount}
+            </Text>
+            {onSpeechBubblePress ? (
+              <Pressable
+                onPress={onSpeechBubblePress}
+                style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+                accessibilityRole='button'
+                accessibilityLabel='View conversation'
+              >
+                <FontAwesome
+                  name='comment-o'
+                  size={18}
+                  color={colors.icon}
+                  style={styles.icon}
+                />
+              </Pressable>
+            ) : (
               <FontAwesome
                 name='comment-o'
                 size={18}
                 color={colors.icon}
                 style={styles.icon}
               />
-            </Pressable>
-          ) : (
-            <FontAwesome
-              name='comment-o'
-              size={18}
-              color={colors.icon}
-              style={styles.icon}
-            />
-          )}
-          <Text style={[styles.replyCount, { color: colors.text }]}>
-            {replyCount}
-          </Text>
-          {/* Resnap button */}
-          {onResnapPress && permlink && canBeResnapped({ author, permlink }) && (
-            <Pressable
-              onPress={() => onResnapPress(author, permlink)}
-              style={({ pressed }) => [
-                {
-                  opacity: pressed ? 0.6 : 1,
+            )}
+            <Text style={[styles.replyCount, { color: colors.text }]}>
+              {replyCount}
+            </Text>
+            {/* Resnap button */}
+            {onResnapPress &&
+              permlink &&
+              canBeResnapped({ author, permlink }) && (
+                <Pressable
+                  onPress={() => onResnapPress(author, permlink)}
+                  style={({ pressed }) => [
+                    {
+                      opacity: pressed ? 0.6 : 1,
+                      marginLeft: 12,
+                      padding: 4,
+                    },
+                  ]}
+                  accessibilityRole='button'
+                  accessibilityLabel='Resnap this post'
+                >
+                  <FontAwesome name='retweet' size={18} color={colors.icon} />
+                </Pressable>
+              )}
+            <View style={{ flex: 1 }} />
+            <Text style={[styles.payout, { color: colors.payout }]}>
+              ${payout.toFixed(2)}
+            </Text>
+            {/* Edit button - only show for own snaps */}
+            {onEditPress && permlink && author === currentUsername && (
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  alignSelf: 'auto',
                   marginLeft: 12,
-                  padding: 4,
-                },
-              ]}
-              accessibilityRole='button'
-              accessibilityLabel='Resnap this post'
-            >
-              <FontAwesome name='retweet' size={18} color={colors.icon} />
-            </Pressable>
-          )}
-          <View style={{ flex: 1 }} />
-          <Text style={[styles.payout, { color: colors.payout }]}>
-            ${payout.toFixed(2)}
-          </Text>
-          {/* Edit button - only show for own snaps */}
-          {onEditPress && permlink && author === currentUsername && (
-            <TouchableOpacity
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                alignSelf: 'auto',
-                marginLeft: 12,
-                paddingHorizontal: 14,
-                paddingVertical: 7,
-                borderRadius: 20,
-                backgroundColor: 'transparent',
-                opacity: posting || editing ? 0.5 : 1, // Dim when disabled
-              }}
-              onPress={() => onEditPress({ author, permlink, body })}
-              disabled={posting || editing}
-              accessibilityRole='button'
-              accessibilityLabel='Edit this snap'
-            >
-              <FontAwesome name='edit' size={16} color={colors.icon} />
-              <Text
-                style={{
-                  marginLeft: 6,
-                  fontWeight: 'bold',
-                  fontSize: 15,
-                  color: colors.icon,
+                  paddingHorizontal: 14,
+                  paddingVertical: 7,
+                  borderRadius: 20,
+                  backgroundColor: 'transparent',
+                  opacity: posting || editing ? 0.5 : 1, // Dim when disabled
                 }}
+                onPress={() => onEditPress({ author, permlink, body })}
+                disabled={posting || editing}
+                accessibilityRole='button'
+                accessibilityLabel='Edit this snap'
               >
-                Edit
-              </Text>
-            </TouchableOpacity>
-          )}
-          {onReplyPress && permlink && (
-            <TouchableOpacity
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                alignSelf: 'auto',
-                marginLeft: 12,
-                paddingHorizontal: 14,
-                paddingVertical: 7,
-                borderRadius: 20,
-                backgroundColor: 'transparent',
-                opacity: posting || editing ? 0.5 : 1, // Dim when disabled
-              }}
-              onPress={() => onReplyPress(author, permlink)}
-              disabled={posting || editing}
-              accessibilityRole='button'
-              accessibilityLabel='Reply to this snap'
-            >
-              <FontAwesome name='reply' size={16} color={colors.icon} />
-              <Text
+                <FontAwesome name='edit' size={16} color={colors.icon} />
+                <Text
+                  style={{
+                    marginLeft: 6,
+                    fontWeight: 'bold',
+                    fontSize: 15,
+                    color: colors.icon,
+                  }}
+                >
+                  Edit
+                </Text>
+              </TouchableOpacity>
+            )}
+            {onReplyPress && permlink && (
+              <TouchableOpacity
                 style={{
-                  marginLeft: 6,
-                  fontWeight: 'bold',
-                  fontSize: 15,
-                  color: colors.icon,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  alignSelf: 'auto',
+                  marginLeft: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 7,
+                  borderRadius: 20,
+                  backgroundColor: 'transparent',
+                  opacity: posting || editing ? 0.5 : 1, // Dim when disabled
                 }}
+                onPress={() => onReplyPress(author, permlink)}
+                disabled={posting || editing}
+                accessibilityRole='button'
+                accessibilityLabel='Reply to this snap'
               >
-                Reply
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
+                <FontAwesome name='reply' size={16} color={colors.icon} />
+                <Text
+                  style={{
+                    marginLeft: 6,
+                    fontWeight: 'bold',
+                    fontSize: 15,
+                    color: colors.icon,
+                  }}
+                >
+                  Reply
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
-      {/* Hive Post Previews - Footer Style */}
-      {hivePostUrls.length > 0 && (
-        <View style={{ marginTop: 12 }}>
-          <OptimizedHivePostPreviewRenderer
-            postUrls={hivePostUrls}
-            colors={{
-              bubble: colors.bubble,
-              icon: colors.icon,
-              text: colors.text,
-            }}
-            onError={error => {
-              console.warn('[Snap] Hive post preview error:', error);
-            }}
-          />
-        </View>
-      )}
+        {/* Hive Post Previews - Footer Style */}
+        {hivePostUrls.length > 0 && (
+          <View style={{ marginTop: 12 }}>
+            <OptimizedHivePostPreviewRenderer
+              postUrls={hivePostUrls}
+              colors={{
+                bubble: colors.bubble,
+                icon: colors.icon,
+                text: colors.text,
+              }}
+              onError={error => {
+                console.warn('[Snap] Hive post preview error:', error);
+              }}
+            />
+          </View>
+        )}
       </View>
     </View>
   );
