@@ -15,18 +15,6 @@ export const linkStyles = StyleSheet.create({
 
 export type MinimalThemeColors = { icon: string };
 
-// Pure builder for theme/contextual link text style
-export function buildLinkTextStyle(
-  colors: MinimalThemeColors,
-  isReply: boolean
-): TextStyle {
-  return {
-    color: colors.icon,
-    fontSize: isReply ? 14 : 15,
-    ...(isReply ? { lineHeight: 20 } : {}),
-  };
-}
-
 // Hook to memoize link text style per theme and context
 export function useLinkTextStyle(iconColor: string, isReply: boolean) {
   return useMemo(
