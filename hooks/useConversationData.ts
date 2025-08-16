@@ -88,19 +88,10 @@ export const useConversationData = (
       if (depth > maxDepth) return [];
 
       try {
-        // Fetch shallow replies
-        const res = await fetch('https://api.hive.blog', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            method: 'condenser_api.get_content_replies',
-            params: [author, permlink],
-            id: 1,
-          }),
-        });
-        const data = await res.json();
-        const shallowReplies = data.result || [];
+        // Robust shallow replies fetch via dhive client (handles node rotation + JSON)
+        const shallowReplies: any[] = await client.database
+          .call('get_content_replies', [author, permlink])
+          .catch(() => [] as any[]);
 
         // Batch fetch full content for all replies in parallel
         const fullContentArr = await Promise.all(
@@ -181,7 +172,9 @@ export const useConversationData = (
         );
         return fullReplies;
       } catch (error) {
-        console.error('Error fetching replies tree:', error);
+        if (depth === 0) {
+          console.error('Error fetching replies tree:', error);
+        }
         return [];
       }
     },
