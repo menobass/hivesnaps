@@ -35,6 +35,7 @@ import { classifyUrl } from '../../utils/urlClassifier';
 import { canBeResnapped } from '../../utils/postTypeDetector';
 import { getMarkdownStyles } from '../../styles/markdownStyles';
 import { linkStyles, useLinkTextStyle } from '../../styles/linkStyles';
+import { extractRawImageUrls as extractRawImageUrlsUtil, removeRawImageUrls as removeRawImageUrlsUtil } from '../../utils/rawImageUrls';
 
 const twitterColors = {
   light: {
@@ -88,33 +89,7 @@ interface SnapProps {
   compactMode?: boolean; // For more compact button layout
 }
 
-// Utility to extract raw image URLs from text (not in markdown or html)
-function extractRawImageUrls(text: string): string[] {
-  // Match URLs ending with image extensions, not inside markdown or html tags
-  const regex =
-    /(?:^|\s)(https?:\/\/(?:[\w.-]+)\/(?:[\w\-./%]+)\.(?:jpg|jpeg|png|gif|webp|bmp|svg))(?:\s|$)/gi;
-  const matches = [];
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    matches.push(match[1]);
-  }
-  return matches;
-}
-
-// Utility to remove raw image URLs from text
-function removeRawImageUrls(text: string): string {
-  const replaced = text.replace(
-    /(?:^|\s)(https?:\/\/(?:[\w.-]+)\/(?:[\w\-./%]+)\.(?:jpg|jpeg|png|gif|webp|bmp|svg))(?:\s|$)/gi,
-    ' '
-  );
-  // Collapse only horizontal spaces within each line; preserve blank lines & newlines
-  return replaced
-    .replace(/\r\n/g, '\n')
-    .split('\n')
-    .map(l => l.replace(/[ \t]{2,}/g, ' ').replace(/ +$/,''))
-    .join('\n');
-}
-
+// Utility to remove YouTube links (youtube.com/watch?v=, youtu.be/, youtube.com/shorts/, etc.)
 const removeYouTubeUrl = (text: string): string => {
   // Remove all YouTube links (youtube.com/watch?v=, youtu.be/, youtube.com/shorts/, etc.)
   const removed = text.replace(
@@ -249,7 +224,7 @@ const Snap: React.FC<SnapProps> = ({
   const colors = twitterColors[colorScheme];
   const upvoteColor = hasUpvoted ? '#8e44ad' : colors.icon; // purple if upvoted
   const imageUrls = extractImageUrls(body);
-  const rawImageUrls = extractRawImageUrls(body);
+  const rawImageUrls = extractRawImageUrlsUtil(body);
   const embeddedContent = extractVideoInfo(body); // Renamed from videoInfo to be more accurate
   const hivePostUrls = extractHivePostUrls(body); // Extract Hive post URLs for previews
   const router = useRouter(); // For navigation in reply mode
@@ -493,7 +468,7 @@ const Snap: React.FC<SnapProps> = ({
     textBody = removeVideoUrls(textBody);
   }
   if (rawImageUrls.length > 0) {
-    textBody = removeRawImageUrls(textBody);
+    textBody = removeRawImageUrlsUtil(textBody);
   }
 
   // Remove Hive post URLs from text body to avoid showing raw URLs
