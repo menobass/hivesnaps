@@ -47,6 +47,7 @@ import SmallButton from '../components/SmallButton';
 import StaticContentModal from '../components/StaticContentModal';
 import Slider from '@react-native-community/slider';
 import UpvoteModal from '../components/UpvoteModal';
+import { addPromiseIfValid } from '../utils/promiseUtils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -418,13 +419,13 @@ const FeedScreenRefactored = () => {
         // Resource credits returns a promise
         try {
           const rcPromise = refreshResourceCredits();
-          if (rcPromise && typeof (rcPromise as any).then === 'function') ops.push(rcPromise as Promise<any>);
+          addPromiseIfValid(rcPromise, ops);
         } catch (e) { console.warn('[FeedScreen] refreshResourceCredits error (non-blocking):', e); }
 
         // Notifications manual refresh returns a promise
         try {
           const notifPromise = refreshNotifications();
-          if (notifPromise && typeof (notifPromise as any).then === 'function') ops.push(notifPromise as Promise<any>);
+          addPromiseIfValid(notifPromise, ops);
         } catch (e) { console.warn('[FeedScreen] refreshNotifications error (non-blocking):', e); }
       }
 
