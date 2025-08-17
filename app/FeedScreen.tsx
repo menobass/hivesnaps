@@ -47,6 +47,7 @@ import SmallButton from '../components/SmallButton';
 import StaticContentModal from '../components/StaticContentModal';
 import Slider from '@react-native-community/slider';
 import UpvoteModal from '../components/UpvoteModal';
+import { addPromiseIfValid } from '../utils/promiseUtils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -139,10 +140,11 @@ const FeedScreenRefactored = () => {
     avatarUrl,
     hasUnclaimedRewards,
     loading: userLoading,
+    refreshProfile,
   } = useUserProfile(username);
 
-  const { votingPower, loading: vpLoading } = useVotingPower(username);
-  const { resourceCredits, loading: rcLoading } = useResourceCredits(username);
+  const { votingPower, loading: vpLoading, refreshVotingPower } = useVotingPower(username);
+  const { resourceCredits, loading: rcLoading, refreshResourceCredits } = useResourceCredits(username);
 
   // Feed data and related functions
   const {
@@ -208,7 +210,7 @@ const FeedScreenRefactored = () => {
     loadRecentSearches,
   } = useSearch();
 
-  const { unreadCount } = useNotifications(username || null);
+  const { unreadCount, refresh: refreshNotifications } = useNotifications(username || null);
 
   const [isSearchModalVisible, setIsSearchModalVisible] = useState(false);
   const [vpInfoModalVisible, setVpInfoModalVisible] = useState(false);
@@ -216,6 +218,10 @@ const FeedScreenRefactored = () => {
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [modalImages, setModalImages] = useState<Array<{ uri: string }>>([]);
   const [modalImageIndex, setModalImageIndex] = useState(0);
+  // Global refresh spinner + throttle state
+  const [globalRefreshing, setGlobalRefreshing] = useState(false);
+  const lastRefreshTimeRef = useRef<number>(0);
+  const MIN_REFRESH_INTERVAL_MS = 4000; // Throttle window
 
   // Refs
   const flatListRef = useRef<FlatList<any>>(null);
@@ -383,6 +389,54 @@ const FeedScreenRefactored = () => {
     setModalImages([{ uri: imageUrl }]);
     setModalImageIndex(0);
     setImageModalVisible(true);
+  };
+
+  // Unified global refresh (pull-to-refresh)
+  const handleGlobalRefresh = async () => {
+    const now = Date.now();
+    if (globalRefreshing) {
+      console.log('⏳ [FeedScreen] Ignoring refresh: already in progress');
+      return;
+    }
+    if (now - lastRefreshTimeRef.current < MIN_REFRESH_INTERVAL_MS) {
+      console.log('� [FeedScreen] Ignoring refresh: throttled');
+      return;
+    }
+    lastRefreshTimeRef.current = now;
+
+    console.log('�🔄 [FeedScreen] Pull-to-refresh started (global refresh)');
+    setGlobalRefreshing(true);
+    const ops: Promise<any>[] = [];
+    try {
+      // Always refresh feed snaps (returns a promise)
+      ops.push(refreshSnaps());
+
+      if (username) {
+        // Voting power + profile refreshers are fire-and-forget (not returning promises)
+        try { refreshVotingPower(); } catch (e) { console.warn('[FeedScreen] refreshVotingPower error (non-blocking):', e); }
+        try { refreshProfile(); } catch (e) { console.warn('[FeedScreen] refreshProfile error (non-blocking):', e); }
+
+        // Resource credits returns a promise
+        try {
+          const rcPromise = refreshResourceCredits();
+          addPromiseIfValid(rcPromise, ops);
+        } catch (e) { console.warn('[FeedScreen] refreshResourceCredits error (non-blocking):', e); }
+
+        // Notifications manual refresh returns a promise
+        try {
+          const notifPromise = refreshNotifications();
+          addPromiseIfValid(notifPromise, ops);
+        } catch (e) { console.warn('[FeedScreen] refreshNotifications error (non-blocking):', e); }
+      }
+
+      // Await all promise-based ops (feed + any async hooks) but don't reject on single failure
+      await Promise.allSettled(ops);
+      console.log('✅ [FeedScreen] Global refresh complete');
+    } catch (err) {
+      console.error('❌ [FeedScreen] Global refresh encountered an error:', err);
+    } finally {
+      setGlobalRefreshing(false);
+    }
   };
 
   // Handle search modal close
@@ -848,11 +902,8 @@ const FeedScreenRefactored = () => {
             )}
             contentContainerStyle={{ paddingBottom: 80 }}
             style={{ width: '100%' }}
-            refreshing={feedLoading}
-            onRefresh={async () => {
-              console.log(`🔄 [FeedScreen] User initiated pull-to-refresh`);
-              await refreshSnaps();
-            }}
+            refreshing={feedLoading || globalRefreshing}
+            onRefresh={handleGlobalRefresh}
             onEndReached={handleEndReached}
             onEndReachedThreshold={0.3}
             onScrollToIndexFailed={({ index }) => {
