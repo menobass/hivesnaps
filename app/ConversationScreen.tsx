@@ -40,6 +40,10 @@ import RenderHtml, {
 import { Dimensions } from 'react-native';
 
 import { extractImageUrls } from '../utils/extractImageUrls';
+import {
+  extractRawImageUrls as extractRawImageUrlsUtil,
+  removeRawImageUrls as removeRawImageUrlsUtil,
+} from '../utils/rawImageUrls';
 import ImageView from 'react-native-image-viewing';
 import genericAvatar from '../assets/images/generic-avatar.png';
 import { extractHivePostUrls } from '../utils/extractHivePostInfo';
@@ -657,7 +661,8 @@ const ConversationScreenRefactored = () => {
   // DEPRECATED: renderReplyTree function - Now using flattened approach instead
   const renderReplyTree = (reply: ReplyData, level = 0) => {
     const videoInfo = extractVideoInfo(reply.body);
-    const imageUrls = extractImageUrls(reply.body);
+  const imageUrls = extractImageUrls(reply.body);
+  const rawImageUrls = extractRawImageUrlsUtil(reply.body);
     const hivePostUrls = extractHivePostUrls(reply.body);
 
     let textBody = reply.body;
@@ -670,6 +675,9 @@ const ConversationScreenRefactored = () => {
       textBody = removeTwitterUrls(textBody);
     }
     textBody = stripImageTags(textBody);
+    if (rawImageUrls.length > 0) {
+      textBody = removeRawImageUrlsUtil(textBody);
+    }
 
     // Process spoiler syntax
     const spoilerData = convertSpoilerSyntax(textBody);
@@ -755,6 +763,21 @@ const ConversationScreenRefactored = () => {
                   key={url + idx}
                   onPress={() => handleImagePress(url)}
                 >
+                  <ExpoImage
+                    source={{ uri: url }}
+                    style={ConversationScreenStyles.imageStyle}
+                    contentFit='cover'
+                  />
+                </Pressable>
+              ))}
+            </View>
+          )}
+
+          {/* Images from raw URLs */}
+          {rawImageUrls.length > 0 && (
+            <View style={ConversationScreenStyles.imageContainer}>
+              {rawImageUrls.map((url, idx) => (
+                <Pressable key={url + idx} onPress={() => handleImagePress(url)}>
                   <ExpoImage
                     source={{ uri: url }}
                     style={ConversationScreenStyles.imageStyle}
@@ -931,7 +954,8 @@ const ConversationScreenRefactored = () => {
     if (!snap) return null;
 
     const videoInfo = extractVideoInfo(snap.body);
-    const imageUrls = extractImageUrls(snap.body);
+  const imageUrls = extractImageUrls(snap.body);
+  const rawImageUrls = extractRawImageUrlsUtil(snap.body);
     const hivePostUrls = extractHivePostUrls(snap.body);
 
     let textBody = snap.body;
@@ -944,6 +968,9 @@ const ConversationScreenRefactored = () => {
       textBody = removeTwitterUrls(textBody);
     }
     textBody = stripImageTags(textBody);
+    if (rawImageUrls.length > 0) {
+      textBody = removeRawImageUrlsUtil(textBody);
+    }
 
     // Process spoiler syntax
     const spoilerData = convertSpoilerSyntax(textBody);
@@ -1020,6 +1047,21 @@ const ConversationScreenRefactored = () => {
         {imageUrls.length > 0 && (
           <View style={ConversationScreenStyles.imageContainer}>
             {imageUrls.map((url, idx) => (
+              <Pressable key={url + idx} onPress={() => handleImagePress(url)}>
+                <ExpoImage
+                  source={{ uri: url }}
+                  style={ConversationScreenStyles.imageStyle}
+                  contentFit='cover'
+                />
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {/* Images from raw URLs */}
+        {rawImageUrls.length > 0 && (
+          <View style={ConversationScreenStyles.imageContainer}>
+            {rawImageUrls.map((url, idx) => (
               <Pressable key={url + idx} onPress={() => handleImagePress(url)}>
                 <ExpoImage
                   source={{ uri: url }}
