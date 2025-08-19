@@ -76,7 +76,7 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
 
 ### Media & Storage
 
-- **Cloudinary** for image hosting and optimization
+- **Cloudinary** as fallback for image hosting and optimization
 - **Tenor API** for GIF search and integration
 - **Expo Image Picker** for camera/gallery access
 - **AsyncStorage** for local data persistence
@@ -164,22 +164,8 @@ app/
 
 - [ ] Push notifications for mentions and votes
 - [ ] Advanced search functionality
-- [ ] Post scheduling
+- [ ] Video uploads
 - [ ] Multiple account support
-
-### v1.3.0 (Future)
-
-- [ ] Stories feature (24h expiring content)
-- [ ] Live streaming integration
-- [ ] Community creation tools
-- [ ] Advanced analytics dashboard
-
-### v2.0.0 (Long-term)
-
-- [ ] Cross-chain support (other blockchains)
-- [ ] NFT integration
-- [ ] Decentralized messaging
-- [ ] DAO governance features
 
 ## 🤝 Contributing
 
@@ -200,4 +186,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **HiveSnaps** - _What's snappening today?_ 🚀
 
-Follow us: [@hivesnaps](https://hive.blog/@hivesnaps) | Join our community on [Discord](https://discord.gg/CgJP7t7nWy)
+Follow us: [@snapie](https://hive.blog/@snapie) | Join our community on [Discord](https://discord.gg/CgJP7t7nWy) (permanent invite)
