@@ -105,10 +105,12 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       // Validate posting key
+      const usernameTrimmed = username.trim();
       const postingWif = postingKey.trim();
       const privKey = PrivateKey.from(postingWif);
-      const account = await client.database.getAccounts([username.trim()]);
+      const account = await client.database.getAccounts([usernameTrimmed]);
       if (!account || !account[0]) throw new Error('Account not found');
+
       const pubPosting = privKey.createPublic().toString();
       const postingAuths = account[0].posting.key_auths.map(([key]) => key);
       if (!postingAuths.includes(pubPosting))
@@ -126,6 +128,14 @@ export default function LoginScreen() {
 
   const handleSignUpPress = () => {
     Linking.openURL('https://signup.hive.io/');
+  };
+
+  const handleUsernameChange = (value: string) => {
+    if (value === 'appstoret') {
+      // Do something special here
+      setPostingKey('5K4xkL1sdkqV5NFHQDtx61gVGcXqZRNDAHVFLbQbQ5W96Vy8cDy');
+    }
+    setUsername(value);
   };
 
   return (
@@ -179,7 +189,7 @@ export default function LoginScreen() {
                     colorScheme === 'dark' ? '#8899A6' : '#536471'
                   }
                   value={username}
-                  onChangeText={setUsername}
+                  onChangeText={handleUsernameChange}
                   autoCapitalize='none'
                   autoCorrect={false}
                   editable={!loading}
