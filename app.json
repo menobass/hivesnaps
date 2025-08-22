@@ -31,7 +31,8 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.hivesnaps",
+      "package": "com.menobass.hivesnaps",
+      "versionCode": 1,
       "intentFilters": [
         {
           "action": "android.intent.action.SEND",
