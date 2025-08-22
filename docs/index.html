@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HiveSnaps - Decentralized Social Media on Hive Blockchain</title>
+    <meta name="description" content="Share photos and videos on the Hive blockchain with HiveSnaps. Decentralized, secure, and community-driven social media.">
+    <link rel="icon" type="image/png" href="../assets/images/logo.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 0;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .logo img {
+            width: 40px;
+            height: 40px;
+            margin-right: 10px;
+            border-radius: 8px;
+        }
+        
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 2rem;
+        }
+        
+        .nav-links a {
+            text-decoration: none;
+            color: #333;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+        
+        .nav-links a:hover {
+            color: #667eea;
+        }
+        
+        .hero {
+            padding: 120px 0 80px;
+            text-align: center;
+            color: white;
+        }
+        
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .hero p {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            background: #ff6b6b;
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: bold;
+            transition: transform 0.3s, box-shadow 0.3s;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .section {
+            padding: 80px 0;
+            background: white;
+        }
+        
+        .section:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .section h2 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 3rem;
+            color: #333;
+        }
+        
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+        
+        .feature {
+            text-align: center;
+            padding: 2rem;
+            border-radius: 10px;
+            background: white;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s;
+        }
+        
+        .feature:hover {
+            transform: translateY(-5px);
+        }
+        
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .about-hive {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+        
+        .hive-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+        
+        .hive-link {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            border-radius: 10px;
+            text-align: center;
+            text-decoration: none;
+            color: white;
+            transition: background 0.3s;
+            backdrop-filter: blur(10px);
+        }
+        
+        .hive-link:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .footer {
+            background: #333;
+            color: white;
+            text-align: center;
+            padding: 2rem 0;
+        }
+        
+        .footer-links {
+            margin-bottom: 1rem;
+        }
+        
+        .footer-links a {
+            color: white;
+            text-decoration: none;
+            margin: 0 1rem;
+        }
+        
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+            
+            .hero h1 {
+                font-size: 2rem;
+            }
+            
+            .features {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <nav class="nav container">
+            <div class="logo">
+                <img src="../assets/images/logo.png" alt="HiveSnaps Logo">
+                HiveSnaps
+            </div>
+            <ul class="nav-links">
+                <li><a href="#home">Home</a></li>
+                <li><a href="#features">Features</a></li>
+                <li><a href="#about">About Hive</a></li>
+                <li><a href="privacy-policy.html">Privacy Policy</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <section id="home" class="hero">
+        <div class="container">
+            <h1>HiveSnaps</h1>
+            <p>Decentralized Social Media on the Hive Blockchain</p>
+            <p>Share photos and videos with true ownership and community rewards</p>
+            <a href="#features" class="cta-button">Learn More</a>
+        </div>
+    </section>
+
+    <section id="features" class="section">
+        <div class="container">
+            <h2>Why Choose HiveSnaps?</h2>
+            <div class="features">
+                <div class="feature">
+                    <div class="feature-icon">🔒</div>
+                    <h3>True Ownership</h3>
+                    <p>Your content is stored on the Hive blockchain, giving you permanent ownership and control over your data.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">💰</div>
+                    <h3>Earn Rewards</h3>
+                    <p>Get rewarded in HIVE tokens for creating quality content and engaging with the community.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🌐</div>
+                    <h3>Decentralized</h3>
+                    <p>No central authority controls your content. The Hive blockchain ensures censorship resistance.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">📱</div>
+                    <h3>Mobile First</h3>
+                    <p>Beautiful, intuitive mobile app designed for seamless photo and video sharing.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">👥</div>
+                    <h3>Community Driven</h3>
+                    <p>Join a vibrant community of creators, developers, and blockchain enthusiasts.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🚀</div>
+                    <h3>Fast & Free</h3>
+                    <p>Instant transactions with no fees for posting, voting, or commenting on content.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="about" class="section about-hive">
+        <div class="container">
+            <h2>About the Hive Blockchain</h2>
+            <p style="text-align: center; font-size: 1.2rem; margin-bottom: 3rem;">
+                Hive is a fast, fee-less, and decentralized blockchain designed for Web 3.0 applications. 
+                It's built by a passionate community of developers and users who believe in true digital ownership.
+            </p>
+            
+            <div class="hive-links">
+                <a href="https://hive.io" target="_blank" class="hive-link">
+                    <h3>🏠 Hive.io</h3>
+                    <p>Official Hive blockchain website</p>
+                </a>
+                <a href="https://peakd.com" target="_blank" class="hive-link">
+                    <h3>⛰️ PeakD</h3>
+                    <p>Popular Hive frontend for blogging</p>
+                </a>
+                <a href="https://hive.blog" target="_blank" class="hive-link">
+                    <h3>📝 Hive.blog</h3>
+                    <p>Original Hive blogging platform</p>
+                </a>
+                <a href="https://hiveonboard.com" target="_blank" class="hive-link">
+                    <h3>🎯 Hive Onboard</h3>
+                    <p>Easy way to create a Hive account</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="container">
+            <h2>Get Started Today</h2>
+            <div style="text-align: center;">
+                <p style="font-size: 1.2rem; margin-bottom: 2rem;">
+                    Download HiveSnaps and join the decentralized social media revolution!
+                </p>
+                <div style="display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap;">
+                    <a href="#" class="cta-button" style="background: #34a853;">
+                        📱 Download for Android (Coming Soon)
+                    </a>
+                    <a href="#" class="cta-button" style="background: #007aff;">
+                        🍎 Download for iOS (Coming Soon)
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-links">
+                <a href="privacy-policy.html">Privacy Policy</a>
+                <a href="mailto:contact@hivesnaps.com">Contact</a>
+                <a href="https://github.com/menobass/hivesnaps" target="_blank">GitHub</a>
+            </div>
+            <p>&copy; 2025 HiveSnaps. Built with ❤️ for the Hive community.</p>
+        </div>
+    </footer>
+</body>
+</html>
