@@ -1,0 +1,26 @@
+diff --git a/node_modules/react-native-image-viewing/dist/components/ImageItem/ImageItem.d.ts b/node_modules/react-native-image-viewing/dist/components/ImageItem/ImageItem.d.ts
+new file mode 100644
+index 0000000..cd84a11
+--- /dev/null
++++ b/node_modules/react-native-image-viewing/dist/components/ImageItem/ImageItem.d.ts
+@@ -0,0 +1,2 @@
++declare const ImageItem: any;
++export default ImageItem;
+diff --git a/node_modules/react-native-image-viewing/dist/components/ImageItem/ImageItem.js b/node_modules/react-native-image-viewing/dist/components/ImageItem/ImageItem.js
+new file mode 100644
+index 0000000..7082133
+--- /dev/null
++++ b/node_modules/react-native-image-viewing/dist/components/ImageItem/ImageItem.js
+@@ -0,0 +1,12 @@
++// Platform-specific export for ImageItem
++import { Platform } from 'react-native';
++
++let ImageItem;
++
++if (Platform.OS === 'ios') {
++  ImageItem = require('./ImageItem.ios').default;
++} else {
++  ImageItem = require('./ImageItem.android').default;
++}
++
++export default ImageItem;
