@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { sortByPayoutRecursive } from '../utils/sortRepliesByPayout';
 import { Client } from '@hiveio/dhive';
 import { useOptimisticUpdates } from './useOptimisticUpdates';
+import { avatarService } from '../services/AvatarService';
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -68,7 +69,7 @@ export const useConversationData = (
     error: null,
   });
 
-  // In-memory avatar/profile cache for this session
+  // In-memory avatar cache (images.hive.blog) for this session
   const avatarProfileCache: Record<string, string | undefined> = {};
 
   // Helper function to check if current user has upvoted
@@ -102,47 +103,21 @@ export const useConversationData = (
           )
         );
 
-        // Collect all unique authors for avatar batch fetch, skipping those already cached
-        const authorsToFetch = Array.from(
-          new Set(fullContentArr.map(r => r.author))
-        ).filter(a => !(a in avatarProfileCache));
-        let accountsArr: any[] = [];
-        if (authorsToFetch.length > 0) {
-          try {
-            accountsArr = await client.database.call('get_accounts', [
-              authorsToFetch,
-            ]);
-          } catch (e) {
-            accountsArr = [];
-          }
-          // Update cache with fetched avatars
-          for (const acc of accountsArr) {
-            let meta = acc.posting_json_metadata;
-            if (!meta || meta === '{}') {
-              meta = acc.json_metadata;
-            }
-            if (meta) {
-              let profile;
-              try {
-                profile = JSON.parse(meta).profile;
-              } catch (e) {
-                profile = undefined;
-              }
-              if (profile && profile.profile_image) {
-                avatarProfileCache[acc.name] = profile.profile_image;
-              } else {
-                avatarProfileCache[acc.name] = undefined;
-              }
-            } else {
-              avatarProfileCache[acc.name] = undefined;
-            }
-          }
+        // Prepare avatar URLs deterministically via images.hive.blog; warm service in background
+        const authorsToFetch = Array.from(new Set(fullContentArr.map(r => r.author)));
+        for (const a of authorsToFetch) {
+          const cached = avatarService.getCachedAvatarUrl(a);
+          avatarProfileCache[a] = cached || `https://images.hive.blog/u/${a}/avatar/original`;
         }
+        // Background warm (non-blocking)
+        avatarService.preloadAvatars(authorsToFetch).catch(() => {});
 
         // Build replies with avatar and recurse
         const fullReplies: ReplyData[] = await Promise.all(
           fullContentArr.map(async fullReply => {
-            const avatarUrl = avatarProfileCache[fullReply.author];
+            const avatarUrl =
+              avatarProfileCache[fullReply.author] ||
+              `https://images.hive.blog/u/${fullReply.author}/avatar/original`;
             const payout = parseFloat(
               fullReply.pending_payout_value
                 ? fullReply.pending_payout_value.replace(' HBD', '')
@@ -200,33 +175,22 @@ export const useConversationData = (
         permlink,
       ]);
 
-      // Fetch avatar robustly from account profile
-      let avatarUrl: string | undefined = undefined;
-      try {
-        let meta;
-        const accounts = await client.database.call('get_accounts', [
-          [post.author],
-        ]);
-        if (accounts && accounts[0]) {
-          meta = accounts[0].posting_json_metadata;
-          if (!meta || meta === '{}') {
-            meta = accounts[0].json_metadata;
-          }
-          if (meta) {
-            let profile;
-            try {
-              profile = JSON.parse(meta).profile;
-            } catch (e) {
-              profile = undefined;
-            }
-            if (profile && profile.profile_image) {
-              avatarUrl = profile.profile_image;
-            }
-          }
+      // Avatar: deterministic images.hive.blog with immediate value and background warm
+      const cachedMain = avatarService.getCachedAvatarUrl(post.author);
+      const avatarUrl: string | undefined =
+        cachedMain || `https://images.hive.blog/u/${post.author}/avatar/original`;
+      avatarService.getAvatarUrl(post.author).then(({ url }) => {
+        if (url && url !== avatarUrl) {
+          setState(prev =>
+            prev.snap && prev.snap.author === post.author
+              ? { ...prev, snap: { ...prev.snap, avatarUrl: url } }
+              : prev
+          );
+          try {
+            console.log(`[Avatar][Conversation] ${post.author} -> ${url}`);
+          } catch {}
         }
-      } catch (e) {
-        // Avatar fetch fail fallback
-      }
+      }).catch(() => {});
 
       const snapData: SnapData = {
         author: post.author,
