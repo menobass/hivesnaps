@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Client } from '@hiveio/dhive';
 import { useFollowingList, useCurrentUser } from '../store/context';
+import { avatarService } from '../services/AvatarService';
 
 /**
  * Refactored Feed Data Hook with Ordered Container Map and Shared State Integration
@@ -357,95 +358,60 @@ export function useFeedData(): UseFeedDataReturn {
     []
   ); // Remove dependencies for stability
 
-  const [avatarCache, setAvatarCache] = useState<
-    Record<string, { url: string; timestamp: number }>
-  >({});
-
-  // Fire-and-forget avatar enrichment (reference behavior from enhanceSnapsWithAvatar in backup)
+  // Fire-and-forget avatar enrichment using unified AvatarService
   // This does not return enriched snaps; it updates state asynchronously when avatar URLs are resolved.
   const updateSnapsWithAvatars = useCallback(
     async (snaps: Snap[]) => {
       if (!snaps || snaps.length === 0) return;
 
-      const AVATAR_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
-      const now = Date.now();
-
-      // Unique authors present in the provided snaps
+      // Extract unique authors from the provided snaps
       const authors = Array.from(new Set(snaps.map(s => s.author)));
 
-      // Determine which authors need (re)fetch based on cache staleness
-      const authorsToFetch = authors.filter(a => {
-        const cached = avatarCache[a];
-        return (
-          !cached ||
-          now - cached.timestamp > AVATAR_CACHE_DURATION ||
-          !cached.url
-        );
-      });
-
-      let updatedEntries: Record<string, { url: string; timestamp: number }> =
-        {};
-
-      if (authorsToFetch.length > 0) {
+      // Immediately apply any cached URLs (or deterministic images.hive.blog fallback) to reduce empty avatars on first render
+      const cachedUrls: Record<string, string> = {};
+      authors.forEach(a => {
+        const cached = avatarService.getCachedAvatarUrl(a);
+        cachedUrls[a] = cached || `https://images.hive.blog/u/${a}/avatar/original`;
         try {
-          const CHUNK_SIZE = 20;
-          for (let i = 0; i < authorsToFetch.length; i += CHUNK_SIZE) {
-            const chunk = authorsToFetch.slice(i, i + CHUNK_SIZE);
-            try {
-              const accounts = await client.database.getAccounts(chunk);
-              for (const acc of accounts) {
-                let meta: any = null;
-                // Try posting_json_metadata first
-                if (acc.posting_json_metadata) {
-                  try {
-                    meta = JSON.parse(acc.posting_json_metadata);
-                  } catch {}
-                }
-                // Fallback to json_metadata
-                if (
-                  (!meta || !meta.profile || !meta.profile.profile_image) &&
-                  acc.json_metadata
-                ) {
-                  try {
-                    meta = JSON.parse(acc.json_metadata);
-                  } catch {}
-                }
-                const url =
-                  meta && meta.profile && meta.profile.profile_image
-                    ? meta.profile.profile_image.replace(/[\\/]+$/, '')
-                    : '';
-                updatedEntries[acc.name] = { url, timestamp: now };
-              }
-            } catch (chunkErr) {
-              console.log(
-                '[updateSnapsWithAvatars] Chunk fetch error:',
-                chunkErr
-              );
-            }
-          }
-        } catch (e) {
-          console.log('[updateSnapsWithAvatars] Error fetching accounts:', e);
-        }
-      }
-
-      if (Object.keys(updatedEntries).length > 0) {
-        // Merge cache updates
-        setAvatarCache(prev => ({ ...prev, ...updatedEntries }));
-      }
-
-      // Apply avatar URLs (from existing cache + newly fetched) to current snaps in state
+          console.log(`[Avatar][Feed] initial ${a} -> ${cachedUrls[a] || 'EMPTY'}`);
+        } catch {}
+      });
       setState(prev => ({
         ...prev,
-        snaps: prev.snaps.map(s => {
-          if (!authors.includes(s.author)) return s; // skip unrelated snaps quickly
-          const cached = updatedEntries[s.author] || avatarCache[s.author];
-          if (!cached || !cached.url) return s;
-          if (s.avatarUrl === cached.url) return s; // no change
-          return { ...s, avatarUrl: cached.url };
-        }),
+        snaps: prev.snaps.map(s =>
+          authors.includes(s.author) && !s.avatarUrl
+            ? { ...s, avatarUrl: cachedUrls[s.author] }
+            : s
+        ),
       }));
+
+      // Start loading avatars for all authors (fire-and-forget)
+      avatarService.preloadAvatars(authors).catch(() => {});
+
+      // Set up listeners to update state when avatars are loaded
+      const unsubscribe = avatarService.subscribe((updatedUsername, avatarUrl) => {
+        if (!authors.includes(updatedUsername)) return;
+        try {
+          console.log(`[Avatar][Feed] updated ${updatedUsername} -> ${avatarUrl || 'EMPTY'}`);
+        } catch {}
+        setState(prev => ({
+          ...prev,
+          snaps: prev.snaps.map(s =>
+            s.author === updatedUsername && s.avatarUrl !== avatarUrl
+              ? { ...s, avatarUrl }
+              : s
+          ),
+        }));
+      });
+
+      authors.forEach(author => {
+        // No longer needed, as we are using subscribe
+      });
+
+      // Clean up listeners on component unmount or when dependencies change
+      return () => unsubscribe();
     },
-    [avatarCache]
+    []
   );
 
   // Fetch snaps from containers and store in ordered dictionary
@@ -553,7 +519,17 @@ export function useFeedData(): UseFeedDataReturn {
             followingListRef.current || [],
             username
           );
-          return { ...prev, snaps: filteredSnaps, loading: false };
+          // Immediate enrichment for first paint
+          const authors = Array.from(new Set(filteredSnaps.map(s => s.author)));
+          const enriched = filteredSnaps.map(s => {
+            const cached = avatarService.getCachedAvatarUrl(s.author);
+            const chosen = s.avatarUrl || cached || `https://images.hive.blog/u/${s.author}/avatar/original`;
+            try { console.log(`[Avatar][Feed] initial ${s.author} -> ${chosen || 'EMPTY'}`); } catch {}
+            return { ...s, avatarUrl: chosen };
+          });
+          // Fire-and-forget preloading to backfill better sizes or late cache
+          try { avatarService.preloadAvatars(authors).catch(() => {}); } catch {}
+          return { ...prev, snaps: enriched, loading: false };
         });
       } catch (error) {
         console.error('❌ [FetchSnaps] Error fetching snaps:', error);
@@ -606,7 +582,7 @@ export function useFeedData(): UseFeedDataReturn {
         author: containerPost.author,
         fetchedAt: Date.now(),
       };
-      setState(prev => {
+  setState(prev => {
         const map = prev.containerMap;
         // Find the most recent container by created date
         let mostRecentKey: string | undefined;
@@ -631,7 +607,16 @@ export function useFeedData(): UseFeedDataReturn {
           followingListRef.current || [],
           username
         );
-        return { ...prev, snaps: filteredSnaps, loading: false };
+        // Immediate enrichment on refresh
+        const authors = Array.from(new Set(filteredSnaps.map(s => s.author)));
+        const enriched = filteredSnaps.map(s => {
+          const cached = avatarService.getCachedAvatarUrl(s.author);
+          const chosen = s.avatarUrl || cached || `https://images.hive.blog/u/${s.author}/avatar/original`;
+          try { console.log(`[Avatar][Feed] initial ${s.author} -> ${chosen || 'EMPTY'}`); } catch {}
+          return { ...s, avatarUrl: chosen };
+        });
+        try { avatarService.preloadAvatars(authors).catch(() => {}); } catch {}
+        return { ...prev, snaps: enriched, loading: false };
       });
       updateSnapsWithAvatars(containerMetadata.snaps);
     } catch (error) {
@@ -802,7 +787,24 @@ export function useFeedData(): UseFeedDataReturn {
         console.log(
           `🎯 [setFilter] Filter "${filter}": ${allSnaps.length} → ${filteredSnaps.length} snaps`
         );
-        // Fire-and-forget avatar enrichment for the new filtered set
+        // Immediately enrich filtered snaps with cached avatar URLs (images.hive.blog fallback)
+        if (filteredSnaps.length > 0) {
+          const authors = Array.from(new Set(filteredSnaps.map(s => s.author)));
+          const enriched = filteredSnaps.map(snap => ({
+            ...snap,
+            avatarUrl:
+              snap.avatarUrl ||
+              avatarService.getCachedAvatarUrl(snap.author) ||
+              `https://images.hive.blog/u/${snap.author}/avatar/original`,
+          }));
+          // Replace filteredSnaps with enriched version
+          // Note: we keep the variable name for subsequent logs/logic
+          (filteredSnaps as any) = enriched;
+          // Optionally kick off background preloads to ensure updates arrive
+          try { avatarService.preloadAvatars(authors).catch(() => {}); } catch {}
+        }
+
+        // Fire-and-forget fetch if list is very short
         if (filteredSnaps.length < 4) {
           const containersToFetch =
             state.containerMap.getMaxSize() -
