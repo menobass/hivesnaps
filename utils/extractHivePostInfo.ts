@@ -5,6 +5,7 @@
 
 import { Client } from '@hiveio/dhive';
 import { detectPostType, type PostInfo } from './postTypeDetector';
+import { avatarService, type AvatarLoadResult } from '../services/AvatarService';
 
 // Constants for validation
 const MIN_USERNAME_LENGTH = 3;
@@ -216,46 +217,21 @@ function generateSummary(body: string, maxLength = 150): string {
 }
 
 /**
- * Fetch author avatar URL with caching
+ * Fetch author avatar URL via unified AvatarService (images.hive.blog first, metadata fallback)
  */
-const avatarCache = new Map<string, string | undefined>();
-
-async function fetchAuthorAvatar(author: string): Promise<string | undefined> {
-  // Check cache first
-  if (avatarCache.has(author)) {
-    return avatarCache.get(author);
-  }
-
+async function fetchAuthorAvatar(author: string): Promise<string> {
   try {
-    const accounts = await client.database.getAccounts([author]);
-    if (!accounts || accounts.length === 0) {
-      avatarCache.set(author, undefined);
-      return undefined;
-    }
-
-    const account = accounts[0];
-    let meta = account.posting_json_metadata;
-    if (!meta || meta === '{}') {
-      meta = account.json_metadata;
-    }
-
-    if (meta) {
-      try {
-        const profile = JSON.parse(meta).profile;
-        const avatarUrl = profile?.profile_image || undefined;
-        avatarCache.set(author, avatarUrl);
-        return avatarUrl;
-      } catch (e) {
-        // Invalid JSON metadata
-      }
-    }
-
-    avatarCache.set(author, undefined);
-    return undefined;
+    const result: AvatarLoadResult = await avatarService.getAvatarUrl(author);
+    const url = result?.url || '';
+    try {
+      console.log(`[Avatar][Extract] ${author} -> ${url || 'EMPTY'} (source=${result?.source || 'unknown'}, cache=${result?.fromCache ? 'hit' : 'miss'})`);
+    } catch {}
+    return url;
   } catch (error) {
-    console.error('Error fetching author avatar:', error);
-    avatarCache.set(author, undefined);
-    return undefined;
+    console.warn('[extractHivePostInfo] AvatarService failed, falling back to images URL:', { author, error });
+    const fallback = `https://images.hive.blog/u/${author}/avatar/original`;
+    try { console.log(`[Avatar][Extract] ${author} -> ${fallback} (fallback)`); } catch {}
+    return fallback;
   }
 }
 
@@ -283,8 +259,8 @@ export async function fetchHivePostInfo(
       return null;
     }
 
-    // Fetch post content and author avatar in parallel
-    const [post, avatarUrl] = await Promise.all([
+  // Fetch post content and author avatar in parallel (avatar via unified service)
+  const [post, avatarUrl] = await Promise.all([
       client.database.call('get_content', [author, permlink]),
       fetchAuthorAvatar(author),
     ]);

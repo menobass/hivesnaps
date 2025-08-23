@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Client } from '@hiveio/dhive';
 import { useOptimisticUpdates } from './useOptimisticUpdates';
+import { avatarService } from '../services/AvatarService';
 
 // User snap interface for profile bubbles
 export interface UserSnap {
@@ -33,10 +34,6 @@ const userSnapsCache = new Map<
 >();
 const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes cache
 
-// Cache for avatar URLs to avoid refetching
-const avatarCache = new Map<string, { url: string; timestamp: number }>();
-const AVATAR_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes cache
-
 export const useUserSnaps = (username: string | undefined) => {
   const [userSnaps, setUserSnaps] = useState<UserSnap[]>([]);
   const [snapsLoading, setSnapsLoading] = useState(false);
@@ -58,55 +55,6 @@ export const useUserSnaps = (username: string | undefined) => {
   const setCachedUserSnaps = (username: string, snaps: UserSnap[]) => {
     userSnapsCache.set(username, { snaps, timestamp: Date.now() });
   };
-
-  // Fetch avatar URL for a user
-  const fetchAvatarUrl = useCallback(
-    async (author: string): Promise<string> => {
-      // Check avatar cache first
-      const cached = avatarCache.get(author);
-      if (cached && Date.now() - cached.timestamp < AVATAR_CACHE_DURATION) {
-        return cached.url;
-      }
-
-      try {
-        const accounts = await client.database.getAccounts([author]);
-        if (accounts && accounts.length > 0) {
-          const account = accounts[0];
-
-          // Extract avatar URL from metadata
-          let meta = null;
-          if (account.posting_json_metadata) {
-            try {
-              meta = JSON.parse(account.posting_json_metadata);
-            } catch {}
-          }
-          if (
-            (!meta || !meta.profile || !meta.profile.profile_image) &&
-            account.json_metadata
-          ) {
-            try {
-              meta = JSON.parse(account.json_metadata);
-            } catch {}
-          }
-
-          const avatarUrl =
-            meta && meta.profile && meta.profile.profile_image
-              ? meta.profile.profile_image.replace(/[\\/]+$/, '')
-              : '';
-
-          // Cache the avatar URL
-          avatarCache.set(author, { url: avatarUrl, timestamp: Date.now() });
-
-          return avatarUrl;
-        }
-      } catch (error) {
-        console.log('Error fetching avatar for', author, error);
-      }
-
-      return '';
-    },
-    []
-  );
 
   // Optimized fetch user's recent snaps from Hive blockchain
   const fetchUserSnaps = useCallback(async () => {
@@ -171,13 +119,33 @@ export const useUserSnaps = (username: string | undefined) => {
       // Keep more snaps for load more functionality
       const limitedSnaps = userSnapsFound.slice(0, 50);
 
-      // Fetch avatar URLs for all snaps in parallel
-      const avatarPromises = limitedSnaps.map(async snap => {
-        const avatarUrl = await fetchAvatarUrl(snap.author);
-        return { ...snap, avatarUrl };
-      });
+      // Start loading avatars for all authors using the service
+      const authors = Array.from(new Set(limitedSnaps.map(snap => snap.author)));
+      avatarService.preloadAvatars(authors).catch(() => {});
 
-      const snapsWithAvatars = await Promise.all(avatarPromises);
+      // Get current avatar URLs from the service cache or deterministic images.hive.blog fallback
+      const snapsWithAvatars = limitedSnaps.map(snap => ({
+        ...snap,
+        avatarUrl:
+          avatarService.getCachedAvatarUrl(snap.author) ||
+          `https://images.hive.blog/u/${snap.author}/avatar/original`,
+      }));
+      try {
+        snapsWithAvatars.forEach(s =>
+          console.log(`[Avatar][UserSnaps] initial ${s.author} -> ${s.avatarUrl || 'EMPTY'}`)
+        );
+      } catch {}
+
+      // Subscribe once and update any matching author as avatars resolve
+      const unsubscribe = avatarService.subscribe((updatedUsername, avatarUrl) => {
+        if (!authors.includes(updatedUsername)) return;
+        try {
+          console.log(`[Avatar][UserSnaps] updated ${updatedUsername} -> ${avatarUrl || 'EMPTY'}`);
+        } catch {}
+        setUserSnaps(prev => prev.map(snap =>
+          snap.author === updatedUsername ? { ...snap, avatarUrl } : snap
+        ));
+      });
 
       // Cache the results
       setCachedUserSnaps(username, snapsWithAvatars);
@@ -194,7 +162,7 @@ export const useUserSnaps = (username: string | undefined) => {
     } finally {
       setSnapsLoading(false);
     }
-  }, [username, fetchAvatarUrl]);
+  }, [username]);
 
   // Load more snaps function
   const loadMoreSnaps = useCallback(async () => {

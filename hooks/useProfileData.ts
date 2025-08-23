@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Client } from '@hiveio/dhive';
+import { avatarService } from '../services/AvatarService';
 
 // Profile data interface
 export interface ProfileData {
@@ -255,9 +256,12 @@ export const useProfileData = (username: string | undefined) => {
       console.log('Unclaimed VESTS:', unclaimedVests);
 
       // Set profile with account object counts first (non-blocking)
+      // Avatar: use unified AvatarService (images.hive.blog) for immediate first paint
+      const imagesUrl = `https://images.hive.blog/u/${account.name}/avatar/original`;
+      const cachedAvatar = avatarService.getCachedAvatarUrl(account.name) || imagesUrl;
       const profileData = {
         username: account.name,
-        avatarUrl: profileMeta.profile_image,
+        avatarUrl: cachedAvatar,
         reputation: reputation, // Direct from API - no need for rounding!
         hivePower: Math.round(hivePower * 100) / 100,
         hbd: Math.round(hbdBalance * 100) / 100,
@@ -274,6 +278,17 @@ export const useProfileData = (username: string | undefined) => {
 
       console.log('Setting profile data:', profileData);
       setProfile(profileData);
+
+      // Background: resolve avatar via service and update if changed
+      avatarService
+        .getAvatarUrl(account.name)
+        .then(({ url, source }) => {
+          if (url && url !== cachedAvatar) {
+            console.log(`[Avatar][Profile] ${account.name} -> ${url} (source=${source})`);
+            setProfile(prev => (prev ? { ...prev, avatarUrl: url } : prev));
+          }
+        })
+        .catch(() => {});
 
       // Fetch accurate follow counts using the proper API
       try {
@@ -294,10 +309,10 @@ export const useProfileData = (username: string | undefined) => {
           followers: followCount.follower_count || 0,
         });
 
-        console.log('Final profile data being set:', {
+        console.log('Final profile data being set (post-follow counts):', {
           username: account.name,
           displayName: profileMeta.name,
-          avatarUrl: profileMeta.profile_image,
+          avatarUrl: cachedAvatar,
           about: profileMeta.about,
           location: profileMeta.location,
           website: profileMeta.website,

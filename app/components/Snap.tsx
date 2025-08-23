@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -212,6 +212,18 @@ const Snap: React.FC<SnapProps> = ({
   isReply = false,
   compactMode = false,
 }) => {
+  // Log avatarUrl changes for debugging
+  const prevAvatarRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (prevAvatarRef.current !== avatarUrl) {
+      try {
+        console.log(
+          `[Avatar][Snap] ${author} -> ${avatarUrl || 'EMPTY'}`
+        );
+      } catch {}
+      prevAvatarRef.current = avatarUrl;
+    }
+  }, [author, avatarUrl]);
   // Process hashtags in text, converting them to clickable markdown links
   function processHashtags(text: string): string {
     return text.replace(/(#\w+)/g, (match, hashtag) => {

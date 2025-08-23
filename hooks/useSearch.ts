@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Client } from '@hiveio/dhive';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { avatarService } from '../services/AvatarService';
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -65,40 +66,32 @@ export const useSearch = (): UseSearchReturn => {
         // Get account details for found usernames
         const accounts = await client.database.getAccounts(usernames);
 
-        // Parse metadata and add avatar URLs
+        // Use unified avatar service and deterministic URLs
         const usersWithAvatars = accounts.map(account => {
-          let meta = null;
-          let avatarUrl = '';
-
-          // Try posting_json_metadata first
-          if (account.posting_json_metadata) {
-            try {
-              meta = JSON.parse(account.posting_json_metadata);
-            } catch {}
-          }
-
-          // Fallback to json_metadata
-          if (
-            (!meta || !meta.profile || !meta.profile.profile_image) &&
-            account.json_metadata
-          ) {
-            try {
-              meta = JSON.parse(account.json_metadata);
-            } catch {}
-          }
-
-          if (meta && meta.profile && meta.profile.profile_image) {
-            avatarUrl = meta.profile.profile_image.replace(/[\\/]+$/, '');
-          }
-
+          const name = account.name;
+          const immediate =
+            avatarService.getCachedAvatarUrl(name) ||
+            `https://images.hive.blog/u/${name}/avatar/original`;
+          // Warm in background (fire-and-forget)
+          avatarService.getAvatarUrl(name).catch(() => {});
+          let displayName: string | undefined = undefined;
+          let about: string | undefined = undefined;
+          // Optionally parse display fields (safe)
+          try {
+            let meta: any = undefined;
+            if (account.posting_json_metadata) meta = JSON.parse(account.posting_json_metadata);
+            if ((!meta || !meta.profile) && account.json_metadata) meta = JSON.parse(account.json_metadata);
+            displayName = meta?.profile?.name || account.name;
+            about = meta?.profile?.about || '';
+          } catch {}
           return {
-            name: account.name,
-            displayName: meta?.profile?.name || account.name,
-            about: meta?.profile?.about || '',
-            avatarUrl,
-            followerCount: 0, // Account stats not readily available in this API
+            name,
+            displayName: displayName || account.name,
+            about: about || '',
+            avatarUrl: immediate,
+            followerCount: 0,
             followingCount: 0,
-          };
+          } as SearchResult;
         });
 
         return usersWithAvatars;

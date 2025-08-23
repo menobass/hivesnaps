@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { sortByPayoutRecursive } from '../utils/sortRepliesByPayout';
 import { Client } from '@hiveio/dhive';
+import { avatarService } from '../services/AvatarService';
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -81,7 +82,7 @@ export const useHivePostData = (
     commentsError: null,
   });
 
-  // In-memory avatar/profile cache for this session (persists across renders)
+  // In-memory avatar cache for this session (images.hive.blog deterministic)
   const avatarProfileCache = useRef<Record<string, string | undefined>>({});
 
   // Helper function to check if current user has upvoted
@@ -90,38 +91,23 @@ export const useHivePostData = (
     return activeVotes.some((v: any) => v.voter === currentUsername && v.percent > 0);
   }, [currentUsername]);
 
-  // Helper function to fetch avatar for a given author
+  // Resolve avatar using avatarService with immediate deterministic URL and background warm
   const fetchAvatar = useCallback(async (authorName: string): Promise<string | undefined> => {
-    // Check cache first
     if (authorName in avatarProfileCache.current) {
       return avatarProfileCache.current[authorName];
     }
-
-    try {
-      const accounts = await client.database.call('get_accounts', [[authorName]]);
-      if (accounts && accounts[0]) {
-        let metadata = accounts[0].posting_json_metadata;
-        if (!metadata || metadata === '{}') {
-          metadata = accounts[0].json_metadata;
-        }
-        if (metadata) {
-          try {
-            const profile = JSON.parse(metadata).profile;
-            if (profile && profile.profile_image) {
-              avatarProfileCache.current[authorName] = profile.profile_image;
-              return profile.profile_image;
-            }
-          } catch (e) {
-            // Invalid JSON metadata
-          }
-        }
+    const immediate =
+      avatarService.getCachedAvatarUrl(authorName) ||
+      `https://images.hive.blog/u/${authorName}/avatar/original`;
+    avatarProfileCache.current[authorName] = immediate;
+    // Warm in background and update cache (no state coupling here)
+    avatarService.getAvatarUrl(authorName).then(({ url, source }) => {
+      if (url && url !== avatarProfileCache.current[authorName]) {
+        avatarProfileCache.current[authorName] = url;
+        try { console.log(`[Avatar][PostData] ${authorName} -> ${url} (source=${source})`); } catch {}
       }
-    } catch (e) {
-      // Avatar fetch failed
-    }
-
-    avatarProfileCache.current[authorName] = undefined;
-    return undefined;
+    }).catch(() => {});
+    return immediate;
   }, []);
 
   // Recursively fetch comments tree with full content
@@ -154,46 +140,20 @@ export const useHivePostData = (
           )
         );
 
-        // Collect all unique authors for avatar batch fetch, skipping those already cached
-        const authorsToFetch = Array.from(
-          new Set(fullContentArr.map(c => c.author))
-        ).filter(a => !(a in avatarProfileCache.current));
-
-        let accountsArr: any[] = [];
-        if (authorsToFetch.length > 0) {
-          try {
-            accountsArr = await client.database.call('get_accounts', [authorsToFetch]);
-          } catch (e) {
-            accountsArr = [];
-          }
-          // Update cache with fetched avatars
-          for (const acc of accountsArr) {
-            let meta = acc.posting_json_metadata;
-            if (!meta || meta === '{}') {
-              meta = acc.json_metadata;
-            }
-            if (meta) {
-              let profile;
-              try {
-                profile = JSON.parse(meta).profile;
-              } catch (e) {
-                profile = undefined;
-              }
-              if (profile && profile.profile_image) {
-                avatarProfileCache.current[acc.name] = profile.profile_image;
-              } else {
-                avatarProfileCache.current[acc.name] = undefined;
-              }
-            } else {
-              avatarProfileCache.current[acc.name] = undefined;
-            }
-          }
+        // Prepare deterministic avatars and preload in background
+        const authorsToFetch = Array.from(new Set(fullContentArr.map(c => c.author)));
+        for (const a of authorsToFetch) {
+          const cached = avatarService.getCachedAvatarUrl(a);
+          avatarProfileCache.current[a] = cached || `https://images.hive.blog/u/${a}/avatar/original`;
         }
+        avatarService.preloadAvatars(authorsToFetch).catch(() => {});
 
         // Build comments with avatar and recurse
         const fullComments: HiveCommentData[] = await Promise.all(
           fullContentArr.map(async fullComment => {
-            const avatarUrl = avatarProfileCache.current[fullComment.author];
+            const avatarUrl =
+              avatarProfileCache.current[fullComment.author] ||
+              `https://images.hive.blog/u/${fullComment.author}/avatar/original`;
             const payout = parseFloat(
               fullComment.pending_payout_value
                 ? fullComment.pending_payout_value.replace(' HBD', '')
