@@ -1,13 +1,4 @@
-import { Client } from '@hiveio/dhive';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const HIVE_NODES = [
-  'https://api.hive.blog',
-  'https://api.deathwing.me',
-  'https://api.openhive.network',
-];
-
-const client = new Client(HIVE_NODES);
 
 interface AvatarCacheEntry {
   url: string;
@@ -26,6 +17,7 @@ class AvatarService {
   private cache = new Map<string, AvatarCacheEntry>();
   private loadingPromises = new Map<string, Promise<string>>();
   private listeners = new Set<(username: string, avatarUrl: string) => void>();
+  private readonly DEBUG = typeof __DEV__ !== 'undefined' ? __DEV__ : true;
   
   // Cache duration: 30 minutes for successful loads, 5 minutes for failures
   private readonly CACHE_DURATION_SUCCESS = 30 * 60 * 1000;
@@ -44,6 +36,21 @@ class AvatarService {
   }
 
   /**
+   * Normalize usernames to a canonical cache key
+   */
+  private normalizeUsername(username: string | null | undefined): string {
+    return (username || '').trim().toLowerCase();
+  }
+
+  /**
+   * Deterministic Hive images service URL for a username
+   */
+  static imagesAvatarUrl(username: string): string {
+    const u = (username || '').trim().toLowerCase();
+    return `https://images.hive.blog/u/${u}/avatar/original`;
+  }
+
+  /**
    * Subscribe to avatar updates
    */
   subscribe(listener: (username: string, avatarUrl: string) => void): () => void {
@@ -55,9 +62,9 @@ class AvatarService {
    * Notify all listeners of avatar update
    */
   private notifyListeners(username: string, avatarUrl: string) {
-    try {
-      console.log(`[Avatar][Service] notify ${username} -> ${avatarUrl || 'EMPTY'}`);
-    } catch {}
+    if (this.DEBUG) {
+      try { console.log(`[Avatar][Service] notify ${username} -> ${avatarUrl || 'EMPTY'}`); } catch {}
+    }
     this.listeners.forEach(listener => {
       try {
         listener(username, avatarUrl);
@@ -71,12 +78,13 @@ class AvatarService {
    * Get avatar URL for a user (with fallback strategies)
    */
   async getAvatarUrl(username: string): Promise<AvatarLoadResult> {
-    if (!username) {
+    const key = this.normalizeUsername(username);
+    if (!key) {
       return { url: '', fromCache: false, source: 'fallback' };
     }
 
     // Check cache first
-    const cached = this.cache.get(username);
+    const cached = this.cache.get(key);
     const now = Date.now();
     
     if (cached) {
@@ -91,27 +99,27 @@ class AvatarService {
     }
 
     // Check if already loading
-    const existingPromise = this.loadingPromises.get(username);
+    const existingPromise = this.loadingPromises.get(key);
     if (existingPromise) {
       const url = await existingPromise;
-      return { url, fromCache: false, source: this.cache.get(username)?.source || 'metadata' };
+      return { url, fromCache: false, source: this.cache.get(key)?.source || 'hive-images' };
     }
 
     // Start loading
-    const loadPromise = this.fetchAvatarUrl(username);
-    this.loadingPromises.set(username, loadPromise);
+    const loadPromise = this.fetchAvatarUrl(key);
+    this.loadingPromises.set(key, loadPromise);
 
     try {
       const url = await loadPromise;
-      this.loadingPromises.delete(username);
+      this.loadingPromises.delete(key);
       
       // Notify listeners of the update
-      this.notifyListeners(username, url);
+      this.notifyListeners(key, url);
       
-      return { url, fromCache: false, source: this.cache.get(username)?.source || 'metadata' };
+      return { url, fromCache: false, source: this.cache.get(key)?.source || 'hive-images' };
     } catch (error) {
-      this.loadingPromises.delete(username);
-      console.warn(`Failed to load avatar for ${username}:`, error);
+      this.loadingPromises.delete(key);
+      console.warn(`Failed to load avatar for ${key}:`, error);
       return { url: '', fromCache: false, source: 'fallback' };
     }
   }
@@ -120,20 +128,23 @@ class AvatarService {
    * Preload avatars for multiple users
    */
   async preloadAvatars(usernames: string[]): Promise<void> {
-    const uniqueUsernames = [...new Set(usernames.filter(Boolean))];
+    const uniqueUsernames = [...new Set(usernames.map(u => this.normalizeUsername(u)).filter(Boolean))];
     const loadPromises = uniqueUsernames.map(username => 
       this.getAvatarUrl(username).catch(() => ({ url: '', fromCache: false, source: 'fallback' as const }))
     );
     
     await Promise.all(loadPromises);
-    console.log(`✅ Preloaded avatars for ${uniqueUsernames.length} users`);
+    if (this.DEBUG) {
+      console.log(`✅ Preloaded avatars for ${uniqueUsernames.length} users`);
+    }
   }
 
   /**
    * Get cached avatar URL immediately (no async loading)
    */
   getCachedAvatarUrl(username: string): string {
-    const cached = this.cache.get(username);
+    const key = this.normalizeUsername(username);
+    const cached = this.cache.get(key);
     if (!cached) return '';
     
     const now = Date.now();
@@ -143,9 +154,9 @@ class AvatarService {
     if (cacheAge >= maxAge) return '';
 
     // Normalize: always prefer images.hive.blog. If cached is not images, return images URL and update cache.
-    const imagesUrl = `https://images.hive.blog/u/${username}/avatar/original`;
+    const imagesUrl = AvatarService.imagesAvatarUrl(key);
     if (!cached.url || !cached.url.startsWith('https://images.hive.blog/')) {
-      this.cache.set(username, { url: imagesUrl, timestamp: Date.now(), source: 'hive-images' });
+      this.cache.set(key, { url: imagesUrl, timestamp: Date.now(), source: 'hive-images' });
       this.persistCacheToStorage();
       return imagesUrl;
     }
@@ -156,9 +167,10 @@ class AvatarService {
    * Force refresh avatar for a user
    */
   async refreshAvatar(username: string): Promise<string> {
-    this.cache.delete(username);
-    this.loadingPromises.delete(username);
-    const result = await this.getAvatarUrl(username);
+    const key = this.normalizeUsername(username);
+    this.cache.delete(key);
+    this.loadingPromises.delete(key);
+    const result = await this.getAvatarUrl(key);
     return result.url;
   }
 
@@ -188,16 +200,11 @@ class AvatarService {
     let avatarUrl = '';
     let source: 'metadata' | 'hive-images' | 'fallback' = 'hive-images';
 
-    try {
-      // Always use the deterministic Hive images service URL.
-      // We intentionally avoid metadata because many accounts reference dead hosts (e.g., snag.gy).
-      const hiveImageUrl = `https://images.hive.blog/u/${username}/avatar/original`;
-      avatarUrl = hiveImageUrl;
-      source = 'hive-images';
-
-    } catch (error) {
-      console.warn(`Error fetching avatar for ${username}:`, error);
-    }
+  // Always use the deterministic Hive images service URL.
+  // We intentionally avoid metadata because many accounts reference dead hosts (e.g., snag.gy).
+  const hiveImageUrl = AvatarService.imagesAvatarUrl(username);
+  avatarUrl = hiveImageUrl;
+  source = 'hive-images';
 
     // Cache the result (even if empty)
     this.cache.set(username, {
@@ -207,27 +214,9 @@ class AvatarService {
     });
 
     // Persist cache to storage periodically
-    this.persistCacheToStorage();
+  this.persistCacheToStorage();
 
     return avatarUrl;
-  }
-
-  /**
-   * Perform a HEAD request with a timeout; returns true if response.ok
-   */
-  private async headWithTimeout(url: string, timeoutMs: number): Promise<boolean> {
-    try {
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), timeoutMs)
-      );
-      const response: Response = await Promise.race([
-        fetch(url, { method: 'HEAD' }),
-        timeout,
-      ]);
-      return (response as any)?.ok === true;
-    } catch {
-      return false;
-    }
   }
 
   /**
@@ -244,13 +233,15 @@ class AvatarService {
           const normalized: AvatarCacheEntry = e.url && e.url.startsWith('https://images.hive.blog/')
             ? e
             : {
-                url: `https://images.hive.blog/u/${username}/avatar/original`,
+                url: AvatarService.imagesAvatarUrl(username),
                 timestamp: Date.now(),
                 source: 'hive-images',
               };
-          this.cache.set(username, normalized);
+          this.cache.set(this.normalizeUsername(username), normalized);
         });
-        console.log(`📱 Loaded ${this.cache.size} avatar cache entries from storage`);
+        if (this.DEBUG) {
+          console.log(`📱 Loaded ${this.cache.size} avatar cache entries from storage`);
+        }
       }
     } catch (error) {
       console.warn('Failed to load avatar cache from storage:', error);

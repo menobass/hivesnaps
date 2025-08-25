@@ -388,31 +388,32 @@ export function useFeedData(): UseFeedDataReturn {
       // Start loading avatars for all authors (fire-and-forget)
       avatarService.preloadAvatars(authors).catch(() => {});
 
-      // Set up listeners to update state when avatars are loaded
-      const unsubscribe = avatarService.subscribe((updatedUsername, avatarUrl) => {
-        if (!authors.includes(updatedUsername)) return;
-        try {
-          console.log(`[Avatar][Feed] updated ${updatedUsername} -> ${avatarUrl || 'EMPTY'}`);
-        } catch {}
-        setState(prev => ({
-          ...prev,
-          snaps: prev.snaps.map(s =>
-            s.author === updatedUsername && s.avatarUrl !== avatarUrl
-              ? { ...s, avatarUrl }
-              : s
-          ),
-        }));
-      });
-
+      // Listener now handled by a single useEffect subscription with cleanup
       authors.forEach(author => {
-        // No longer needed, as we are using subscribe
+        // Intentionally left for clarity; updates arrive via global subscription
       });
-
-      // Clean up listeners on component unmount or when dependencies change
-      return () => unsubscribe();
     },
     []
   );
+
+  // Subscribe once to avatar updates and clean up on unmount
+  useEffect(() => {
+    const unsubscribe = avatarService.subscribe((updatedUsername, avatarUrl) => {
+      try { console.log(`[Avatar][Feed] updated ${updatedUsername} -> ${avatarUrl || 'EMPTY'}`); } catch {}
+      setState(prev => {
+        let changed = false;
+        const snaps = prev.snaps.map(s => {
+          if (s.author === updatedUsername && s.avatarUrl !== avatarUrl) {
+            changed = true;
+            return { ...s, avatarUrl };
+          }
+          return s;
+        });
+        return changed ? { ...prev, snaps } : prev;
+      });
+    });
+    return () => { if (typeof unsubscribe === 'function') unsubscribe(); };
+  }, []);
 
   // Fetch snaps from containers and store in ordered dictionary
   const fetchSnaps = useCallback(
@@ -788,24 +789,22 @@ export function useFeedData(): UseFeedDataReturn {
           `🎯 [setFilter] Filter "${filter}": ${allSnaps.length} → ${filteredSnaps.length} snaps`
         );
         // Immediately enrich filtered snaps with cached avatar URLs (images.hive.blog fallback)
+        let enrichedSnaps = filteredSnaps;
         if (filteredSnaps.length > 0) {
           const authors = Array.from(new Set(filteredSnaps.map(s => s.author)));
-          const enriched = filteredSnaps.map(snap => ({
+          enrichedSnaps = filteredSnaps.map(snap => ({
             ...snap,
             avatarUrl:
               snap.avatarUrl ||
               avatarService.getCachedAvatarUrl(snap.author) ||
               `https://images.hive.blog/u/${snap.author}/avatar/original`,
           }));
-          // Replace filteredSnaps with enriched version
-          // Note: we keep the variable name for subsequent logs/logic
-          (filteredSnaps as any) = enriched;
           // Optionally kick off background preloads to ensure updates arrive
           try { avatarService.preloadAvatars(authors).catch(() => {}); } catch {}
         }
 
         // Fire-and-forget fetch if list is very short
-        if (filteredSnaps.length < 4) {
+        if (enrichedSnaps.length < 4) {
           const containersToFetch =
             state.containerMap.getMaxSize() -
             state.containerMap.containers.size;
@@ -814,7 +813,7 @@ export function useFeedData(): UseFeedDataReturn {
           );
           fetchSnaps(false, containersToFetch); // Fetch more snaps if needed
         }
-        return { ...prev, currentFilter: filter, snaps: filteredSnaps };
+        return { ...prev, currentFilter: filter, snaps: enrichedSnaps };
       });
     },
     [applyFilter, username, updateSnapsWithAvatars]
