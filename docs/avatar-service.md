@@ -75,3 +75,14 @@ Usernames are normalized (trimmed, lowercased) for cache keys and URLs.
 - Fixed leaks in `useUserSnaps` and `useFeedData` by moving subscriptions into `useEffect`.
 - Removed `debug-avatar.js` (no longer needed).
 - Simplified `AvatarService.fetchAvatarUrl` and centralized URL construction.
+
+## Testing checklist
+- Clear Expo cache if needed (cold start): `npx expo start --clear`.
+- Verify immediate avatar display and subsequent background updates on:
+  - Feed (app startup), Trending filter
+  - Profile screen
+  - Conversation view (main snap + threaded replies)
+  - Discovery screen / hashtag lists
+  - Post details + comments
+  - Compose header (current user)
+  - Link previews
