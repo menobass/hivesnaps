@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Client } from '@hiveio/dhive';
 import { useOptimisticUpdates } from './useOptimisticUpdates';
 import { avatarService } from '../services/AvatarService';
@@ -136,17 +136,6 @@ export const useUserSnaps = (username: string | undefined) => {
         );
       } catch {}
 
-      // Subscribe once and update any matching author as avatars resolve
-      const unsubscribe = avatarService.subscribe((updatedUsername, avatarUrl) => {
-        if (!authors.includes(updatedUsername)) return;
-        try {
-          console.log(`[Avatar][UserSnaps] updated ${updatedUsername} -> ${avatarUrl || 'EMPTY'}`);
-        } catch {}
-        setUserSnaps(prev => prev.map(snap =>
-          snap.author === updatedUsername ? { ...snap, avatarUrl } : snap
-        ));
-      });
-
       // Cache the results
       setCachedUserSnaps(username, snapsWithAvatars);
 
@@ -162,6 +151,25 @@ export const useUserSnaps = (username: string | undefined) => {
     } finally {
       setSnapsLoading(false);
     }
+  }, [username]);
+
+  // Subscribe to avatar updates for this user and clean up on unmount/username change
+  // Ensures we don't accumulate multiple subscriptions when fetchUserSnaps is called repeatedly
+  // We only care about updates for the target username since all snaps belong to that author
+  React.useEffect(() => {
+    if (!username) return;
+    const unsubscribe = avatarService.subscribe((updatedUsername, avatarUrl) => {
+      if (updatedUsername !== username) return;
+      try {
+        console.log(`[Avatar][UserSnaps] updated ${updatedUsername} -> ${avatarUrl || 'EMPTY'}`);
+      } catch {}
+      setUserSnaps(prev => prev.map(snap =>
+        snap.author === updatedUsername ? { ...snap, avatarUrl } : snap
+      ));
+    });
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   }, [username]);
 
   // Load more snaps function
