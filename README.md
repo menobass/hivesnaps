@@ -131,6 +131,10 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
 
 ## 🔧 Development
 
+### Avatar Unification
+
+We standardized avatars to images.hive.blog across the app. See `docs/avatar-unification.md` for details on behavior, affected files, and testing.
+
 ### Testing
 
 ```sh

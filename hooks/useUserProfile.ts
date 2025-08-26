@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Client } from '@hiveio/dhive';
+import { avatarService } from '../services/AvatarService';
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -29,28 +30,17 @@ export const useUserProfile = (username: string | null) => {
       if (accounts && accounts.length > 0) {
         const account = accounts[0];
 
-        // Extract avatar URL from metadata
-        let meta = null;
-        if (account.posting_json_metadata) {
-          try {
-            meta = JSON.parse(account.posting_json_metadata);
-          } catch {}
-        }
-        if (
-          (!meta || !meta.profile || !meta.profile.profile_image) &&
-          account.json_metadata
-        ) {
-          try {
-            meta = JSON.parse(account.json_metadata);
-          } catch {}
-        }
-
-        const avatar =
-          meta && meta.profile && meta.profile.profile_image
-            ? meta.profile.profile_image.replace(/[\\/]+$/, '')
-            : null;
-
-        setAvatarUrl(avatar);
+        // Avatar via unified service
+        const immediate =
+          avatarService.getCachedAvatarUrl(account.name) ||
+          `https://images.hive.blog/u/${account.name}/avatar/original`;
+        setAvatarUrl(immediate);
+        avatarService
+          .getAvatarUrl(account.name)
+          .then(({ url }) => {
+            if (url) setAvatarUrl(url);
+          })
+          .catch(() => {});
 
         // Check for unclaimed rewards
         const unclaimedHbd = parseFloat(
