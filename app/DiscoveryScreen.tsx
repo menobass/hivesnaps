@@ -17,6 +17,7 @@ import { Image as ExpoImage } from 'expo-image';
 import ContentModal from './components/ContentModal';
 import Slider from '@react-native-community/slider';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { avatarService } from '../services/AvatarService';
 import { calculateVoteValue } from '../utils/calculateVoteValue';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -73,7 +74,7 @@ interface Snap {
   [key: string]: any;
 }
 
-const AVATAR_CACHE_TTL = 1000 * 60 * 60 * 24 * 3; // 3 days
+const AVATAR_CACHE_TTL = 1000 * 60 * 60 * 24 * 3; // 3 days (legacy; service handles caching)
 
 const DiscoveryScreen = () => {
   const insets = useSafeAreaInsets();
@@ -87,9 +88,7 @@ const DiscoveryScreen = () => {
 
   const [snaps, setSnaps] = useState<Snap[]>([]);
   const [loading, setLoading] = useState(true);
-  const [avatarCache, setAvatarCache] = useState<{
-    [username: string]: { url: string; ts: number };
-  }>({});
+  const [avatarCache, setAvatarCache] = useState<{ [username: string]: { url: string; ts: number } }>({});
 
   // Edit functionality
   const {
@@ -112,18 +111,15 @@ const DiscoveryScreen = () => {
     addGif: addEditGif,
   } = useEdit(currentUsername);
 
-  // Avatar fetching/caching helpers
-  const getAvatarUrl = (username: string) =>
-    `https://images.hive.blog/u/${username}/avatar/original`;
+  // Avatar helper (deterministic); service will be used to warm/update
+  const getAvatarUrl = (username: string) => `https://images.hive.blog/u/${username}/avatar/original`;
 
-  // Load avatar cache from AsyncStorage on mount
+  // Load legacy avatar cache (optional); will be superseded by service updates
   useEffect(() => {
     (async () => {
       try {
         const cacheStr = await AsyncStorage.getItem('hivesnaps_avatar_cache');
-        if (cacheStr) {
-          setAvatarCache(JSON.parse(cacheStr));
-        }
+        if (cacheStr) setAvatarCache(JSON.parse(cacheStr));
       } catch {}
     })();
   }, []);
@@ -178,35 +174,16 @@ const DiscoveryScreen = () => {
         `[DiscoveryScreen] Found ${allSnaps.length} snaps with hashtag #${hashtag}, showing ${limitedSnaps.length}`
       );
 
-      // Fetch avatars for all unique authors
+      // Prepare avatars via service: immediate deterministic URL and background preload
       const now = Date.now();
-      const uniqueAuthors = Array.from(
-        new Set(limitedSnaps.map(s => s.author))
-      );
+      const uniqueAuthors = Array.from(new Set(limitedSnaps.map(s => s.author)));
       const newCache = { ...avatarCache };
-      const avatarFetchPromises = uniqueAuthors.map(async username => {
-        // Use cache if not expired
-        if (
-          newCache[username] &&
-          now - newCache[username].ts < AVATAR_CACHE_TTL
-        ) {
-          return;
-        }
-        // Check if user has custom avatar (by checking if the image exists)
-        const url = getAvatarUrl(username);
-        try {
-          const res = await fetch(url, { method: 'HEAD' });
-          if (res.ok) {
-            newCache[username] = { url, ts: now };
-          } else {
-            newCache[username] = { url: '', ts: now };
-          }
-        } catch {
-          newCache[username] = { url: '', ts: now };
-        }
-      });
-      await Promise.all(avatarFetchPromises);
+      for (const u of uniqueAuthors) {
+        const cached = avatarService.getCachedAvatarUrl(u);
+        newCache[u] = { url: cached || getAvatarUrl(u), ts: now };
+      }
       setAvatarCache(newCache);
+      avatarService.preloadAvatars(uniqueAuthors).catch(() => {});
 
       // Attach avatarUrl and hasUpvoted to each snap
       const snapsWithAvatars = limitedSnaps.map(snap => {
@@ -216,9 +193,15 @@ const DiscoveryScreen = () => {
           snap.active_votes.some(
             (v: any) => v.voter === currentUsername && v.percent > 0
           );
+  const chosenUrl = newCache[snap.author]?.url || getAvatarUrl(snap.author);
+        try {
+          console.log(
+            `[Avatar][Discovery] ${snap.author} -> ${chosenUrl || 'EMPTY'}`
+          );
+        } catch {}
         return {
           ...snap,
-          avatarUrl: newCache[snap.author]?.url || '',
+          avatarUrl: chosenUrl,
           hasUpvoted: !!hasUpvoted,
         };
       });

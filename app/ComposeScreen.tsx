@@ -23,6 +23,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as ImagePicker from 'expo-image-picker';
 import { FontAwesome } from '@expo/vector-icons';
 import { Client, PrivateKey } from '@hiveio/dhive';
+import { avatarService } from '../services/AvatarService';
 import { uploadImageSmart } from '../utils/imageUploadService';
 import { useSharedContent } from '@/hooks/useSharedContent';
 import { useShare } from '@/context/ShareContext';
@@ -90,31 +91,18 @@ export default function ComposeScreen() {
         const storedUsername = await SecureStore.getItemAsync('hive_username');
         setCurrentUsername(storedUsername);
 
-        // Fetch user avatar
+        // Fetch user avatar (unified service)
         if (storedUsername) {
-          try {
-            const accounts = await client.database.call('get_accounts', [
-              [storedUsername],
-            ]);
-            if (accounts && accounts[0]) {
-              let meta = accounts[0].posting_json_metadata;
-              if (!meta || meta === '{}') {
-                meta = accounts[0].json_metadata;
-              }
-              if (meta) {
-                try {
-                  const profile = JSON.parse(meta).profile;
-                  if (profile && profile.profile_image) {
-                    setAvatarUrl(profile.profile_image);
-                  }
-                } catch (e) {
-                  console.warn('Error parsing profile metadata:', e);
-                }
-              }
-            }
-          } catch (e) {
-            console.warn('Error fetching user profile:', e);
-          }
+          const immediate =
+            avatarService.getCachedAvatarUrl(storedUsername) ||
+            `https://images.hive.blog/u/${storedUsername}/avatar/original`;
+          setAvatarUrl(immediate);
+          avatarService
+            .getAvatarUrl(storedUsername)
+            .then(({ url }) => {
+              if (url) setAvatarUrl(url);
+            })
+            .catch(() => {});
         }
       } catch (e) {
         console.error('Error loading credentials:', e);
