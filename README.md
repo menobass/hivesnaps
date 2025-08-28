@@ -135,6 +135,10 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
 
 We standardized avatars to images.hive.blog across the app. See `docs/avatar-unification.md` for details on behavior, affected files, and testing.
 
+### Moderation (Downvote Hiding)
+
+Client-side moderation hides posts/replies downvoted by an allowlisted moderator (default: `@snapie`). Minimal, on-chain, no backend. See `docs/moderation.md` for policy, config, and integration points.
+
 ### Testing
 
 ```sh
