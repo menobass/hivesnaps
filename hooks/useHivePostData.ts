@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { sortByPayoutRecursive } from '../utils/sortRepliesByPayout';
 import { Client } from '@hiveio/dhive';
 import { avatarService } from '../services/AvatarService';
+import { ModerationService } from '../services/ModerationService';
 
 const HIVE_NODES = [
   'https://api.hive.blog',

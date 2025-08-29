@@ -2,6 +2,8 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { Client } from '@hiveio/dhive';
 import { useFollowingList, useCurrentUser } from '../store/context';
 import { avatarService } from '../services/AvatarService';
+import { ModerationService } from '../services/ModerationService';
+import type { ActiveVote } from '../services/ModerationService';
 
 /**
  * Refactored Feed Data Hook with Ordered Container Map and Shared State Integration
@@ -34,6 +36,9 @@ export interface Snap {
   json_metadata?: string;
   posting_json_metadata?: string;
   avatarUrl?: string;
+  // Optional moderation-related fields returned by Hive APIs
+  active_votes?: ActiveVote[];
+  net_votes?: number;
   [key: string]: any;
 }
 
@@ -297,7 +302,7 @@ export function useFeedData(): UseFeedDataReturn {
         `🔍 [applyFilter] Applying filter "${filter}" to ${snaps.length} snaps`
       );
 
-      let filteredSnaps = snaps;
+  let filteredSnaps = snaps;
 
       switch (filter) {
         case 'following':
@@ -353,10 +358,33 @@ export function useFeedData(): UseFeedDataReturn {
           filteredSnaps = snaps;
       }
 
-      return filteredSnaps;
+      // Moderation: drop items blocked by allowlisted moderators
+      // Fast path: if active_votes present on snaps, apply immediately.
+      const afterModeration = filteredSnaps.filter(s => {
+        // If we already have a cached verdict and it is blocked, drop now
+        const cached = ModerationService.getCached(s.author, s.permlink);
+        if (cached?.isBlocked) return false;
+        // If active_votes exist, evaluate once and cache
+        if (Array.isArray(s.active_votes)) {
+          const verdict = ModerationService.fromActiveVotes(s.author, s.permlink, s.active_votes);
+          if (verdict?.isBlocked) return false;
+        }
+        return true;
+      });
+
+      return afterModeration;
     },
     []
   ); // Remove dependencies for stability
+
+  // Helper: identifies snaps without loaded active_votes and with negative net_votes
+  const isNegativeUnvotedSnap = useCallback((s: Snap): boolean => {
+    return (
+      (typeof s.active_votes === 'undefined' || s.active_votes === null) &&
+      typeof s.net_votes === 'number' &&
+      s.net_votes < 0
+    );
+  }, []);
 
   // Fire-and-forget avatar enrichment using unified AvatarService
   // This does not return enriched snaps; it updates state asynchronously when avatar URLs are resolved.
@@ -532,6 +560,26 @@ export function useFeedData(): UseFeedDataReturn {
           try { avatarService.preloadAvatars(authors).catch(() => {}); } catch {}
           return { ...prev, snaps: enriched, loading: false };
         });
+
+        // Background moderation checks for negative-hinted items (no active_votes)
+        try {
+          const snapsToCheck = state.containerMap
+            .getAllSnaps()
+            .filter(isNegativeUnvotedSnap)
+            .slice(0, 20); // limit checks per fetch
+          // Ensure checks and filter updates arrive via state refresh on completion
+          await Promise.all(
+            snapsToCheck.map(async s => {
+              const verdict = await ModerationService.ensureChecked(s.author, s.permlink);
+              if (verdict.isBlocked) {
+                setState(prev => ({
+                  ...prev,
+                  snaps: prev.snaps.filter(x => !(x.author === s.author && x.permlink === s.permlink)),
+                }));
+              }
+            })
+          );
+        } catch {}
       } catch (error) {
         console.error('❌ [FetchSnaps] Error fetching snaps:', error);
         setState(prev => ({
@@ -601,8 +649,8 @@ export function useFeedData(): UseFeedDataReturn {
           map.prepend(containerPost.permlink, containerMetadata);
         }
         map.logState();
-        const allSnaps = map.getAllSnaps();
-        const filteredSnaps = applyFilter(
+  const allSnaps = map.getAllSnaps();
+  const filteredSnaps = applyFilter(
           allSnaps,
           prev.currentFilter,
           followingListRef.current || [],
@@ -619,6 +667,23 @@ export function useFeedData(): UseFeedDataReturn {
         try { avatarService.preloadAvatars(authors).catch(() => {}); } catch {}
         return { ...prev, snaps: enriched, loading: false };
       });
+      // Kick background checks for negative-hinted items without active_votes
+      try {
+        const snapsToCheck = containerMetadata.snaps
+          .filter(isNegativeUnvotedSnap)
+          .slice(0, 20);
+        await Promise.all(
+          snapsToCheck.map(async s => {
+            const verdict = await ModerationService.ensureChecked(s.author, s.permlink);
+            if (verdict.isBlocked) {
+              setState(prev => ({
+                ...prev,
+                snaps: prev.snaps.filter(x => !(x.author === s.author && x.permlink === s.permlink)),
+              }));
+            }
+          })
+        );
+      } catch {}
       updateSnapsWithAvatars(containerMetadata.snaps);
     } catch (error) {
       console.error('❌ [refreshSnaps] Error refreshing snaps:', error);
