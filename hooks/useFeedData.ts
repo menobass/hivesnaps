@@ -3,6 +3,7 @@ import { Client } from '@hiveio/dhive';
 import { useFollowingList, useCurrentUser } from '../store/context';
 import { avatarService } from '../services/AvatarService';
 import { ModerationService } from '../services/ModerationService';
+import type { ActiveVote } from '../services/ModerationService';
 
 /**
  * Refactored Feed Data Hook with Ordered Container Map and Shared State Integration
@@ -35,6 +36,9 @@ export interface Snap {
   json_metadata?: string;
   posting_json_metadata?: string;
   avatarUrl?: string;
+  // Optional moderation-related fields returned by Hive APIs
+  active_votes?: ActiveVote[];
+  net_votes?: number;
   [key: string]: any;
 }
 
@@ -361,8 +365,8 @@ export function useFeedData(): UseFeedDataReturn {
         const cached = ModerationService.getCached(s.author, s.permlink);
         if (cached?.isBlocked) return false;
         // If active_votes exist, evaluate once and cache
-        if (Array.isArray((s as any).active_votes)) {
-          const verdict = ModerationService.fromActiveVotes(s.author, s.permlink, (s as any).active_votes);
+        if (Array.isArray(s.active_votes)) {
+          const verdict = ModerationService.fromActiveVotes(s.author, s.permlink, s.active_votes);
           if (verdict?.isBlocked) return false;
         }
         return true;
@@ -372,6 +376,15 @@ export function useFeedData(): UseFeedDataReturn {
     },
     []
   ); // Remove dependencies for stability
+
+  // Helper: identifies snaps without loaded active_votes and with negative net_votes
+  const isNegativeUnvotedSnap = useCallback((s: Snap): boolean => {
+    return (
+      (typeof s.active_votes === 'undefined' || s.active_votes === null) &&
+      typeof s.net_votes === 'number' &&
+      s.net_votes < 0
+    );
+  }, []);
 
   // Fire-and-forget avatar enrichment using unified AvatarService
   // This does not return enriched snaps; it updates state asynchronously when avatar URLs are resolved.
@@ -552,10 +565,7 @@ export function useFeedData(): UseFeedDataReturn {
         try {
           const snapsToCheck = state.containerMap
             .getAllSnaps()
-            .filter(s =>
-              (typeof (s as any).active_votes === 'undefined' || (s as any).active_votes === null)
-              && (typeof (s as any).net_votes === 'number' && (s as any).net_votes < 0)
-            )
+            .filter(isNegativeUnvotedSnap)
             .slice(0, 20); // limit checks per fetch
           // Ensure checks and filter updates arrive via state refresh on completion
           await Promise.all(
@@ -660,8 +670,7 @@ export function useFeedData(): UseFeedDataReturn {
       // Kick background checks for negative-hinted items without active_votes
       try {
         const snapsToCheck = containerMetadata.snaps
-          .filter(s => (typeof (s as any).active_votes === 'undefined' || (s as any).active_votes === null)
-            && (typeof (s as any).net_votes === 'number' && (s as any).net_votes < 0))
+          .filter(isNegativeUnvotedSnap)
           .slice(0, 20);
         await Promise.all(
           snapsToCheck.map(async s => {
