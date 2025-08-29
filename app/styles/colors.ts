@@ -7,6 +7,7 @@ export type AppColors = {
   border: string;
   icon: string;
   payout: string;
+  placeholderText: string;
 };
 
 export const palettes: Record<'light' | 'dark', AppColors> = {
@@ -17,6 +18,8 @@ export const palettes: Record<'light' | 'dark', AppColors> = {
     border: '#CFD9DE',
     icon: '#1DA1F2',
     payout: '#17BF63',
+  // Slightly muted slate-ish gray for placeholders in light mode
+  placeholderText: '#94a3b8',
   },
   dark: {
     background: '#15202B',
@@ -25,6 +28,8 @@ export const palettes: Record<'light' | 'dark', AppColors> = {
     border: '#38444D',
     icon: '#1DA1F2',
     payout: '#17BF63',
+  // Muted blue-gray for placeholders in dark mode
+  placeholderText: '#8899A6',
   },
 };
 
