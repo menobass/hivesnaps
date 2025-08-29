@@ -35,7 +35,7 @@ class ModerationServiceImpl {
 
   primeAllowlist(users: string[]) {
     allowlist.clear();
-    users.forEach(u => allowlist.add(u.toLowerCase()))
+    users.forEach(u => allowlist.add(u.toLowerCase()));
   }
 
   getCached(author: string, permlink: string): ModerationVerdict | undefined {
