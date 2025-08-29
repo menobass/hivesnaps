@@ -36,37 +36,17 @@ import { canBeResnapped } from '../../utils/postTypeDetector';
 import { getMarkdownStyles } from '../../styles/markdownStyles';
 import { linkStyles, useLinkTextStyle } from '../../styles/linkStyles';
 import { extractRawImageUrls as extractRawImageUrlsUtil, removeRawImageUrls as removeRawImageUrlsUtil } from '../../utils/rawImageUrls';
-
-const twitterColors = {
-  light: {
-    background: '#FFFFFF',
-    text: '#0F1419',
-    bubble: '#F7F9F9',
-    border: '#CFD9DE',
-    icon: '#1DA1F2',
-    payout: '#17BF63',
-  },
-  dark: {
-    background: '#15202B',
-    text: '#D7DBDC',
-    bubble: '#22303C',
-    border: '#38444D',
-    icon: '#1DA1F2',
-    payout: '#17BF63',
-  },
-};
+import ModerationRequestModal, { ModerationReason, ModerationRequestPayload } from './moderation/ModerationRequestModal';
+import { formatRelativeShort } from '../../utils/time';
+import ActionSheet from './common/ActionSheet';
+import { ICON_SIZE, HEADER_SPACING, BUTTON_TAP_PADDING, TIMESTAMP_MAX_WIDTH, USERNAME_MAX_WIDTH_PCT, HIT_SLOP_SM } from '../constants/ui';
+import { useAppColors } from '../styles/colors';
+import { submitReport, mapUiReasonToApi } from '../services/reportService';
+import { SnapData } from '../../hooks/useConversationData';
 
 interface SnapProps {
-  author: string;
-  avatarUrl?: string;
-  body: string;
-  created: string;
-  voteCount?: number;
-  replyCount?: number;
-  payout?: number;
+  snap: SnapData;
   onUpvotePress?: (snap: { author: string; permlink: string }) => void;
-  permlink?: string;
-  hasUpvoted?: boolean;
   onSpeechBubblePress?: () => void; // NEW: handler for speech bubble
   onUserPress?: (username: string) => void; // NEW: handler for username/avatar press
   onContentPress?: () => void; // NEW: handler for content/text press
@@ -185,16 +165,8 @@ const renderMp4Video = (uri: string, key?: string | number) => (
 // Custom markdown rules for mp4 and video support
 
 const Snap: React.FC<SnapProps> = ({
-  author,
-  avatarUrl,
-  body,
-  created,
-  voteCount = 0,
-  replyCount = 0,
-  payout = 0,
+  snap,
   onUpvotePress,
-  permlink,
-  hasUpvoted = false,
   onSpeechBubblePress,
   onUserPress,
   onContentPress,
@@ -212,6 +184,19 @@ const Snap: React.FC<SnapProps> = ({
   isReply = false,
   compactMode = false,
 }) => {
+  // Destructure snap properties for easier access
+  const {
+    author,
+    avatarUrl,
+    body,
+    created,
+    voteCount = 0,
+    replyCount = 0,
+    payout = 0,
+    permlink,
+    hasUpvoted = false,
+    community,
+  } = snap;
   // Log avatarUrl changes for debugging
   const prevAvatarRef = useRef<string | undefined>(undefined);
   useEffect(() => {
@@ -233,7 +218,7 @@ const Snap: React.FC<SnapProps> = ({
   }
   const colorScheme = useColorScheme() || 'light';
   const isDark = colorScheme === 'dark';
-  const colors = twitterColors[colorScheme];
+  const colors = useAppColors();
   const upvoteColor = hasUpvoted ? '#8e44ad' : colors.icon; // purple if upvoted
   const imageUrls = extractImageUrls(body);
   const rawImageUrls = extractRawImageUrlsUtil(body);
@@ -509,6 +494,32 @@ const Snap: React.FC<SnapProps> = ({
   const [modalVisible, setModalVisible] = useState(false);
   const [modalImageUrl, setModalImageUrl] = useState<string | null>(null);
 
+  // Moderation modal visibility
+  const [moderationVisible, setModerationVisible] = useState(false);
+  const handleOpenModeration = () => setModerationVisible(true);
+  const handleSubmitModeration = async (payload: ModerationRequestPayload) => {
+    // Submit to report API: requires community, author, permlink, reason
+    // Prefer prop community if provided; otherwise attempt to parse from json_metadata/category upstream
+    const communityId = community;
+    const mapped = mapUiReasonToApi(payload.reason, payload.details);
+    try {
+      const res = await submitReport({
+        community: communityId || '',
+        author,
+        permlink: permlink || '',
+        reason: mapped.reason,
+        details: mapped.details,
+      });
+      console.log('[Report][API] status:', res.status, res.body);
+    } catch (e) {
+      console.error('[Report][API] error:', e);
+    } finally {
+      setModerationVisible(false);
+    }
+  };
+  // Overflow (three-dots) menu
+  const [moreMenuVisible, setMoreMenuVisible] = useState(false);
+
   // Remove global side-effects previously used for handlers
   // (globalThis references deleted)
 
@@ -583,6 +594,8 @@ const Snap: React.FC<SnapProps> = ({
                 opacity: pressed ? 0.7 : 1,
                 flexDirection: 'row',
                 alignItems: 'center',
+                flexShrink: 1,
+                minWidth: 0, // allow username to shrink/ellipsize
               },
             ]}
             disabled={!onUserPress}
@@ -597,13 +610,34 @@ const Snap: React.FC<SnapProps> = ({
               }
               style={styles.avatar}
             />
-            <Text style={[styles.username, { color: colors.text }]}>
+            <Text
+              style={[styles.username, { color: colors.text }]}
+              numberOfLines={1}
+              ellipsizeMode='tail'
+            >
               {author}
             </Text>
           </Pressable>
-          <Text style={[styles.timestamp, { color: colors.text }]}>
-            {new Date(created + 'Z').toLocaleString()}
-          </Text>
+          <View style={styles.topRightCluster}>
+            <Text
+              style={[styles.timestamp, { color: colors.text }]}
+              numberOfLines={1}
+              ellipsizeMode='tail'
+              accessibilityLabel={new Date(created + 'Z').toLocaleString()}
+            >
+              {formatRelativeShort(new Date(created + 'Z'))}
+            </Text>
+            {/* Moderation flag button */}
+            <Pressable
+                onPress={() => setMoreMenuVisible(true)}
+                style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, marginLeft: 10, padding: 4 }]}
+                accessibilityRole='button'
+                accessibilityLabel='More options'
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <FontAwesome name='ellipsis-h' size={18} color={colors.icon} />
+              </Pressable>
+          </View>
         </View>
       )}
       {/* Embedded Content (Videos, Twitter posts, etc.) */}
@@ -1037,6 +1071,30 @@ const Snap: React.FC<SnapProps> = ({
           />
         </View>
       )}
+      {/* Three-dots Action Sheet */}
+      <ActionSheet
+        visible={moreMenuVisible}
+        onClose={() => setMoreMenuVisible(false)}
+        items={[
+          {
+            label: 'Report Content',
+            tone: 'danger',
+            accessibilityLabel: 'Report Content',
+            onPress: () => {
+              setMoreMenuVisible(false);
+              setModerationVisible(true);
+            },
+          },
+        ]}
+        colors={{ bubble: colors.bubble, border: colors.border, text: colors.text }}
+      />
+      {/* Moderation Request Modal (Mock) */}
+      <ModerationRequestModal
+        visible={moderationVisible}
+        onClose={() => setModerationVisible(false)}
+        onSubmit={handleSubmitModeration}
+  colors={colors}
+      />
       </View>
     </View>
   );
@@ -1060,6 +1118,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 6,
+  minWidth: 0,
+  },
+  topRightCluster: {
+    marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   avatar: {
     width: 32,
@@ -1071,12 +1135,13 @@ const styles = StyleSheet.create({
   username: {
     fontWeight: 'bold',
     fontSize: 15,
-    marginRight: 8,
+  marginRight: 8,
+  maxWidth: `${USERNAME_MAX_WIDTH_PCT * 100}%`,
   },
   timestamp: {
     fontSize: 13,
-    marginLeft: 'auto',
     opacity: 0.7,
+  maxWidth: TIMESTAMP_MAX_WIDTH,
   },
   body: {
     fontSize: 16,

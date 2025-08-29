@@ -20,6 +20,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import RenderHtml from 'react-native-render-html';
 import { ConversationScreenStyles } from '../styles/ConversationScreenStyles';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -27,16 +28,10 @@ import Modal from 'react-native-modal';
 import Markdown from 'react-native-markdown-display';
 import {
   extractVideoInfo,
-  removeVideoUrls,
   removeTwitterUrls,
   removeEmbedUrls,
-  extractYouTubeId,
 } from '../utils/extractVideoInfo';
 import { Image as ExpoImage } from 'expo-image';
-import RenderHtml, {
-  defaultHTMLElementModels,
-  HTMLContentModel,
-} from 'react-native-render-html';
 import { Dimensions } from 'react-native';
 
 import { extractImageUrls } from '../utils/extractImageUrls';
@@ -48,7 +43,6 @@ import ImageView from 'react-native-image-viewing';
 import genericAvatar from '../assets/images/generic-avatar.png';
 import { extractHivePostUrls } from '../utils/extractHivePostInfo';
 import { ContextHivePostPreviewRenderer } from '../components/ContextHivePostPreviewRenderer';
-import { HivePostPreview } from '../components/HivePostPreview';
 import { convertSpoilerSyntax, SpoilerData } from '../utils/spoilerParser';
 import SpoilerText from './components/SpoilerText';
 import TwitterEmbed from './components/TwitterEmbed';
@@ -66,8 +60,8 @@ import {
 } from '../hooks/useConversationData';
 import { useUpvote } from '../hooks/useUpvote';
 import { useHiveData } from '../hooks/useHiveData';
-import { useReply, ReplyTarget } from '../hooks/useReply';
-import { useEdit, EditTarget } from '../hooks/useEdit';
+import { useReply } from '../hooks/useReply';
+import { useEdit } from '../hooks/useEdit';
 import { useGifPicker, GifMode } from '../hooks/useGifPicker';
 
 const ConversationScreenRefactored = () => {
@@ -119,25 +113,6 @@ const ConversationScreenRefactored = () => {
     updateReply
   );
 
-  // Content detection functions for polling
-  const [replySubmissionTime, setReplySubmissionTime] = useState<number | null>(
-    null
-  );
-  const [editSubmissionTime, setEditSubmissionTime] = useState<number | null>(
-    null
-  );
-
-  // Submission start callbacks
-  const handleReplySubmissionStart = useCallback(() => {
-    console.log(`Reply submission started at ${Date.now()}`);
-    setReplySubmissionTime(Date.now());
-  }, []);
-
-  const handleEditSubmissionStart = useCallback(() => {
-    console.log(`Edit submission started at ${Date.now()}`);
-    setEditSubmissionTime(Date.now());
-  }, []);
-
   const {
     replyModalVisible,
     replyText,
@@ -156,7 +131,7 @@ const ConversationScreenRefactored = () => {
     submitReply,
     addImage: addReplyImage,
     addGif: addReplyGif,
-  } = useReply(currentUsername, checkForNewContent, handleReplySubmissionStart);
+  } = useReply(currentUsername, checkForNewContent);
 
   const {
     editModalVisible,
@@ -176,7 +151,7 @@ const ConversationScreenRefactored = () => {
     submitEdit,
     addImage: addEditImage,
     addGif: addEditGif,
-  } = useEdit(currentUsername, checkForNewContent, handleEditSubmissionStart);
+  } = useEdit(currentUsername, checkForNewContent);
 
   const {
     gifModalVisible,
@@ -225,11 +200,6 @@ const ConversationScreenRefactored = () => {
     button: '#1DA1F2',
     buttonText: '#FFFFFF',
     buttonInactive: isDark ? '#22303C' : '#E1E8ED',
-  };
-
-  // Event handlers
-  const handleRefresh = () => {
-    refreshConversation();
   };
 
   const handlePullToRefresh = async () => {
@@ -1360,21 +1330,13 @@ const ConversationScreenRefactored = () => {
 
             {snap && (
               <Snap
-                author={snap.author}
-                avatarUrl={snap.avatarUrl}
-                body={snap.body}
-                created={snap.created}
-                voteCount={snap.voteCount || 0}
-                replyCount={snap.replyCount || 0}
-                payout={snap.payout || 0}
-                permlink={snap.permlink}
+                snap={snap}
                 onUpvotePress={() =>
                   handleUpvotePress({
                     author: snap.author,
                     permlink: snap.permlink || '',
                   })
                 }
-                hasUpvoted={snap.hasUpvoted || false}
                 onSpeechBubblePress={() => {}} // Disable in conversation view
                 onContentPress={() => {}} // Disable in conversation view
                 onUserPress={username => {
@@ -1415,15 +1377,7 @@ const ConversationScreenRefactored = () => {
               {flattenReplies(replies).map(reply => (
                 <Snap
                   key={reply.author + reply.permlink + '-' + reply.visualLevel}
-                  author={reply.author}
-                  avatarUrl={reply.avatarUrl}
-                  body={reply.body}
-                  created={reply.created}
-                  voteCount={reply.voteCount}
-                  replyCount={reply.replyCount}
-                  payout={reply.payout}
-                  permlink={reply.permlink}
-                  hasUpvoted={reply.hasUpvoted}
+                  snap={reply}
                   onUpvotePress={handleUpvotePress}
                   onReplyPress={handleOpenReplyModal}
                   onEditPress={(snapData: { author: string; permlink: string; body: string }) =>
