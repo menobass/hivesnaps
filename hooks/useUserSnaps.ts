@@ -238,6 +238,10 @@ export const useUserSnaps = (username: string | undefined) => {
         payout: payout,
         permlink: userSnap.permlink,
         hasUpvoted: hasUserUpvoted(userSnap, currentUsername),
+        community:
+          typeof (userSnap as any).category === 'string' && /^hive-\d+$/i.test((userSnap as any).category)
+            ? (userSnap as any).category
+            : undefined,
       };
     },
     [hasUserUpvoted]

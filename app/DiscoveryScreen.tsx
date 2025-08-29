@@ -480,55 +480,63 @@ const DiscoveryScreen = () => {
         <FlatList
           data={snaps}
           keyExtractor={item => item.author + '-' + item.permlink}
-          renderItem={({ item }) => (
-            <Snap
-              author={item.author}
-              avatarUrl={item.avatarUrl}
-              body={item.body}
-              created={item.created}
-              voteCount={item.net_votes || 0}
-              replyCount={item.children || 0}
-              payout={parseFloat(
+          renderItem={({ item }) => {
+            // Create snap object from discovery item
+            const snapData = {
+              author: item.author,
+              avatarUrl: item.avatarUrl,
+              body: item.body,
+              created: item.created,
+              voteCount: item.net_votes || 0,
+              replyCount: item.children || 0,
+              payout: parseFloat(
                 item.pending_payout_value
                   ? item.pending_payout_value.replace(' HBD', '')
                   : '0'
-              )}
-              permlink={item.permlink}
-              onUpvotePress={handleUpvotePress}
-              hasUpvoted={item.hasUpvoted}
-              onSpeechBubblePress={() => {
-                router.push({
-                  pathname: '/ConversationScreen',
-                  params: { author: item.author, permlink: item.permlink },
-                });
-              }}
-              onContentPress={() => {
-                router.push({
-                  pathname: '/ConversationScreen',
-                  params: { author: item.author, permlink: item.permlink },
-                });
-              }}
-              onUserPress={username => {
-                router.push(`/ProfileScreen?username=${username}` as any);
-              }}
-              showAuthor
-              onHashtagPress={tag => {
-                router.push({
-                  pathname: '/DiscoveryScreen',
-                  params: { hashtag: tag },
-                });
-              }}
-              onEditPress={handleEditPress}
-              onResnapPress={(author, permlink) => {
-                const snapUrl = `https://hive.blog/@${author}/${permlink}`;
-                router.push({
-                  pathname: '/ComposeScreen',
-                  params: { resnapUrl: snapUrl },
-                });
-              }}
-              currentUsername={currentUsername}
-            />
-          )}
+              ),
+              permlink: item.permlink,
+              hasUpvoted: item.hasUpvoted,
+              community: typeof (item as any).category === 'string' && /^hive-\d+$/i.test((item as any).category) ? (item as any).category : undefined,
+            };
+
+            return (
+              <Snap
+                snap={snapData}
+                onUpvotePress={handleUpvotePress}
+                onSpeechBubblePress={() => {
+                  router.push({
+                    pathname: '/ConversationScreen',
+                    params: { author: item.author, permlink: item.permlink },
+                  });
+                }}
+                onContentPress={() => {
+                  router.push({
+                    pathname: '/ConversationScreen',
+                    params: { author: item.author, permlink: item.permlink },
+                  });
+                }}
+                onUserPress={username => {
+                  router.push(`/ProfileScreen?username=${username}` as any);
+                }}
+                showAuthor
+                onHashtagPress={tag => {
+                  router.push({
+                    pathname: '/DiscoveryScreen',
+                    params: { hashtag: tag },
+                  });
+                }}
+                onEditPress={handleEditPress}
+                onResnapPress={(author, permlink) => {
+                  const snapUrl = `https://hive.blog/@${author}/${permlink}`;
+                  router.push({
+                    pathname: '/ComposeScreen',
+                    params: { resnapUrl: snapUrl },
+                  });
+                }}
+                currentUsername={currentUsername}
+              />
+            );
+          }}
           contentContainerStyle={{ paddingBottom: 80 }}
           style={{ width: '100%' }}
           refreshing={loading}

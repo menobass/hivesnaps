@@ -82,7 +82,11 @@ class ModerationServiceImpl {
 
     const p = (async (): Promise<ModerationVerdict> => {
       try {
-        const votes: ActiveVote[] = await client.database.call('get_active_votes', [author, permlink]);
+        // Fetch votes and validate the response shape defensively before use
+        const raw: unknown = await client.database.call('get_active_votes', [author, permlink]);
+        const votes: ActiveVote[] | undefined = Array.isArray(raw)
+          ? (raw.filter((v: any) => v && typeof v.voter === 'string') as ActiveVote[])
+          : undefined;
         const { blocked, by } = this.fromVotes(votes);
         const verdict: ModerationVerdict = { isBlocked: blocked, checkedAt: Date.now(), by: blocked ? by : undefined };
         this.cache.set(k, verdict);
