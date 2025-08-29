@@ -494,6 +494,7 @@ const DiscoveryScreen = () => {
                   : '0'
               )}
               permlink={item.permlink}
+              community={typeof (item as any).category === 'string' && /^hive-\d+$/i.test((item as any).category) ? (item as any).category : undefined}
               onUpvotePress={handleUpvotePress}
               hasUpvoted={item.hasUpvoted}
               onSpeechBubblePress={() => {
