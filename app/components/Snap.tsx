@@ -1098,13 +1098,7 @@ const Snap: React.FC<SnapProps> = ({
         visible={moderationVisible}
         onClose={() => setModerationVisible(false)}
         onSubmit={handleSubmitModeration}
-        colors={{
-          background: colors.background,
-          text: colors.text,
-          bubble: colors.bubble,
-          border: colors.border,
-          icon: colors.icon,
-        }}
+  colors={colors}
       />
       </View>
     </View>

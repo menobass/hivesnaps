@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, ScrollView, Dimensions } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
-import { useAppColors } from '../../styles/colors';
+import { useAppColors, type AppColors } from '../../styles/colors';
 
 export type ModerationReason = 'violence' | 'harmful' | 'scam' | 'spam' | 'other';
 
@@ -14,13 +14,7 @@ interface ModerationRequestModalProps {
   visible: boolean;
   onClose: () => void;
   onSubmit: (payload: ModerationRequestPayload) => void;
-  colors?: {
-    background: string;
-    text: string;
-    bubble: string;
-    border: string;
-    icon: string;
-  };
+  colors?: AppColors;
   title?: string;
 }
 
@@ -96,7 +90,7 @@ const ModerationRequestModal: React.FC<ModerationRequestModalProps> = ({
                 <TextInput
                   style={[styles.otherInput, { color: palette.text, borderColor: palette.border }]}
                   placeholder="Please explain in detail."
-                  placeholderTextColor={appColors.text === '#D7DBDC' ? '#8899A6' : '#94a3b8'}
+                  placeholderTextColor={palette.placeholderText}
                   multiline
                   numberOfLines={4}
                   value={otherDetails}
