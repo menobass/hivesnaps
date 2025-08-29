@@ -717,16 +717,7 @@ const ProfileScreen = () => {
                           return (
                             <Snap
                               key={`${userSnap.author}-${userSnap.permlink}`}
-                              author={snapProps.author}
-                              avatarUrl={snapProps.avatarUrl}
-                              body={snapProps.body}
-                              created={snapProps.created}
-                              voteCount={snapProps.voteCount}
-                              replyCount={snapProps.replyCount}
-                              payout={snapProps.payout}
-                              permlink={snapProps.permlink}
-                              community={(snapProps as any).community}
-                              hasUpvoted={snapProps.hasUpvoted}
+                              snap={snapProps}
                               onUpvotePress={snap =>
                                 openUpvoteModal({
                                   author: snap.author,

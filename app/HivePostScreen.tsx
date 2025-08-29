@@ -525,15 +525,7 @@ const HivePostScreen = () => {
                     '-' +
                     comment.visualLevel
                   }
-                  author={comment.author}
-                  avatarUrl={comment.avatarUrl}
-                  body={comment.body}
-                  created={comment.created}
-                  voteCount={comment.voteCount}
-                  replyCount={comment.replyCount}
-                  payout={comment.payout}
-                  permlink={comment.permlink}
-                  hasUpvoted={comment.hasUpvoted}
+                  snap={comment}
                   onUpvotePress={handleCommentUpvotePress}
                   onReplyPress={handleOpenReplyModal}
                   onEditPress={(snapData: { author: string; permlink: string; body: string }) => {
