@@ -42,20 +42,11 @@ import ActionSheet from './common/ActionSheet';
 import { ICON_SIZE, HEADER_SPACING, BUTTON_TAP_PADDING, TIMESTAMP_MAX_WIDTH, USERNAME_MAX_WIDTH_PCT, HIT_SLOP_SM } from '../constants/ui';
 import { useAppColors } from '../styles/colors';
 import { submitReport, mapUiReasonToApi } from '../services/reportService';
+import { SnapData } from '../../hooks/useConversationData';
 
 interface SnapProps {
-  author: string;
-  avatarUrl?: string;
-  body: string;
-  created: string;
-  voteCount?: number;
-  replyCount?: number;
-  payout?: number;
+  snap: SnapData;
   onUpvotePress?: (snap: { author: string; permlink: string }) => void;
-  permlink?: string;
-  hasUpvoted?: boolean;
-  // Community id (e.g., 'hive-124838') for moderation/reporting APIs
-  community?: string;
   onSpeechBubblePress?: () => void; // NEW: handler for speech bubble
   onUserPress?: (username: string) => void; // NEW: handler for username/avatar press
   onContentPress?: () => void; // NEW: handler for content/text press
@@ -174,17 +165,8 @@ const renderMp4Video = (uri: string, key?: string | number) => (
 // Custom markdown rules for mp4 and video support
 
 const Snap: React.FC<SnapProps> = ({
-  author,
-  avatarUrl,
-  body,
-  created,
-  voteCount = 0,
-  replyCount = 0,
-  payout = 0,
+  snap,
   onUpvotePress,
-  permlink,
-  hasUpvoted = false,
-  community,
   onSpeechBubblePress,
   onUserPress,
   onContentPress,
@@ -202,6 +184,19 @@ const Snap: React.FC<SnapProps> = ({
   isReply = false,
   compactMode = false,
 }) => {
+  // Destructure snap properties for easier access
+  const {
+    author,
+    avatarUrl,
+    body,
+    created,
+    voteCount = 0,
+    replyCount = 0,
+    payout = 0,
+    permlink,
+    hasUpvoted = false,
+    community,
+  } = snap;
   // Log avatarUrl changes for debugging
   const prevAvatarRef = useRef<string | undefined>(undefined);
   useEffect(() => {

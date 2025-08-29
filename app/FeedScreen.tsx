@@ -45,11 +45,9 @@ import Snap from './components/Snap';
 import NotificationBadge from './components/NotificationBadge';
 import SmallButton from '../components/SmallButton';
 import StaticContentModal from '../components/StaticContentModal';
-import Slider from '@react-native-community/slider';
 import UpvoteModal from '../components/UpvoteModal';
 import { addPromiseIfValid } from '../utils/promiseUtils';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Modal content constants
 const VP_MODAL_CONTENT = {
@@ -842,65 +840,70 @@ const FeedScreenRefactored = () => {
             keyExtractor={(item, index) =>
               `${item.author}-${item.permlink}-${index}`
             }
-            renderItem={({ item }) => (
-              <Snap
-                author={item.author}
-                avatarUrl={item.avatarUrl}
-                body={item.body}
-                created={item.created}
-                voteCount={item.net_votes || 0}
-                replyCount={item.children || 0}
-                payout={parseFloat(
+            renderItem={({ item }) => {
+              // Create snap object from feed item
+              const snapData = {
+                author: item.author,
+                avatarUrl: item.avatarUrl,
+                body: item.body,
+                created: item.created,
+                voteCount: item.net_votes || 0,
+                replyCount: item.children || 0,
+                payout: parseFloat(
                   item.pending_payout_value
                     ? item.pending_payout_value.replace(' HBD', '')
                     : '0'
-                )}
-                permlink={item.permlink}
-                community={typeof (item as any).category === 'string' && /^hive-\d+$/i.test((item as any).category) ? (item as any).category : undefined}
-                onUpvotePress={() =>
-                  handleUpvotePress({
-                    author: item.author,
-                    permlink: item.permlink,
-                  })
-                }
-                hasUpvoted={
-                  Array.isArray(item.active_votes) &&
+                ),
+                permlink: item.permlink,
+                hasUpvoted: Array.isArray(item.active_votes) &&
                   item.active_votes.some(
                     (v: any) => v.voter === username && v.percent > 0
-                  )
-                }
-                onSpeechBubblePress={() => {
-                  router.push({
-                    pathname: '/ConversationScreen',
-                    params: { author: item.author, permlink: item.permlink },
-                  });
-                }}
-                onContentPress={() => {
-                  router.push({
-                    pathname: '/ConversationScreen',
-                    params: { author: item.author, permlink: item.permlink },
-                  });
-                }}
-                onUserPress={username => {
-                  router.push(`/ProfileScreen?username=${username}` as any);
-                }}
-                onImagePress={handleImagePress}
-                showAuthor
-                onHashtagPress={tag => {
-                  router.push({
-                    pathname: '/DiscoveryScreen',
-                    params: { hashtag: tag },
-                  });
-                }}
-                onResnapPress={(author, permlink) => {
-                  const snapUrl = `https://hive.blog/@${author}/${permlink}`;
-                  router.push({
-                    pathname: '/ComposeScreen',
-                    params: { resnapUrl: snapUrl },
-                  });
-                }}
-              />
-            )}
+                  ),
+                community: typeof (item as any).category === 'string' && /^hive-\d+$/i.test((item as any).category) ? (item as any).category : undefined,
+              };
+
+              return (
+                <Snap
+                  snap={snapData}
+                  onUpvotePress={() =>
+                    handleUpvotePress({
+                      author: item.author,
+                      permlink: item.permlink,
+                    })
+                  }
+                  onSpeechBubblePress={() => {
+                    router.push({
+                      pathname: '/ConversationScreen',
+                      params: { author: item.author, permlink: item.permlink },
+                    });
+                  }}
+                  onContentPress={() => {
+                    router.push({
+                      pathname: '/ConversationScreen',
+                      params: { author: item.author, permlink: item.permlink },
+                    });
+                  }}
+                  onUserPress={username => {
+                    router.push(`/ProfileScreen?username=${username}` as any);
+                  }}
+                  onImagePress={handleImagePress}
+                  showAuthor
+                  onHashtagPress={tag => {
+                    router.push({
+                      pathname: '/DiscoveryScreen',
+                      params: { hashtag: tag },
+                    });
+                  }}
+                  onResnapPress={(author, permlink) => {
+                    const snapUrl = `https://hive.blog/@${author}/${permlink}`;
+                    router.push({
+                      pathname: '/ComposeScreen',
+                      params: { resnapUrl: snapUrl },
+                    });
+                  }}
+                />
+              );
+            }}
             contentContainerStyle={{ paddingBottom: 80 }}
             style={{ width: '100%' }}
             refreshing={feedLoading || globalRefreshing}
