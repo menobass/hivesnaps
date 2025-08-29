@@ -26,6 +26,8 @@ export interface SnapData {
   json_metadata?: string;
   parent_author?: string;
   parent_permlink?: string;
+  // When a post belongs to a Hive community, this will be like 'hive-124838'
+  community?: string;
 }
 
 export interface ReplyData extends SnapData {
@@ -210,6 +212,11 @@ export const useConversationData = (
         json_metadata: post.json_metadata,
         parent_author: post.parent_author,
         parent_permlink: post.parent_permlink,
+        // Populate community only when category is in the 'hive-XXXXX' format
+        community:
+          typeof post.category === 'string' && /^hive-\d+$/i.test(post.category)
+            ? post.category
+            : undefined,
       };
 
       // Fetch replies tree with full content
@@ -318,6 +325,10 @@ export const useConversationData = (
             json_metadata: post.json_metadata,
             parent_author: post.parent_author,
             parent_permlink: post.parent_permlink,
+            community:
+              typeof post.category === 'string' && /^hive-\d+$/i.test(post.category)
+                ? post.category
+                : prev.snap?.community,
           },
           replies: sortedTree,
         }));

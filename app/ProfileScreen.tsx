@@ -725,6 +725,7 @@ const ProfileScreen = () => {
                               replyCount={snapProps.replyCount}
                               payout={snapProps.payout}
                               permlink={snapProps.permlink}
+                              community={(snapProps as any).community}
                               hasUpvoted={snapProps.hasUpvoted}
                               onUpvotePress={snap =>
                                 openUpvoteModal({

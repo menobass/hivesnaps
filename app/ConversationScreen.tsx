@@ -1368,6 +1368,7 @@ const ConversationScreenRefactored = () => {
                 replyCount={snap.replyCount || 0}
                 payout={snap.payout || 0}
                 permlink={snap.permlink}
+                community={snap.community}
                 onUpvotePress={() =>
                   handleUpvotePress({
                     author: snap.author,
@@ -1424,6 +1425,7 @@ const ConversationScreenRefactored = () => {
                   payout={reply.payout}
                   permlink={reply.permlink}
                   hasUpvoted={reply.hasUpvoted}
+                  community={snap?.community}
                   onUpvotePress={handleUpvotePress}
                   onReplyPress={handleOpenReplyModal}
                   onEditPress={(snapData: { author: string; permlink: string; body: string }) =>
