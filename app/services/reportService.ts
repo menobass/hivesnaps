@@ -10,17 +10,46 @@ export interface ReportPayload {
   details?: string;  // optional free text if 'other'
 }
 
-export async function submitReport(payload: ReportPayload): Promise<{ ok: boolean; status: number; body?: any }>{
-  const res = await fetch(REPORT_API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  let body: any = undefined;
+// Small helper to add a timeout to fetch requests (React Native supports AbortController)
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 10000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    body = await res.json();
-  } catch {}
-  return { ok: res.ok, status: res.status, body };
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+export async function submitReport(payload: ReportPayload): Promise<{ ok: boolean; status: number; body?: any }> {
+  // Basic URL sanity check to avoid opaque RN errors
+  if (!REPORT_API_URL || typeof REPORT_API_URL !== 'string' || !/^https?:\/\//i.test(REPORT_API_URL)) {
+    throw new Error('Invalid REPORT_API_URL configuration');
+  }
+  try {
+    const res = await fetchWithTimeout(REPORT_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    }, 12000);
+    let body: any = undefined;
+    try {
+      body = await res.json();
+    } catch {
+      // Non-JSON response; leave body undefined
+    }
+    return { ok: res.ok, status: res.status, body };
+  } catch (e: any) {
+    // Normalize RN network failure into a clear error
+    const msg = (e && e.message) || String(e);
+    if (msg.includes('Network request failed') || msg.includes('AbortError')) {
+      throw new Error('NetworkError: report submission failed');
+    }
+    throw e;
+  }
 }
 
 export function mapUiReasonToApi(reason: string, details?: string): { reason: string; details?: string } {
