@@ -643,7 +643,7 @@ const Snap: React.FC<SnapProps> = ({
           <View style={styles.topRightCluster}>
             {viaHiveSnaps && (
               <Image
-                source={require('../../assets/images/generic-avatar.png')}
+                source={require('../../assets/images/hivesnaps-badge.png')}
                 style={styles.avatar}
                 accessibilityLabel='Posted with HiveSnaps'
               />
