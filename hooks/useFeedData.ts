@@ -736,7 +736,52 @@ export function useFeedData(): UseFeedDataReturn {
         '📝 [useFeedData] updateSnap called for',
         author + '/' + permlink
       );
-      // Do nothing - just log
+      setState(prev => {
+        // Apply updates in-place to the flattened snaps array
+        const updatedSnaps = prev.snaps.map(snap => {
+          if (snap.author === author && snap.permlink === permlink) {
+            // Support functional updaters inside updates values
+            const next: any = { ...snap };
+            Object.entries(updates).forEach(([key, value]) => {
+              if (typeof value === 'function') {
+                try {
+                  next[key] = (value as any)(snap[key]);
+                } catch {
+                  next[key] = snap[key];
+                }
+              } else {
+                next[key] = value as any;
+              }
+            });
+            return next;
+          }
+          return snap;
+        });
+
+        // Also update the snap inside any containers we have cached
+        const newMap = new OrderedContainerMap(prev.containerMap.getMaxSize());
+        for (const [key, container] of prev.containerMap.entries()) {
+          const newContainer: ContainerMetadata = {
+            ...container,
+            snaps: container.snaps.map(s =>
+              s.author === author && s.permlink === permlink
+                ? {
+                    ...s,
+                    ...Object.fromEntries(
+                      Object.entries(updates).map(([k, v]) => [
+                        k,
+                        typeof v === 'function' ? (v as any)((s as any)[k]) : v,
+                      ])
+                    ),
+                  }
+                : s
+            ),
+          };
+          newMap.set(key, newContainer);
+        }
+
+        return { ...prev, snaps: updatedSnaps, containerMap: newMap };
+      });
     },
     []
   );
