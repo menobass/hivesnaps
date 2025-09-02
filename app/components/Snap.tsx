@@ -197,6 +197,28 @@ const Snap: React.FC<SnapProps> = ({
     hasUpvoted = false,
     community,
   } = snap;
+
+  // Detect if this content was posted via HiveSnaps (from json metadata)
+  const viaHiveSnaps = useMemo(() => {
+    const tryParse = (val: any): any => {
+      if (!val) return null;
+      try {
+        return typeof val === 'string' ? JSON.parse(val) : val;
+      } catch {
+        return null;
+      }
+    };
+    const meta = tryParse((snap as any).json_metadata) || tryParse((snap as any).posting_json_metadata) || null;
+    const app: string | undefined = typeof meta?.app === 'string' ? meta.app : undefined;
+    if (app && /hivesnaps/i.test(app)) return true;
+    // Some older posts may have a custom marker in metadata
+    const client: string | undefined = typeof meta?.client === 'string' ? meta.client : undefined;
+    if (client && /hivesnaps/i.test(client)) return true;
+    // Fallback: look for a friendly marker string
+    const metaString = typeof (snap as any).json_metadata === 'string' ? (snap as any).json_metadata : '';
+    if (/HiveSnaps\s*1\.0/i.test(metaString)) return true;
+    return false;
+  }, [(snap as any).json_metadata, (snap as any).posting_json_metadata]);
   // Log avatarUrl changes for debugging
   const prevAvatarRef = useRef<string | undefined>(undefined);
   useEffect(() => {
@@ -619,6 +641,13 @@ const Snap: React.FC<SnapProps> = ({
             </Text>
           </Pressable>
           <View style={styles.topRightCluster}>
+            {viaHiveSnaps && (
+              <Image
+                source={require('../../assets/images/generic-avatar.png')}
+                style={styles.avatar}
+                accessibilityLabel='Posted with HiveSnaps'
+              />
+            )}
             <Text
               style={[styles.timestamp, { color: colors.text }]}
               numberOfLines={1}
