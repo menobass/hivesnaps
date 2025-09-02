@@ -15,7 +15,7 @@ import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { extractImageUrls } from '../../utils/extractImageUrls';
 import { stripImageTags } from '../../utils/stripImageTags';
-import { extractVideoInfo, removeVideoUrls } from '../../utils/extractVideoInfo';
+import { extractVideoInfo, removeVideoUrls, removeInstagramUrls } from '../../utils/extractVideoInfo';
 import IPFSVideoPlayer from './IPFSVideoPlayer';
 import { WebView } from 'react-native-webview';
 import Markdown from 'react-native-markdown-display';
@@ -29,6 +29,7 @@ import SpoilerText from './SpoilerText';
 import TwitterEmbed from './TwitterEmbed';
 import YouTubeEmbed from './YouTubeEmbed';
 import ThreeSpeakEmbed from './ThreeSpeakEmbed';
+import InstagramEmbed from './InstagramEmbed';
 import { extractHivePostUrls } from '../../utils/extractHivePostInfo';
 import { OptimizedHivePostPreviewRenderer } from '../../components/OptimizedHivePostPreviewRenderer';
 import { classifyUrl } from '../../utils/urlClassifier';
@@ -462,7 +463,8 @@ const Snap: React.FC<SnapProps> = ({
   // Remove embedded content URLs and image URLs from text body if present
   let textBody = stripImageTags(body);
   if (embeddedContent) {
-    textBody = removeVideoUrls(textBody);
+  textBody = removeVideoUrls(textBody);
+  textBody = removeInstagramUrls(textBody);
   }
   if (rawImageUrls.length > 0) {
     textBody = removeRawImageUrlsUtil(textBody);
@@ -650,6 +652,8 @@ const Snap: React.FC<SnapProps> = ({
             />
           ) : embeddedContent.type === 'twitter' ? (
             <TwitterEmbed embedUrl={embeddedContent.embedUrl} isDark={isDark} />
+          ) : embeddedContent.type === 'instagram' ? (
+            <InstagramEmbed embedUrl={embeddedContent.embedUrl} isDark={isDark} />
           ) : embeddedContent.type === 'youtube' ? (
             <YouTubeEmbed embedUrl={embeddedContent.embedUrl} isDark={isDark} />
           ) : embeddedContent.type === '3speak' ? (
