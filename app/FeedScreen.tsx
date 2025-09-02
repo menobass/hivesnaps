@@ -382,7 +382,7 @@ const FeedScreenRefactored = () => {
     openUpvoteModal({ author, permlink, snap });
     // Optimistic UI: immediately mark as upvoted visually if not already
     if (snap && !snap.hasUpvoted) {
-      updateSnap(author, permlink, { hasUpvoted: true } as any);
+      updateSnap(author, permlink, { hasUpvoted: true });
     }
   };
 

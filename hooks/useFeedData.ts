@@ -25,6 +25,25 @@ const HIVE_NODES = [
 ];
 const client = new Client(HIVE_NODES);
 
+// Generic typed updater utilities for optimistic updates
+type Updater<T> = T | ((prev: T) => T);
+type Updates<T> = { [K in keyof T]?: Updater<T[K]> };
+
+function applyUpdates<T extends object>(item: T, updates: Updates<T>): T {
+  // Create a shallow copy and apply either direct values or functional updaters per key
+  const next = { ...(item as any) } as T;
+  (Object.keys(updates) as Array<keyof T>).forEach((key) => {
+    const value = updates[key]!;
+    if (typeof value === 'function') {
+      const fn = value as (prev: T[typeof key]) => T[typeof key];
+      (next as any)[key] = fn((item as any)[key]);
+    } else {
+      (next as any)[key] = value as T[typeof key];
+    }
+  });
+  return next;
+}
+
 // Define a Snap type for Hive posts/comments
 export interface Snap {
   author: string;
@@ -36,6 +55,7 @@ export interface Snap {
   json_metadata?: string;
   posting_json_metadata?: string;
   avatarUrl?: string;
+  hasUpvoted?: boolean;
   // Optional moderation-related fields returned by Hive APIs
   active_votes?: ActiveVote[];
   net_votes?: number;
@@ -226,7 +246,7 @@ interface UseFeedDataReturn extends FeedState {
   updateSnap: (
     author: string,
     permlink: string,
-    updates: Partial<Snap>
+    updates: Updates<Snap>
   ) => void;
   fetchAndCacheFollowingList: (username: string) => Promise<string[]>;
   ensureFollowingListCached: (username: string) => Promise<void>;
@@ -731,56 +751,33 @@ export function useFeedData(): UseFeedDataReturn {
   }, []);
 
   const updateSnap = useCallback(
-    (author: string, permlink: string, updates: Partial<Snap>) => {
-      console.log(
-        '📝 [useFeedData] updateSnap called for',
-        author + '/' + permlink
-      );
+    (author: string, permlink: string, updates: Updates<Snap>) => {
+      if (__DEV__) {
+        try {
+          console.log(
+            '📝 [useFeedData] updateSnap called for',
+            author + '/' + permlink
+          );
+        } catch {}
+      }
       setState(prev => {
         // Apply updates in-place to the flattened snaps array
-        const updatedSnaps = prev.snaps.map(snap => {
-          if (snap.author === author && snap.permlink === permlink) {
-            // Support functional updaters inside updates values
-            const next: any = { ...snap };
-            Object.entries(updates).forEach(([key, value]) => {
-              if (typeof value === 'function') {
-                try {
-                  next[key] = (value as any)(snap[key]);
-                } catch {
-                  next[key] = snap[key];
-                }
-              } else {
-                next[key] = value as any;
-              }
-            });
-            return next;
-          }
-          return snap;
-        });
+        const updatedSnaps = prev.snaps.map(snap =>
+          snap.author === author && snap.permlink === permlink
+            ? applyUpdates<Snap>(snap, updates)
+            : snap
+        );
 
-        // Also update the snap inside any containers we have cached
-        const newMap = new OrderedContainerMap(prev.containerMap.getMaxSize());
-        for (const [key, container] of prev.containerMap.entries()) {
-          const newContainer: ContainerMetadata = {
-            ...container,
-            snaps: container.snaps.map(s =>
-              s.author === author && s.permlink === permlink
-                ? {
-                    ...s,
-                    ...Object.fromEntries(
-                      Object.entries(updates).map(([k, v]) => [
-                        k,
-                        typeof v === 'function' ? (v as any)((s as any)[k]) : v,
-                      ])
-                    ),
-                  }
-                : s
-            ),
-          };
-          newMap.set(key, newContainer);
+        // Update the snap inside any containers we have cached (mutate container entries)
+        for (const [, container] of prev.containerMap.entries()) {
+          container.snaps = container.snaps.map(s =>
+            s.author === author && s.permlink === permlink
+              ? applyUpdates<Snap>(s, updates)
+              : s
+          );
         }
 
-        return { ...prev, snaps: updatedSnaps, containerMap: newMap };
+        return { ...prev, snaps: updatedSnaps };
       });
     },
     []
