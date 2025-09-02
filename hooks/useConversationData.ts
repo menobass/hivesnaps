@@ -11,6 +11,9 @@ const HIVE_NODES = [
 ];
 const client = new Client(HIVE_NODES);
 
+// Default maximum depth for fetching nested replies
+const DEFAULT_MAX_REPLY_DEPTH = 3;
+
 // Types for conversation data
 export interface SnapData {
   author: string;
@@ -86,7 +89,7 @@ export const useConversationData = (
       author: string,
       permlink: string,
       depth = 0,
-      maxDepth = 3,
+  maxDepth = DEFAULT_MAX_REPLY_DEPTH,
       parentCommunity?: string
     ): Promise<ReplyData[]> => {
       if (depth > maxDepth) return [];
@@ -227,8 +230,14 @@ export const useConversationData = (
             : undefined,
       };
 
-      // Fetch replies tree with full content
-  const tree = await fetchRepliesTreeWithContent(author, permlink, 0, 3, snapData.community);
+  // Fetch replies tree with full content
+  const tree = await fetchRepliesTreeWithContent(
+    author,
+    permlink,
+    0,
+    DEFAULT_MAX_REPLY_DEPTH,
+    snapData.community
+  );
 
       const sortedTree = sortByPayoutRecursive(tree);
       setState({
@@ -297,8 +306,14 @@ export const useConversationData = (
         permlink,
       ]);
 
-      // Fetch replies tree without setting loading state
-  const tree = await fetchRepliesTreeWithContent(author, permlink);
+  // Fetch replies tree without setting loading state (preserve community inheritance)
+  const tree = await fetchRepliesTreeWithContent(
+    author,
+    permlink,
+    0,
+    DEFAULT_MAX_REPLY_DEPTH,
+    state.snap?.community
+  );
   const sortedTree = sortByPayoutRecursive(tree);
 
       // Check if we have new content
