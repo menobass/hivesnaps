@@ -86,7 +86,8 @@ export const useConversationData = (
       author: string,
       permlink: string,
       depth = 0,
-      maxDepth = 3
+      maxDepth = 3,
+      parentCommunity?: string
     ): Promise<ReplyData[]> => {
       if (depth > maxDepth) return [];
 
@@ -125,11 +126,17 @@ export const useConversationData = (
                 ? fullReply.pending_payout_value.replace(' HBD', '')
                 : '0'
             );
+            // Determine this reply's community: use its own category if hive-XXXXX, else inherit from parent
+            const replyCommunity =
+              typeof fullReply.category === 'string' && /^hive-\d+$/i.test(fullReply.category)
+                ? fullReply.category
+                : parentCommunity;
             const childrenReplies = await fetchRepliesTreeWithContent(
               fullReply.author,
               fullReply.permlink,
               depth + 1,
-              maxDepth
+              maxDepth,
+              replyCommunity
             );
             return {
               author: fullReply.author,
@@ -143,6 +150,7 @@ export const useConversationData = (
               hasUpvoted: checkHasUpvoted(fullReply.active_votes),
               active_votes: fullReply.active_votes,
               json_metadata: fullReply.json_metadata,
+              community: replyCommunity,
               replies: childrenReplies,
             };
           })
@@ -220,7 +228,7 @@ export const useConversationData = (
       };
 
       // Fetch replies tree with full content
-      const tree = await fetchRepliesTreeWithContent(author, permlink);
+  const tree = await fetchRepliesTreeWithContent(author, permlink, 0, 3, snapData.community);
 
       const sortedTree = sortByPayoutRecursive(tree);
       setState({
