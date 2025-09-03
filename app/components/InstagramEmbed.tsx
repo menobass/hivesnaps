@@ -1,27 +1,67 @@
 import React from 'react';
-import { View } from 'react-native';
+import { View, Text, StyleSheet, useColorScheme } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 interface Props {
   embedUrl: string; // e.g., https://www.instagram.com/p/{shortcode}/embed
-  isDark: boolean;
+  isDark?: boolean;
 }
 
-const InstagramEmbed: React.FC<Props> = ({ embedUrl }) => {
-  // Instagram requires embed endpoint; content is interactive but we block autoplay
+const InstagramEmbed: React.FC<Props> = ({ embedUrl, isDark }) => {
+  const colorScheme = useColorScheme();
+  const themeIsDark = isDark ?? colorScheme === 'dark';
+
   return (
-    <View style={{ width: '100%', aspectRatio: 1, marginVertical: 10, borderRadius: 12, overflow: 'hidden', backgroundColor: '#eee' }}>
+    <View
+      style={{
+        width: '100%',
+        aspectRatio: 0.8, // Instagram's characteristic 4:5 ratio
+        borderRadius: 12,
+        overflow: 'hidden',
+        position: 'relative',
+      }}
+    >
       <WebView
         source={{ uri: embedUrl }}
-        style={{ flex: 1 }}
+        style={{ flex: 1, backgroundColor: themeIsDark ? '#000' : '#fff' }}
         javaScriptEnabled
         domStorageEnabled
-        mediaPlaybackRequiresUserAction
-        allowsInlineMediaPlayback
+        mediaPlaybackRequiresUserAction={true}
+        allowsInlineMediaPlayback={true}
         startInLoadingState
+        allowsFullscreenVideo
+        onShouldStartLoadWithRequest={request => {
+          // Allow Instagram URLs, block others for security
+          return (
+            request.url.includes('instagram.com') ||
+            request.url.includes('cdninstagram.com') ||
+            request.url.includes('fbcdn.net')
+          );
+        }}
       />
+      {/* Instagram type indicator */}
+      <View
+        style={[styles.indicator, { backgroundColor: 'rgba(225,48,108,0.8)' }]}
+      >
+        <Text style={[styles.indicatorText, { color: '#fff' }]}>INSTAGRAM</Text>
+      </View>
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  indicator: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  indicatorText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+});
 
 export default InstagramEmbed;
