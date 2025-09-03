@@ -104,21 +104,24 @@ export default function LoginScreen() {
     setError('');
     setLoading(true);
     try {
+      // Clean username by removing @ symbol if present
+      const cleanUsername = username.trim().replace(/^@/, '');
+      
       // Validate posting key
 
       // Use a test posting key for the username 'appstoret' for easier testing
       const testPostingKey = '5K4xkL1sdkqV5NFHQDtx61gVGcXqZRNDAHVFLbQbQ5W96Vy8cDy';
-      const postingWif = username.trim() !== 'appstoret' ? postingKey.trim() : testPostingKey;
+      const postingWif = cleanUsername !== 'appstoret' ? postingKey.trim() : testPostingKey;
       console.log('Using posting key:', postingWif);
       const privKey = PrivateKey.from(postingWif);
-      const account = await client.database.getAccounts([username.trim()]);
+      const account = await client.database.getAccounts([cleanUsername]);
       if (!account || !account[0]) throw new Error('Account not found');
       const pubPosting = privKey.createPublic().toString();
       const postingAuths = account[0].posting.key_auths.map(([key]) => key);
       if (!postingAuths.includes(pubPosting))
         throw new Error('Invalid posting key');
       // Store key securely
-      await SecureStore.setItemAsync('hive_username', username.trim());
+      await SecureStore.setItemAsync('hive_username', cleanUsername);
       await SecureStore.setItemAsync('hive_posting_key', postingWif);
       setLoading(false);
       router.push('/FeedScreen');
@@ -178,7 +181,7 @@ export default function LoginScreen() {
                       width: FIELD_WIDTH,
                     },
                   ]}
-                  placeholder='username do not use @'
+                  placeholder='username'
                   placeholderTextColor={
                     colorScheme === 'dark' ? '#8899A6' : '#536471'
                   }
