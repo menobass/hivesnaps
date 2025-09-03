@@ -9,12 +9,13 @@
  */
 
 export interface VideoInfo {
-  type: 'youtube' | '3speak' | 'ipfs' | 'twitter';
+  type: 'youtube' | '3speak' | 'ipfs' | 'twitter' | 'instagram';
   id?: string;
   username?: string;
   videoId?: string;
   ipfsHash?: string;
   tweetId?: string;
+  shortcode?: string;
   embedUrl: string;
   originalUrl: string;
 }
@@ -111,6 +112,23 @@ export function extractVideoInfo(text: string): VideoInfo | null {
     };
   }
 
+  // Instagram post/reel/tv detection
+  // Matches: https://www.instagram.com/p/{shortcode}/, /reel/{shortcode}/, /tv/{shortcode}/ (with or without www, trailing slash optional)
+  const instagramMatch = text.match(
+    /(?:https?:\/\/)?(?:www\.)?instagram\.com\/(p|reel|tv)\/([A-Za-z0-9_-]+)\/?/i
+  );
+  if (instagramMatch) {
+    const kind = instagramMatch[1];
+    const shortcode = instagramMatch[2];
+    const embedUrl = `https://www.instagram.com/${kind}/${shortcode}/embed`;
+    return {
+      type: 'instagram',
+      shortcode,
+      embedUrl,
+      originalUrl: instagramMatch[0],
+    };
+  }
+
   return null;
 }
 
@@ -164,6 +182,24 @@ export function removeTwitterUrls(text: string): string {
 }
 
 /**
+ * Remove Instagram URLs from text content when they're rendered as embeds
+ * @param text - The text to clean
+ * @returns Cleaned text with Instagram URLs removed
+ */
+export function removeInstagramUrls(text: string): string {
+  return (
+    text
+      // Remove Instagram post/reel/tv URLs
+      .replace(
+        /(?:https?:\/\/)?(?:www\.)?instagram\.com\/(p|reel|tv)\/[A-Za-z0-9_-]+\/?(\S*)?/gi,
+        ''
+      )
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+  );
+}
+
+/**
  * Remove Hive post URLs from text content when they're rendered as previews
  * @param text - The text to clean
  * @returns Cleaned text with Hive post URLs removed
@@ -200,6 +236,7 @@ export function removeHivePostUrls(text: string): string {
 export function removeEmbedUrls(text: string): string {
   let cleanText = removeVideoUrls(text);
   cleanText = removeTwitterUrls(cleanText);
+  cleanText = removeInstagramUrls(cleanText);
   cleanText = removeHivePostUrls(cleanText);
   return cleanText;
 }
