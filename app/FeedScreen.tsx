@@ -727,10 +727,16 @@ const FeedScreenRefactored = () => {
         />
 
         {/* Slogan row */}
-        <View style={styles.sloganRow}>
-          <Text style={[styles.slogan, { color: colors.text }]}>
-            What's snappening today?
-          </Text>
+          <View style={styles.sloganRow}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => router.push('/ComposeScreen' as any)}
+              accessibilityLabel='Create new snap (slogan)'
+            >
+              <Text style={[styles.slogan, { color: colors.text }]}> 
+                What's snappening today?
+              </Text>
+            </TouchableOpacity>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity
               style={[styles.searchBtn, { marginRight: 12 }]}
