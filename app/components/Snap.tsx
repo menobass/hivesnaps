@@ -43,6 +43,7 @@ import { ICON_SIZE, HEADER_SPACING, BUTTON_TAP_PADDING, TIMESTAMP_MAX_WIDTH, USE
 import { useAppColors } from '../styles/colors';
 import { submitReport, mapUiReasonToApi } from '../services/reportService';
 import { SnapData } from '../../hooks/useConversationData';
+import { wasPostedViaHiveSnaps } from '../../utils/appDetection';
 
 interface SnapProps {
   snap: SnapData;
@@ -197,6 +198,15 @@ const Snap: React.FC<SnapProps> = ({
     hasUpvoted = false,
     community,
   } = snap;
+
+  // Detect if this content was posted via HiveSnaps (from metadata)
+  const viaHiveSnaps = useMemo(
+    () => wasPostedViaHiveSnaps({
+      json_metadata: (snap as any).json_metadata,
+      posting_json_metadata: (snap as any).posting_json_metadata,
+    }),
+    [(snap as any).json_metadata, (snap as any).posting_json_metadata]
+  );
   // Log avatarUrl changes for debugging
   const prevAvatarRef = useRef<string | undefined>(undefined);
   useEffect(() => {
@@ -619,6 +629,13 @@ const Snap: React.FC<SnapProps> = ({
             </Text>
           </Pressable>
           <View style={styles.topRightCluster}>
+            {viaHiveSnaps && (
+              <Image
+                source={require('../../assets/images/hivesnaps-badge.png')}
+                style={styles.avatar}
+                accessibilityLabel='Posted with HiveSnaps'
+              />
+            )}
             <Text
               style={[styles.timestamp, { color: colors.text }]}
               numberOfLines={1}
