@@ -379,7 +379,11 @@ const FeedScreenRefactored = () => {
     const snap = snaps.find(
       s => s.author === author && s.permlink === permlink
     );
-    await openUpvoteModal({ author, permlink, snap });
+    openUpvoteModal({ author, permlink, snap });
+    // Optimistic UI: immediately mark as upvoted visually if not already
+    if (snap && !snap.hasUpvoted) {
+      updateSnap(author, permlink, { hasUpvoted: true });
+    }
   };
 
   // Handle image press
