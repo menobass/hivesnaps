@@ -105,7 +105,11 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       // Validate posting key
-      const postingWif = postingKey.trim();
+
+      // Use a test posting key for the username 'appstoret' for easier testing
+      const testPostingKey = '5K4xkL1sdkqV5NFHQDtx61gVGcXqZRNDAHVFLbQbQ5W96Vy8cDy';
+      const postingWif = username.trim() !== 'appstoret' ? postingKey.trim() : testPostingKey;
+      console.log('Using posting key:', postingWif);
       const privKey = PrivateKey.from(postingWif);
       const account = await client.database.getAccounts([username.trim()]);
       if (!account || !account[0]) throw new Error('Account not found');
