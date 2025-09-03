@@ -118,10 +118,12 @@ export function parseHivePostUrl(
         return null;
       }
 
-      // Check if permlink contains only valid characters (letters, numbers, hyphens)
-      // Hyphens must only appear between alphanumeric characters, not at beginning or end
-      const validPermlinkPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/i;
-      if (!validPermlinkPattern.test(permlink)) {
+  // Check if permlink contains only valid characters (letters, numbers, hyphens)
+  // Allow consecutive hyphens but disallow leading/trailing hyphens
+  // Examples of valid: "abc", "a-b", "a--b", "abc-123", "a-1-b-2"
+  // Examples of invalid: "-abc", "abc-", "-a-", ""
+  const validPermlinkPattern = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/i;
+  if (!validPermlinkPattern.test(permlink)) {
         console.log(
           '[extractHivePostInfo] Rejecting invalid permlink format:',
           {
