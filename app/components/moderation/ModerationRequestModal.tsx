@@ -114,7 +114,7 @@ const ModerationRequestModal: React.FC<ModerationRequestModalProps> = ({
             <TouchableOpacity
               onPress={handleSubmit}
               disabled={!canSubmit || submitting}
-              style={[styles.submitBtn, { backgroundColor: (!canSubmit || submitting) ? '#94a3b8' : palette.icon }]}
+              style={[styles.submitBtn, { backgroundColor: (!canSubmit || submitting) ? palette.placeholderText : palette.icon }]}
               accessibilityRole="button"
               accessibilityLabel="Submit moderation request"
             >
