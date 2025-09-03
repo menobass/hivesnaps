@@ -31,12 +31,22 @@ const InstagramEmbed: React.FC<Props> = ({ embedUrl, isDark }) => {
         startInLoadingState
         allowsFullscreenVideo
         onShouldStartLoadWithRequest={request => {
-          // Allow Instagram URLs, block others for security
-          return (
-            request.url.includes('instagram.com') ||
-            request.url.includes('cdninstagram.com') ||
-            request.url.includes('fbcdn.net')
-          );
+          // Allow only legitimate Instagram and related CDN URLs, block others for security
+          try {
+            const allowedHostnames = [
+              'www.instagram.com',
+              'instagram.com',
+              'cdninstagram.com',
+              'scontent.cdninstagram.com',
+              'fbcdn.net',
+              'www.fbcdn.net',
+            ];
+            const urlObj = new URL(request.url);
+            return allowedHostnames.some(host => urlObj.hostname === host);
+          } catch (e) {
+            // If URL parsing fails, block the request
+            return false;
+          }
         }}
       />
       {/* Instagram type indicator */}
