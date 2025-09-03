@@ -39,6 +39,7 @@ const ModerationRequestModal: React.FC<ModerationRequestModalProps> = ({
   const palette = colors || appColors;
   const [selectedReason, setSelectedReason] = useState<ModerationReason | null>(null);
   const [otherDetails, setOtherDetails] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -54,12 +55,19 @@ const ModerationRequestModal: React.FC<ModerationRequestModalProps> = ({
     return true;
   }, [selectedReason, otherDetails]);
 
-  const handleSubmit = () => {
-    if (!selectedReason) return;
-    onSubmit({
-      reason: selectedReason,
-      details: selectedReason === 'other' ? otherDetails.trim() : undefined,
-    });
+  const handleSubmit = async () => {
+    if (!selectedReason || submitting) return;
+    setSubmitting(true);
+    try {
+      await onSubmit({
+        reason: selectedReason,
+        details: selectedReason === 'other' ? otherDetails.trim() : undefined,
+      });
+      // Optionally close the modal here if you want
+      // onClose();
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const { width } = Dimensions.get('window');
@@ -103,8 +111,14 @@ const ModerationRequestModal: React.FC<ModerationRequestModalProps> = ({
             <TouchableOpacity onPress={onClose} style={[styles.cancelBtn, { borderColor: palette.border }]} accessibilityRole="button" accessibilityLabel="Cancel moderation request">
               <Text style={[styles.cancelText, { color: palette.text }]}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleSubmit} disabled={!canSubmit} style={[styles.submitBtn, { backgroundColor: canSubmit ? palette.icon : '#94a3b8' }]} accessibilityRole="button" accessibilityLabel="Submit moderation request">
-              <Text style={styles.submitText}>Submit</Text>
+            <TouchableOpacity
+              onPress={handleSubmit}
+              disabled={!canSubmit || submitting}
+              style={[styles.submitBtn, { backgroundColor: (!canSubmit || submitting) ? palette.placeholderText : palette.icon }]}
+              accessibilityRole="button"
+              accessibilityLabel="Submit moderation request"
+            >
+              <Text style={styles.submitText}>{submitting ? 'Submitting...' : 'Submit'}</Text>
             </TouchableOpacity>
           </View>
         </View>
