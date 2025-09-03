@@ -802,7 +802,10 @@ const ProfileScreen = () => {
               <View style={styles.logoutSection}>
                 <TouchableOpacity
                   style={[styles.logoutButton, { backgroundColor: '#E74C3C' }]}
-                  onPress={handleLogout}
+                  onPress={async () => {
+                    await handleLogout();
+                    router.push('/(tabs)');
+                  }}
                 >
                   <FontAwesome name='sign-out' size={18} color='#fff' />
                   <Text style={styles.logoutButtonText}>Log Out</Text>
