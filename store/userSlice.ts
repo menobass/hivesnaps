@@ -26,6 +26,7 @@ export const initialUserState: UserState = {
   profiles: {},
   followingLists: {},
   followerLists: {},
+  mutedSets: {},
   loading: {
     profile: {},
     following: {},
@@ -103,6 +104,48 @@ export function userReducer(state: UserState, action: UserAction): UserState {
           },
         },
       };
+
+    case 'USER_MUTE_ADD': {
+      const { owner, target } = action.payload;
+      if (owner === target) return state; // no self-mute
+      const existing = state.mutedSets[owner] || new Set<string>();
+      if (existing.has(target)) return state; // idempotent
+      const next = new Set(existing);
+      next.add(target);
+      return {
+        ...state,
+        mutedSets: {
+          ...state.mutedSets,
+          [owner]: next,
+        },
+      };
+    }
+
+    case 'USER_MUTE_REMOVE': {
+      const { owner, target } = action.payload;
+      const existing = state.mutedSets[owner];
+      if (!existing || !existing.has(target)) return state;
+      const next = new Set(existing);
+      next.delete(target);
+      return {
+        ...state,
+        mutedSets: {
+          ...state.mutedSets,
+          [owner]: next,
+        },
+      };
+    }
+
+    case 'USER_MUTE_SET': {
+      const { owner, muted } = action.payload;
+      return {
+        ...state,
+        mutedSets: {
+          ...state.mutedSets,
+          [owner]: new Set(muted.filter(u => u && u !== owner)),
+        },
+      };
+    }
 
     case 'USER_SET_LOADING':
       return {
@@ -199,6 +242,17 @@ export const userSelectors = {
     const followingList = userSelectors.getFollowingList(state, follower);
     if (!followingList) return null;
     return followingList.includes(following);
+  },
+
+  // Get muted set for a user (returns empty set if none)
+  getMutedSet: (state: UserState, owner: string): Set<string> => {
+    return state.mutedSets[owner] || new Set<string>();
+  },
+
+  // Check if owner has muted target
+  isMuted: (state: UserState, owner: string, target: string): boolean => {
+    const set = state.mutedSets[owner];
+    return !!set && set.has(target);
   },
 
   // Get loading state

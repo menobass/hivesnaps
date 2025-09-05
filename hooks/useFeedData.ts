@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Client } from '@hiveio/dhive';
 import { useFollowingList, useCurrentUser } from '../store/context';
+import { useMutedUsers, filterMuted } from './useMutedUsers';
 import { avatarService } from '../services/AvatarService';
 import { ModerationService } from '../services/ModerationService';
 import type { ActiveVote } from '../services/ModerationService';
@@ -270,6 +271,7 @@ interface UseFeedDataReturn extends FeedState {
 export function useFeedData(): UseFeedDataReturn {
   // Always use the context username
   const username = useCurrentUser();
+  const { mutedSet } = useMutedUsers(username);
   const [state, setState] = useState<FeedState>({
     snaps: [],
     loading: false,
@@ -313,7 +315,7 @@ export function useFeedData(): UseFeedDataReturn {
   // Utility function to apply filtering to snaps
   const applyFilter = useCallback(
     (
-      snaps: Snap[],
+  snaps: Snap[],
       filter: FeedFilter,
       followingList: string[],
       currentUsername: string | null
@@ -392,9 +394,11 @@ export function useFeedData(): UseFeedDataReturn {
         return true;
       });
 
-      return afterModeration;
+      // Apply mute filtering last (ensures moderation logic can still see original set)
+      const afterMute = filterMuted(afterModeration, mutedSet);
+      return afterMute;
     },
-    []
+    [mutedSet]
   ); // Remove dependencies for stability
 
   // Helper: identifies snaps without loaded active_votes and with negative net_votes
