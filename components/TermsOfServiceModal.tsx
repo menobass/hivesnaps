@@ -10,6 +10,8 @@ import {
   useColorScheme,
   StatusBar,
   Platform,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { TERMS_OF_SERVICE_CONTENT } from '../constants/TermsOfService';
@@ -85,7 +87,7 @@ const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({
     );
   };
 
-  const handleScroll = (event: any) => {
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
     const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 50;
     if (isCloseToBottom && !hasScrolledToBottom) {
