@@ -17,6 +17,8 @@ export interface UserSnap {
   total_payout_value?: string;
   active_votes?: any[];
   avatarUrl?: string; // Add avatar URL to the interface
+  json_metadata?: string;
+  posting_json_metadata?: string;
   [key: string]: any;
 }
 
@@ -242,6 +244,9 @@ export const useUserSnaps = (username: string | undefined) => {
           typeof (userSnap as any).category === 'string' && /^hive-\d+$/i.test((userSnap as any).category)
             ? (userSnap as any).category
             : undefined,
+        // Include metadata fields needed for HiveSnaps badge detection
+        json_metadata: userSnap.json_metadata,
+        posting_json_metadata: userSnap.posting_json_metadata,
       };
     },
     [hasUserUpvoted]
