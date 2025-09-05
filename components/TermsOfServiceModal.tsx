@@ -224,7 +224,7 @@ const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({
           borderTopWidth: 1,
           borderTopColor: colors.border,
         }}>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flexDirection: 'row' }}>
             {/* Decline Button */}
             <TouchableOpacity
               style={{
@@ -233,6 +233,7 @@ const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({
                 paddingVertical: 14,
                 borderRadius: 8,
                 alignItems: 'center',
+                marginRight: 12,
               }}
               onPress={handleDecline}
               disabled={accepting}
