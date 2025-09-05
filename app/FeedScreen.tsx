@@ -870,6 +870,9 @@ const FeedScreenRefactored = () => {
                     (v: any) => v.voter === username && v.percent > 0
                   ),
                 community: typeof (item as any).category === 'string' && /^hive-\d+$/i.test((item as any).category) ? (item as any).category : undefined,
+                // Include metadata fields needed for HiveSnaps badge detection
+                json_metadata: item.json_metadata,
+                posting_json_metadata: item.posting_json_metadata,
               };
 
               return (
