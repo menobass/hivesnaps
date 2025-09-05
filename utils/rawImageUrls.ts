@@ -43,10 +43,15 @@ export function extractRawImageUrls(text: string): string[] {
   );
 
   return Array.from(found).filter(u => {
-    // Escape the URL safely for use inside a regex
-    const escaped = u.replace(/[][*+?^${}()|[\]\\]/g, m => `\\${m}`);
-    const markdownImagePattern = new RegExp(`!\\[[^\\]]*\\]\\(${escaped}\\)`);
-    return !markdownImagePattern.test(text);
+    try {
+      // Escape the URL safely for use inside a regex
+      const escaped = u.replace(/[.*+?^${}()|[\]\\]/g, m => `\\${m}`);
+      const markdownImagePattern = new RegExp(`!\\[[^\\]]*\\]\\(${escaped}\\)`);
+      return !markdownImagePattern.test(text);
+    } catch (e) {
+      console.warn('[extractRawImageUrls] RegExp error for URL:', u, e);
+      return false;
+    }
   });
 }
 
