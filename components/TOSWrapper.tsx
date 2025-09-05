@@ -3,6 +3,9 @@ import { View, ActivityIndicator, useColorScheme, BackHandler, Platform, Alert }
 import TermsOfServiceModal from '../components/TermsOfServiceModal';
 import { tosStorage } from '../utils/tosStorage';
 
+// Animation timing constants
+const MODAL_ANIMATION_DELAY = 100; // ms - Delay to ensure smooth modal entrance animation
+
 interface TOSWrapperProps {
   children: React.ReactNode;
 }
@@ -32,7 +35,7 @@ const TOSWrapper: React.FC<TOSWrapperProps> = ({ children }) => {
         // Small delay to ensure smooth animation
         setTimeout(() => {
           setShowTOSModal(true);
-        }, 100);
+        }, MODAL_ANIMATION_DELAY);
       }
     } catch (error) {
       console.error('Error checking TOS acceptance:', error);
