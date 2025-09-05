@@ -25,6 +25,8 @@ import Snap from './components/Snap';
 import { Client } from '@hiveio/dhive';
 import UpvoteModal from '../components/UpvoteModal';
 import { useEdit } from '../hooks/useEdit';
+import { useMutedUsers } from '../hooks/useMutedUsers';
+import { filterMutedContent } from '../utils/mutedContentUtils';
 
 // Use local twitterColors definition (copied from FeedScreen)
 const twitterColors = {
@@ -85,6 +87,9 @@ const DiscoveryScreen = () => {
 
   // Get current username
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
+
+  // Initialize muted users management
+  const { mutedUsersSet } = useMutedUsers(currentUsername);
 
   const [snaps, setSnaps] = useState<Snap[]>([]);
   const [loading, setLoading] = useState(true);
@@ -205,7 +210,14 @@ const DiscoveryScreen = () => {
           hasUpvoted: !!hasUpvoted,
         };
       });
-      setSnaps(snapsWithAvatars);
+
+      // Filter out muted users before setting snaps
+      const filteredSnaps = snapsWithAvatars.filter((snap: any) => !mutedUsersSet.has(snap.author));
+      console.log(
+        `[DiscoveryScreen] Muted user filter: ${snapsWithAvatars.length} → ${filteredSnaps.length} snaps (removed ${snapsWithAvatars.length - filteredSnaps.length} from muted users)`
+      );
+      
+      setSnaps(filteredSnaps);
     } catch (err) {
       setSnaps([]);
     }

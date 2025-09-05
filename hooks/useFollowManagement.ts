@@ -11,7 +11,10 @@ const client = new Client(HIVE_NODES);
 
 export const useFollowManagement = (
   currentUsername: string | null,
-  targetUsername: string | undefined
+  targetUsername: string | undefined,
+  // Optional callbacks for real-time mute list updates
+  onMuteUser?: (username: string) => void,
+  onUnmuteUser?: (username: string) => void
 ) => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -228,6 +231,11 @@ export const useFollowManagement = (
 
       setIsMuted(true);
       console.log('Successfully muted:', targetUsername);
+      
+      // Update global muted users list in real-time
+      if (onMuteUser && targetUsername) {
+        onMuteUser(targetUsername);
+      }
     } catch (error) {
       console.log('Error muting user:', error);
       throw error;
@@ -271,6 +279,11 @@ export const useFollowManagement = (
 
       setIsMuted(false);
       console.log('Successfully unmuted:', targetUsername);
+      
+      // Update global muted users list in real-time
+      if (onUnmuteUser && targetUsername) {
+        onUnmuteUser(targetUsername);
+      }
     } catch (error) {
       console.log('Error unmuting user:', error);
       throw error;

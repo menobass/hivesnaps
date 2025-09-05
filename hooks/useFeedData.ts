@@ -4,6 +4,8 @@ import { useFollowingList, useCurrentUser } from '../store/context';
 import { avatarService } from '../services/AvatarService';
 import { ModerationService } from '../services/ModerationService';
 import type { ActiveVote } from '../services/ModerationService';
+import { useMutedUsers } from './useMutedUsers';
+import { filterMutedContent } from '../utils/mutedContentUtils';
 
 /**
  * Refactored Feed Data Hook with Ordered Container Map and Shared State Integration
@@ -270,6 +272,10 @@ interface UseFeedDataReturn extends FeedState {
 export function useFeedData(): UseFeedDataReturn {
   // Always use the context username
   const username = useCurrentUser();
+  
+  // Initialize muted users management
+  const { mutedUsersSet, isLoading: mutedUsersLoading } = useMutedUsers(username);
+  
   const [state, setState] = useState<FeedState>({
     snaps: [],
     loading: false,
@@ -316,13 +322,18 @@ export function useFeedData(): UseFeedDataReturn {
       snaps: Snap[],
       filter: FeedFilter,
       followingList: string[],
-      currentUsername: string | null
+      currentUsername: string | null,
+      mutedUsers: Set<string>
     ): Snap[] => {
       console.log(
         `🔍 [applyFilter] Applying filter "${filter}" to ${snaps.length} snaps`
       );
 
-  let filteredSnaps = snaps;
+      // First, filter out muted users completely (applies to ALL filters)
+      let filteredSnaps = filterMutedContent(snaps, mutedUsers);
+      console.log(
+        `🔇 [applyFilter] Muted user filter: ${snaps.length} → ${filteredSnaps.length} snaps (removed ${snaps.length - filteredSnaps.length} from muted users)`
+      );
 
       switch (filter) {
         case 'following':
@@ -394,8 +405,8 @@ export function useFeedData(): UseFeedDataReturn {
 
       return afterModeration;
     },
-    []
-  ); // Remove dependencies for stability
+    [mutedUsersSet]
+  ); // Add mutedUsersSet as dependency for muted user filtering
 
   // Helper: identifies snaps without loaded active_votes and with negative net_votes
   const isNegativeUnvotedSnap = useCallback((s: Snap): boolean => {
@@ -566,7 +577,8 @@ export function useFeedData(): UseFeedDataReturn {
             allSnaps,
             prev.currentFilter,
             followingListRef.current || [],
-            username
+            username,
+            mutedUsersSet
           );
           // Immediate enrichment for first paint
           const authors = Array.from(new Set(filteredSnaps.map(s => s.author)));
@@ -674,7 +686,8 @@ export function useFeedData(): UseFeedDataReturn {
           allSnaps,
           prev.currentFilter,
           followingListRef.current || [],
-          username
+          username,
+          mutedUsersSet
         );
         // Immediate enrichment on refresh
         const authors = Array.from(new Set(filteredSnaps.map(s => s.author)));
@@ -890,7 +903,8 @@ export function useFeedData(): UseFeedDataReturn {
           allSnaps,
           filter,
           followingListRef.current || [],
-          username
+          username,
+          mutedUsersSet
         );
         console.log(
           `🎯 [setFilter] Filter "${filter}": ${allSnaps.length} → ${filteredSnaps.length} snaps`
