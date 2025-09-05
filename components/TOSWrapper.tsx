@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, ActivityIndicator, useColorScheme, BackHandler, Platform, Alert } from 'react-native';
 import TermsOfServiceModal from '../components/TermsOfServiceModal';
 import { tosStorage } from '../utils/tosStorage';
+import Colors from '../constants/Colors';
 
 // Animation timing constants
 const MODAL_ANIMATION_DELAY = 100; // ms - Delay to ensure smooth modal entrance animation
@@ -14,13 +15,7 @@ const TOSWrapper: React.FC<TOSWrapperProps> = ({ children }) => {
   const [tosAccepted, setTosAccepted] = useState<boolean | null>(null);
   const [showTOSModal, setShowTOSModal] = useState(false);
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-
-  const colors = {
-    background: isDark ? '#15202B' : '#FFFFFF',
-    text: isDark ? '#D7DBDC' : '#0F1419',
-    primary: '#1DA1F2',
-  };
+  const colors = Colors[colorScheme ?? 'light'];
 
   useEffect(() => {
     checkTOSAcceptance();
@@ -91,7 +86,7 @@ const TOSWrapper: React.FC<TOSWrapperProps> = ({ children }) => {
           backgroundColor: 'rgba(0, 0, 0, 0.8)',
           zIndex: 9999,
         }}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.primaryButton} />
         </View>
       </>
     );

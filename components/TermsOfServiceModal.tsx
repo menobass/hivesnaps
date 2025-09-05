@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { TERMS_OF_SERVICE_CONTENT } from '../constants/TermsOfService';
+import Colors from '../constants/Colors';
 
 interface TermsOfServiceModalProps {
   visible: boolean;
@@ -30,19 +31,7 @@ const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({
   const [accepting, setAccepting] = useState(false);
   const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-
-  const colors = {
-    background: isDark ? '#15202B' : '#FFFFFF',
-    text: isDark ? '#D7DBDC' : '#0F1419',
-    primaryButton: '#1DA1F2',
-    primaryButtonText: '#FFFFFF',
-    secondaryButton: isDark ? '#22303C' : '#E1E8ED',
-    secondaryButtonText: isDark ? '#D7DBDC' : '#0F1419',
-    border: isDark ? '#38444D' : '#E1E8ED',
-    warning: '#FF6B6B',
-    success: '#51CF66',
-  };
+  const colors = Colors[colorScheme ?? 'light'];
 
   const handleAccept = async () => {
     if (!hasScrolledToBottom) {
@@ -103,12 +92,12 @@ const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({
       statusBarTranslucent={true}
     >
       <StatusBar
-        backgroundColor={colors.background}
-        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={colors.tosBackground}
+        barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'}
       />
       <View style={{
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: colors.tosBackground,
         paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight || 0,
       }}>
         {/* Header */}
@@ -131,7 +120,7 @@ const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({
           <Text style={{
             fontSize: 20,
             fontWeight: '600',
-            color: colors.text,
+            color: colors.tosText,
             textAlign: 'center',
           }}>
             Terms of Service
@@ -140,7 +129,7 @@ const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({
 
         {/* Important Notice */}
         <View style={{
-          backgroundColor: isDark ? '#1A2A3A' : '#F0F8FF',
+          backgroundColor: colorScheme === 'dark' ? '#1A2A3A' : '#F0F8FF',
           margin: 16,
           padding: 16,
           borderRadius: 12,
@@ -152,7 +141,7 @@ const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({
             <Text style={{
               fontSize: 16,
               fontWeight: '600',
-              color: colors.text,
+              color: colors.tosText,
               marginLeft: 8,
             }}>
               Required for App Store Compliance
@@ -160,7 +149,7 @@ const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({
           </View>
           <Text style={{
             fontSize: 14,
-            color: colors.text,
+            color: colors.tosText,
             opacity: 0.8,
             lineHeight: 20,
           }}>
@@ -184,7 +173,7 @@ const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({
           <Text style={{
             fontSize: 14,
             lineHeight: 22,
-            color: colors.text,
+            color: colors.tosText,
             fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
           }}>
             {TERMS_OF_SERVICE_CONTENT}
@@ -220,7 +209,7 @@ const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({
         <View style={{
           paddingHorizontal: 20,
           paddingVertical: 16,
-          backgroundColor: colors.background,
+          backgroundColor: colors.tosBackground,
           borderTopWidth: 1,
           borderTopColor: colors.border,
         }}>
@@ -286,7 +275,7 @@ const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({
           {/* Helper Text */}
           <Text style={{
             fontSize: 12,
-            color: colors.text,
+            color: colors.tosText,
             opacity: 0.6,
             textAlign: 'center',
             marginTop: 12,
