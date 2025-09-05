@@ -1,0 +1,303 @@
+import React, { useState } from 'react';
+import {
+  Modal,
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  useColorScheme,
+  StatusBar,
+  Platform,
+} from 'react-native';
+import { FontAwesome } from '@expo/vector-icons';
+import { TERMS_OF_SERVICE_CONTENT } from '../constants/TermsOfService';
+
+interface TermsOfServiceModalProps {
+  visible: boolean;
+  onAccept: () => Promise<void>;
+  onDecline?: () => void;
+}
+
+const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({
+  visible,
+  onAccept,
+  onDecline,
+}) => {
+  const [accepting, setAccepting] = useState(false);
+  const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+
+  const colors = {
+    background: isDark ? '#15202B' : '#FFFFFF',
+    text: isDark ? '#D7DBDC' : '#0F1419',
+    primaryButton: '#1DA1F2',
+    primaryButtonText: '#FFFFFF',
+    secondaryButton: isDark ? '#22303C' : '#E1E8ED',
+    secondaryButtonText: isDark ? '#D7DBDC' : '#0F1419',
+    border: isDark ? '#38444D' : '#E1E8ED',
+    warning: '#FF6B6B',
+    success: '#51CF66',
+  };
+
+  const handleAccept = async () => {
+    if (!hasScrolledToBottom) {
+      Alert.alert(
+        'Please Read Terms',
+        'Please scroll to the bottom and read the complete Terms of Service before accepting.',
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+
+    setAccepting(true);
+    try {
+      await onAccept();
+    } catch (error) {
+      console.error('Error accepting TOS:', error);
+      Alert.alert(
+        'Error',
+        'There was an error saving your acceptance. Please try again.',
+        [{ text: 'OK', style: 'default' }]
+      );
+    } finally {
+      setAccepting(false);
+    }
+  };
+
+  const handleDecline = () => {
+    Alert.alert(
+      'Terms Required',
+      'You must accept the Terms of Service to use HiveSnaps. The app will close if you decline.',
+      [
+        {
+          text: 'Review Terms',
+          style: 'cancel',
+        },
+        {
+          text: 'Close App',
+          style: 'destructive',
+          onPress: onDecline,
+        },
+      ]
+    );
+  };
+
+  const handleScroll = (event: any) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 50;
+    if (isCloseToBottom && !hasScrolledToBottom) {
+      setHasScrolledToBottom(true);
+    }
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="fade"
+      transparent={false}
+      statusBarTranslucent={true}
+    >
+      <StatusBar
+        backgroundColor={colors.background}
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+      />
+      <View style={{
+        flex: 1,
+        backgroundColor: colors.background,
+        paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight || 0,
+      }}>
+        {/* Header */}
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingHorizontal: 20,
+          paddingVertical: 16,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+          position: 'relative',
+        }}>
+          <FontAwesome 
+            name="shield" 
+            size={24} 
+            color={colors.primaryButton} 
+            style={{ position: 'absolute', left: 20 }}
+          />
+          <Text style={{
+            fontSize: 20,
+            fontWeight: '600',
+            color: colors.text,
+            textAlign: 'center',
+          }}>
+            Terms of Service
+          </Text>
+        </View>
+
+        {/* Important Notice */}
+        <View style={{
+          backgroundColor: isDark ? '#1A2A3A' : '#F0F8FF',
+          margin: 16,
+          padding: 16,
+          borderRadius: 12,
+          borderLeftWidth: 4,
+          borderLeftColor: colors.primaryButton,
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+            <FontAwesome name="info-circle" size={18} color={colors.primaryButton} />
+            <Text style={{
+              fontSize: 16,
+              fontWeight: '600',
+              color: colors.text,
+              marginLeft: 8,
+            }}>
+              Required for App Store Compliance
+            </Text>
+          </View>
+          <Text style={{
+            fontSize: 14,
+            color: colors.text,
+            opacity: 0.8,
+            lineHeight: 20,
+          }}>
+            You must read and accept these terms before using HiveSnaps. These terms include our zero-tolerance policy for abusive content and community guidelines.
+          </Text>
+        </View>
+
+        {/* Terms Content */}
+        <ScrollView
+          style={{
+            flex: 1,
+            paddingHorizontal: 20,
+          }}
+          contentContainerStyle={{
+            paddingBottom: 100,
+          }}
+          showsVerticalScrollIndicator={true}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+        >
+          <Text style={{
+            fontSize: 14,
+            lineHeight: 22,
+            color: colors.text,
+            fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+          }}>
+            {TERMS_OF_SERVICE_CONTENT}
+          </Text>
+        </ScrollView>
+
+        {/* Scroll Progress Indicator */}
+        {!hasScrolledToBottom && (
+          <View style={{
+            position: 'absolute',
+            bottom: 120,
+            right: 20,
+            backgroundColor: colors.warning,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 20,
+            flexDirection: 'row',
+            alignItems: 'center',
+          }}>
+            <FontAwesome name="arrow-down" size={12} color="white" />
+            <Text style={{
+              color: 'white',
+              fontSize: 12,
+              fontWeight: '600',
+              marginLeft: 6,
+            }}>
+              Scroll to continue
+            </Text>
+          </View>
+        )}
+
+        {/* Action Buttons */}
+        <View style={{
+          paddingHorizontal: 20,
+          paddingVertical: 16,
+          backgroundColor: colors.background,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+        }}>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            {/* Decline Button */}
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                backgroundColor: colors.secondaryButton,
+                paddingVertical: 14,
+                borderRadius: 8,
+                alignItems: 'center',
+              }}
+              onPress={handleDecline}
+              disabled={accepting}
+            >
+              <Text style={{
+                color: colors.secondaryButtonText,
+                fontSize: 16,
+                fontWeight: '600',
+              }}>
+                Decline
+              </Text>
+            </TouchableOpacity>
+
+            {/* Accept Button */}
+            <TouchableOpacity
+              style={{
+                flex: 2,
+                backgroundColor: hasScrolledToBottom ? colors.primaryButton : colors.border,
+                paddingVertical: 14,
+                borderRadius: 8,
+                alignItems: 'center',
+                flexDirection: 'row',
+                justifyContent: 'center',
+              }}
+              onPress={handleAccept}
+              disabled={!hasScrolledToBottom || accepting}
+            >
+              {accepting ? (
+                <ActivityIndicator size="small" color={colors.primaryButtonText} />
+              ) : (
+                <>
+                  <FontAwesome 
+                    name="check-circle" 
+                    size={18} 
+                    color={hasScrolledToBottom ? colors.primaryButtonText : colors.secondaryButtonText}
+                    style={{ marginRight: 8 }}
+                  />
+                  <Text style={{
+                    color: hasScrolledToBottom ? colors.primaryButtonText : colors.secondaryButtonText,
+                    fontSize: 16,
+                    fontWeight: '600',
+                  }}>
+                    I Accept Terms
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Helper Text */}
+          <Text style={{
+            fontSize: 12,
+            color: colors.text,
+            opacity: 0.6,
+            textAlign: 'center',
+            marginTop: 12,
+            lineHeight: 16,
+          }}>
+            {hasScrolledToBottom 
+              ? "By accepting, you agree to follow our community guidelines and content policies."
+              : "Please scroll through the complete terms before accepting."
+            }
+          </Text>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+export default TermsOfServiceModal;
