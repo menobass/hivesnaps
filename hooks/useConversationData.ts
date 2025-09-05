@@ -27,6 +27,7 @@ export interface SnapData {
   hasUpvoted?: boolean;
   active_votes?: any[];
   json_metadata?: string;
+  posting_json_metadata?: string;
   parent_author?: string;
   parent_permlink?: string;
   // When a post belongs to a Hive community, this will be like 'hive-124838'
@@ -153,6 +154,7 @@ export const useConversationData = (
               hasUpvoted: checkHasUpvoted(fullReply.active_votes),
               active_votes: fullReply.active_votes,
               json_metadata: fullReply.json_metadata,
+              posting_json_metadata: fullReply.posting_json_metadata,
               community: replyCommunity,
               replies: childrenReplies,
             };
@@ -221,6 +223,7 @@ export const useConversationData = (
         hasUpvoted: checkHasUpvoted(post.active_votes),
         active_votes: post.active_votes,
         json_metadata: post.json_metadata,
+        posting_json_metadata: post.posting_json_metadata,
         parent_author: post.parent_author,
         parent_permlink: post.parent_permlink,
         // Populate community only when category is in the 'hive-XXXXX' format
@@ -346,6 +349,7 @@ export const useConversationData = (
             hasUpvoted: checkHasUpvoted(post.active_votes),
             active_votes: post.active_votes,
             json_metadata: post.json_metadata,
+            posting_json_metadata: post.posting_json_metadata,
             parent_author: post.parent_author,
             parent_permlink: post.parent_permlink,
             community:
