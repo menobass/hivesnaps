@@ -84,7 +84,7 @@ We may update these Terms periodically. Continued use after changes constitutes 
 
 11. CONTACT INFORMATION
 For questions about these Terms or to report violations:
-• Email: snapieapp@proton.me
+• Email: snapieapp@protonmail.me
 • Report content through in-app reporting features
 
 12. GOVERNING LAW
