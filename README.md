@@ -31,6 +31,7 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
 - **Image Uploads** - Camera capture or gallery selection with Cloudinary hosting
 - **GIF Integration** - Powered by Tenor API with search functionality
 - **Video Embedding** - YouTube, 3Speak, and IPFS video support
+- **Instagram Embeds** - Native Instagram post rendering in feed
 - **Twitter/X Embeds** - Native tweet rendering in posts
 - **Image Galleries** - Full-screen image viewing with zoom
 
@@ -39,12 +40,15 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
 - **Smart Composer** - Rich text editor with live previews
 - **Media Attachments** - Images, GIFs, and video embeds
 - **Edit Functionality** - Edit your posts and replies after publishing
+- **Three-Dots Menu** - Quick actions including "Go to Profile" and content reporting
 - **Optimistic Updates** - Instant UI updates for better UX
 - **Draft Support** - Auto-save functionality (coming soon)
 
 ### 🔔 User Experience
 
 - **Notifications System** - Track mentions, votes, and replies
+- **Content Moderation** - Community-driven reporting and moderation system
+- **Terms of Service** - Required acceptance for App Store compliance
 - **Dark/Light Theme** - Automatic theme switching
 - **Pull-to-Refresh** - Intuitive feed updates
 - **Infinite Scroll** - Smooth content loading
@@ -135,9 +139,17 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
 
 We standardized avatars to images.hive.blog across the app. See `docs/avatar-unification.md` for details on behavior, affected files, and testing.
 
-### Moderation (Downvote Hiding)
+### Moderation & Community Guidelines
 
-Client-side moderation hides posts/replies downvoted by an allowlisted moderator (default: `@snapie`). Minimal, on-chain, no backend. See `docs/moderation.md` for policy, config, and integration points.
+HiveSnaps implements a comprehensive content moderation system:
+
+- **Community Reporting** - Users can report inappropriate content through three-dots menu
+- **Blockchain-native Moderation** - Content moderation via @snapie account voting system  
+- **Automatic Content Filtering** - Posts with moderation downvotes are hidden from interface
+- **Zero-tolerance Policy** - Strict enforcement against harassment, abuse, and harmful content
+- **Terms of Service** - Required acceptance with App Store compliance for community standards
+
+See `docs/moderation.md` for detailed policy, configuration, and technical implementation.
 
 ### Testing
 
