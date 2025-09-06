@@ -183,6 +183,20 @@ export function userReducer(state: UserState, action: UserAction): UserState {
         };
       }
 
+    case 'USER_INVALIDATE_FOLLOWING_CACHE':
+      // Mark following list cache as expired by deleting it
+      const newState = { ...state };
+      delete newState.followingLists[action.payload];
+      console.log(`🔄 [userReducer] Invalidated following cache for: ${action.payload}`);
+      return newState;
+
+    case 'USER_INVALIDATE_MUTED_CACHE':
+      // Mark muted list cache as expired by deleting it
+      const newMutedState = { ...state };
+      delete newMutedState.mutedLists[action.payload];
+      console.log(`🔇 [userReducer] Invalidated muted cache for: ${action.payload}`);
+      return newMutedState;
+
     default:
       return state;
   }
