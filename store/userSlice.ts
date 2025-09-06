@@ -183,6 +183,13 @@ export function userReducer(state: UserState, action: UserAction): UserState {
         };
       }
 
+    case 'USER_INVALIDATE_FOLLOWING_CACHE':
+      // Mark following list cache as expired by deleting it
+      const newState = { ...state };
+      delete newState.followingLists[action.payload];
+      console.log(`🔄 [userReducer] Invalidated following cache for: ${action.payload}`);
+      return newState;
+
     default:
       return state;
   }
