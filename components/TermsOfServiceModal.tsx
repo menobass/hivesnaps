@@ -61,21 +61,7 @@ const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({
   };
 
   const handleDecline = () => {
-    Alert.alert(
-      'Terms Required',
-      'You must accept the Terms of Service to use HiveSnaps. The app will close if you decline.',
-      [
-        {
-          text: 'Review Terms',
-          style: 'cancel',
-        },
-        {
-          text: 'Close App',
-          style: 'destructive',
-          onPress: onDecline,
-        },
-      ]
-    );
+    onDecline?.();
   };
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -108,19 +94,6 @@ const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({
           />
           <Text style={styles.headerTitle}>
             Terms of Service
-          </Text>
-        </View>
-
-        {/* Important Notice */}
-        <View style={styles.noticeContainer}>
-          <View style={styles.noticeHeader}>
-            <FontAwesome name="info-circle" size={18} color={colors.primaryButton} />
-            <Text style={styles.noticeTitle}>
-              Required for App Store Compliance
-            </Text>
-          </View>
-          <Text style={styles.noticeText}>
-            You must read and accept these terms before using HiveSnaps. These terms include our zero-tolerance policy for abusive content and community guidelines.
           </Text>
         </View>
 
