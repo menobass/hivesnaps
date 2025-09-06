@@ -1098,6 +1098,16 @@ const Snap: React.FC<SnapProps> = ({
         onClose={() => setMoreMenuVisible(false)}
         items={[
           {
+            label: 'Go to Profile',
+            accessibilityLabel: 'Go to Profile',
+            onPress: () => {
+              setMoreMenuVisible(false);
+              if (onUserPress) {
+                onUserPress(snap.author);
+              }
+            },
+          },
+          {
             label: 'Report Content',
             tone: 'danger',
             accessibilityLabel: 'Report Content',

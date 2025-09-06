@@ -533,6 +533,9 @@ const HivePostScreen = () => {
                     // TODO: Implement edit functionality
                   }}
                   onImagePress={handleImagePress}
+                  onUserPress={username => {
+                    router.push(`/ProfileScreen?username=${username}` as any);
+                  }}
                   currentUsername={currentUsername}
                   // Reply-specific props
                   visualLevel={comment.visualLevel}

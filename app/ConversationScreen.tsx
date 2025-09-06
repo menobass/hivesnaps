@@ -1393,6 +1393,9 @@ const ConversationScreenRefactored = () => {
                     onEditPress={(snapData: { author: string; permlink: string; body: string }) =>
                       handleOpenEditModal(snapData, 'reply')
                     }
+                    onUserPress={username => {
+                      router.push(`/ProfileScreen?username=${username}` as any);
+                    }}
                     onImagePress={handleImagePress}
                     currentUsername={currentUsername}
                     posting={posting}
