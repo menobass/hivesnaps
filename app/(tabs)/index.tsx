@@ -131,8 +131,8 @@ export default function LoginScreen() {
     }
   };
 
-  const handleSignUpPress = () => {
-    Linking.openURL('https://signup.hive.io/');
+  const handleLearnMorePress = () => {
+    Linking.openURL('https://hive.io/');
   };
 
   return (
@@ -249,15 +249,15 @@ export default function LoginScreen() {
                 {/* Add space and move the phrase up here */}
                 <View style={{ height: 32 }} />
 
-                {/* Signup link */}
+                {/* Learn more link */}
                 <TouchableOpacity
-                  onPress={handleSignUpPress}
+                  onPress={handleLearnMorePress}
                   style={{ marginBottom: 16 }}
                   accessibilityRole='button'
-                  accessibilityLabel='Sign up for a Hive account'
+                  accessibilityLabel='Learn more about Hive'
                 >
                   <Text style={[styles.signupLink, { color: colors.button }]}>
-                    Don't have a Hive account?
+                    Learn more at hive.io
                   </Text>
                 </TouchableOpacity>
 
