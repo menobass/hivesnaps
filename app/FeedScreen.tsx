@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -182,6 +182,11 @@ const FeedScreenRefactored = () => {
       ensureMutedListCached_id: ensureMutedListCached && ensureMutedListCached.toString().slice(0, 60),
     });
   }
+
+  // Memoize filtered snaps to avoid re-filtering on every render
+  const filteredSnaps = useMemo(() => {
+    return snaps.filter((item) => !mutedList || !mutedList.includes(item.author));
+  }, [snaps, mutedList]);
 
   const { hivePrice, globalProps, rewardFund } = useHiveData();
 
@@ -860,9 +865,7 @@ const FeedScreenRefactored = () => {
         ) : (
           <FlatList
             ref={flatListRef}
-            data={snaps.filter(
-              (item) => !mutedList || !mutedList.includes(item.author)
-            )}
+            data={filteredSnaps}
             keyExtractor={(item, index) =>
               `${item.author}-${item.permlink}-${index}`
             }
