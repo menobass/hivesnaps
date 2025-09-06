@@ -28,7 +28,6 @@ HiveSnaps maintains a zero-tolerance policy for abusive, harmful, or objectionab
   - Content that violates our guidelines may receive moderation downvotes via @snapie
   - Posts with moderation downvotes are automatically hidden from the HiveSnaps interface
   - Repeat violations may result in automatic moderation of future posts
-  - Severe violations may result in restricted access to the HiveSnaps app
   - Our moderation system operates within Hive blockchain's voting mechanisms
 
 3. USER RESPONSIBILITIES
@@ -55,7 +54,7 @@ Our moderation approach uses blockchain-native mechanisms:
 • Content with moderation downvotes is automatically filtered from HiveSnaps
 • This system respects blockchain principles while maintaining community standards
 • Persistent violations may result in automatic moderation of future content
-• App access may also be restricted for severe or repeated violations
+
 
 Important: Moderation actions use Hive's voting system and do not delete blockchain content.
 
@@ -85,7 +84,7 @@ We may update these Terms periodically. Continued use after changes constitutes 
 
 11. CONTACT INFORMATION
 For questions about these Terms or to report violations:
-• Email: support@hivesnaps.com
+• Email: snapieapp@proton.me
 • Report content through in-app reporting features
 
 12. GOVERNING LAW
