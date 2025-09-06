@@ -14,6 +14,7 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { HivePostPreviewProvider } from '../context/HivePostPreviewContext';
 import { ShareProvider } from '../context/ShareContext';
 import { AppProvider } from '../store/context';
+import TOSWrapper from '../components/TOSWrapper';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -62,16 +63,18 @@ function RootLayoutNav() {
           <ThemeProvider
             value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
           >
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name='(tabs)' />
-              <Stack.Screen name='FeedScreen' />
-              <Stack.Screen name='NotificationsScreen' />
-              <Stack.Screen name='ConversationScreen' />
-              <Stack.Screen name='HivePostScreen' />
-              <Stack.Screen name='ProfileScreen' />
-              <Stack.Screen name='ComposeScreen' />
-              <Stack.Screen name='modal' options={{ presentation: 'modal' }} />
-            </Stack>
+            <TOSWrapper>
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name='(tabs)' />
+                <Stack.Screen name='FeedScreen' />
+                <Stack.Screen name='NotificationsScreen' />
+                <Stack.Screen name='ConversationScreen' />
+                <Stack.Screen name='HivePostScreen' />
+                <Stack.Screen name='ProfileScreen' />
+                <Stack.Screen name='ComposeScreen' />
+                <Stack.Screen name='modal' options={{ presentation: 'modal' }} />
+              </Stack>
+            </TOSWrapper>
           </ThemeProvider>
         </HivePostPreviewProvider>
       </ShareProvider>
