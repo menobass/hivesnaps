@@ -21,6 +21,7 @@ interface AppContextType {
   setUserProfile: (username: string, profile: UserProfile) => void;
   setFollowingList: (username: string, following: string[]) => void;
   setFollowerList: (username: string, followers: string[]) => void;
+  setMutedList: (username: string, muted: string[]) => void;
   setUserLoading: (type: keyof AppState['user']['loading'], username: string, loading: boolean) => void;
   setUserError: (type: keyof AppState['user']['errors'], username: string, error: string | null) => void;
   clearUserCache: (username?: string, type?: keyof AppState['user']['loading']) => void;
@@ -41,11 +42,14 @@ interface AppContextType {
     getCurrentUser: () => string | null;
     getUserProfile: (username: string) => UserProfile | null;
     getFollowingList: (username: string) => string[] | null;
+    getMutedList: (username: string) => string[] | null;
     isFollowing: (follower: string, following: string) => boolean | null;
+    isMuted: (muter: string, muted: string) => boolean | null;
     isUserLoading: (type: keyof AppState['user']['loading'], username: string) => boolean;
     needsUserRefresh: {
       profile: (username: string) => boolean;
       following: (username: string) => boolean;
+      muted: (username: string) => boolean;
     };
     
     // Hive selectors
@@ -121,6 +125,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     dispatch({ type: 'USER_SET_FOLLOWER_LIST', payload: { username, followers } });
   }, []);
 
+  const setMutedList = useCallback((username: string, muted: string[]) => {
+    dispatch({ type: 'USER_SET_MUTED_LIST', payload: { username, muted } });
+  }, []);
+
   const setUserLoading = useCallback((type: keyof AppState['user']['loading'], username: string, loading: boolean) => {
     dispatch({ type: 'USER_SET_LOADING', payload: { type, username, loading } });
   }, []);
@@ -166,12 +174,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     getCurrentUser: () => userSelectors.getCurrentUser(state.user),
     getUserProfile: (username: string) => userSelectors.getUserProfile(state.user, username),
     getFollowingList: (username: string) => userSelectors.getFollowingList(state.user, username),
+    getMutedList: (username: string) => userSelectors.getMutedList(state.user, username),
     isFollowing: (follower: string, following: string) => userSelectors.isFollowing(state.user, follower, following),
+    isMuted: (muter: string, muted: string) => userSelectors.isMuted(state.user, muter, muted),
     isUserLoading: (type: keyof AppState['user']['loading'], username: string) => 
       userSelectors.isLoading(state.user, type, username),
     needsUserRefresh: {
       profile: (username: string) => userSelectors.needsRefresh.profile(state.user, username),
       following: (username: string) => userSelectors.needsRefresh.following(state.user, username),
+      muted: (username: string) => userSelectors.needsRefresh.muted(state.user, username),
     },
 
     // Hive selectors
@@ -199,6 +210,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setUserProfile,
       setFollowingList,
       setFollowerList,
+      setMutedList,
       setUserLoading,
       setUserError,
       clearUserCache,
@@ -255,6 +267,28 @@ export function useFollowingList(username: string) {
     needsRefresh,
     isLoading,
     setFollowingList: stableSetFollowingList,
+    setLoading: stableSetLoading,
+    setError: stableSetError,
+  };
+}
+
+export function useMutedList(username: string) {
+  const { selectors, setMutedList, setUserLoading, setUserError } = useAppStore();
+
+  // Memoize the setters so their reference never changes for a given username
+  const stableSetMutedList = React.useCallback((muted: string[]) => setMutedList(username, muted), [setMutedList, username]);
+  const stableSetLoading = React.useCallback((loading: boolean) => setUserLoading('muted', username, loading), [setUserLoading, username]);
+  const stableSetError = React.useCallback((error: string | null) => setUserError('muted', username, error), [setUserError, username]);
+
+  const mutedList = selectors.getMutedList(username);
+  const needsRefresh = selectors.needsUserRefresh.muted(username);
+  const isLoading = selectors.isUserLoading('muted', username);
+
+  return {
+    mutedList,
+    needsRefresh,
+    isLoading,
+    setMutedList: stableSetMutedList,
     setLoading: stableSetLoading,
     setError: stableSetError,
   };
