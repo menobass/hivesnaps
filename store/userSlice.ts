@@ -26,15 +26,18 @@ export const initialUserState: UserState = {
   profiles: {},
   followingLists: {},
   followerLists: {},
+  mutedLists: {},
   loading: {
     profile: {},
     following: {},
     followers: {},
+    muted: {},
   },
   errors: {
     profile: {},
     following: {},
     followers: {},
+    muted: {},
   },
 };
 
@@ -104,6 +107,25 @@ export function userReducer(state: UserState, action: UserAction): UserState {
         },
       };
 
+    case 'USER_SET_MUTED_LIST':
+      return {
+        ...state,
+        mutedLists: {
+          ...state.mutedLists,
+          [action.payload.username]: createCacheItem(
+            action.payload.muted,
+            CACHE_DURATIONS.FOLLOWING_LIST
+          ),
+        },
+        errors: {
+          ...state.errors,
+          muted: {
+            ...state.errors.muted,
+            [action.payload.username]: null,
+          },
+        },
+      };
+
     case 'USER_SET_LOADING':
       return {
         ...state,
@@ -138,6 +160,8 @@ export function userReducer(state: UserState, action: UserAction): UserState {
           delete newState.followingLists[action.payload.username];
         } else if (action.payload.type === 'followers') {
           delete newState.followerLists[action.payload.username];
+        } else if (action.payload.type === 'muted') {
+          delete newState.mutedLists[action.payload.username];
         }
         return newState;
       } else if (action.payload?.username) {
@@ -146,6 +170,7 @@ export function userReducer(state: UserState, action: UserAction): UserState {
         delete newState.profiles[action.payload.username];
         delete newState.followingLists[action.payload.username];
         delete newState.followerLists[action.payload.username];
+        delete newState.mutedLists[action.payload.username];
         return newState;
       } else {
         // Clear all cache
@@ -154,6 +179,7 @@ export function userReducer(state: UserState, action: UserAction): UserState {
           profiles: {},
           followingLists: {},
           followerLists: {},
+          mutedLists: {},
         };
       }
 
@@ -194,11 +220,27 @@ export const userSelectors = {
     return cached.data;
   },
 
+  // Get muted list with cache check
+  getMutedList: (state: UserState, username: string): string[] | null => {
+    const cached = state.mutedLists[username];
+    if (!cached || isCacheExpired(cached)) {
+      return null;
+    }
+    return cached.data;
+  },
+
   // Check if user is following another user
   isFollowing: (state: UserState, follower: string, following: string): boolean | null => {
     const followingList = userSelectors.getFollowingList(state, follower);
     if (!followingList) return null;
     return followingList.includes(following);
+  },
+
+  // Check if user has muted another user
+  isMuted: (state: UserState, muter: string, muted: string): boolean | null => {
+    const mutedList = userSelectors.getMutedList(state, muter);
+    if (!mutedList) return null;
+    return mutedList.includes(muted);
   },
 
   // Get loading state
@@ -225,6 +267,10 @@ export const userSelectors = {
       const cached = state.followerLists[username];
       return !cached || isCacheExpired(cached);
     },
+    muted: (state: UserState, username: string): boolean => {
+      const cached = state.mutedLists[username];
+      return !cached || isCacheExpired(cached);
+    },
   },
 
   // Get cache info for debugging
@@ -232,8 +278,10 @@ export const userSelectors = {
     profiles: Object.keys(state.profiles).length,
     followingLists: Object.keys(state.followingLists).length,
     followerLists: Object.keys(state.followerLists).length,
+    mutedLists: Object.keys(state.mutedLists).length,
     expiredProfiles: Object.values(state.profiles).filter(isCacheExpired).length,
     expiredFollowing: Object.values(state.followingLists).filter(isCacheExpired).length,
     expiredFollowers: Object.values(state.followerLists).filter(isCacheExpired).length,
+    expiredMuted: Object.values(state.mutedLists).filter(isCacheExpired).length,
   }),
 };

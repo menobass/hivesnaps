@@ -34,15 +34,18 @@ export interface UserState {
   profiles: Record<string, CacheItem<UserProfile>>;
   followingLists: Record<string, CacheItem<string[]>>;
   followerLists: Record<string, CacheItem<string[]>>;
+  mutedLists: Record<string, CacheItem<string[]>>;
   loading: {
     profile: Record<string, boolean>;
     following: Record<string, boolean>;
     followers: Record<string, boolean>;
+    muted: Record<string, boolean>;
   };
   errors: {
     profile: Record<string, string | null>;
     following: Record<string, string | null>;
     followers: Record<string, string | null>;
+    muted: Record<string, string | null>;
   };
 }
 
@@ -149,6 +152,7 @@ export type UserAction =
   | { type: 'USER_SET_PROFILE'; payload: { username: string; profile: UserProfile } }
   | { type: 'USER_SET_FOLLOWING_LIST'; payload: { username: string; following: string[] } }
   | { type: 'USER_SET_FOLLOWER_LIST'; payload: { username: string; followers: string[] } }
+  | { type: 'USER_SET_MUTED_LIST'; payload: { username: string; muted: string[] } }
   | { type: 'USER_SET_LOADING'; payload: { type: keyof UserState['loading']; username: string; loading: boolean } }
   | { type: 'USER_SET_ERROR'; payload: { type: keyof UserState['errors']; username: string; error: string | null } }
   | { type: 'USER_CLEAR_CACHE'; payload?: { username?: string; type?: keyof UserState['loading'] } };
