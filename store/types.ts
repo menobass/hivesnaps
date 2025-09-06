@@ -155,7 +155,8 @@ export type UserAction =
   | { type: 'USER_SET_MUTED_LIST'; payload: { username: string; muted: string[] } }
   | { type: 'USER_SET_LOADING'; payload: { type: keyof UserState['loading']; username: string; loading: boolean } }
   | { type: 'USER_SET_ERROR'; payload: { type: keyof UserState['errors']; username: string; error: string | null } }
-  | { type: 'USER_CLEAR_CACHE'; payload?: { username?: string; type?: keyof UserState['loading'] } };
+  | { type: 'USER_CLEAR_CACHE'; payload?: { username?: string; type?: keyof UserState['loading'] } }
+  | { type: 'USER_INVALIDATE_FOLLOWING_CACHE'; payload: string }; // username
 
 export type HiveAction =
   | { type: 'HIVE_SET_DATA'; payload: Partial<HiveData> }
