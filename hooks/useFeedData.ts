@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Client } from '@hiveio/dhive';
 import { useFollowingList, useMutedList, useCurrentUser } from '../store/context';
 import { avatarService } from '../services/AvatarService';
@@ -8,6 +8,12 @@ import type { ActiveVote } from '../services/ModerationService';
 
 /**
  * Refactored Feed Data Hook with Ordered Container Map and Shared State Integration
+ * 
+ * Performance Optimizations:
+ * - Memoized following list filtering using Set for O(1) lookups instead of O(n) array.includes()
+ * - Memoized user posts filtering to avoid recalculation on filter changes
+ * - Memoized filtered snaps calculation to prevent expensive re-filtering on each render
+ * - Memoized avatar enrichment to avoid re-processing when filter results are unchanged
  *
  * This hook manages Hive snaps using a clean, robust ordered dictionary structure:
  * - OrderedContainerMap: Map keyed by permlink, value is container metadata with snaps
@@ -328,6 +334,21 @@ export function useFeedData(): UseFeedDataReturn {
     }
   }, [username]);
 
+  // Memoized helper for following list filtering (most expensive operation)
+  const memoizedFollowingFilter = useMemo(() => {
+    return (snaps: Snap[]) => {
+      const followingSet = new Set(followingList || []);
+      return snaps.filter(snap => followingSet.has(snap.author));
+    };
+  }, [followingList]);
+
+  // Memoized helper for user's own posts filtering
+  const memoizedMyPostsFilter = useMemo(() => {
+    return (snaps: Snap[]) => {
+      return snaps.filter(snap => snap.author === username);
+    };
+  }, [username]);
+
   // Utility function to apply filtering to snaps
   const applyFilter = useCallback(
     (
@@ -344,20 +365,18 @@ export function useFeedData(): UseFeedDataReturn {
 
       switch (filter) {
         case 'following':
-          // Filter snaps from followed users
+          // Use memoized following filter for better performance
           console.log('🔍 [applyFilter] followingList:', followingList);
-          filteredSnaps = snaps.filter(snap =>
-            followingList.includes(snap.author)
-          );
+          filteredSnaps = memoizedFollowingFilter(snaps);
           console.log(
             `🔍 [applyFilter] Following filter: ${snaps.length} → ${filteredSnaps.length} snaps`
           );
           break;
 
         case 'my':
-          // Filter snaps from current user
+          // Use memoized user posts filter for better performance
           console.log('🔍 [applyFilter] Current user:', currentUsername);
-          filteredSnaps = snaps.filter(snap => snap.author === currentUsername);
+          filteredSnaps = memoizedMyPostsFilter(snaps);
           console.log(
             `🔍 [applyFilter] My snaps filter: ${snaps.length} → ${filteredSnaps.length} snaps`
           );
@@ -412,8 +431,8 @@ export function useFeedData(): UseFeedDataReturn {
 
       return afterModeration;
     },
-    []
-  ); // Remove dependencies for stability
+    [memoizedFollowingFilter, memoizedMyPostsFilter]
+  ); // Include memoized filters for optimization
 
   // Helper: identifies snaps without loaded active_votes and with negative net_votes
   const isNegativeUnvotedSnap = useCallback((s: Snap): boolean => {
@@ -977,10 +996,65 @@ export function useFeedData(): UseFeedDataReturn {
   }, [state.containerMap]);
 
   // Fixed setFilter: now defined AFTER updateSnapsWithAvatars so it's available; avatar enrichment is triggered inside state update.
+  // Memoize filtered snaps to avoid expensive re-filtering on every setFilter call
+  const memoizedFilteredSnaps = useMemo(() => {
+    const allSnaps = state.containerMap.getAllSnaps();
+    if (allSnaps.length === 0) return [];
+    
+    const filteredSnaps = applyFilter(
+      allSnaps,
+      state.currentFilter,
+      followingListRef.current || [],
+      username
+    );
+    
+    console.log(
+      `🎯 [memoizedFilteredSnaps] Filter "${state.currentFilter}": ${allSnaps.length} → ${filteredSnaps.length} snaps`
+    );
+    
+    return filteredSnaps;
+  }, [state.containerMap, state.currentFilter, followingList, username, applyFilter]);
+
+  // Memoize enriched snaps to avoid re-processing avatars when filter result is the same
+  const memoizedEnrichedSnaps = useMemo(() => {
+    if (memoizedFilteredSnaps.length === 0) return [];
+    
+    const authors = Array.from(new Set(memoizedFilteredSnaps.map(s => s.author)));
+    const enrichedSnaps = memoizedFilteredSnaps.map(snap => ({
+      ...snap,
+      avatarUrl:
+        snap.avatarUrl ||
+        avatarService.getCachedAvatarUrl(snap.author) ||
+        `https://images.hive.blog/u/${snap.author}/avatar/original`,
+    }));
+    
+    // Kick off background preloads to ensure updates arrive
+    try { 
+      avatarService.preloadAvatars(authors).catch(() => {}); 
+    } catch {}
+    
+    console.log(`🎯 [memoizedEnrichedSnaps] Enriched ${enrichedSnaps.length} snaps with avatars`);
+    
+    return enrichedSnaps;
+  }, [memoizedFilteredSnaps]);
+
   const setFilter = useCallback(
     (filter: FeedFilter) => {
       console.log('🎯 [useFeedData] setFilter called:', filter);
       setState(prev => {
+        // If filter hasn't changed, no need to re-calculate
+        if (prev.currentFilter === filter) {
+          console.log('🎯 [setFilter] Filter unchanged, skipping recalculation');
+          return prev;
+        }
+        
+        console.log(`🎯 [setFilter] Changing filter from "${prev.currentFilter}" to "${filter}"`);
+        
+        // Update filter - memoized calculations will handle the heavy lifting
+        const newState = { ...prev, currentFilter: filter };
+        
+        // For immediate response, we'll compute enriched snaps here
+        // But on next render, memoizedEnrichedSnaps will take over
         const allSnaps = prev.containerMap.getAllSnaps();
         const filteredSnaps = applyFilter(
           allSnaps,
@@ -988,38 +1062,30 @@ export function useFeedData(): UseFeedDataReturn {
           followingListRef.current || [],
           username
         );
-        console.log(
-          `🎯 [setFilter] Filter "${filter}": ${allSnaps.length} → ${filteredSnaps.length} snaps`
-        );
-        // Immediately enrich filtered snaps with cached avatar URLs (images.hive.blog fallback)
-        let enrichedSnaps = filteredSnaps;
-        if (filteredSnaps.length > 0) {
-          const authors = Array.from(new Set(filteredSnaps.map(s => s.author)));
-          enrichedSnaps = filteredSnaps.map(snap => ({
-            ...snap,
-            avatarUrl:
-              snap.avatarUrl ||
-              avatarService.getCachedAvatarUrl(snap.author) ||
-              `https://images.hive.blog/u/${snap.author}/avatar/original`,
-          }));
-          // Optionally kick off background preloads to ensure updates arrive
-          try { avatarService.preloadAvatars(authors).catch(() => {}); } catch {}
-        }
+        
+        const enrichedSnaps = filteredSnaps.map(snap => ({
+          ...snap,
+          avatarUrl:
+            snap.avatarUrl ||
+            avatarService.getCachedAvatarUrl(snap.author) ||
+            `https://images.hive.blog/u/${snap.author}/avatar/original`,
+        }));
 
         // Fire-and-forget fetch if list is very short
         if (enrichedSnaps.length < 4) {
           const containersToFetch =
-            state.containerMap.getMaxSize() -
-            state.containerMap.containers.size;
+            prev.containerMap.getMaxSize() - prev.containerMap.containers.size;
           console.log(
-            `🎯 [setFilter] Fetching avatars for ${containersToFetch} containers`
+            `🎯 [setFilter] Fetching ${containersToFetch} more containers due to short list`
           );
-          fetchSnaps(false, containersToFetch); // Fetch more snaps if needed
+          // Use setTimeout to avoid blocking the state update
+          setTimeout(() => fetchSnaps(false, containersToFetch), 0);
         }
-        return { ...prev, currentFilter: filter, snaps: enrichedSnaps };
+        
+        return { ...newState, snaps: enrichedSnaps };
       });
     },
-    [applyFilter, username, updateSnapsWithAvatars]
+    [applyFilter, username, followingList, fetchSnaps]
   );
 
   // Add a function to check if we can fetch more containers (internal only)
@@ -1032,6 +1098,8 @@ export function useFeedData(): UseFeedDataReturn {
 
   return {
     ...state,
+    // Use memoized enriched snaps when available for better performance
+    snaps: memoizedEnrichedSnaps.length > 0 ? memoizedEnrichedSnaps : state.snaps,
     followingList: followingList || [], // Include following list from shared state
     mutedList: mutedList || [], // Include muted list from shared state
     fetchSnaps,

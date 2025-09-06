@@ -38,7 +38,7 @@ import { useResourceCredits } from '../hooks/useResourceCredits';
 import { useUserProfile } from '../hooks/useUserProfile';
 
 // Shared state management
-import { useAppStore, useCurrentUser, useAppDebug } from '../store/context';
+import { useAppStore, useCurrentUser, useAppDebug, useFollowCacheManagement } from '../store/context';
 
 // Components
 import Snap from './components/Snap';
@@ -165,6 +165,9 @@ const FeedScreenRefactored = () => {
     getMemoryStats,
     canFetchMore
   } = useFeedData();
+
+  // Cache management for follow/mute lists
+  const { invalidateFollowingCache, invalidateMutedCache } = useFollowCacheManagement();
 
   // Debug: Track function references and username on every render
   if (__DEV__) {
@@ -420,16 +423,33 @@ const FeedScreenRefactored = () => {
       return;
     }
     if (now - lastRefreshTimeRef.current < MIN_REFRESH_INTERVAL_MS) {
-      console.log('� [FeedScreen] Ignoring refresh: throttled');
+      console.log('⏱️ [FeedScreen] Ignoring refresh: throttled');
       return;
     }
     lastRefreshTimeRef.current = now;
 
-    console.log('�🔄 [FeedScreen] Pull-to-refresh started (global refresh)');
+    console.log('🔄 [FeedScreen] Pull-to-refresh started (global refresh)');
     setGlobalRefreshing(true);
     const ops: Promise<any>[] = [];
     try {
-      // Always refresh feed snaps (returns a promise)
+      if (username) {
+        // Invalidate follow/mute caches first to ensure fresh data
+        console.log('🗑️ [FeedScreen] Invalidating follow/mute caches for fresh data');
+        invalidateFollowingCache(username);
+        invalidateMutedCache(username);
+
+        // Ensure fresh muted and following lists are cached BEFORE refreshing feed
+        console.log('📋 [FeedScreen] Ensuring fresh follow/mute lists are cached');
+        try {
+          await ensureFollowingListCached(username);
+          await ensureMutedListCached(username);
+          console.log('✅ [FeedScreen] Follow/mute lists refreshed and cached');
+        } catch (e) {
+          console.warn('[FeedScreen] Error refreshing follow/mute lists (non-blocking):', e);
+        }
+      }
+
+      // Now refresh feed snaps with fresh muted/following data (returns a promise)
       ops.push(refreshSnaps());
 
       if (username) {
