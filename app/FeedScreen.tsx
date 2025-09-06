@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -147,6 +147,8 @@ const FeedScreenRefactored = () => {
   // Feed data and related functions
   const {
     snaps,
+    followingList,
+    mutedList,
     loading: feedLoading,
     error: feedError,
     currentFilter,
@@ -155,7 +157,9 @@ const FeedScreenRefactored = () => {
     loadMoreSnaps,
     updateSnap,
     fetchAndCacheFollowingList,
+    fetchAndCacheMutedList,
     ensureFollowingListCached,
+    ensureMutedListCached,
     onScrollPositionChange,
     setFilter,
     getMemoryStats,
@@ -166,12 +170,23 @@ const FeedScreenRefactored = () => {
   if (__DEV__) {
     console.log('[FeedScreen][DEBUG] Render:', {
       username,
+      followingListLength: followingList?.length || 0,
+      mutedListLength: mutedList?.length || 0,
       fetchAndCacheFollowingList,
+      fetchAndCacheMutedList,
       ensureFollowingListCached,
+      ensureMutedListCached,
       fetchAndCacheFollowingList_id: fetchAndCacheFollowingList && fetchAndCacheFollowingList.toString().slice(0, 60),
+      fetchAndCacheMutedList_id: fetchAndCacheMutedList && fetchAndCacheMutedList.toString().slice(0, 60),
       ensureFollowingListCached_id: ensureFollowingListCached && ensureFollowingListCached.toString().slice(0, 60),
+      ensureMutedListCached_id: ensureMutedListCached && ensureMutedListCached.toString().slice(0, 60),
     });
   }
+
+  // Memoize filtered snaps to avoid re-filtering on every render
+  const filteredSnaps = useMemo(() => {
+    return snaps.filter((item) => !mutedList || !mutedList.includes(item.author));
+  }, [snaps, mutedList]);
 
   const { hivePrice, globalProps, rewardFund } = useHiveData();
 
@@ -267,7 +282,7 @@ const FeedScreenRefactored = () => {
   }, [currentFilter]);
 
   // Fetch following list when username becomes available
-  const prevDepsRef = useRef({ username, fetchAndCacheFollowingList, ensureFollowingListCached });
+  const prevDepsRef = useRef({ username, fetchAndCacheFollowingList, ensureFollowingListCached, fetchAndCacheMutedList, ensureMutedListCached });
   useEffect(() => {
     if (__DEV__) {
       const prev = prevDepsRef.current;
@@ -280,27 +295,31 @@ const FeedScreenRefactored = () => {
       if (prev.ensureFollowingListCached !== ensureFollowingListCached) {
         console.log('[FeedScreen][DEBUG] ensureFollowingListCached function reference changed');
       }
-      prevDepsRef.current = { username, fetchAndCacheFollowingList, ensureFollowingListCached };
+      if (prev.fetchAndCacheMutedList !== fetchAndCacheMutedList) {
+        console.log('[FeedScreen][DEBUG] fetchAndCacheMutedList function reference changed');
+      }
+      if (prev.ensureMutedListCached !== ensureMutedListCached) {
+        console.log('[FeedScreen][DEBUG] ensureMutedListCached function reference changed');
+      }
+      prevDepsRef.current = { username, fetchAndCacheFollowingList, ensureFollowingListCached, fetchAndCacheMutedList, ensureMutedListCached };
     }
     if (username) {
       console.log(`👤 [FeedScreen] Username became available: ${username}`);
-      console.log(
-        `👤 [FeedScreen] Fetching following list for offline filtering...`
-      );
-
-      // Call both functions to ensure following list is cached
+      console.log(`👤 [FeedScreen] Fetching following list for offline filtering...`);
       fetchAndCacheFollowingList(username);
-
-      // Also ensure it's cached (this will check if it's already there)
       ensureFollowingListCached(username).then(() => {
         console.log(`👤 [FeedScreen] Following list ensured for ${username}`);
       });
+      // --- Muted list loading and logging ---
+      console.log(`🔇 [FeedScreen] Fetching muted list for offline filtering...`);
+      fetchAndCacheMutedList(username);
+      ensureMutedListCached(username).then(() => {
+        console.log(`� [FeedScreen] Muted list ensured for ${username}`);
+      });
     } else {
-      console.log(
-        `👤 [FeedScreen] No username yet - waiting for authentication...`
-      );
+      console.log(`👤 [FeedScreen] No username yet - waiting for authentication...`);
     }
-  }, [username, fetchAndCacheFollowingList, ensureFollowingListCached]);
+  }, [username, fetchAndCacheFollowingList, ensureFollowingListCached, fetchAndCacheMutedList, ensureMutedListCached]);
 
   // Handle when user reaches near the end of the list
   const handleEndReached = () => {
@@ -846,7 +865,7 @@ const FeedScreenRefactored = () => {
         ) : (
           <FlatList
             ref={flatListRef}
-            data={snaps}
+            data={filteredSnaps}
             keyExtractor={(item, index) =>
               `${item.author}-${item.permlink}-${index}`
             }

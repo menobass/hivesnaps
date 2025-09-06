@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { SafeAreaView as SafeAreaViewRN } from 'react-native';
 import {
   SafeAreaView as SafeAreaViewSA,
@@ -64,6 +64,9 @@ import { useReply } from '../hooks/useReply';
 import { useEdit } from '../hooks/useEdit';
 import { useGifPicker, GifMode } from '../hooks/useGifPicker';
 
+import { useMutedList } from '../store/context';
+
+
 const ConversationScreenRefactored = () => {
   const colorScheme = useColorScheme() || 'light';
   const isDark = colorScheme === 'dark';
@@ -77,6 +80,8 @@ const ConversationScreenRefactored = () => {
 
   // Custom hooks for business logic
   const { currentUsername } = useUserAuth();
+  // Get muted list for current user
+  const { mutedList } = useMutedList(currentUsername || '');
 
   const {
     snap,
@@ -627,6 +632,11 @@ const ConversationScreenRefactored = () => {
 
     return flattened;
   };
+
+  // Memoize filtered replies to avoid re-filtering on every render
+  const filteredReplies = useMemo(() => {
+    return flattenReplies(replies).filter(reply => !mutedList || !mutedList.includes(reply.author));
+  }, [replies, mutedList]);
 
   // DEPRECATED: renderReplyTree function - Now using flattened approach instead
   const renderReplyTree = (reply: ReplyData, level = 0) => {
@@ -1374,26 +1384,26 @@ const ConversationScreenRefactored = () => {
               />
             )}
             <View style={ConversationScreenStyles.repliesList}>
-              {flattenReplies(replies).map(reply => (
-                <Snap
-                  key={reply.author + reply.permlink + '-' + reply.visualLevel}
-                  snap={reply}
-                  onUpvotePress={handleUpvotePress}
-                  onReplyPress={handleOpenReplyModal}
-                  onEditPress={(snapData: { author: string; permlink: string; body: string }) =>
-                    handleOpenEditModal(snapData, 'reply')
-                  }
-                  onImagePress={handleImagePress}
-                  currentUsername={currentUsername}
-                  posting={posting}
-                  editing={editing}
-                  // Reply-specific props
-                  visualLevel={reply.visualLevel}
-                  isReply={true}
-                  compactMode={true}
-                  showAuthor={true}
-                />
-              ))}
+              {filteredReplies.map(reply => (
+                  <Snap
+                    key={reply.author + reply.permlink + '-' + reply.visualLevel}
+                    snap={reply}
+                    onUpvotePress={handleUpvotePress}
+                    onReplyPress={handleOpenReplyModal}
+                    onEditPress={(snapData: { author: string; permlink: string; body: string }) =>
+                      handleOpenEditModal(snapData, 'reply')
+                    }
+                    onImagePress={handleImagePress}
+                    currentUsername={currentUsername}
+                    posting={posting}
+                    editing={editing}
+                    // Reply-specific props
+                    visualLevel={reply.visualLevel}
+                    isReply={true}
+                    compactMode={true}
+                    showAuthor={true}
+                  />
+                ))}
             </View>
           </ScrollView>
         )}

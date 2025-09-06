@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Client } from '@hiveio/dhive';
-import { useFollowingList, useCurrentUser } from '../store/context';
+import { useFollowingList, useMutedList, useCurrentUser } from '../store/context';
 import { avatarService } from '../services/AvatarService';
 import { ModerationService } from '../services/ModerationService';
+import { fetchMutedList } from '../services/HiveMuteService';
 import type { ActiveVote } from '../services/ModerationService';
 
 /**
@@ -239,6 +240,7 @@ interface FeedState {
 
 interface UseFeedDataReturn extends FeedState {
   followingList: string[]; // From shared state
+  mutedList: string[]; // From shared state
   fetchSnaps: (useCache?: boolean) => Promise<void>; // Remove filter parameter
   refreshSnaps: () => Promise<void>; // Remove filter parameter
   loadMoreSnaps: () => Promise<void>; // Remove filter parameter
@@ -249,7 +251,9 @@ interface UseFeedDataReturn extends FeedState {
     updates: Updates<Snap>
   ) => void;
   fetchAndCacheFollowingList: (username: string) => Promise<string[]>;
+  fetchAndCacheMutedList: (username: string) => Promise<string[]>;
   ensureFollowingListCached: (username: string) => Promise<void>;
+  ensureMutedListCached: (username: string) => Promise<void>;
   onScrollPositionChange: (index: number) => void;
   setFilter: (filter: FeedFilter) => void; // Add filter setter
   getMemoryStats: () => {
@@ -287,12 +291,26 @@ export function useFeedData(): UseFeedDataReturn {
     setError: setFollowingError,
   } = useFollowingList(username || '');
 
+  // Use shared state for muted list
+  const {
+    mutedList,
+    needsRefresh: needsMutedRefresh,
+    setMutedList,
+    setLoading: setMutedLoading,
+    setError: setMutedError,
+  } = useMutedList(username || '');
+
   const followingListRef = useRef(followingList);
   const needsFollowingRefreshRef = useRef(needsFollowingRefresh);
+  const mutedListRef = useRef(mutedList);
+  const needsMutedRefreshRef = useRef(needsMutedRefresh);
+  
   useEffect(() => {
     followingListRef.current = followingList;
     needsFollowingRefreshRef.current = needsFollowingRefresh;
-  }, [followingList, needsFollowingRefresh]);
+    mutedListRef.current = mutedList;
+    needsMutedRefreshRef.current = needsMutedRefresh;
+  }, [followingList, needsFollowingRefresh, mutedList, needsMutedRefresh]);
 
   // Debug: Track username changes
   const prevUsernameRef = useRef<string | null | undefined>(undefined);
@@ -832,6 +850,51 @@ export function useFeedData(): UseFeedDataReturn {
     [setFollowingList, setFollowingLoading, setFollowingError]
   );
 
+  // Fetch and cache muted list (stable reference)
+  const fetchAndCacheMutedList = useCallback(
+    async (username: string): Promise<string[]> => {
+      console.log(
+        '🔇 [useFeedData] fetchAndCacheMutedList called for',
+        username
+      );
+      const cachedList = mutedListRef.current;
+      const needsRefresh = needsMutedRefreshRef.current;
+      if (cachedList && !needsRefresh) {
+        console.log(
+          '🔇 [fetchAndCacheMutedList] Using cached muted list:',
+          cachedList.length,
+          'users'
+        );
+        return cachedList;
+      }
+      try {
+        setMutedLoading(true);
+        console.log('🔇 [fetchAndCacheMutedList] Fetching from HAFSQL API...');
+        const mutedSet = await fetchMutedList(username);
+        const mutedArray = Array.from(mutedSet);
+        console.log(
+          '🔇 [fetchAndCacheMutedList] Fetched',
+          mutedArray.length,
+          'muted users from blockchain'
+        );
+        setMutedList(mutedArray);
+        setMutedError(null);
+        return mutedArray;
+      } catch (error) {
+        console.error('❌ [fetchAndCacheMutedList] Error:', error);
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : 'Failed to fetch muted list';
+        setMutedError(errorMessage);
+        return [];
+      } finally {
+        setMutedLoading(false);
+      }
+    },
+    [setMutedList, setMutedLoading, setMutedError]
+  );
+
   // Ensure following list is cached (stable reference)
   const ensureFollowingListCached = useCallback(
     async (username: string) => {
@@ -854,9 +917,34 @@ export function useFeedData(): UseFeedDataReturn {
     [fetchAndCacheFollowingList]
   );
 
+  // Ensure muted list is cached (stable reference)
+  const ensureMutedListCached = useCallback(
+    async (username: string) => {
+      console.log(
+        '🔇 [useFeedData] ensureMutedListCached called for',
+        username
+      );
+      const cachedList = mutedListRef.current;
+      const needsRefresh = needsMutedRefreshRef.current;
+      if (!cachedList || needsRefresh) {
+        await fetchAndCacheMutedList(username);
+      } else {
+        console.log(
+          '🔇 [ensureMutedListCached] Using cached data:',
+          cachedList.length,
+          'users'
+        );
+      }
+    },
+    [fetchAndCacheMutedList]
+  );
+
   // Debug: Track function reference changes (after functions are defined)
   const prevFetchAndCacheRef = useRef<any>(fetchAndCacheFollowingList);
   const prevEnsureFollowingRef = useRef<any>(ensureFollowingListCached);
+  const prevFetchAndCacheMutedRef = useRef<any>(fetchAndCacheMutedList);
+  const prevEnsureMutedRef = useRef<any>(ensureMutedListCached);
+  
   useEffect(() => {
     if (prevFetchAndCacheRef.current !== fetchAndCacheFollowingList) {
       console.log('[useFeedData] fetchAndCacheFollowingList reference changed');
@@ -866,7 +954,15 @@ export function useFeedData(): UseFeedDataReturn {
       console.log('[useFeedData] ensureFollowingListCached reference changed');
       prevEnsureFollowingRef.current = ensureFollowingListCached;
     }
-  }, [fetchAndCacheFollowingList, ensureFollowingListCached]);
+    if (prevFetchAndCacheMutedRef.current !== fetchAndCacheMutedList) {
+      console.log('[useFeedData] fetchAndCacheMutedList reference changed');
+      prevFetchAndCacheMutedRef.current = fetchAndCacheMutedList;
+    }
+    if (prevEnsureMutedRef.current !== ensureMutedListCached) {
+      console.log('[useFeedData] ensureMutedListCached reference changed');
+      prevEnsureMutedRef.current = ensureMutedListCached;
+    }
+  }, [fetchAndCacheFollowingList, ensureFollowingListCached, fetchAndCacheMutedList, ensureMutedListCached]);
 
   const onScrollPositionChange = useCallback((index: number) => {
     console.log(
@@ -937,13 +1033,16 @@ export function useFeedData(): UseFeedDataReturn {
   return {
     ...state,
     followingList: followingList || [], // Include following list from shared state
+    mutedList: mutedList || [], // Include muted list from shared state
     fetchSnaps,
     refreshSnaps,
     loadMoreSnaps,
     clearError,
     updateSnap,
     fetchAndCacheFollowingList,
+    fetchAndCacheMutedList,
     ensureFollowingListCached,
+    ensureMutedListCached,
     onScrollPositionChange,
     getMemoryStats,
     setFilter,
