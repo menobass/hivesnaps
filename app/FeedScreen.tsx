@@ -860,7 +860,9 @@ const FeedScreenRefactored = () => {
         ) : (
           <FlatList
             ref={flatListRef}
-            data={snaps}
+            data={snaps.filter(
+              (item) => !mutedList || !mutedList.includes(item.author)
+            )}
             keyExtractor={(item, index) =>
               `${item.author}-${item.permlink}-${index}`
             }
