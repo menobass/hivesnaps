@@ -25,6 +25,7 @@ interface AppContextType {
   setUserLoading: (type: keyof AppState['user']['loading'], username: string, loading: boolean) => void;
   setUserError: (type: keyof AppState['user']['errors'], username: string, error: string | null) => void;
   invalidateFollowingCache: (username: string) => void;
+  invalidateMutedCache: (username: string) => void;
   clearUserCache: (username?: string, type?: keyof AppState['user']['loading']) => void;
   
   // Hive actions
@@ -142,6 +143,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     dispatch({ type: 'USER_INVALIDATE_FOLLOWING_CACHE', payload: username });
   }, []);
 
+  const invalidateMutedCache = useCallback((username: string) => {
+    dispatch({ type: 'USER_INVALIDATE_MUTED_CACHE', payload: username });
+  }, []);
+
   const clearUserCache = useCallback((username?: string, type?: keyof AppState['user']['loading']) => {
     dispatch({ type: 'USER_CLEAR_CACHE', payload: username || type ? { username, type } : undefined });
   }, []);
@@ -219,6 +224,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setUserLoading,
       setUserError,
       invalidateFollowingCache,
+      invalidateMutedCache,
       clearUserCache,
       setHiveData,
       setHivePost,
@@ -280,10 +286,11 @@ export function useFollowingList(username: string) {
 
 // Hook to access cache invalidation functions
 export function useFollowCacheManagement() {
-  const { invalidateFollowingCache } = useAppStore();
+  const { invalidateFollowingCache, invalidateMutedCache } = useAppStore();
   
   return {
     invalidateFollowingCache,
+    invalidateMutedCache,
   };
 }
 

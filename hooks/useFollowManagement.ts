@@ -20,7 +20,7 @@ export const useFollowManagement = (
   const [muteLoading, setMuteLoading] = useState(false);
   
   // Cache management for immediate updates
-  const { invalidateFollowingCache } = useFollowCacheManagement();
+  const { invalidateFollowingCache, invalidateMutedCache } = useFollowCacheManagement();
 
   // Check if current user is following/muting the profile user
   const checkFollowStatus = async () => {
@@ -245,6 +245,13 @@ export const useFollowManagement = (
       );
 
       setIsMuted(true);
+      
+      // Invalidate muted cache to trigger immediate refresh
+      if (currentUsername) {
+        invalidateMutedCache(currentUsername);
+        console.log('🔇 Invalidated muted cache for:', currentUsername);
+      }
+      
       console.log('Successfully muted:', targetUsername);
     } catch (error) {
       console.log('Error muting user:', error);
@@ -288,6 +295,13 @@ export const useFollowManagement = (
       );
 
       setIsMuted(false);
+      
+      // Invalidate muted cache to trigger immediate refresh
+      if (currentUsername) {
+        invalidateMutedCache(currentUsername);
+        console.log('🔇 Invalidated muted cache for:', currentUsername);
+      }
+      
       console.log('Successfully unmuted:', targetUsername);
     } catch (error) {
       console.log('Error unmuting user:', error);
