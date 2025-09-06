@@ -525,12 +525,15 @@ const HivePostScreen = () => {
                     '-' +
                     comment.visualLevel
                   }
-                  snap={comment}
+                  snap={{...comment, community: post?.category}}
                   onUpvotePress={handleCommentUpvotePress}
                   onReplyPress={handleOpenReplyModal}
                   onEditPress={(snapData: { author: string; permlink: string; body: string }) => {
                     console.log('Edit comment:', snapData);
                     // TODO: Implement edit functionality
+                  }}
+                  onUserPress={username => {
+                    router.push(`/ProfileScreen?username=${username}` as any);
                   }}
                   onImagePress={handleImagePress}
                   currentUsername={currentUsername}
