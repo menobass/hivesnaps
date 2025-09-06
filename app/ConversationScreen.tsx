@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { SafeAreaView as SafeAreaViewRN } from 'react-native';
 import {
   SafeAreaView as SafeAreaViewSA,
@@ -632,6 +632,11 @@ const ConversationScreenRefactored = () => {
 
     return flattened;
   };
+
+  // Memoize filtered replies to avoid re-filtering on every render
+  const filteredReplies = useMemo(() => {
+    return flattenReplies(replies).filter(reply => !mutedList || !mutedList.includes(reply.author));
+  }, [replies, mutedList]);
 
   // DEPRECATED: renderReplyTree function - Now using flattened approach instead
   const renderReplyTree = (reply: ReplyData, level = 0) => {
@@ -1379,9 +1384,7 @@ const ConversationScreenRefactored = () => {
               />
             )}
             <View style={ConversationScreenStyles.repliesList}>
-              {flattenReplies(replies)
-                .filter(reply => !mutedList || !mutedList.includes(reply.author))
-                .map(reply => (
+              {filteredReplies.map(reply => (
                   <Snap
                     key={reply.author + reply.permlink + '-' + reply.visualLevel}
                     snap={reply}
