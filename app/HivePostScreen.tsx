@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { SafeAreaView as SafeAreaViewRN } from 'react-native';
 import {
   SafeAreaView as SafeAreaViewSA,
@@ -27,6 +27,7 @@ import { HivePostScreenStyles } from '../styles/HivePostScreenStyles';
 import { useReply, ReplyTarget } from '../hooks/useReply';
 import { useGifPicker, GifMode } from '../hooks/useGifPicker';
 import UpvoteModal from '../components/UpvoteModal';
+import { useMutedList } from '../store/context';
 import Snap from './components/Snap';
 import ContentModal from './components/ContentModal';
 import GifPickerModal from './components/GifPickerModal';
@@ -60,6 +61,9 @@ const HivePostScreen = () => {
     updatePost,
     updateComment,
   } = useHivePostData(author, permlink, currentUsername);
+
+  // Get muted list for filtering comments (includes personal mutes + global blacklist)
+  const { mutedList } = useMutedList(currentUsername || '');
 
   // Create wrapper functions for useUpvote that match expected signatures
   const handleUpdatePost = useCallback((author: string, permlink: string, updates: any) => {
@@ -176,6 +180,25 @@ const HivePostScreen = () => {
   };
 
   const windowWidth = Dimensions.get('window').width;
+
+  // Filter comments to exclude muted users (includes personal mutes + global blacklist)
+  const filteredComments = useMemo(() => {
+    if (!comments || !mutedList) return comments;
+
+    // Ensure mutedList is a Set for efficient lookups
+    const mutedSet = mutedList instanceof Set ? mutedList : new Set(mutedList);
+    
+    const filterCommentsRecursively = (commentList: typeof comments): typeof comments => {
+      return commentList
+        .filter(comment => !mutedSet.has(comment.author))
+        .map(comment => ({
+          ...comment,
+          replies: comment.replies ? filterCommentsRecursively(comment.replies) : undefined,
+        }));
+    };
+
+    return filterCommentsRecursively(comments);
+  }, [comments, mutedList]);
 
   // Function to flatten nested comments into a flat array with level information
   // This follows the same pattern as ConversationScreen for consistency
@@ -515,9 +538,9 @@ const HivePostScreen = () => {
           )}
 
           {/* Render Comments */}
-          {!commentsLoading && !commentsError && comments.length > 0 && (
+          {!commentsLoading && !commentsError && filteredComments.length > 0 && (
             <View style={HivePostScreenStyles.commentsList}>
-              {flattenComments(comments).map(comment => (
+              {flattenComments(filteredComments).map(comment => (
                 <Snap
                   key={
                     comment.author +
@@ -548,7 +571,7 @@ const HivePostScreen = () => {
           )}
 
           {/* No Comments State */}
-          {!commentsLoading && !commentsError && comments.length === 0 && (
+          {!commentsLoading && !commentsError && filteredComments.length === 0 && (
             <View style={HivePostScreenStyles.noCommentsContainer}>
               <FontAwesome name='comment-o' size={32} color={colors.icon} />
               <Text
