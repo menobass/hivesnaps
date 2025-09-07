@@ -5,7 +5,7 @@ export type HTTPMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 export interface NetworkTarget {
   path: string;
   method: HTTPMethod;
-  params?: Record<string, any>; // For query params (GET) or body (POST)
+  params?: Record<string, any>; // For query parameters (appended to URL, e.g. GET)
   headers?: Record<string, string>;
   shouldCache?: boolean;
   body?: any;
@@ -29,7 +29,7 @@ function buildQueryString(params?: Record<string, any>): string {
 export async function makeRequest<T = any>(
   target: NetworkTarget,
   baseUrl: string = BASE_API_URL
-): Promise<T> {
+): Promise<{ body: T; status: number }> {
   let url = baseUrl + target.path;
   console.log('[makeRequest] URL:', url, 'method:', target.method, 'params:', target.params, 'body:', target.body);
   let options: RequestInit = {
@@ -63,9 +63,9 @@ export async function makeRequest<T = any>(
       }
       // Try to parse JSON, fallback to text
       try {
-        return await res.json();
+        return { body: await res.json(), status: res.status };
       } catch {
-        return (await res.text()) as any;
+        return { body: (await res.text()) as any, status: res.status };
       }
     } catch (e) {
       clearTimeout(id);

@@ -24,8 +24,8 @@ export async function submitReport(payload: ReportPayload): Promise<{ ok: boolea
     timeoutMs: 12000,
   };
   try {
-    const body = await makeRequest(target);
-    return { ok: true, status: 200, body };
+    const { body, status } = await makeRequest(target);
+    return { ok: status >= 200 && status < 300, status, body };
   } catch (e: any) {
     const msg = (e && e.message) || String(e);
     if (msg.includes('Network request failed') || msg.includes('AbortError')) {
