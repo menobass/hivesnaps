@@ -8,7 +8,7 @@ import { View, Text, ActivityIndicator } from 'react-native';
 import { HivePostPreview } from './HivePostPreview';
 import {
   HivePostInfo,
-  extractHivePostUrls,
+  extractBlogPostUrls,
 } from '../utils/extractHivePostInfo';
 import { useHivePostPreview } from '../context/HivePostPreviewContext';
 
@@ -30,7 +30,7 @@ export const ContextHivePostPreviewRenderer: React.FC<ContextHivePostPreviewRend
 
       useEffect(() => {
         const loadPreviews = async () => {
-          const urls = extractHivePostUrls(text);
+          const urls = extractBlogPostUrls(text);
           if (urls.length === 0) {
             setPostPreviews([]);
             return;
@@ -51,7 +51,7 @@ export const ContextHivePostPreviewRenderer: React.FC<ContextHivePostPreviewRend
         loadPreviews();
       }, [text, getPostPreviews]);
 
-      const urls = extractHivePostUrls(text);
+      const urls = extractBlogPostUrls(text);
       if (urls.length === 0) return null;
 
       if (loading && postPreviews.length === 0) {

@@ -11,6 +11,38 @@ import { avatarService, type AvatarLoadResult } from '../services/AvatarService'
 const MIN_USERNAME_LENGTH = 3;
 const MIN_PERMLINK_LENGTH = 3;
 
+/**
+ * URL classification types for Hive frontend links
+ */
+export type HiveUrlType = 'profile' | 'ui-page' | 'blog-post';
+
+/**
+ * Known UI page suffixes that are not blog posts
+ * These represent profile pages and interface elements
+ */
+const UI_PAGE_SUFFIXES = [
+  'wallet',
+  'posts', 
+  'comments',
+  'replies',
+  'activities',
+  'followers',
+  'following',
+  'notifications',
+  'witnesses',
+  'proposals',
+  'settings',
+  'blog',
+  'feed'
+] as const;
+
+/**
+ * Supported Hive frontend domains
+ */
+const HIVE_DOMAINS = ['ecency.com', 'peakd.com', 'hive.blog'] as const;
+
+type HiveDomain = typeof HIVE_DOMAINS[number];
+
 const client = new Client([
   'https://api.hive.blog',
   'https://api.hivekings.com',
@@ -32,6 +64,81 @@ export interface HivePostInfo {
   originalUrl: string;
   category?: string;
   tags: string[];
+}
+
+/**
+ * Classifies a Hive URL into its type for proper handling
+ * @param url - The URL to classify
+ * @returns The URL type or null if not a valid Hive URL
+ * 
+ * @example
+ * ```typescript
+ * classifyHiveUrl('https://peakd.com/@username') // 'profile'
+ * classifyHiveUrl('https://peakd.com/@username/wallet') // 'ui-page'
+ * classifyHiveUrl('https://peakd.com/@username/my-post-title') // 'blog-post'
+ * classifyHiveUrl('https://peakd.com/hive-123/@username/post') // 'blog-post'
+ * ```
+ */
+export function classifyHiveUrl(url: string): HiveUrlType | null {
+  if (!url || typeof url !== 'string') {
+    return null;
+  }
+
+  try {
+    // Normalize URL by removing protocol and www
+    const cleanUrl = url.replace(/^https?:\/\/(?:www\.)?/, '').toLowerCase();
+    
+    // Check if it's a valid Hive domain
+    const domain = cleanUrl.split('/')[0] as HiveDomain;
+    if (!HIVE_DOMAINS.includes(domain)) {
+      return null;
+    }
+
+    // Extract path components
+    const pathParts = cleanUrl.split('/').slice(1);
+    if (pathParts.length === 0) {
+      return null;
+    }
+
+    // Handle different URL patterns
+    const [firstPart, secondPart] = pathParts;
+
+    // Pattern: @username (profile page)
+    if (firstPart?.startsWith('@') && pathParts.length === 1) {
+      return 'profile';
+    }
+
+    // Pattern: @username/something
+    if (firstPart?.startsWith('@') && pathParts.length === 2) {
+      const suffix = secondPart;
+      return UI_PAGE_SUFFIXES.includes(suffix as any) ? 'ui-page' : 'blog-post';
+    }
+
+    // Pattern: community/@username/something (always blog post)
+    if (pathParts.length === 3 && secondPart?.startsWith('@')) {
+      return 'blog-post';
+    }
+
+    // Pattern: hive-123/@username/something (always blog post)
+    if (firstPart?.startsWith('hive-') && secondPart?.startsWith('@') && pathParts.length === 3) {
+      return 'blog-post';
+    }
+
+    // Default to null for unrecognized patterns
+    return null;
+  } catch (error) {
+    console.warn('[classifyHiveUrl] Error classifying URL:', { url, error });
+    return null;
+  }
+}
+
+/**
+ * Extracts only blog post URLs from text content
+ * Filters out profile pages and UI pages to prevent extraction errors
+ */
+export function extractBlogPostUrls(text: string): string[] {
+  const allUrls = extractHivePostUrls(text);
+  return allUrls.filter(url => classifyHiveUrl(url) === 'blog-post');
 }
 
 /**
