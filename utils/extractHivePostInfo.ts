@@ -67,6 +67,13 @@ export interface HivePostInfo {
 }
 
 /**
+ * Type guard to check if a string is a valid UI page suffix
+ */
+function isUIPageSuffix(suffix: string): suffix is typeof UI_PAGE_SUFFIXES[number] {
+  return UI_PAGE_SUFFIXES.includes(suffix as typeof UI_PAGE_SUFFIXES[number]);
+}
+
+/**
  * Classifies a Hive URL into its type for proper handling
  * @param url - The URL to classify
  * @returns The URL type or null if not a valid Hive URL
@@ -111,7 +118,7 @@ export function classifyHiveUrl(url: string): HiveUrlType | null {
     // Pattern: @username/something
     if (firstPart?.startsWith('@') && pathParts.length === 2) {
       const suffix = secondPart;
-      return UI_PAGE_SUFFIXES.includes(suffix as any) ? 'ui-page' : 'blog-post';
+      return isUIPageSuffix(suffix) ? 'ui-page' : 'blog-post';
     }
 
     // Pattern: community/@username/something (always blog post)
