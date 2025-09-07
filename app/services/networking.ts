@@ -1,4 +1,5 @@
 // networking.ts
+import { BASE_API_URL } from '../config/env';
 
 export type HTTPMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 
@@ -26,8 +27,8 @@ function buildQueryString(params?: Record<string, any>): string {
 
 // Main request function
 export async function makeRequest<T = any>(
-  baseUrl: string,
-  target: NetworkTarget
+  target: NetworkTarget,
+  baseUrl: string = BASE_API_URL
 ): Promise<T> {
   let url = baseUrl + target.path;
   let options: RequestInit = {
