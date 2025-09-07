@@ -14,24 +14,33 @@ export async function fetchMutedList(username: string): Promise<Set<string>> {
   if (!username) return new Set();
   
   try {
+    console.log('[HiveMuteService] 🚀 Starting fetch for user:', username);
+    
     // Fetch both user's personal muted list and global blacklist in parallel
     const [personalMuted, globalBlacklist] = await Promise.all([
       fetchPersonalMutedList(username),
       BlacklistService.getBlacklist()
     ]);
 
+    // Log each list separately for debugging
+    console.log('[HiveMuteService] 👤 PERSONAL MUTED USERS (' + personalMuted.length + '):', personalMuted);
+    console.log('[HiveMuteService] 🚫 GLOBAL BLACKLISTED USERS (' + globalBlacklist.length + '):', globalBlacklist);
+
     // Combine both lists
     const combinedMuted = new Set([...personalMuted, ...globalBlacklist]);
+    const combinedArray = Array.from(combinedMuted);
     
-    console.log('[HiveMuteService] Combined muted list:', {
+    console.log('[HiveMuteService] 🔗 FINAL COMBINED LIST (' + combinedMuted.size + '):', combinedArray);
+    console.log('[HiveMuteService] ✅ Summary:', {
       personal: personalMuted.length,
       blacklist: globalBlacklist.length,
-      total: combinedMuted.size
+      total: combinedMuted.size,
+      includes_mutethisuser: combinedMuted.has('mutethisuser')
     });
 
     return combinedMuted;
   } catch (err) {
-    console.error('[HiveMuteService] Error fetching combined muted list:', err);
+    console.error('[HiveMuteService] ❌ Error fetching combined muted list:', err);
     return new Set();
   }
 }

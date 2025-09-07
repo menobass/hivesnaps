@@ -13,6 +13,7 @@ interface BlacklistApiResponse {
   data?: string[];
   blacklist?: string[];
   users?: string[];
+  blacklistedUsers?: string[]; // The actual field name from your API
 }
 
 /**
@@ -73,7 +74,7 @@ export class BlacklistService {
    */
   private static async fetchFreshBlacklist(): Promise<string[]> {
     try {
-      console.log('[BlacklistService] Fetching blacklist from /blacklist');
+      console.log('[BlacklistService] Fetching blacklist from /blacklisted');
       
       // Use networking layer with the single blacklist endpoint
       const response = await makeRequest<BlacklistApiResponse>({
@@ -103,26 +104,47 @@ export class BlacklistService {
    * Extract blacklist array from various API response formats
    */
   private static extractBlacklistFromResponse(data: any): string[] {
-    if (!data) return [];
+    if (!data) {
+      console.log('[BlacklistService] ❌ No data received');
+      return [];
+    }
+
+    console.log('[BlacklistService] 🔍 Raw API response:', JSON.stringify(data, null, 2));
 
     // Handle different response formats
     if (Array.isArray(data)) {
-      return data.filter(item => typeof item === 'string');
+      const filtered = data.filter(item => typeof item === 'string');
+      console.log('[BlacklistService] ✅ Found array format:', filtered.length, 'users');
+      return filtered;
+    }
+    
+    // Check for blacklistedUsers field (the actual field from your API)
+    if (data.blacklistedUsers && Array.isArray(data.blacklistedUsers)) {
+      const filtered = data.blacklistedUsers.filter((item: any) => typeof item === 'string');
+      console.log('[BlacklistService] ✅ Found blacklistedUsers field:', filtered.length, 'users');
+      console.log('[BlacklistService] 📋 Blacklisted users:', filtered);
+      return filtered;
     }
     
     if (data.data && Array.isArray(data.data)) {
-      return data.data.filter((item: any) => typeof item === 'string');
+      const filtered = data.data.filter((item: any) => typeof item === 'string');
+      console.log('[BlacklistService] ✅ Found data field:', filtered.length, 'users');
+      return filtered;
     }
     
     if (data.blacklist && Array.isArray(data.blacklist)) {
-      return data.blacklist.filter((item: any) => typeof item === 'string');
+      const filtered = data.blacklist.filter((item: any) => typeof item === 'string');
+      console.log('[BlacklistService] ✅ Found blacklist field:', filtered.length, 'users');
+      return filtered;
     }
     
     if (data.users && Array.isArray(data.users)) {
-      return data.users.filter((item: any) => typeof item === 'string');
+      const filtered = data.users.filter((item: any) => typeof item === 'string');
+      console.log('[BlacklistService] ✅ Found users field:', filtered.length, 'users');
+      return filtered;
     }
 
-    console.warn('[BlacklistService] Unexpected response format:', data);
+    console.warn('[BlacklistService] ❌ Unexpected response format:', data);
     return [];
   }
 
