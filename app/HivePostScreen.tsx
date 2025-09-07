@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { SafeAreaView as SafeAreaViewRN } from 'react-native';
 import {
   SafeAreaView as SafeAreaViewSA,
@@ -27,6 +27,7 @@ import { HivePostScreenStyles } from '../styles/HivePostScreenStyles';
 import { useReply, ReplyTarget } from '../hooks/useReply';
 import { useGifPicker, GifMode } from '../hooks/useGifPicker';
 import UpvoteModal from '../components/UpvoteModal';
+import { useMutedList } from '../store/context';
 import Snap from './components/Snap';
 import ContentModal from './components/ContentModal';
 import GifPickerModal from './components/GifPickerModal';
@@ -60,6 +61,9 @@ const HivePostScreen = () => {
     updatePost,
     updateComment,
   } = useHivePostData(author, permlink, currentUsername);
+
+  // Get muted list for filtering comments
+  const { mutedList } = useMutedList(currentUsername || '');
 
   // Create wrapper functions for useUpvote that match expected signatures
   const handleUpdatePost = useCallback((author: string, permlink: string, updates: any) => {
@@ -174,6 +178,22 @@ const HivePostScreen = () => {
     buttonInactive: isDark ? '#38444D' : '#E1E8ED',
     payout: '#17BF63',
   };
+
+  // Filter comments to exclude muted users
+  const filteredComments = useMemo(() => {
+    if (!comments || !mutedList) return comments;
+    
+    const filterCommentsRecursively = (commentList: typeof comments): typeof comments => {
+      return commentList
+        .filter(comment => !mutedList.includes(comment.author))
+        .map(comment => ({
+          ...comment,
+          replies: comment.replies ? filterCommentsRecursively(comment.replies) : undefined,
+        }));
+    };
+    
+    return filterCommentsRecursively(comments);
+  }, [comments, mutedList]);
 
   const windowWidth = Dimensions.get('window').width;
 
@@ -515,9 +535,9 @@ const HivePostScreen = () => {
           )}
 
           {/* Render Comments */}
-          {!commentsLoading && !commentsError && comments.length > 0 && (
+          {!commentsLoading && !commentsError && filteredComments.length > 0 && (
             <View style={HivePostScreenStyles.commentsList}>
-              {flattenComments(comments).map(comment => (
+              {flattenComments(filteredComments).map(comment => (
                 <Snap
                   key={
                     comment.author +
