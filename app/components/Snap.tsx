@@ -42,7 +42,7 @@ import { formatRelativeShort } from '../../utils/time';
 import ActionSheet from './common/ActionSheet';
 import { ICON_SIZE, HEADER_SPACING, BUTTON_TAP_PADDING, TIMESTAMP_MAX_WIDTH, USERNAME_MAX_WIDTH_PCT, HIT_SLOP_SM } from '../constants/ui';
 import { useAppColors } from '../styles/colors';
-import { submitReport, mapUiReasonToApi } from '../services/reportService';
+import { submitReport, mapUiReasonToApi } from '../../services/reportService';
 import { SnapData } from '../../hooks/useConversationData';
 import { wasPostedViaHiveSnaps } from '../../utils/appDetection';
 

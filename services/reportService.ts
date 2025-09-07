@@ -1,5 +1,6 @@
+// This file was moved from app/services/reportService.ts
 import { makeRequest, NetworkTarget } from './networking';
-import { BASE_API_URL } from '../config/env';
+import { BASE_API_URL } from '../app/config/env';
 
 export type ReportReason = 'violence' | 'harmful' | 'scam' | 'other' | 'spam';
 
