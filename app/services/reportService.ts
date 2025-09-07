@@ -1,5 +1,5 @@
 import { makeRequest, NetworkTarget } from './networking';
-import { BASE_API_URL } from '../config/api';
+import { BASE_API_URL } from '../config/env';
 
 export type ReportReason = 'violence' | 'harmful' | 'scam' | 'other' | 'spam';
 
@@ -23,7 +23,7 @@ export async function submitReport(payload: ReportPayload): Promise<{ ok: boolea
     timeoutMs: 12000,
   };
   try {
-    const body = await makeRequest(BASE_API_URL, target);
+    const body = await makeRequest(target);
     return { ok: true, status: 200, body };
   } catch (e: any) {
     const msg = (e && e.message) || String(e);
