@@ -1,4 +1,6 @@
-import { REPORT_API_URL } from '../config/api';
+// This file was moved from app/services/reportService.ts
+import { makeRequest, NetworkTarget } from './networking';
+import { BASE_API_URL } from '../app/config/env';
 
 export type ReportReason = 'violence' | 'harmful' | 'scam' | 'other' | 'spam';
 
@@ -10,40 +12,21 @@ export interface ReportPayload {
   details?: string;  // optional free text if 'other'
 }
 
-// Small helper to add a timeout to fetch requests (React Native supports AbortController)
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 10000) {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(id);
-  }
-}
-
 export async function submitReport(payload: ReportPayload): Promise<{ ok: boolean; status: number; body?: any }> {
-  // Basic URL sanity check to avoid opaque RN errors
-  if (!REPORT_API_URL || typeof REPORT_API_URL !== 'string' || !/^https?:\/\//i.test(REPORT_API_URL)) {
-    throw new Error('Invalid REPORT_API_URL configuration');
-  }
+  const target: NetworkTarget = {
+    path: '/report',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: payload,
+    timeoutMs: 12000,
+  };
   try {
-    const res = await fetchWithTimeout(REPORT_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    }, 12000);
-    let body: any = undefined;
-    try {
-      body = await res.json();
-    } catch {
-      // Non-JSON response; leave body undefined
-    }
-    return { ok: res.ok, status: res.status, body };
+    const { body, status } = await makeRequest(target);
+    return { ok: status >= 200 && status < 300, status, body };
   } catch (e: any) {
-    // Normalize RN network failure into a clear error
     const msg = (e && e.message) || String(e);
     if (msg.includes('Network request failed') || msg.includes('AbortError')) {
       throw new Error('NetworkError: report submission failed');
