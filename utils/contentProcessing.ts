@@ -5,7 +5,7 @@ import {
   removeTwitterUrls,
   removeEmbedUrls,
 } from './extractVideoInfo';
-import { extractHivePostUrls } from './extractHivePostInfo';
+import { extractBlogPostUrls } from './extractHivePostInfo';
 import { convertSpoilerSyntax } from './spoilerParser';
 
 /**
@@ -60,7 +60,7 @@ export const containsHtml = (str: string): boolean => {
 export const processContent = (body: string) => {
   const videoInfo = extractVideoInfo(body);
   const imageUrls = extractImageUrls(body);
-  const hivePostUrls = extractHivePostUrls(body);
+  const hivePostUrls = extractBlogPostUrls(body);
 
   let textBody = body;
 

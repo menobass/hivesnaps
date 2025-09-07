@@ -30,7 +30,7 @@ import TwitterEmbed from './TwitterEmbed';
 import YouTubeEmbed from './YouTubeEmbed';
 import ThreeSpeakEmbed from './ThreeSpeakEmbed';
 import InstagramEmbed from './InstagramEmbed';
-import { extractHivePostUrls } from '../../utils/extractHivePostInfo';
+import { extractBlogPostUrls } from '../../utils/extractHivePostInfo';
 import { OptimizedHivePostPreviewRenderer } from '../../components/OptimizedHivePostPreviewRenderer';
 import { classifyUrl } from '../../utils/urlClassifier';
 import { canBeResnapped } from '../../utils/postTypeDetector';
@@ -234,7 +234,7 @@ const Snap: React.FC<SnapProps> = ({
   const imageUrls = extractImageUrls(body);
   const rawImageUrls = extractRawImageUrlsUtil(body);
   const embeddedContent = extractVideoInfo(body); // Renamed from videoInfo to be more accurate
-  const hivePostUrls = extractHivePostUrls(body); // Extract Hive post URLs for previews
+  const hivePostUrls = extractBlogPostUrls(body); // Extract Hive post URLs for previews
   const router = useRouter(); // For navigation in reply mode
 
   // Calculate indentation and content width for replies
