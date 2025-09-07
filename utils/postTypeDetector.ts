@@ -92,6 +92,18 @@ async function checkParentChainForSnap(
 export type PostType = 'snap' | 'hive_post';
 
 /**
+ * Helper function to check if a post has strong snap indicators
+ * Strong indicators are reliable signs that a post is definitely a snap
+ */
+function hasStrongSnapIndicators(post: any, metadata?: any): boolean {
+  return (
+    post.permlink?.startsWith('snap-') ||
+    post.parent_author === 'peak.snaps' ||
+    (metadata?.app && metadata.app.includes('hivesnaps'))
+  );
+}
+
+/**
  * Detect if a post is a snap based on its metadata and content
  */
 export async function detectPostType(post: PostInfo): Promise<PostType> {
@@ -366,7 +378,7 @@ export async function detectPostType(post: PostInfo): Promise<PostType> {
         metadata.tags &&
         Array.isArray(metadata.tags) &&
         metadata.tags.includes('hivesnaps') &&
-        (post.permlink?.startsWith('snap-') || post.parent_author === 'peak.snaps' || (metadata.app && metadata.app.includes('hivesnaps')))
+        hasStrongSnapIndicators(post, metadata)
       ) {
         snapIndicators.push('hivesnaps_tag');
       }
