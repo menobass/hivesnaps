@@ -77,7 +77,7 @@ export class BlacklistService {
       
       // Use networking layer with the single blacklist endpoint
       const response = await makeRequest<BlacklistApiResponse>({
-        path: '/blacklist',
+        path: '/blacklisted',
         method: 'GET',
         timeoutMs: 10000,
         retries: 2
