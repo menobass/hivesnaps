@@ -41,7 +41,7 @@ import {
 } from '../utils/rawImageUrls';
 import ImageView from 'react-native-image-viewing';
 import genericAvatar from '../assets/images/generic-avatar.png';
-import { extractHivePostUrls } from '../utils/extractHivePostInfo';
+import { extractBlogPostUrls } from '../utils/extractHivePostInfo';
 import { ContextHivePostPreviewRenderer } from '../components/ContextHivePostPreviewRenderer';
 import { convertSpoilerSyntax, SpoilerData } from '../utils/spoilerParser';
 import SpoilerText from './components/SpoilerText';
@@ -643,7 +643,7 @@ const ConversationScreenRefactored = () => {
     const videoInfo = extractVideoInfo(reply.body);
   const imageUrls = extractImageUrls(reply.body);
   const rawImageUrls = extractRawImageUrlsUtil(reply.body);
-    const hivePostUrls = extractHivePostUrls(reply.body);
+    const hivePostUrls = extractBlogPostUrls(reply.body);
 
     let textBody = reply.body;
     if (videoInfo || hivePostUrls.length > 0) {
@@ -936,7 +936,7 @@ const ConversationScreenRefactored = () => {
     const videoInfo = extractVideoInfo(snap.body);
   const imageUrls = extractImageUrls(snap.body);
   const rawImageUrls = extractRawImageUrlsUtil(snap.body);
-    const hivePostUrls = extractHivePostUrls(snap.body);
+    const hivePostUrls = extractBlogPostUrls(snap.body);
 
     let textBody = snap.body;
     if (videoInfo || hivePostUrls.length > 0) {
