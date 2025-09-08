@@ -6,7 +6,7 @@
     "version": "1.1.1",
     "orientation": "portrait",
     "platforms": ["ios", "android"],
-    "icon": "./assets/images/logo.png",
+    "icon": "./assets/images/appicon.png",
     "scheme": "hivesnaps",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -27,7 +27,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/logo.png",
+        "foregroundImage": "./assets/images/appicon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
