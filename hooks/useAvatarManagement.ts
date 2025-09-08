@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Client, PrivateKey } from '@hiveio/dhive';
 import * as ImagePicker from 'expo-image-picker';
-import { Platform } from 'react-native';
+import { Platform, ActionSheetIOS, Alert } from 'react-native';
+import * as Linking from 'expo-linking';
+import * as IntentLauncher from 'expo-intent-launcher';
 import { uploadImageSmart } from '../utils/imageUploadService';
 
 const HIVE_NODES = [
@@ -35,43 +37,39 @@ export const useAvatarManagement = (currentUsername: string | null) => {
       if (Platform.OS === 'ios') {
         pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(
           resolve => {
-            import('react-native').then(({ ActionSheetIOS }) => {
-              ActionSheetIOS.showActionSheetWithOptions(
-                {
-                  options: ['Cancel', 'Take Photo', 'Choose from Gallery'],
-                  cancelButtonIndex: 0,
-                },
-                buttonIndex => {
-                  if (buttonIndex === 0) resolve('cancel');
-                  else if (buttonIndex === 1) resolve('camera');
-                  else if (buttonIndex === 2) resolve('gallery');
-                }
-              );
-            });
+            ActionSheetIOS.showActionSheetWithOptions(
+              {
+                options: ['Cancel', 'Take Photo', 'Choose from Gallery'],
+                cancelButtonIndex: 0,
+              },
+              buttonIndex => {
+                if (buttonIndex === 0) resolve('cancel');
+                else if (buttonIndex === 1) resolve('camera');
+                else if (buttonIndex === 2) resolve('gallery');
+              }
+            );
           }
         );
       } else {
         pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(
           resolve => {
-            import('react-native').then(({ Alert }) => {
-              Alert.alert(
-                'Select Avatar Image',
-                'Choose an option',
-                [
-                  { text: 'Take Photo', onPress: () => resolve('camera') },
-                  {
-                    text: 'Choose from Gallery',
-                    onPress: () => resolve('gallery'),
-                  },
-                  {
-                    text: 'Cancel',
-                    style: 'cancel',
-                    onPress: () => resolve('cancel'),
-                  },
-                ],
-                { cancelable: true }
-              );
-            });
+            Alert.alert(
+              'Select Avatar Image',
+              'Choose an option',
+              [
+                { text: 'Take Photo', onPress: () => resolve('camera') },
+                {
+                  text: 'Choose from Gallery',
+                  onPress: () => resolve('gallery'),
+                },
+                {
+                  text: 'Cancel',
+                  style: 'cancel',
+                  onPress: () => resolve('cancel'),
+                },
+              ],
+              { cancelable: true }
+            );
           }
         );
       }
@@ -93,42 +91,30 @@ export const useAvatarManagement = (currentUsername: string | null) => {
         }
 
         if (finalStatus !== 'granted') {
-          import('react-native').then(({ Alert }) => {
-            Alert.alert(
-              'Camera Permission Required',
-              'HiveSnaps needs camera access to take photos. Please enable camera permissions in your device settings.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Open Settings',
-                  onPress: () => {
-                    if (Platform.OS === 'ios') {
-                      import('expo-linking').then(({ default: Linking }) => {
-                        Linking.openURL('app-settings:');
-                      });
-                    } else {
-                      import('expo-intent-launcher')
-                        .then(({ default: IntentLauncher }) => {
-                          IntentLauncher.startActivityAsync(
-                            IntentLauncher.ActivityAction
-                              .APPLICATION_DETAILS_SETTINGS,
-                            { data: 'package:com.anonymous.hivesnaps' }
-                          );
-                        })
-                        .catch(() => {
-                          // Fallback for older Android versions
-                          import('expo-linking').then(
-                            ({ default: Linking }) => {
-                              Linking.openURL('app-settings:');
-                            }
-                          );
-                        });
-                    }
-                  },
+          Alert.alert(
+            'Camera Permission Required',
+            'HiveSnaps needs camera access to take photos. Please enable camera permissions in your device settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Open Settings',
+                onPress: () => {
+                  if (Platform.OS === 'ios') {
+                    Linking.openURL('app-settings:');
+                  } else {
+                    IntentLauncher.startActivityAsync(
+                      IntentLauncher.ActivityAction
+                        .APPLICATION_DETAILS_SETTINGS,
+                      { data: 'package:com.anonymous.hivesnaps' }
+                    ).catch(() => {
+                      // Fallback for older Android versions
+                      Linking.openURL('app-settings:');
+                    });
+                  }
                 },
-              ]
-            );
-          });
+              },
+            ]
+          );
           return;
         }
 
@@ -151,42 +137,30 @@ export const useAvatarManagement = (currentUsername: string | null) => {
         }
 
         if (finalStatus !== 'granted') {
-          import('react-native').then(({ Alert }) => {
-            Alert.alert(
-              'Photo Library Permission Required',
-              'HiveSnaps needs photo library access to select images. Please enable photo permissions in your device settings.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Open Settings',
-                  onPress: () => {
-                    if (Platform.OS === 'ios') {
-                      import('expo-linking').then(({ default: Linking }) => {
-                        Linking.openURL('app-settings:');
-                      });
-                    } else {
-                      import('expo-intent-launcher')
-                        .then(({ default: IntentLauncher }) => {
-                          IntentLauncher.startActivityAsync(
-                            IntentLauncher.ActivityAction
-                              .APPLICATION_DETAILS_SETTINGS,
-                            { data: 'package:com.anonymous.hivesnaps' }
-                          );
-                        })
-                        .catch(() => {
-                          // Fallback for older Android versions
-                          import('expo-linking').then(
-                            ({ default: Linking }) => {
-                              Linking.openURL('app-settings:');
-                            }
-                          );
-                        });
-                    }
-                  },
+          Alert.alert(
+            'Photo Library Permission Required',
+            'HiveSnaps needs photo library access to select images. Please enable photo permissions in your device settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Open Settings',
+                onPress: () => {
+                  if (Platform.OS === 'ios') {
+                    Linking.openURL('app-settings:');
+                  } else {
+                    IntentLauncher.startActivityAsync(
+                      IntentLauncher.ActivityAction
+                        .APPLICATION_DETAILS_SETTINGS,
+                      { data: 'package:com.anonymous.hivesnaps' }
+                    ).catch(() => {
+                      // Fallback for older Android versions
+                      Linking.openURL('app-settings:');
+                    });
+                  }
                 },
-              ]
-            );
-          });
+              },
+            ]
+          );
           return;
         }
 
@@ -217,24 +191,20 @@ export const useAvatarManagement = (currentUsername: string | null) => {
         console.error('Image upload error:', err);
         const errorMessage =
           err instanceof Error ? err.message : 'Unknown upload error';
-        import('react-native').then(({ Alert }) => {
-          Alert.alert(
-            'Upload Failed',
-            `Avatar upload failed: ${errorMessage}`,
-            [{ text: 'OK' }]
-          );
-        });
+        Alert.alert(
+          'Upload Failed',
+          `Avatar upload failed: ${errorMessage}`,
+          [{ text: 'OK' }]
+        );
       } finally {
         setAvatarUploading(false);
       }
     } catch (err) {
       console.error('Image picker error:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      import('react-native').then(({ Alert }) => {
-        Alert.alert('Error', `Failed to pick image: ${errorMessage}`, [
-          { text: 'OK' },
-        ]);
-      });
+      Alert.alert('Error', `Failed to pick image: ${errorMessage}`, [
+        { text: 'OK' },
+      ]);
       setAvatarUploading(false);
     }
   };
