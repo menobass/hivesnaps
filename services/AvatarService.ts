@@ -3,13 +3,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 interface AvatarCacheEntry {
   url: string;
   timestamp: number;
-  source: 'metadata' | 'hive-images' | 'fallback';
+  source: 'metadata' | 'ecency-images' | 'fallback';
 }
 
 interface AvatarLoadResult {
   url: string;
   fromCache: boolean;
-  source: 'metadata' | 'hive-images' | 'fallback';
+  source: 'metadata' | 'ecency-images' | 'fallback';
 }
 
 class AvatarService {
@@ -43,11 +43,12 @@ class AvatarService {
   }
 
   /**
-   * Deterministic Hive images service URL for a username
+   * Deterministic Ecency images service URL for a username
+   * Uses Ecency's reliable image proxy service instead of Hive's inconsistent service
    */
   static imagesAvatarUrl(username: string): string {
     const u = (username || '').trim().toLowerCase();
-    return `https://images.hive.blog/u/${u}/avatar/original`;
+    return `https://images.ecency.com/u/${u}/avatar/large`;
   }
 
   /**
@@ -90,11 +91,11 @@ class AvatarService {
     if (cached) {
       const cacheAge = now - cached.timestamp;
       const maxAge = cached.url ? this.CACHE_DURATION_SUCCESS : this.CACHE_DURATION_FAILURE;
-      // Only short-circuit on non-empty cached URLs within TTL AND from images.hive.blog.
+      // Only short-circuit on non-empty cached URLs within TTL AND from images.ecency.com.
       // If the cached URL is from metadata or another host, treat as stale and re-fetch.
-      const isImagesHost = typeof cached.url === 'string' && cached.url.startsWith('https://images.hive.blog/');
+      const isImagesHost = typeof cached.url === 'string' && cached.url.startsWith('https://images.ecency.com/');
       if (cached.url && cacheAge < maxAge && isImagesHost) {
-        return { url: cached.url, fromCache: true, source: 'hive-images' };
+        return { url: cached.url, fromCache: true, source: 'ecency-images' };
       }
     }
 
@@ -102,7 +103,7 @@ class AvatarService {
     const existingPromise = this.loadingPromises.get(key);
     if (existingPromise) {
       const url = await existingPromise;
-      return { url, fromCache: false, source: this.cache.get(key)?.source || 'hive-images' };
+      return { url, fromCache: false, source: this.cache.get(key)?.source || 'ecency-images' };
     }
 
     // Start loading
@@ -116,7 +117,7 @@ class AvatarService {
       // Notify listeners of the update
       this.notifyListeners(key, url);
       
-      return { url, fromCache: false, source: this.cache.get(key)?.source || 'hive-images' };
+      return { url, fromCache: false, source: this.cache.get(key)?.source || 'ecency-images' };
     } catch (error) {
       this.loadingPromises.delete(key);
       console.warn(`Failed to load avatar for ${key}:`, error);
@@ -153,10 +154,10 @@ class AvatarService {
 
     if (cacheAge >= maxAge) return '';
 
-    // Normalize: always prefer images.hive.blog. If cached is not images, return images URL and update cache.
+    // Normalize: always prefer images.ecency.com. If cached is not images, return images URL and update cache.
     const imagesUrl = AvatarService.imagesAvatarUrl(key);
-    if (!cached.url || !cached.url.startsWith('https://images.hive.blog/')) {
-      this.cache.set(key, { url: imagesUrl, timestamp: Date.now(), source: 'hive-images' });
+    if (!cached.url || !cached.url.startsWith('https://images.ecency.com/')) {
+      this.cache.set(key, { url: imagesUrl, timestamp: Date.now(), source: 'ecency-images' });
       this.persistCacheToStorage();
       return imagesUrl;
     }
@@ -198,13 +199,13 @@ class AvatarService {
    */
   private async fetchAvatarUrl(username: string): Promise<string> {
     let avatarUrl = '';
-    let source: 'metadata' | 'hive-images' | 'fallback' = 'hive-images';
+    let source: 'metadata' | 'ecency-images' | 'fallback' = 'ecency-images';
 
-  // Always use the deterministic Hive images service URL.
+  // Always use the deterministic Ecency images service URL.
   // We intentionally avoid metadata because many accounts reference dead hosts (e.g., snag.gy).
-  const hiveImageUrl = AvatarService.imagesAvatarUrl(username);
-  avatarUrl = hiveImageUrl;
-  source = 'hive-images';
+  const ecencyImageUrl = AvatarService.imagesAvatarUrl(username);
+  avatarUrl = ecencyImageUrl;
+  source = 'ecency-images';
 
     // Cache the result (even if empty)
     this.cache.set(username, {
@@ -229,13 +230,13 @@ class AvatarService {
         const parsed = JSON.parse(cacheData);
         Object.entries(parsed).forEach(([username, entry]) => {
           const e = entry as AvatarCacheEntry;
-          // Migrate any non-images URLs to images.hive.blog
-          const normalized: AvatarCacheEntry = e.url && e.url.startsWith('https://images.hive.blog/')
+          // Migrate any non-images URLs to images.ecency.com
+          const normalized: AvatarCacheEntry = e.url && e.url.startsWith('https://images.ecency.com/')
             ? e
             : {
                 url: AvatarService.imagesAvatarUrl(username),
                 timestamp: Date.now(),
-                source: 'hive-images',
+                source: 'ecency-images',
               };
           this.cache.set(this.normalizeUsername(username), normalized);
         });
