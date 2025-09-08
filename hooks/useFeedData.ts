@@ -251,6 +251,7 @@ interface UseFeedDataReturn extends FeedState {
   refreshSnaps: () => Promise<void>; // Remove filter parameter
   loadMoreSnaps: () => Promise<void>; // Remove filter parameter
   clearError: () => void;
+  clearContainerMap: () => void;
   updateSnap: (
     author: string,
     permlink: string,
@@ -787,6 +788,17 @@ export function useFeedData(): UseFeedDataReturn {
     setState(prev => ({ ...prev, error: null }));
   }, []);
 
+  const clearContainerMap = useCallback(() => {
+    setState(prev => {
+      const newContainerMap = new OrderedContainerMap(4);
+      return { 
+        ...prev, 
+        containerMap: newContainerMap,
+        snaps: []
+      };
+    });
+  }, []);
+
   const updateSnap = useCallback(
     (author: string, permlink: string, updates: Updates<Snap>) => {
       if (__DEV__) {
@@ -1106,6 +1118,7 @@ export function useFeedData(): UseFeedDataReturn {
     refreshSnaps,
     loadMoreSnaps,
     clearError,
+    clearContainerMap,
     updateSnap,
     fetchAndCacheFollowingList,
     fetchAndCacheMutedList,

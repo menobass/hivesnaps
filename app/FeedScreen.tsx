@@ -163,7 +163,8 @@ const FeedScreenRefactored = () => {
     onScrollPositionChange,
     setFilter,
     getMemoryStats,
-    canFetchMore
+    canFetchMore,
+    clearContainerMap
   } = useFeedData();
 
   // Cache management for follow/mute lists
@@ -448,6 +449,10 @@ const FeedScreenRefactored = () => {
           console.warn('[FeedScreen] Error refreshing follow/mute lists (non-blocking):', e);
         }
       }
+
+      // Clear container state to ensure fresh data and resolve refresh delays
+      console.log('🧹 [FeedScreen] Clearing container map for fresh state');
+      clearContainerMap();
 
       // Now refresh feed snaps with fresh muted/following data (returns a promise)
       ops.push(refreshSnaps());
