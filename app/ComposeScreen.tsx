@@ -432,6 +432,7 @@ export default function ComposeScreen() {
       const allMedia = [...images, ...gifs];
       const json_metadata = JSON.stringify({
         app: 'hivesnaps/1.0',
+        tags: ['hive-178315', 'snaps'],
         image: allMedia, // Include all images and GIFs in metadata
         shared: hasSharedContent, // Additional flag for shared content
       });
