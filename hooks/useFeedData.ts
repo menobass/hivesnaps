@@ -32,6 +32,21 @@ const HIVE_NODES = [
 ];
 const client = new Client(HIVE_NODES);
 
+/**
+ * Maximum number of containers (Hive posts with snaps) to keep in memory.
+ * 
+ * This balances:
+ * - Memory usage: Each container can hold 10-20+ snaps
+ * - Performance: Prevents excessive DOM nodes and memory consumption
+ * - UX: Provides enough content for smooth scrolling without overwhelming the device
+ * 
+ * 4 containers typically equals 40-80 snaps in memory, which is optimal for:
+ * - Mobile device performance
+ * - Network efficiency
+ * - Responsive scroll behavior
+ */
+const MAX_CONTAINERS_IN_MEMORY = 4;
+
 // Generic typed updater utilities for optimistic updates
 type Updater<T> = T | ((prev: T) => T);
 type Updates<T> = { [K in keyof T]?: Updater<T[K]> };
@@ -85,7 +100,7 @@ class OrderedContainerMap {
   containers: Map<string, ContainerMetadata> = new Map();
   private maxSize: number;
 
-  constructor(maxSize: number = 4) {
+  constructor(maxSize: number = MAX_CONTAINERS_IN_MEMORY) {
     this.maxSize = maxSize;
   }
 
@@ -285,7 +300,7 @@ export function useFeedData(): UseFeedDataReturn {
     snaps: [],
     loading: false,
     error: null,
-    containerMap: new OrderedContainerMap(4),
+    containerMap: new OrderedContainerMap(MAX_CONTAINERS_IN_MEMORY),
     currentFilter: 'newest', // Default filter
   });
 
@@ -790,7 +805,7 @@ export function useFeedData(): UseFeedDataReturn {
 
   const clearContainerMap = useCallback(() => {
     setState(prev => {
-      const newContainerMap = new OrderedContainerMap(4);
+      const newContainerMap = new OrderedContainerMap(MAX_CONTAINERS_IN_MEMORY);
       return { 
         ...prev, 
         containerMap: newContainerMap,
