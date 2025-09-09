@@ -48,7 +48,7 @@ class AvatarService {
    */
   static imagesAvatarUrl(username: string): string {
     const u = (username || '').trim().toLowerCase();
-    const url = `https://images.ecency.com/u/${u}/avatar/original`;
+    const url = `https://images.hive.blog/u/${u}/avatar/original?cache=false`;
     // Debug: Log URL construction to catch any /large issues
     if (typeof __DEV__ !== 'undefined' && __DEV__) {
       console.log(`[AvatarService] imagesAvatarUrl(${username}) -> ${url}`);
