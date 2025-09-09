@@ -33,7 +33,7 @@ export const useUserProfile = (username: string | null) => {
         // Avatar via unified service
         const immediate =
           avatarService.getCachedAvatarUrl(account.name) ||
-          `https://images.hive.blog/u/${account.name}/avatar/original`;
+          `https://images.ecency.com/u/${account.name}/avatar/original`;
         setAvatarUrl(immediate);
         avatarService
           .getAvatarUrl(account.name)

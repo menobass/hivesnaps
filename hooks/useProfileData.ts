@@ -256,8 +256,8 @@ export const useProfileData = (username: string | undefined) => {
       console.log('Unclaimed VESTS:', unclaimedVests);
 
       // Set profile with account object counts first (non-blocking)
-      // Avatar: use unified AvatarService (images.hive.blog) for immediate first paint
-      const imagesUrl = `https://images.hive.blog/u/${account.name}/avatar/original`;
+      // Avatar: use unified AvatarService (Ecency images service) for immediate first paint
+      const imagesUrl = `https://images.ecency.com/u/${account.name}/avatar/original`;
       const cachedAvatar = avatarService.getCachedAvatarUrl(account.name) || imagesUrl;
       const profileData = {
         username: account.name,
