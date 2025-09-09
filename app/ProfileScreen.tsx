@@ -421,7 +421,7 @@ const ProfileScreen = () => {
                       />
                     )}
                     <Text style={[styles.buttonText, { color: colors.text }]}>
-                      {muteLoading ? 'Unmuting...' : 'Unmute'}
+                      {muteLoading ? 'Unblocking...' : 'Unblock'}
                     </Text>
                   </TouchableOpacity>
                 ) : (
@@ -446,7 +446,7 @@ const ProfileScreen = () => {
                       <FontAwesome name='volume-off' size={16} color='#fff' />
                     )}
                     <Text style={styles.buttonText}>
-                      {muteLoading ? 'Muting...' : 'Mute'}
+                      {muteLoading ? 'Blocking...' : 'Block'}
                     </Text>
                   </TouchableOpacity>
                 )}
