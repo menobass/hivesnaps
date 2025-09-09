@@ -48,7 +48,7 @@ class AvatarService {
    */
   static imagesAvatarUrl(username: string): string {
     const u = (username || '').trim().toLowerCase();
-    return `https://images.ecency.com/u/${u}/avatar/large`;
+    return `https://images.ecency.com/u/${u}/avatar/original`;
   }
 
   /**
