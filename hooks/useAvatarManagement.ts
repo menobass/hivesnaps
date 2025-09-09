@@ -5,6 +5,7 @@ import { Platform, ActionSheetIOS, Alert } from 'react-native';
 import * as Linking from 'expo-linking';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { uploadImageSmart } from '../utils/imageUploadService';
+import { avatarService } from '../services/AvatarService';
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -301,6 +302,9 @@ export const useAvatarManagement = (currentUsername: string | null) => {
 
       // Clear sensitive data immediately
       setActiveKeyInput('');
+
+      // Clear avatar cache to force refresh of updated avatar
+      avatarService.clearCache();
 
       // Clear any cached avatar data and refresh profile
       setTimeout(async () => {
