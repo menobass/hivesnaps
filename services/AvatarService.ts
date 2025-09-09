@@ -48,7 +48,12 @@ class AvatarService {
    */
   static imagesAvatarUrl(username: string): string {
     const u = (username || '').trim().toLowerCase();
-    return `https://images.ecency.com/u/${u}/avatar/original`;
+    const url = `https://images.ecency.com/u/${u}/avatar/original`;
+    // Debug: Log URL construction to catch any /large issues
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      console.log(`[AvatarService] imagesAvatarUrl(${username}) -> ${url}`);
+    }
+    return url;
   }
 
   /**
@@ -117,7 +122,11 @@ class AvatarService {
       // Notify listeners of the update
       this.notifyListeners(key, url);
       
-      return { url, fromCache: false, source: this.cache.get(key)?.source || 'ecency-images' };
+      const result = { url, fromCache: false, source: this.cache.get(key)?.source || 'ecency-images' };
+      if (this.DEBUG) {
+        console.log(`[AvatarService] getAvatarUrl(${username}) -> ${url} (source: ${result.source})`);
+      }
+      return result;
     } catch (error) {
       this.loadingPromises.delete(key);
       console.warn(`Failed to load avatar for ${key}:`, error);
@@ -146,20 +155,37 @@ class AvatarService {
   getCachedAvatarUrl(username: string): string {
     const key = this.normalizeUsername(username);
     const cached = this.cache.get(key);
-    if (!cached) return '';
+    if (!cached) {
+      if (this.DEBUG) {
+        console.log(`[AvatarService] getCachedAvatarUrl(${username}) -> NO CACHE`);
+      }
+      return '';
+    }
     
     const now = Date.now();
     const cacheAge = now - cached.timestamp;
     const maxAge = cached.url ? this.CACHE_DURATION_SUCCESS : this.CACHE_DURATION_FAILURE;
 
-    if (cacheAge >= maxAge) return '';
+    if (cacheAge >= maxAge) {
+      if (this.DEBUG) {
+        console.log(`[AvatarService] getCachedAvatarUrl(${username}) -> EXPIRED (age: ${Math.round(cacheAge/1000)}s)`);
+      }
+      return '';
+    }
 
-    // Normalize: always prefer images.ecency.com. If cached is not images, return images URL and update cache.
+    // Normalize: always prefer images.ecency.com with /original. Migrate any URL that's not exactly the right format.
     const imagesUrl = AvatarService.imagesAvatarUrl(key);
-    if (!cached.url || !cached.url.startsWith('https://images.ecency.com/')) {
+    if (!cached.url || cached.url !== imagesUrl) {
+      if (this.DEBUG) {
+        console.log(`[AvatarService] getCachedAvatarUrl(${username}) -> MIGRATING from ${cached.url} to ${imagesUrl}`);
+      }
       this.cache.set(key, { url: imagesUrl, timestamp: Date.now(), source: 'ecency-images' });
       this.persistCacheToStorage();
       return imagesUrl;
+    }
+    
+    if (this.DEBUG) {
+      console.log(`[AvatarService] getCachedAvatarUrl(${username}) -> ${cached.url} (cached)`);
     }
     return cached.url;
   }
@@ -179,6 +205,9 @@ class AvatarService {
    * Clear all cached avatars
    */
   clearCache(): void {
+    if (this.DEBUG) {
+      console.log(`[AvatarService] Clearing cache (${this.cache.size} entries)`);
+    }
     this.cache.clear();
     this.loadingPromises.clear();
     AsyncStorage.removeItem(this.STORAGE_KEY);
@@ -230,11 +259,12 @@ class AvatarService {
         const parsed = JSON.parse(cacheData);
         Object.entries(parsed).forEach(([username, entry]) => {
           const e = entry as AvatarCacheEntry;
-          // Migrate any non-images URLs to images.ecency.com
-          const normalized: AvatarCacheEntry = e.url && e.url.startsWith('https://images.ecency.com/')
+          // Migrate any URLs that aren't exactly the correct Ecency /original format
+          const correctUrl = AvatarService.imagesAvatarUrl(username);
+          const normalized: AvatarCacheEntry = e.url === correctUrl
             ? e
             : {
-                url: AvatarService.imagesAvatarUrl(username),
+                url: correctUrl,
                 timestamp: Date.now(),
                 source: 'ecency-images',
               };
