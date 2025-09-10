@@ -55,7 +55,7 @@ export default function RootLayout() {
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
-
+  // Do NOT call useUserProfile or useSetUserProfile here!
   return (
     <AppProvider>
       <ShareProvider>
