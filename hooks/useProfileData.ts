@@ -76,11 +76,12 @@ export const useProfileData = (username: string | undefined) => {
   }
 
   useEffect(() => {
-    // If globalProfile exists and has a profile_image, use it for avatarUrl
+    // Always prefer globalProfile.profile_image for avatarUrl, with cache-busting if available
     if (globalProfile && globalProfile.profile_image) {
-      setProfile(prev => (prev ? { ...prev, avatarUrl: globalProfile.profile_image } : prev));
+      const cacheBustedUrl = `${globalProfile.profile_image}?t=${globalProfile.profile_image_last_updated || Date.now()}`;
+      setProfile(prev => (prev ? { ...prev, avatarUrl: cacheBustedUrl } : prev));
     }
-  }, [globalProfile?.profile_image]);
+  }, [globalProfile?.profile_image, globalProfile?.profile_image_last_updated]);
 
   const fetchProfileData = async () => {
     if (!username) return;
@@ -277,7 +278,10 @@ export const useProfileData = (username: string | undefined) => {
       const cachedAvatar = avatarService.getCachedAvatarUrl(account.name) || imagesUrl;
       const profileData = {
         username: account.name,
-        avatarUrl: cachedAvatar,
+        // Only use Ecency/cachedAvatar if no globalProfile.profile_image
+        avatarUrl: globalProfile && globalProfile.profile_image
+          ? `${globalProfile.profile_image}?t=${globalProfile.profile_image_last_updated || Date.now()}`
+          : cachedAvatar,
         reputation: reputation, // Direct from API - no need for rounding!
         hivePower: Math.round(hivePower * 100) / 100,
         hbd: Math.round(hbdBalance * 100) / 100,
