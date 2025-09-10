@@ -333,7 +333,7 @@ function generateSummary(body: string, maxLength = 150): string {
 }
 
 /**
- * Fetch author avatar URL via unified AvatarService (images.hive.blog first, metadata fallback)
+ * Fetch author avatar URL via unified AvatarService (Ecency images service)
  */
 async function fetchAuthorAvatar(author: string): Promise<string> {
   try {
@@ -344,8 +344,8 @@ async function fetchAuthorAvatar(author: string): Promise<string> {
     } catch {}
     return url;
   } catch (error) {
-    console.warn('[extractHivePostInfo] AvatarService failed, falling back to images URL:', { author, error });
-    const fallback = `https://images.hive.blog/u/${author}/avatar/original`;
+    console.warn('[extractHivePostInfo] AvatarService failed, falling back to Ecency images URL:', { author, error });
+    const fallback = `https://images.ecency.com/u/${author}/avatar/original`;
     try { console.log(`[Avatar][Extract] ${author} -> ${fallback} (fallback)`); } catch {}
     return fallback;
   }

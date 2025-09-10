@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Client } from '@hiveio/dhive';
 import { avatarService } from '../services/AvatarService';
+import { useUserProfile } from '../store/context';
 
 // Profile data interface
 export interface ProfileData {
@@ -65,6 +66,22 @@ export const useProfileData = (username: string | undefined) => {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [globalProps, setGlobalProps] = useState<any>(null);
+  // Get global user profile (immediate updates, e.g. avatar)
+  let globalProfile: any = undefined;
+  try {
+    globalProfile = useUserProfile(username || '');
+  } catch (err) {
+    console.error('[useProfileData] useUserProfile threw error:', err);
+    console.trace('[useProfileData] useUserProfile call stack');
+  }
+
+  useEffect(() => {
+    // Always prefer globalProfile.profile_image for avatarUrl, with cache-busting if available
+    if (globalProfile && globalProfile.profile_image) {
+      const cacheBustedUrl = `${globalProfile.profile_image}?t=${globalProfile.profile_image_last_updated || Date.now()}`;
+      setProfile(prev => (prev ? { ...prev, avatarUrl: cacheBustedUrl } : prev));
+    }
+  }, [globalProfile?.profile_image, globalProfile?.profile_image_last_updated]);
 
   const fetchProfileData = async () => {
     if (!username) return;
@@ -256,12 +273,15 @@ export const useProfileData = (username: string | undefined) => {
       console.log('Unclaimed VESTS:', unclaimedVests);
 
       // Set profile with account object counts first (non-blocking)
-      // Avatar: use unified AvatarService (images.hive.blog) for immediate first paint
-      const imagesUrl = `https://images.hive.blog/u/${account.name}/avatar/original`;
+      // Avatar: use unified AvatarService (Ecency images service) for immediate first paint
+      const imagesUrl = `https://images.ecency.com/u/${account.name}/avatar/original`;
       const cachedAvatar = avatarService.getCachedAvatarUrl(account.name) || imagesUrl;
       const profileData = {
         username: account.name,
-        avatarUrl: cachedAvatar,
+        // Only use Ecency/cachedAvatar if no globalProfile.profile_image
+        avatarUrl: globalProfile && globalProfile.profile_image
+          ? `${globalProfile.profile_image}?t=${globalProfile.profile_image_last_updated || Date.now()}`
+          : cachedAvatar,
         reputation: reputation, // Direct from API - no need for rounding!
         hivePower: Math.round(hivePower * 100) / 100,
         hbd: Math.round(hbdBalance * 100) / 100,
