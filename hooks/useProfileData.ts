@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Client } from '@hiveio/dhive';
 import { avatarService } from '../services/AvatarService';
+import { useUserProfile } from '../store/context';
 
 // Profile data interface
 export interface ProfileData {
@@ -65,6 +66,21 @@ export const useProfileData = (username: string | undefined) => {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [globalProps, setGlobalProps] = useState<any>(null);
+  // Get global user profile (immediate updates, e.g. avatar)
+  let globalProfile: any = undefined;
+  try {
+    globalProfile = useUserProfile(username || '');
+  } catch (err) {
+    console.error('[useProfileData] useUserProfile threw error:', err);
+    console.trace('[useProfileData] useUserProfile call stack');
+  }
+
+  useEffect(() => {
+    // If globalProfile exists and has a profile_image, use it for avatarUrl
+    if (globalProfile && globalProfile.profile_image) {
+      setProfile(prev => (prev ? { ...prev, avatarUrl: globalProfile.profile_image } : prev));
+    }
+  }, [globalProfile?.profile_image]);
 
   const fetchProfileData = async () => {
     if (!username) return;

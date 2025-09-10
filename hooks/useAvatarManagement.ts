@@ -6,6 +6,8 @@ import * as Linking from 'expo-linking';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { uploadImageSmart } from '../utils/imageUploadService';
 import { avatarService } from '../services/AvatarService';
+import { saveAvatarImage } from '../utils/avatarUtils';
+import { useAppStore } from '../store/context';
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -22,6 +24,7 @@ export const useAvatarManagement = (currentUsername: string | null) => {
   const [avatarUpdateSuccess, setAvatarUpdateSuccess] = useState(false);
   const [activeKeyModalVisible, setActiveKeyModalVisible] = useState(false);
   const [activeKeyInput, setActiveKeyInput] = useState('');
+  const { setUserProfile } = useAppStore();
 
   const handleEditAvatarPress = () => {
     setNewAvatarImage(null);
@@ -180,14 +183,15 @@ export const useAvatarManagement = (currentUsername: string | null) => {
       setAvatarUploading(true);
 
       try {
-        const fileToUpload = {
+        const fileToSave = {
           uri: asset.uri,
           name: `avatar-${currentUsername}-${Date.now()}.jpg`,
           type: 'image/jpeg',
         };
-        const uploadResult = await uploadImageSmart(fileToUpload, currentUsername);
-        console.log(`[useAvatarManagement] Avatar uploaded via ${uploadResult.provider} (cost: $${uploadResult.cost})`);
-        setNewAvatarImage(uploadResult.url);
+        const saveResult = await saveAvatarImage(fileToSave, currentUsername!);
+        console.log('Avatar image uploaded:', saveResult);
+        console.log(`[useAvatarManagement] Avatar saved via ${saveResult.provider} (cost: $${saveResult.cost})`);
+        setNewAvatarImage(saveResult.url);
       } catch (err) {
         console.error('Image upload error:', err);
         const errorMessage =
@@ -296,6 +300,36 @@ export const useAvatarManagement = (currentUsername: string | null) => {
       ] as const;
 
       await client.broadcast.sendOperations([operation], activeKey);
+
+      // Update global user profile with new avatar URL
+      // Convert reputation to number if needed
+      let repNum: number | undefined = undefined;
+      if (typeof account.reputation === 'string') {
+        repNum = parseInt(account.reputation, 10);
+      } else if (typeof account.reputation === 'number') {
+        repNum = account.reputation;
+      }
+      // Extract profile fields from updatedJsonMeta.profile if available
+      const profileObj = (updatedJsonMeta as any)?.profile || {};
+      const updatedProfile = {
+        name: account.name,
+        displayName: profileObj.display_name,
+        about: profileObj.about,
+        location: profileObj.location,
+        website: profileObj.website,
+        profile_image: newAvatarImage,
+        cover_image: profileObj.cover_image,
+        reputation: repNum,
+        post_count: account.post_count,
+        created: account.created,
+        json_metadata: account.json_metadata,
+        posting_json_metadata: account.posting_json_metadata,
+        // profile_image_last_updated will be set only after successful Hive update
+      };
+      setUserProfile(currentUsername, {
+        ...updatedProfile,
+        profile_image_last_updated: Date.now(),
+      });
 
       setAvatarUpdateLoading(false);
       setAvatarUpdateSuccess(true);

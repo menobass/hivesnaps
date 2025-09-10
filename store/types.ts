@@ -26,6 +26,7 @@ export interface UserProfile {
   created?: string;
   json_metadata?: string;
   posting_json_metadata?: string;
+  profile_image_last_updated?: number; // Timestamp of last avatar update
   [key: string]: any;
 }
 
