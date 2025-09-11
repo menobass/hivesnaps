@@ -1,6 +1,5 @@
 // This file was moved from app/services/reportService.ts
-import { makeRequest, NetworkTarget } from './networking';
-import { BASE_API_URL } from '../app/config/env';
+import { authenticatedApiCall } from './AuthenticatedRequest';
 
 export type ReportReason = 'violence' | 'harmful' | 'scam' | 'other' | 'spam';
 
@@ -13,23 +12,21 @@ export interface ReportPayload {
 }
 
 export async function submitReport(payload: ReportPayload): Promise<{ ok: boolean; status: number; body?: any }> {
-  const target: NetworkTarget = {
-    path: '/report',
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-    body: payload,
-    timeoutMs: 12000,
-  };
   try {
-    const { body, status } = await makeRequest(target);
-    return { ok: status >= 200 && status < 300, status, body };
+    const response = await authenticatedApiCall('/report', 'POST', payload);
+    
+    return { 
+      ok: response.status >= 200 && response.status < 300, 
+      status: response.status, 
+      body: response.body 
+    };
   } catch (e: any) {
     const msg = (e && e.message) || String(e);
     if (msg.includes('Network request failed') || msg.includes('AbortError')) {
       throw new Error('NetworkError: report submission failed');
+    }
+    if (msg.includes('Authentication required')) {
+      throw new Error('AuthError: please login to report content');
     }
     throw e;
   }

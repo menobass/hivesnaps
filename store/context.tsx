@@ -10,6 +10,7 @@ import { appReducer, initialAppState, appSelectors } from './reducer';
 import { userSelectors } from './userSlice';
 import { hiveSelectors } from './hiveSlice';
 import { notificationSelectors } from './notificationSlice';
+import { authSelectors } from './authSlice';
 
 // Context type
 interface AppContextType {
@@ -38,6 +39,14 @@ interface AppContextType {
   markNotificationsRead: (ids: string | string[]) => void;
   setNotificationLoading: (loading: boolean) => void;
   
+  // Auth actions
+  setAuthToken: (token: string | null) => void;
+  setAuthRefreshToken: (refreshToken: string | null) => void;
+  setAuthTokens: (tokens: { token: string | null; refreshToken: string | null }) => void;
+  setAuthLoading: (loading: boolean) => void;
+  setAuthError: (error: string | null) => void;
+  clearAuth: () => void;
+  
   // Selectors (memoized)
   selectors: {
     // User selectors
@@ -64,6 +73,14 @@ interface AppContextType {
     getNotifications: () => any[] | null;
     getUnreadCount: () => number;
     needsNotificationRefresh: () => boolean;
+    
+    // Auth selectors
+    getAuthToken: () => string | null;
+    getAuthRefreshToken: () => string | null;
+    isAuthenticated: () => boolean;
+    isAuthLoading: () => boolean;
+    getAuthError: () => string | null;
+    isAuthenticationFresh: () => boolean;
     
     // Cross-slice selectors
     getCurrentUserFollowing: () => string[] | null;
@@ -178,6 +195,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     dispatch({ type: 'NOTIFICATION_SET_LOADING', payload: loading });
   }, []);
 
+  // Auth action creators
+  const setAuthToken = useCallback((token: string | null) => {
+    dispatch({ type: 'AUTH_SET_TOKEN', payload: token });
+  }, []);
+
+  const setAuthRefreshToken = useCallback((refreshToken: string | null) => {
+    dispatch({ type: 'AUTH_SET_REFRESH_TOKEN', payload: refreshToken });
+  }, []);
+
+  const setAuthTokens = useCallback((tokens: { token: string | null; refreshToken: string | null }) => {
+    dispatch({ type: 'AUTH_SET_TOKENS', payload: tokens });
+  }, []);
+
+  const setAuthLoading = useCallback((loading: boolean) => {
+    dispatch({ type: 'AUTH_SET_LOADING', payload: loading });
+  }, []);
+
+  const setAuthError = useCallback((error: string | null) => {
+    dispatch({ type: 'AUTH_SET_ERROR', payload: error });
+  }, []);
+
+  const clearAuth = useCallback(() => {
+    dispatch({ type: 'AUTH_CLEAR' });
+  }, []);
+
   // Memoized selectors
   const selectors = React.useMemo(() => ({
     // User selectors
@@ -206,6 +248,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     getUnreadCount: () => notificationSelectors.getUnreadCount(state.notifications),
     needsNotificationRefresh: () => notificationSelectors.needsRefresh(state.notifications),
 
+    // Auth selectors
+    getAuthToken: () => authSelectors.getToken(state.auth),
+    getAuthRefreshToken: () => authSelectors.getRefreshToken(state.auth),
+    isAuthenticated: () => authSelectors.isAuthenticated(state.auth),
+    isAuthLoading: () => authSelectors.isLoading(state.auth),
+    getAuthError: () => authSelectors.getError(state.auth),
+    isAuthenticationFresh: () => authSelectors.isAuthenticationFresh(state.auth),
+
     // Cross-slice selectors
     getCurrentUserFollowing: () => appSelectors.getCurrentUserFollowing(state),
     doesCurrentUserFollow: (username: string) => appSelectors.doesCurrentUserFollow(state, username),
@@ -232,6 +282,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setNotifications,
       markNotificationsRead,
       setNotificationLoading,
+      setAuthToken,
+      setAuthRefreshToken,
+      setAuthTokens,
+      setAuthLoading,
+      setAuthError,
+      clearAuth,
       selectors,
     };
 
