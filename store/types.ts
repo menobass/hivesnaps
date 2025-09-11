@@ -140,11 +140,22 @@ export interface NotificationState {
   lastChecked: number;
 }
 
+// Authentication state
+export interface AuthState {
+  jwtToken: string | null;
+  refreshToken: string | null;
+  isAuthenticated: boolean;
+  lastAuthenticated: number | null;
+  loading: boolean;
+  error: string | null;
+}
+
 // Root app state
 export interface AppState {
   user: UserState;
   hive: HiveState;
   notifications: NotificationState;
+  auth: AuthState;
 }
 
 // Action types
@@ -176,7 +187,15 @@ export type NotificationAction =
   | { type: 'NOTIFICATION_UPDATE_UNREAD_COUNT'; payload: number }
   | { type: 'NOTIFICATION_CLEAR_CACHE' };
 
-export type AppAction = UserAction | HiveAction | NotificationAction;
+export type AuthAction =
+  | { type: 'AUTH_SET_TOKEN'; payload: string | null }
+  | { type: 'AUTH_SET_REFRESH_TOKEN'; payload: string | null }
+  | { type: 'AUTH_SET_TOKENS'; payload: { token: string | null; refreshToken: string | null } }
+  | { type: 'AUTH_SET_LOADING'; payload: boolean }
+  | { type: 'AUTH_SET_ERROR'; payload: string | null }
+  | { type: 'AUTH_CLEAR' };
+
+export type AppAction = UserAction | HiveAction | NotificationAction | AuthAction;
 
 // Cache configuration
 export const CACHE_DURATIONS = {

@@ -1,4 +1,4 @@
-import { makeRequest } from './networking';
+import { makeAuthenticatedRequest } from './AuthenticatedRequest';
 
 interface BlacklistApiResponse {
   data?: string[];
@@ -24,8 +24,8 @@ export class BlacklistService {
     try {
       console.log('[BlacklistService] Fetching blacklist from /blacklisted');
       
-      // Use networking layer with built-in caching
-      const response = await makeRequest<BlacklistApiResponse>({
+      // Use authenticated request with built-in caching and JWT token
+      const response = await makeAuthenticatedRequest({
         path: '/blacklisted',
         method: 'GET',
         shouldCache: true, // Enable networking layer caching
