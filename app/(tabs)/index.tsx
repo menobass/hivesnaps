@@ -18,6 +18,7 @@ import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { Client, PrivateKey } from '@hiveio/dhive';
 import * as Linking from 'expo-linking';
+import { useAuth } from '@/hooks/useAuth';
 
 const twitterColors = {
   light: {
@@ -61,6 +62,7 @@ export default function LoginScreen() {
   const colorScheme = useColorScheme() || 'light';
   const colors = twitterColors[colorScheme];
   const router = useRouter();
+  const { authenticate } = useAuth();
 
   // Auto-login functionality
   useEffect(() => {
@@ -82,7 +84,18 @@ export default function LoginScreen() {
             );
 
             if (postingAuths.includes(pubPosting)) {
-              // Valid credentials found, auto-navigate to feed
+              // Valid Hive credentials found, now get JWT token
+              console.log('[Auto-login] Valid Hive credentials, getting JWT token...');
+              
+              const jwtSuccess = await authenticate(storedUsername, storedPostingKey);
+              
+              if (jwtSuccess) {
+                console.log('[Auto-login] JWT authentication successful');
+              } else {
+                console.warn('[Auto-login] JWT authentication failed, continuing without token');
+              }
+              
+              // Navigate to feed regardless of JWT success (graceful fallback)
               router.push('/FeedScreen');
               return;
             }
@@ -90,6 +103,7 @@ export default function LoginScreen() {
         }
       } catch (error) {
         // If auto-login fails, clear stored credentials and show login screen
+        console.error('[Auto-login] Failed:', error);
         await SecureStore.deleteItemAsync('hive_username');
         await SecureStore.deleteItemAsync('hive_posting_key');
       } finally {
@@ -113,6 +127,8 @@ export default function LoginScreen() {
       const testPostingKey = '5K4xkL1sdkqV5NFHQDtx61gVGcXqZRNDAHVFLbQbQ5W96Vy8cDy';
       const postingWif = cleanUsername !== 'appstoret' ? postingKey.trim() : testPostingKey;
       console.log('Using posting key:', postingWif);
+      
+      // Step 1: Validate posting key with Hive blockchain
       const privKey = PrivateKey.from(postingWif);
       const account = await client.database.getAccounts([cleanUsername]);
       if (!account || !account[0]) throw new Error('Account not found');
@@ -120,9 +136,24 @@ export default function LoginScreen() {
       const postingAuths = account[0].posting.key_auths.map(([key]) => key);
       if (!postingAuths.includes(pubPosting))
         throw new Error('Invalid posting key');
-      // Store key securely
+      
+      // Step 2: Store credentials securely
       await SecureStore.setItemAsync('hive_username', cleanUsername);
       await SecureStore.setItemAsync('hive_posting_key', postingWif);
+      
+      // Step 3: Get JWT token via challenge-response authentication
+      console.log('[Login] Starting JWT authentication...');
+      const jwtSuccess = await authenticate(cleanUsername, postingWif);
+      
+      if (!jwtSuccess) {
+        // JWT authentication failed, but don't block login
+        console.warn('[Login] JWT authentication failed, continuing without token');
+        setError('Login successful, but some features may be limited. Please try again later.');
+      } else {
+        console.log('[Login] JWT authentication successful');
+      }
+      
+      // Step 4: Navigate to feed screen
       setLoading(false);
       router.push('/FeedScreen');
     } catch (e) {

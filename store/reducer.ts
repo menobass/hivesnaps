@@ -7,12 +7,14 @@ import { AppState, AppAction } from './types';
 import { userReducer, initialUserState } from './userSlice';
 import { hiveReducer, initialHiveState } from './hiveSlice';
 import { notificationReducer, initialNotificationState } from './notificationSlice';
+import { authReducer, initialAuthState } from './authSlice';
 
 // Initial app state
 export const initialAppState: AppState = {
   user: initialUserState,
   hive: initialHiveState,
   notifications: initialNotificationState,
+  auth: initialAuthState,
 };
 
 // Root reducer
@@ -36,6 +38,13 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     return {
       ...state,
       notifications: notificationReducer(state.notifications, action as any),
+    };
+  }
+
+  if (action.type.startsWith('AUTH_')) {
+    return {
+      ...state,
+      auth: authReducer(state.auth, action as any),
     };
   }
 
