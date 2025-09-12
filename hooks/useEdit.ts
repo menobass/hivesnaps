@@ -3,6 +3,7 @@ import { Client, PrivateKey } from '@hiveio/dhive';
 import * as SecureStore from 'expo-secure-store';
 import { uploadImageSmart } from '../utils/imageUploadService';
 import { stripImageTags, getFirstImageUrl } from '../utils/extractImageInfo';
+import * as ImagePicker from 'expo-image-picker';
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -106,9 +107,8 @@ export const useEdit = (
     setState(prev => ({ ...prev, uploading: true }));
 
     try {
-      const { launchImageLibraryAsync, MediaTypeOptions } = await import(
-        'expo-image-picker'
-      );
+      // Use static import for ImagePicker
+      const { launchImageLibraryAsync, MediaTypeOptions } = ImagePicker;
 
       const result = await launchImageLibraryAsync({
         mediaTypes: MediaTypeOptions.Images,

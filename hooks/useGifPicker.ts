@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { searchGifs as searchGifsApi, getTrendingGifs } from '../utils/tenorApi';
 
 export type GifMode = 'reply' | 'edit';
 
@@ -55,9 +56,8 @@ export const useGifPicker = (): UseGifPickerReturn => {
     setState(prev => ({ ...prev, gifLoading: true }));
 
     try {
-      const { searchGifs, getTrendingGifs } = await import('../utils/tenorApi');
       const response = query.trim()
-        ? await searchGifs(query, 20)
+        ? await searchGifsApi(query, 20)
         : await getTrendingGifs(20);
 
       setState(prev => ({
