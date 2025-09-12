@@ -431,3 +431,9 @@ export async function getPostScreenRoute(post: PostInfo): Promise<string> {
     return '/HivePostScreen';
   }
 }
+
+// Allows all hive posts to be resnapped, no special restrictions
+export function canBeResnapped(post: PostInfo): boolean {
+  // Any valid Hive post can be resnapped, regardless of its type
+  return !!(post.author && post.permlink && post.permlink.length >= 5);
+}
