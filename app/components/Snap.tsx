@@ -10,6 +10,7 @@ import {
   Modal,
   TouchableOpacity,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -523,8 +524,30 @@ const Snap: React.FC<SnapProps> = ({
         details: mapped.details,
       });
       console.log('[Report][API] status:', res.status, res.body);
+      
+      // Show success or failure feedback to user
+      if (res.ok) {
+        Alert.alert(
+          'Report Submitted',
+          'Thank you for reporting this content. Our moderation team will review it shortly.',
+          [{ text: 'OK', style: 'default' }]
+        );
+      } else {
+        Alert.alert(
+          'Report Failed',
+          `Failed to submit report. Please try again later. (Status: ${res.status})`,
+          [{ text: 'OK', style: 'default' }]
+        );
+      }
     } catch (e) {
       console.error('[Report][API] error:', e);
+      // Show error feedback to user
+      const errorMessage = e instanceof Error ? e.message : 'Unknown error occurred';
+      Alert.alert(
+        'Report Failed',
+        `Could not submit report: ${errorMessage}. Please check your connection and try again.`,
+        [{ text: 'OK', style: 'default' }]
+      );
     } finally {
       setModerationVisible(false);
     }
