@@ -16,6 +16,7 @@ import {
   Pressable,
   FlatList,
   Modal,
+  ActionSheetIOS, // <-- statically import ActionSheetIOS
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -28,6 +29,7 @@ import { uploadImageSmart } from '../utils/imageUploadService';
 import { useSharedContent } from '@/hooks/useSharedContent';
 import { useShare } from '@/context/ShareContext';
 import ReactNativeModal from 'react-native-modal';
+import { searchGifs, getTrendingGifs } from '../utils/tenorApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -182,23 +184,20 @@ export default function ComposeScreen() {
       let pickType: 'camera' | 'gallery' | 'cancel';
 
       if (Platform.OS === 'ios') {
-        pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(
-          resolve => {
-            import('react-native').then(({ ActionSheetIOS }) => {
-              ActionSheetIOS.showActionSheetWithOptions(
-                {
-                  options: ['Cancel', 'Take Photo', 'Choose from Gallery'],
-                  cancelButtonIndex: 0,
-                },
-                buttonIndex => {
-                  if (buttonIndex === 0) resolve('cancel');
-                  else if (buttonIndex === 1) resolve('camera');
-                  else if (buttonIndex === 2) resolve('gallery');
-                }
-              );
-            });
-          }
-        );
+        pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(resolve => {
+          // Use static import for ActionSheetIOS to avoid dynamic import issues
+          ActionSheetIOS.showActionSheetWithOptions(
+            {
+              options: ['Cancel', 'Take Photo', 'Choose from Gallery'],
+              cancelButtonIndex: 0,
+            },
+            buttonIndex => {
+              if (buttonIndex === 0) resolve('cancel');
+              else if (buttonIndex === 1) resolve('camera');
+              else if (buttonIndex === 2) resolve('gallery');
+            }
+          );
+        });
       } else {
         pickType = await new Promise<'camera' | 'gallery' | 'cancel'>(
           resolve => {
@@ -345,8 +344,8 @@ export default function ComposeScreen() {
     console.log('[GIF Search Debug] Starting search with query:', query);
     setGifLoading(true);
     try {
-      console.log('[GIF Search Debug] Importing tenor API...');
-      const { searchGifs, getTrendingGifs } = await import('../utils/tenorApi');
+      // Use static import (already imported at top)
+      // const { searchGifs, getTrendingGifs } = await import('../utils/tenorApi');
       console.log('[GIF Search Debug] Tenor API imported successfully');
 
       const response = query.trim()

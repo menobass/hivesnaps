@@ -547,10 +547,7 @@ export async function isSnapUrl(url: string): Promise<boolean> {
       return false;
     }
 
-    // Import postTypeDetector dynamically to avoid circular dependencies
-    const { detectPostType } = await import('./postTypeDetector');
-
-    // Detect the post type
+    // Use statically imported detectPostType
     const postType = await detectPostType({
       author: postInfo.author,
       permlink: postInfo.permlink,
@@ -594,10 +591,7 @@ export async function getHivePostNavigationInfo(url: string): Promise<{
       return null;
     }
 
-    // Import postTypeDetector dynamically to avoid circular dependencies
-    const { detectPostType } = await import('./postTypeDetector');
-
-    // Detect the post type using the restrictive logic for navigation
+    // Use statically imported detectPostType
     const postType = await detectPostType({
       author: postInfo.author,
       permlink: postInfo.permlink,
@@ -620,10 +614,7 @@ export async function getHivePostNavigationInfo(url: string): Promise<{
       route,
     };
   } catch (error) {
-    console.error(
-      '[extractHivePostInfo] Error getting navigation info:',
-      error
-    );
+    console.error('[extractHivePostInfo] Error getting navigation info:', error);
     return null;
   }
 }
@@ -661,14 +652,9 @@ export async function getHivePostPreviewNavigationInfo(url: string): Promise<{
       console.log('[extractHivePostInfo] Detected snap by permlink pattern');
     } else {
       // For other posts, use a lightweight check without the full detectPostType logic
-      // Import dhive dynamically to avoid circular dependencies
-      const { Client } = await import('@hiveio/dhive');
-      const client = new Client([
-        'https://api.hive.blog',
-        'https://api.hivekings.com',
-        'https://anyx.io',
-      ]);
-
+      // Use statically imported Client from @hiveio/dhive
+      // const { Client } = await import('@hiveio/dhive');
+      // const client = new Client([...]);
       try {
         // Get the post data to check for snap indicators
         const post = await client.database.call('get_content', [
