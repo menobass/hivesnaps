@@ -2,6 +2,8 @@
  * Utility to detect post types (snap vs regular Hive post)
  */
 
+import { Client } from '@hiveio/dhive';
+
 export interface PostInfo {
   author: string;
   permlink: string;
@@ -35,8 +37,7 @@ async function checkParentChainForSnap(
   });
 
   try {
-    // Import dhive dynamically to avoid circular dependencies
-    const { Client } = await import('@hiveio/dhive');
+    // Use statically imported Client from @hiveio/dhive
     const client = new Client([
       'https://api.hive.blog',
       'https://api.hivekings.com',
@@ -423,7 +424,7 @@ export async function detectPostType(post: PostInfo): Promise<PostType> {
  */
 export async function getPostScreenRoute(post: PostInfo): Promise<string> {
   const postType = await detectPostType(post);
-
+  // Return the appropriate route based on post type
   if (postType === 'snap') {
     return '/ConversationScreen';
   } else {
@@ -431,25 +432,7 @@ export async function getPostScreenRoute(post: PostInfo): Promise<string> {
   }
 }
 
-/**
- * Get navigation parameters for the appropriate screen
- */
-export async function getPostNavigationParams(post: PostInfo) {
-  const route = await getPostScreenRoute(post);
-
-  return {
-    route,
-    params: {
-      author: post.author,
-      permlink: post.permlink,
-    },
-  };
-}
-
-/**
- * Check if a post can be resnapped (more inclusive than snap detection)
- * This allows resnapping external Hive posts without affecting navigation
- */
+// Allows all hive posts to be resnapped, no special restrictions
 export function canBeResnapped(post: PostInfo): boolean {
   // Any valid Hive post can be resnapped, regardless of its type
   return !!(post.author && post.permlink && post.permlink.length >= 5);

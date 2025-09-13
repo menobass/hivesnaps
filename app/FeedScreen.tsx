@@ -189,7 +189,8 @@ const FeedScreenRefactored = () => {
 
   // Memoize filtered snaps to avoid re-filtering on every render
   const filteredSnaps = useMemo(() => {
-    return snaps.filter((item) => !mutedList || !mutedList.includes(item.author));
+    const filtered = snaps.filter((item) => !mutedList || !mutedList.includes(item.author));
+    return filtered;
   }, [snaps, mutedList]);
 
   const { hivePrice, globalProps, rewardFund } = useHiveData();
@@ -328,6 +329,11 @@ const FeedScreenRefactored = () => {
   // Handle when user reaches near the end of the list
   const handleEndReached = () => {
     console.log(`\n📜 [FeedScreen] ===== USER REACHED END OF LIST =====`);
+    console.log(`📜 [SCROLL-DEBUG] Current filter: ${currentFilter}`);
+    console.log(`📜 [SCROLL-DEBUG] Current snaps count: ${snaps.length}`);
+    console.log(`📜 [SCROLL-DEBUG] Filtered snaps count: ${filteredSnaps.length}`);
+    console.log(`📜 [SCROLL-DEBUG] Feed loading: ${feedLoading}`);
+    
     if (!canFetchMore()) {
       console.log(`⏹️ [FeedScreen] Not fetching more snaps, limit reached`);
       return;
@@ -343,12 +349,15 @@ const FeedScreenRefactored = () => {
       console.log(
         `🔄 [FeedScreen] Triggering loadMoreSnaps for filter: ${currentFilter} - this may trigger memory cleanup!`
       );
+      console.log(`📜 [SCROLL-DEBUG] About to call loadMoreSnaps() - WATCH FOR SCROLL RESET`);
+      
       loadMoreSnaps().then(() => {
         // Log memory stats after loading more
         const newStats = getMemoryStats();
         console.log(
           `📊 [FeedScreen] Memory after load more: ${newStats.memoryUsage}`
         );
+        console.log(`📜 [SCROLL-DEBUG] loadMoreSnaps() completed`);
       });
     } else {
       console.log(
@@ -356,6 +365,29 @@ const FeedScreenRefactored = () => {
       );
     }
   };
+
+  // Auto-fetch threshold: when filtered feed has too few items to trigger onEndReached naturally
+  const AUTO_FETCH_THRESHOLD = 10;
+
+  // Auto-fetch for Following feed when list is too short to trigger onEndReached
+  useEffect(() => {
+    if (currentFilter === 'following' && !feedLoading && canFetchMore()) {
+      const snapCount = filteredSnaps.length;
+      console.log(`🎯 [AUTO-FETCH] Following feed has ${snapCount} snaps`);
+      
+      // If Following feed has very few snaps, auto-trigger load more
+      // This fixes the issue where onEndReached doesn't fire for short lists
+      if (snapCount < AUTO_FETCH_THRESHOLD) {
+        console.log(`🎯 [AUTO-FETCH] Following feed too short (${snapCount} snaps), calling loadMoreSnaps directly...`);
+        // Call loadMoreSnaps directly instead of handleEndReached to avoid scroll reset
+        loadMoreSnaps().then(() => {
+          console.log(`🎯 [AUTO-FETCH] loadMoreSnaps completed`);
+        }).catch((error) => {
+          console.log(`🎯 [AUTO-FETCH] loadMoreSnaps failed:`, error);
+        });
+      }
+    }
+  }, [currentFilter, filteredSnaps.length, feedLoading, canFetchMore, loadMoreSnaps]);
 
   // Handle filter button presses
   const handleFilterPress = (filter: FeedFilter) => {

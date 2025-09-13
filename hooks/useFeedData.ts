@@ -631,6 +631,7 @@ export function useFeedData(): UseFeedDataReturn {
           });
           // Fire-and-forget preloading to backfill better sizes or late cache
           try { avatarService.preloadAvatars(authors).catch(() => {}); } catch {}
+          console.log(`📄 [useFeedData] Updated feed with ${enriched.length} snaps`);
           return { ...prev, snaps: enriched, loading: false };
         });
 
@@ -769,35 +770,27 @@ export function useFeedData(): UseFeedDataReturn {
   }, [applyFilter, updateSnapsWithAvatars, username]);
 
   const loadMoreSnaps = useCallback(async () => {
-    console.log(
-      '📄 [useFeedData] loadMoreSnaps called with currentFilter:',
-      state.currentFilter
-    );
+    console.log(`📄 [useFeedData] Loading more snaps for filter: ${state.currentFilter}`);
 
-    setState(prev => {
-      // Prevent concurrent loading
-      if (prev.loading) {
-        console.log('📄 [useFeedData] Already loading, ignoring loadMoreSnaps');
-        return prev;
-      }
+    // Prevent concurrent loading
+    if (state.loading) {
+      console.log('📄 [useFeedData] Already loading, ignoring request');
+      return;
+    }
 
+    try {
       // Only proceed if we have at least one container (to get the next one)
-      if (prev.containerMap.getLastPermlink() === undefined) {
-        console.log(
-          '📄 [useFeedData] No containers yet, calling fetchSnaps for initial load'
-        );
-        fetchSnaps();
-        return prev;
+      if (state.containerMap.getLastPermlink() === undefined) {
+        console.log('📄 [useFeedData] No containers yet, performing initial load');
+        await fetchSnaps();
+      } else {
+        console.log('📄 [useFeedData] Loading from last permlink:', state.containerMap.getLastPermlink());
+        await fetchSnaps(false); // useCache = false for fresh data
       }
-
-      console.log(
-        '📄 [useFeedData] Loading more snaps from last permlink:',
-        prev.containerMap.getLastPermlink()
-      );
-      fetchSnaps(false); // useCache = false for fresh data
-      return prev;
-    });
-  }, [fetchSnaps, state.currentFilter]);
+    } catch (error) {
+      console.error('📄 [useFeedData] Failed to load more snaps:', error);
+    }
+  }, [fetchSnaps, state.currentFilter, state.loading, state.containerMap]);
 
   const clearError = useCallback(() => {
     setState(prev => ({ ...prev, error: null }));
@@ -1125,8 +1118,8 @@ export function useFeedData(): UseFeedDataReturn {
 
   return {
     ...state,
-    // Use memoized enriched snaps when available for better performance
-    snaps: memoizedEnrichedSnaps.length > 0 ? memoizedEnrichedSnaps : state.snaps,
+    // Use the snaps directly from state, which are already filtered and enriched
+    snaps: state.snaps,
     followingList: followingList || [], // Include following list from shared state
     mutedList: mutedList || [], // Include muted list from shared state
     fetchSnaps,
