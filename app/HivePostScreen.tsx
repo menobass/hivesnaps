@@ -25,12 +25,12 @@ import { useHiveData } from '../hooks/useHiveData';
 import { useHivePostData } from '../hooks/useHivePostData';
 import { HivePostScreenStyles } from '../styles/HivePostScreenStyles';
 import { useReply, ReplyTarget } from '../hooks/useReply';
-import { useGifPicker, GifMode } from '../hooks/useGifPicker';
+import { useGifPicker } from '../hooks/useGifPickerV2';
 import UpvoteModal from '../components/UpvoteModal';
 import { useMutedList } from '../store/context';
 import Snap from './components/Snap';
 import ContentModal from './components/ContentModal';
-import GifPickerModal from './components/GifPickerModal';
+import { GifPickerModal } from '../components/GifPickerModalV2';
 import genericAvatar from '../assets/images/generic-avatar.png';
 
 const HivePostScreen = () => {
@@ -109,18 +109,14 @@ const HivePostScreen = () => {
     return true; // Always return true since we refreshed
   });
 
-  // GIF picker functionality
-  const {
-    gifModalVisible,
-    gifSearchQuery,
-    gifResults,
-    gifLoading,
-    openGifPicker,
-    closeGifModal,
-    setGifSearchQuery,
-    searchGifs,
-    selectGif,
-  } = useGifPicker();
+    // GIF picker functionality - using new professional hook
+  const gifPicker = useGifPicker({
+    onGifSelected: (gifUrl: string) => {
+      setReplyGif(gifUrl);
+    },
+    loadTrendingOnOpen: true,
+    limit: 20,
+  });
 
   const handleUpvotePress = useCallback(() => {
     if (!post) return;
@@ -153,19 +149,18 @@ const HivePostScreen = () => {
 
   // Handle GIF picker opening
   const handleOpenGifPicker = useCallback(
-    (mode: GifMode) => {
-      openGifPicker(mode);
+    (mode: 'reply') => {
+      gifPicker.openPicker();
     },
-    [openGifPicker]
+    [gifPicker]
   );
 
   // Handle GIF selection
   const handleSelectGif = useCallback(
     (gifUrl: string) => {
-      selectGif(gifUrl);
-      addReplyGif(gifUrl);
+      gifPicker.selectGif(gifUrl);
     },
-    [selectGif, addReplyGif]
+    [gifPicker]
   );
 
   const colors = {
@@ -609,21 +604,23 @@ const HivePostScreen = () => {
         currentUsername={currentUsername}
       />
 
-      {/* GIF Picker Modal */}
+      {/* Professional GIF Picker Modal */}
       <GifPickerModal
-        visible={gifModalVisible}
-        onClose={closeGifModal}
-        onSelectGif={handleSelectGif}
-        searchQuery={gifSearchQuery}
-        onSearchQueryChange={setGifSearchQuery}
-        onSearchSubmit={searchGifs}
-        gifResults={gifResults}
-        loading={gifLoading}
+        visible={gifPicker.state.modalVisible}
+        onClose={gifPicker.closePicker}
+        onSelectGif={gifPicker.selectGif}
+        searchQuery={gifPicker.state.searchQuery}
+        onSearchQueryChange={gifPicker.setSearchQuery}
+        onSearchSubmit={gifPicker.searchGifs}
+        gifResults={gifPicker.state.results}
+        loading={gifPicker.state.loading}
+        error={gifPicker.state.error}
         colors={{
           background: colors.background,
           text: colors.text,
-          border: colors.border,
-          icon: colors.icon,
+          inputBg: colors.border,
+          inputBorder: colors.border,
+          button: colors.button,
         }}
       />
 

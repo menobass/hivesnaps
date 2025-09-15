@@ -62,7 +62,8 @@ import { useUpvote } from '../hooks/useUpvote';
 import { useHiveData } from '../hooks/useHiveData';
 import { useReply } from '../hooks/useReply';
 import { useEdit } from '../hooks/useEdit';
-import { useGifPicker, GifMode } from '../hooks/useGifPicker';
+import { useGifPicker, GifPickerMode, GifSelectionCallback } from '../hooks/useGifPickerV2';
+import { GifPickerModal } from '../components/GifPickerModalV2';
 
 import { useMutedList } from '../store/context';
 
@@ -158,44 +159,7 @@ const ConversationScreenRefactored = () => {
     addGif: addEditGif,
   } = useEdit(currentUsername, checkForNewContent);
 
-  const {
-    gifModalVisible,
-    gifSearchQuery,
-    gifResults,
-    gifLoading,
-    gifMode,
-    openGifPicker,
-    closeGifModal,
-    setGifSearchQuery,
-    searchGifs,
-    selectGif,
-  } = useGifPicker();
-
-  // Local UI state
-  const [imageModalVisible, setImageModalVisible] = useState(false);
-  const [modalImages, setModalImages] = useState<Array<{ uri: string }>>([]);
-  const [modalImageIndex, setModalImageIndex] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
-
-  // Error handling
-  if (!author || !permlink) {
-    return (
-      <SafeAreaViewRN
-        style={[
-          ConversationScreenStyles.safeArea,
-          { backgroundColor: isDark ? '#15202B' : '#fff' },
-        ]}
-      >
-        <View style={{ alignItems: 'center', marginTop: 40 }}>
-          <Text style={{ color: isDark ? '#D7DBDC' : '#0F1419', fontSize: 16 }}>
-            Error: Missing conversation parameters.
-          </Text>
-        </View>
-      </SafeAreaViewRN>
-    );
-  }
-
-  const colors = {
+    const colors = {
     background: isDark ? '#15202B' : '#fff',
     text: isDark ? '#D7DBDC' : '#0F1419',
     bubble: isDark ? '#22303C' : '#f7f9f9',
@@ -206,6 +170,37 @@ const ConversationScreenRefactored = () => {
     buttonText: '#FFFFFF',
     buttonInactive: isDark ? '#22303C' : '#E1E8ED',
   };
+
+  // Color mapping for GIF picker modal
+  const gifPickerColors = {
+    background: colors.background,
+    text: colors.text,
+    inputBg: colors.bubble, // Use bubble color for input background
+    inputBorder: colors.border,
+    button: colors.button,
+    buttonText: colors.buttonText,
+  };
+
+  // GIF picker state
+  const [gifPickerMode, setGifPickerMode] = useState<'reply' | 'edit'>('reply');
+  
+  const handleGifSelection: GifSelectionCallback = useCallback((gifUrl: string) => {
+    if (gifPickerMode === 'edit') {
+      addEditGif(gifUrl);
+    } else {
+      addReplyGif(gifUrl);
+    }
+  }, [gifPickerMode, addEditGif, addReplyGif]);
+
+  const gifPicker = useGifPicker({
+    onGifSelected: handleGifSelection,
+  });
+
+  // Local UI state
+  const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [modalImages, setModalImages] = useState<Array<{ uri: string }>>([]);
+  const [modalImageIndex, setModalImageIndex] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   const handlePullToRefresh = async () => {
     setRefreshing(true);
@@ -361,17 +356,14 @@ const ConversationScreenRefactored = () => {
     setImageModalVisible(true);
   };
 
-  const handleOpenGifPicker = (mode: GifMode) => {
-    openGifPicker(mode);
+  const handleOpenGifPicker = (mode: 'reply' | 'edit') => {
+    setGifPickerMode(mode);
+    gifPicker.openPicker();
   };
 
   const handleSelectGif = (gifUrl: string) => {
-    if (gifMode === 'edit') {
-      addEditGif(gifUrl);
-    } else {
-      addReplyGif(gifUrl);
-    }
-    closeGifModal();
+    // This is now handled automatically by the callback in useGifPicker
+    // The mode is already set when opening the picker
   };
 
   // Utility functions (simplified versions)
@@ -1473,231 +1465,18 @@ const ConversationScreenRefactored = () => {
         />
 
         {/* GIF Picker Modal */}
-        <Modal
-          isVisible={gifModalVisible}
-          onBackdropPress={closeGifModal}
-          onBackButtonPress={closeGifModal}
-          style={{ justifyContent: 'flex-start', margin: 0 }}
-          useNativeDriver
-        >
-          <View
-            style={{ flex: 1, backgroundColor: isDark ? '#15202B' : '#fff' }}
-          >
-            {/* Header */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingHorizontal: 16,
-                paddingVertical: 12,
-                borderBottomWidth: 1,
-                borderBottomColor: colors.border,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 18,
-                  fontWeight: '600',
-                  color: colors.text,
-                }}
-              >
-                Choose a GIF
-              </Text>
-              <Pressable
-                onPress={closeGifModal}
-                style={({ pressed }) => ({
-                  opacity: pressed ? 0.7 : 1,
-                  padding: 4,
-                })}
-              >
-                <FontAwesome name='times' size={24} color={colors.text} />
-              </Pressable>
-            </View>
-
-            {/* Search Bar */}
-            <View
-              style={{
-                padding: 16,
-                borderBottomWidth: 1,
-                borderBottomColor: colors.border,
-              }}
-            >
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: colors.bubble,
-                  borderRadius: 25,
-                  paddingHorizontal: 16,
-                  paddingVertical: 12,
-                }}
-              >
-                <FontAwesome
-                  name='search'
-                  size={16}
-                  color={colors.text}
-                  style={{ marginRight: 12 }}
-                />
-                <TextInput
-                  placeholder='Search GIFs...'
-                  placeholderTextColor={colors.text + '80'}
-                  value={gifSearchQuery}
-                  onChangeText={setGifSearchQuery}
-                  onSubmitEditing={() => searchGifs(gifSearchQuery)}
-                  style={{
-                    flex: 1,
-                    fontSize: 16,
-                    color: colors.text,
-                  }}
-                  returnKeyType='search'
-                />
-                {gifSearchQuery.length > 0 && (
-                  <Pressable
-                    onPress={() => {
-                      setGifSearchQuery('');
-                      searchGifs('');
-                    }}
-                    style={{ marginLeft: 8 }}
-                  >
-                    <FontAwesome
-                      name='times-circle'
-                      size={16}
-                      color={colors.text + '60'}
-                    />
-                  </Pressable>
-                )}
-              </View>
-            </View>
-
-            {/* GIF Grid */}
-            <View style={{ flex: 1, padding: 16 }}>
-              {gifLoading ? (
-                <View
-                  style={{
-                    flex: 1,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}
-                >
-                  <ActivityIndicator size='large' color={colors.icon} />
-                  <Text
-                    style={{ color: colors.text, marginTop: 12, fontSize: 16 }}
-                  >
-                    {gifSearchQuery.trim() ? 'Searching GIFs...' : 'Loading...'}
-                  </Text>
-                </View>
-              ) : gifResults.length > 0 ? (
-                <FlatList
-                  data={gifResults}
-                  renderItem={({ item, index }) => {
-                    const {
-                      getBestGifUrl,
-                      getGifPreviewUrl,
-                    } = require('../utils/tenorApi');
-                    const gifUrl = getBestGifUrl(item);
-                    const previewUrl = getGifPreviewUrl(item);
-
-                    return (
-                      <Pressable
-                        onPress={() => handleSelectGif(gifUrl)}
-                        style={({ pressed }) => [
-                          {
-                            flex: 1,
-                            margin: 2,
-                            borderRadius: 8,
-                            overflow: 'hidden',
-                            aspectRatio: 1,
-                            opacity: pressed ? 0.7 : 1,
-                          },
-                        ]}
-                      >
-                        <Image
-                          source={{ uri: previewUrl || gifUrl }}
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            backgroundColor: isDark ? '#333' : '#f0f0f0',
-                          }}
-                          resizeMode='cover'
-                        />
-                      </Pressable>
-                    );
-                  }}
-                  keyExtractor={item => item.id}
-                  numColumns={3}
-                  columnWrapperStyle={{ justifyContent: 'space-between' }}
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{ paddingBottom: 20 }}
-                />
-              ) : (
-                <View
-                  style={{
-                    flex: 1,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 48,
-                      marginBottom: 16,
-                    }}
-                  >
-                    🎭
-                  </Text>
-                  <Text
-                    style={{
-                      color: colors.text,
-                      fontSize: 18,
-                      textAlign: 'center',
-                      fontWeight: '600',
-                      marginBottom: 8,
-                    }}
-                  >
-                    {gifSearchQuery.trim()
-                      ? `No GIFs found for "${gifSearchQuery}"`
-                      : 'Search for the perfect GIF'}
-                  </Text>
-                  <Text
-                    style={{
-                      color: colors.text,
-                      fontSize: 14,
-                      textAlign: 'center',
-                      opacity: 0.7,
-                      marginTop: 4,
-                    }}
-                  >
-                    {gifSearchQuery.trim()
-                      ? 'Try a different search term'
-                      : 'Type something in the search bar above'}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {/* Powered by Tenor */}
-            <View
-              style={{
-                paddingHorizontal: 16,
-                paddingVertical: 8,
-                borderTopWidth: 1,
-                borderTopColor: colors.border,
-                alignItems: 'center',
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: colors.text + '60',
-                  fontStyle: 'italic',
-                }}
-              >
-                Powered by Tenor
-              </Text>
-            </View>
-          </View>
-        </Modal>
+        <GifPickerModal
+          visible={gifPicker.state.modalVisible}
+          onClose={gifPicker.closePicker}
+          onSelectGif={gifPicker.selectGif}
+          searchQuery={gifPicker.state.searchQuery}
+          onSearchQueryChange={gifPicker.setSearchQuery}
+          onSearchSubmit={gifPicker.searchGifs}
+          gifResults={gifPicker.state.results}
+          loading={gifPicker.state.loading}
+          error={gifPicker.state.error}
+          colors={gifPickerColors}
+        />
       </KeyboardAvoidingView>
     </SafeAreaViewSA>
   );

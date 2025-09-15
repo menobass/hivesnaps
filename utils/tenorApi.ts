@@ -160,7 +160,7 @@ export const getTrendingGifs = async (
     const response = await fetch(
       `${TENOR_BASE_URL}/featured?${params.toString()}`
     );
-
+    
     if (!response.ok) {
       throw new Error(
         `Tenor API error: ${response.status} ${response.statusText}`
