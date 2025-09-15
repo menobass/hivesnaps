@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import Modal from 'react-native-modal';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TenorGif, getBestGifUrl, getGifPreviewUrl } from '../utils/tenorApi';
 
 /**
@@ -96,6 +97,7 @@ export const GifPickerModal: React.FC<GifPickerModalProps> = ({
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const insets = useSafeAreaInsets();
 
   /**
    * Handles GIF selection with proper URL validation
@@ -236,8 +238,8 @@ export const GifPickerModal: React.FC<GifPickerModalProps> = ({
           borderBottomLeftRadius: 20,
           borderBottomRightRadius: 20,
           height: '85%',
-          paddingTop: 60, // Account for status bar
-          marginTop: Platform.OS === 'ios' ? 44 : 24,
+          paddingTop: insets.top + 10, // Use safe area top + small padding
+          marginTop: insets.top > 0 ? 0 : 10, // Only add margin if no safe area
         }}
       >
         {/* Modal Header */}
