@@ -157,11 +157,19 @@ export const getTrendingGifs = async (
   });
 
   try {
-    const response = await fetch(
-      `${TENOR_BASE_URL}/featured?${params.toString()}`
-    );
+    const url = `${TENOR_BASE_URL}/featured?${params.toString()}`;
+    console.log('🔍 [Tenor API] Requesting trending GIFs:', url);
+    console.log('🔑 [Tenor API] API Key length:', TENOR_API_KEY?.length);
+    
+    const response = await fetch(url);
 
+    console.log('📡 [Tenor API] Response status:', response.status, response.statusText);
+    
     if (!response.ok) {
+      // Log response body for debugging
+      const errorText = await response.text();
+      console.error('❌ [Tenor API] Error response body:', errorText);
+      
       throw new Error(
         `Tenor API error: ${response.status} ${response.statusText}`
       );
