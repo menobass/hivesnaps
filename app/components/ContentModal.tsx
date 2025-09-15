@@ -334,7 +334,7 @@ const ContentModal: React.FC<ContentModalProps> = ({
               <FontAwesome name='image' size={22} color={colors.icon} />
             </TouchableOpacity>
             {/* Hide GIF button for iOS in reply mode */}
-            {/* {!(Platform.OS === 'ios' && mode === 'reply') && (
+            {!(Platform.OS === 'ios' && mode === 'reply') && (
               <TouchableOpacity
                 onPress={onAddGif}
                 disabled={uploading || posting || processing}
@@ -345,7 +345,7 @@ const ContentModal: React.FC<ContentModalProps> = ({
               >
                 <Text style={{ fontSize: 18, color: colors.icon }}>GIF</Text>
               </TouchableOpacity>
-            )} */}
+            )}
             {uploading && (
               <FontAwesome name='spinner' size={16} color={colors.icon} />
             )}
