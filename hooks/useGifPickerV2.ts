@@ -74,7 +74,7 @@ export interface GifPickerConfig {
 export const useGifPicker = (config: GifPickerConfig): UseGifPickerReturn => {
   const {
     onGifSelected,
-    loadTrendingOnOpen = false, // Changed to false to match old behavior
+    loadTrendingOnOpen = true, // Changed to false to match old behavior
     limit = 20
   } = config;
 
