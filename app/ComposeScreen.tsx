@@ -28,8 +28,8 @@ import { avatarService } from '../services/AvatarService';
 import { uploadImageSmart } from '../utils/imageUploadService';
 import { useSharedContent } from '@/hooks/useSharedContent';
 import { useShare } from '@/context/ShareContext';
-import ReactNativeModal from 'react-native-modal';
-import { searchGifs, getTrendingGifs } from '../utils/tenorApi';
+import { useGifPicker } from '../hooks/useGifPickerV2';
+import { GifPickerModal } from '../components/GifPickerModalV2';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -68,12 +68,17 @@ export default function ComposeScreen() {
   const [spoilerModalVisible, setSpoilerModalVisible] = useState(false);
   const [spoilerButtonText, setSpoilerButtonText] = useState('');
 
-  // GIF picker state
+  // GIF state for composer (array of GIF URLs)
   const [gifs, setGifs] = useState<string[]>([]);
-  const [gifModalVisible, setGifModalVisible] = useState(false);
-  const [gifSearchQuery, setGifSearchQuery] = useState('');
-  const [gifResults, setGifResults] = useState<any[]>([]);
-  const [gifLoading, setGifLoading] = useState(false);
+
+  // GIF picker state - using our new professional hook
+  const gifPicker = useGifPicker({
+    onGifSelected: (gifUrl: string) => {
+      setGifs(prev => [...prev, gifUrl]);
+    },
+    // Remove loadTrendingOnOpen to use default (false)
+    limit: 20,
+  });
 
   const colors = {
     background: isDark ? '#15202B' : '#fff',
@@ -324,51 +329,22 @@ export default function ComposeScreen() {
     setImages([]);
   };
 
-  // GIF handlers
+  // GIF handlers - using new professional hook
   const handleOpenGifPicker = () => {
-    setGifModalVisible(true);
-    // Load trending GIFs initially
-    setGifResults([]);
-    setGifSearchQuery('');
-    // Load trending GIFs when modal opens
-    handleSearchGifs('');
+    gifPicker.openPicker();
   };
 
   const handleCloseGifModal = () => {
-    setGifModalVisible(false);
-    setGifSearchQuery('');
-    setGifResults([]);
+    gifPicker.closePicker();
   };
 
   const handleSearchGifs = async (query: string) => {
-    console.log('[GIF Search Debug] Starting search with query:', query);
-    setGifLoading(true);
-    try {
-      // Use static import (already imported at top)
-      // const { searchGifs, getTrendingGifs } = await import('../utils/tenorApi');
-      console.log('[GIF Search Debug] Tenor API imported successfully');
-
-      const response = query.trim()
-        ? await searchGifs(query, 20)
-        : await getTrendingGifs(20);
-
-      console.log('[GIF Search Debug] API response:', response);
-      console.log(
-        '[GIF Search Debug] Results count:',
-        response?.results?.length || 0
-      );
-      setGifResults(response.results);
-    } catch (error) {
-      console.error('[GIF Search Debug] Error searching GIFs:', error);
-      setGifResults([]);
-    } finally {
-      setGifLoading(false);
-    }
+    await gifPicker.searchGifs(query);
   };
 
   const handleSelectGif = (gifUrl: string) => {
-    setGifs(prev => [...prev, gifUrl]);
-    handleCloseGifModal();
+    // This is now handled by the hook's onGifSelected callback
+    gifPicker.selectGif(gifUrl);
   };
 
   const handleRemoveGif = (indexToRemove: number) => {
@@ -1028,161 +1004,25 @@ export default function ComposeScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* GIF Picker Modal */}
-      <ReactNativeModal
-        isVisible={gifModalVisible}
-        onBackdropPress={handleCloseGifModal}
-        onBackButtonPress={handleCloseGifModal}
-        style={{ margin: 0, justifyContent: 'flex-start' }}
-        backdropOpacity={0.5}
-        avoidKeyboard={true}
-      >
-        <View
-          style={{
-            backgroundColor: colors.background,
-            borderBottomLeftRadius: 20,
-            borderBottomRightRadius: 20,
-            height: '85%',
-            paddingTop: 60, // Account for status bar
-            marginTop: Platform.OS === 'ios' ? 44 : 24,
-          }}
-        >
-          {/* Modal Header */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: 20,
-              paddingBottom: 15,
-              borderBottomWidth: 1,
-              borderBottomColor: colors.inputBorder,
-            }}
-          >
-            <Text
-              style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}
-            >
-              Choose a GIF
-            </Text>
-            <Pressable onPress={handleCloseGifModal}>
-              <FontAwesome name='close' size={24} color={colors.text} />
-            </Pressable>
-          </View>
-
-          {/* Search Bar */}
-          <View
-            style={{
-              paddingHorizontal: 20,
-              paddingVertical: 15,
-            }}
-          >
-            <TextInput
-              style={{
-                backgroundColor: colors.inputBg,
-                borderRadius: 20,
-                paddingHorizontal: 15,
-                paddingVertical: 10,
-                fontSize: 16,
-                color: colors.text,
-              }}
-              placeholder='Search for GIFs...'
-              placeholderTextColor={colors.text + '80'}
-              value={gifSearchQuery}
-              onChangeText={setGifSearchQuery}
-              returnKeyType='search'
-              onSubmitEditing={() => {
-                if (gifSearchQuery.trim()) {
-                  handleSearchGifs(gifSearchQuery.trim());
-                } else {
-                  handleSearchGifs(''); // This will load trending GIFs
-                }
-              }}
-            />
-          </View>
-
-          {/* GIF Results */}
-          <View style={{ flex: 1, paddingHorizontal: 10, paddingBottom: 20 }}>
-            {gifLoading ? (
-              <View
-                style={{
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: 200,
-                }}
-              >
-                <ActivityIndicator size='large' color={colors.button} />
-                <Text style={{ color: colors.text, marginTop: 10 }}>
-                  Searching GIFs...
-                </Text>
-              </View>
-            ) : gifResults.length > 0 ? (
-              <FlatList
-                data={gifResults}
-                keyExtractor={(item, index) =>
-                  `gif-${index}-${item?.id || Math.random()}`
-                }
-                numColumns={2}
-                showsVerticalScrollIndicator={false}
-                renderItem={({ item }) => {
-                  // Get the best GIF URL (preview size for picker)
-                  const gifUrl =
-                    item?.media_formats?.gif?.url ||
-                    item?.media_formats?.tinygif?.url ||
-                    item?.media_formats?.nanogif?.url;
-
-                  if (!gifUrl) return null;
-
-                  return (
-                    <Pressable
-                      onPress={() => handleSelectGif(gifUrl)}
-                      style={{
-                        flex: 1,
-                        margin: 5,
-                        borderRadius: 8,
-                        overflow: 'hidden',
-                        backgroundColor: colors.inputBg,
-                      }}
-                    >
-                      <Image
-                        source={{ uri: gifUrl }}
-                        style={{
-                          width: '100%',
-                          aspectRatio: 1,
-                          borderRadius: 8,
-                        }}
-                        resizeMode='cover'
-                      />
-                    </Pressable>
-                  );
-                }}
-              />
-            ) : (
-              <View
-                style={{
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: 200,
-                }}
-              >
-                <FontAwesome
-                  name='search'
-                  size={48}
-                  color={colors.inputBorder}
-                />
-                <Text
-                  style={{
-                    color: colors.text,
-                    marginTop: 10,
-                    textAlign: 'center',
-                  }}
-                >
-                  {gifSearchQuery ? 'No GIFs found' : 'Search for GIFs above'}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-      </ReactNativeModal>
+      {/* Professional GIF Picker Modal */}
+      <GifPickerModal
+        visible={gifPicker.state.modalVisible}
+        onClose={gifPicker.closePicker}
+        onSelectGif={gifPicker.selectGif}
+        searchQuery={gifPicker.state.searchQuery}
+        onSearchQueryChange={gifPicker.setSearchQuery}
+        onSearchSubmit={gifPicker.searchGifs}
+        gifResults={gifPicker.state.results}
+        loading={gifPicker.state.loading}
+        error={gifPicker.state.error}
+        colors={{
+          background: colors.background,
+          text: colors.text,
+          inputBg: colors.inputBg,
+          inputBorder: colors.inputBorder,
+          button: colors.button,
+        }}
+      />
 
       {/* Spoiler Modal */}
       <Modal
