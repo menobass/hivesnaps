@@ -95,7 +95,9 @@ export const useUpvote = (
           );
           console.log('[VoteValueDebug] calculateVoteValue result:', calcValue);
           setVoteValue(calcValue);
+          console.log('[useUpvote] Vote value set to:', calcValue);
         } else {
+          console.log('[useUpvote] Setting vote value to null - missing data');
           setVoteValue(null);
         }
       } catch (err) {
@@ -176,9 +178,30 @@ export const useUpvote = (
           snapData: upvoteTarget.snap,
         });
 
-        const estimatedValueIncrease = voteValue
-          ? parseFloat(voteValue.usd)
+        // Recalculate vote value using current voteWeight (in case voteValue is stale/null)
+        let calculatedVoteValue = voteValue;
+        if (!calculatedVoteValue && username) {
+          try {
+            const accounts = await client.database.getAccounts([username]);
+            const accountObj = accounts && accounts[0] ? accounts[0] : null;
+            if (accountObj && globalProps && rewardFund) {
+              calculatedVoteValue = calculateVoteValue(
+                accountObj,
+                globalProps,
+                rewardFund,
+                voteWeight,
+                hivePrice
+              );
+            }
+          } catch (err) {
+            console.error('[useUpvote] Error recalculating vote value:', err);
+          }
+        }
+
+        const estimatedValueIncrease = calculatedVoteValue
+          ? parseFloat(calculatedVoteValue.usd)
           : 0;
+        
         const upvoteUpdates = createUpvoteUpdate(voteWeight, username || '');
         const currentVotes =
           upvoteTarget.snap.voteCount || upvoteTarget.snap.net_votes || 0;
