@@ -95,7 +95,6 @@ export const useUpvote = (
           );
           console.log('[VoteValueDebug] calculateVoteValue result:', calcValue);
           setVoteValue(calcValue);
-          console.log('[useUpvote] Vote value set to:', calcValue);
         } else {
           setVoteValue(null);
         }
