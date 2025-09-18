@@ -11,6 +11,71 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({ embedUrl, isDark }) => {
   const colorScheme = useColorScheme();
   const themeIsDark = isDark ?? colorScheme === 'dark';
 
+  // Extract video ID from various YouTube URL formats
+  const getVideoId = (url: string): string | null => {
+    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+    const match = url.match(regex);
+    return match ? match[1] : null;
+  };
+
+  const videoId = getVideoId(embedUrl);
+
+  if (!videoId) {
+    return (
+      <View
+        style={[
+          styles.errorContainer,
+          { backgroundColor: themeIsDark ? '#333' : '#f0f0f0' },
+        ]}
+      >
+        <Text
+          style={[styles.errorText, { color: themeIsDark ? '#fff' : '#000' }]}
+        >
+          Invalid YouTube URL
+        </Text>
+      </View>
+    );
+  }
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body {
+            margin: 0;
+            padding: 0;
+            background-color: ${themeIsDark ? '#000' : '#fff'};
+          }
+          .video-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+          }
+          iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="video-container">
+          <iframe
+            src="https://www.youtube.com/embed/${videoId}?rel=0&showinfo=0&modestbranding=1&playsinline=1"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowfullscreen>
+          </iframe>
+        </div>
+      </body>
+    </html>
+  `;
+
   return (
     <View
       style={{
@@ -22,21 +87,15 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({ embedUrl, isDark }) => {
       }}
     >
       <WebView
-        source={{ uri: embedUrl }}
+        source={{ html: htmlContent }}
         style={{ flex: 1, backgroundColor: themeIsDark ? '#000' : '#fff' }}
         allowsFullscreenVideo
         javaScriptEnabled
         domStorageEnabled
-        mediaPlaybackRequiresUserAction={true}
+        mediaPlaybackRequiresUserAction={false}
         allowsInlineMediaPlayback={true}
-        onShouldStartLoadWithRequest={request => {
-          // Allow YouTube URLs, block others
-          return (
-            request.url.includes('youtube.com') ||
-            request.url.includes('youtu.be') ||
-            request.url.includes('google.com')
-          );
-        }}
+        startInLoadingState={true}
+        originWhitelist={['*']}
       />
       {/* YouTube type indicator */}
       <View
@@ -60,6 +119,17 @@ const styles = StyleSheet.create({
   indicatorText: {
     fontSize: 10,
     fontWeight: 'bold',
+  },
+  errorContainer: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 
