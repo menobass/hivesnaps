@@ -97,7 +97,6 @@ export const useUpvote = (
           setVoteValue(calcValue);
           console.log('[useUpvote] Vote value set to:', calcValue);
         } else {
-          console.log('[useUpvote] Setting vote value to null - missing data');
           setVoteValue(null);
         }
       } catch (err) {
