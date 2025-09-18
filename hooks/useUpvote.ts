@@ -199,7 +199,6 @@ export const useUpvote = (
         const estimatedValueIncrease = calculatedVoteValue
           ? parseFloat(calculatedVoteValue.usd)
           : 0;
-        
         const upvoteUpdates = createUpvoteUpdate(voteWeight, username || '');
         const currentVotes =
           upvoteTarget.snap.voteCount || upvoteTarget.snap.net_votes || 0;
