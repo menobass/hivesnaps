@@ -474,8 +474,9 @@ const Snap: React.FC<SnapProps> = ({
   // Remove embedded content URLs and image URLs from text body if present
   let textBody = stripImageTags(body);
   if (embeddedContent) {
-  textBody = removeVideoUrls(textBody);
-  textBody = removeInstagramUrls(textBody);
+    textBody = removeVideoUrls(textBody);
+    textBody = removeInstagramUrls(textBody);
+    textBody = removeYouTubeUrl(textBody);
   }
   if (rawImageUrls.length > 0) {
     textBody = removeRawImageUrlsUtil(textBody);
