@@ -307,7 +307,7 @@ const ConversationScreenRefactored = () => {
   };
 
   const handleReplyPress = (author: string, permlink: string) => {
-    console.log('[ConversationScreen] handleUpvotePress called:', {
+    console.log('[ConversationScreen] handleReplyPress called:', {
       author,
       permlink,
     });
