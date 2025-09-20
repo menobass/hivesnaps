@@ -264,7 +264,50 @@ const ConversationScreenRefactored = () => {
     author: string;
     permlink: string;
   }) => {
-    console.log('[ConversationScreen] handleUpvotePress called:', {
+    // Find the target snap (could be main snap or a reply)
+    let targetSnap = null;
+    const correctAuthor = author;
+    const correctPermlink = permlink;
+
+    if (snap && snap.author === correctAuthor && snap.permlink === correctPermlink) {
+      targetSnap = snap;
+    } else {
+      targetSnap = findReplyInTree(replies, correctAuthor, correctPermlink);
+    }
+
+    if (!targetSnap) {
+      console.warn('Target snap not found for voting');
+      return;
+    }
+
+    // Perform immediate optimistic update before opening modal
+    if (!targetSnap.hasUpvoted) {
+      // Get current vote count
+      const currentVotes = targetSnap.voteCount || 0;
+      
+      // Only update vote count and visual state - NOT payout
+      // Payout will be updated after modal confirmation with actual vote weight
+      const optimisticUpdate = {
+        hasUpvoted: true,
+        voteCount: currentVotes + 1,
+      };
+
+      if (snap && snap.author === correctAuthor && snap.permlink === correctPermlink) {
+        updateSnap(correctAuthor, correctPermlink, optimisticUpdate);
+      } else {
+        updateReply(correctAuthor, correctPermlink, optimisticUpdate);
+      }
+    }
+
+    openUpvoteModal({
+      author: correctAuthor,
+      permlink: correctPermlink,
+      snap: targetSnap,
+    });
+  };
+
+  const handleReplyPress = (author: string, permlink: string) => {
+    console.log('[ConversationScreen] handleReplyPress called:', {
       author,
       permlink,
     });

@@ -176,8 +176,28 @@ export const useUpvote = (
           snapData: upvoteTarget.snap,
         });
 
-        const estimatedValueIncrease = voteValue
-          ? parseFloat(voteValue.usd)
+        // Recalculate vote value using current voteWeight (in case voteValue is stale/null)
+        let calculatedVoteValue = voteValue;
+        if (!calculatedVoteValue && username) {
+          try {
+            const accounts = await client.database.getAccounts([username]);
+            const accountObj = accounts && accounts[0] ? accounts[0] : null;
+            if (accountObj && globalProps && rewardFund) {
+              calculatedVoteValue = calculateVoteValue(
+                accountObj,
+                globalProps,
+                rewardFund,
+                voteWeight,
+                hivePrice
+              );
+            }
+          } catch (err) {
+            console.error('[useUpvote] Error recalculating vote value:', err);
+          }
+        }
+
+        const estimatedValueIncrease = calculatedVoteValue
+          ? parseFloat(calculatedVoteValue.usd)
           : 0;
         const upvoteUpdates = createUpvoteUpdate(voteWeight, username || '');
         const currentVotes =
