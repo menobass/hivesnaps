@@ -53,3 +53,5 @@ test-*.ts
 /test
 /android
 /ios
+/android
+/ios
