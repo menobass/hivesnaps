@@ -61,21 +61,19 @@ export const useUpvote = (
   const [upvoteLoading, setUpvoteLoading] = useState(false);
   const [upvoteSuccess, setUpvoteSuccess] = useState(false);
   const [voteWeightLoading, setVoteWeightLoading] = useState(false);
+  const [storedAccountObj, setStoredAccountObj] = useState<any | null>(null);
 
   // Recalculate vote value whenever vote weight changes and modal is open
   useEffect(() => {
     const recalculateVoteValue = async () => {
-      if (!upvoteModalVisible || !username || voteWeightLoading) {
+      if (!upvoteModalVisible || !username || voteWeightLoading || !storedAccountObj) {
         return;
       }
 
       try {
-        const accounts = await client.database.getAccounts([username]);
-        const accountObj = accounts && accounts[0] ? accounts[0] : null;
-        
-        if (accountObj && globalProps && rewardFund) {
+        if (storedAccountObj && globalProps && rewardFund) {
           const calcValue = calculateVoteValue(
-            accountObj,
+            storedAccountObj,
             globalProps,
             rewardFund,
             voteWeight,
@@ -92,7 +90,7 @@ export const useUpvote = (
     };
 
     recalculateVoteValue();
-  }, [voteWeight, upvoteModalVisible, username, globalProps, rewardFund, hivePrice, voteWeightLoading]);
+  }, [voteWeight, upvoteModalVisible, username, globalProps, rewardFund, hivePrice, voteWeightLoading, storedAccountObj]);
 
   const openUpvoteModal = useCallback(
     async (target: UpvoteTarget) => {
@@ -110,6 +108,7 @@ export const useUpvote = (
         if (username) {
           const accounts = await client.database.getAccounts([username]);
           accountObj = accounts && accounts[0] ? accounts[0] : null;
+          setStoredAccountObj(accountObj); // Store for later use
         }
 
         // Calculate initial vote value
@@ -137,6 +136,7 @@ export const useUpvote = (
         if (username) {
           const accounts = await client.database.getAccounts([username]);
           accountObj = accounts && accounts[0] ? accounts[0] : null;
+          setStoredAccountObj(accountObj); // Store for later use
         }
         if (accountObj && globalProps && rewardFund) {
           const calcValue = calculateVoteValue(
@@ -162,6 +162,7 @@ export const useUpvote = (
     setUpvoteModalVisible(false);
     setUpvoteTarget(null);
     setVoteValue(null);
+    setStoredAccountObj(null); // Clear stored account data
     // Do not reset voteWeight, keep last used value
   }, []);
 
@@ -282,6 +283,7 @@ export const useUpvote = (
         setUpvoteSuccess(false);
         setUpvoteTarget(null);
         setVoteValue(null);
+        setStoredAccountObj(null); // Clear stored account data
       }, 1500);
     } catch (err) {
       setUpvoteLoading(false);
