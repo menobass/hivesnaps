@@ -12,7 +12,7 @@ const HIVE_NODES = [
 const client = new Client(HIVE_NODES);
 
 // Default maximum depth for fetching nested replies
-const DEFAULT_MAX_REPLY_DEPTH = 3;
+const DEFAULT_MAX_REPLY_DEPTH = 10;
 
 // Types for conversation data
 export interface SnapData {
