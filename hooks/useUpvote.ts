@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Client, PrivateKey } from '@hiveio/dhive';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -61,6 +61,38 @@ export const useUpvote = (
   const [upvoteLoading, setUpvoteLoading] = useState(false);
   const [upvoteSuccess, setUpvoteSuccess] = useState(false);
   const [voteWeightLoading, setVoteWeightLoading] = useState(false);
+
+  // Recalculate vote value whenever vote weight changes and modal is open
+  useEffect(() => {
+    const recalculateVoteValue = async () => {
+      if (!upvoteModalVisible || !username || voteWeightLoading) {
+        return;
+      }
+
+      try {
+        const accounts = await client.database.getAccounts([username]);
+        const accountObj = accounts && accounts[0] ? accounts[0] : null;
+        
+        if (accountObj && globalProps && rewardFund) {
+          const calcValue = calculateVoteValue(
+            accountObj,
+            globalProps,
+            rewardFund,
+            voteWeight,
+            hivePrice
+          );
+          setVoteValue(calcValue);
+        } else {
+          setVoteValue(null);
+        }
+      } catch (err) {
+        console.error('[useUpvote] Error recalculating vote value:', err);
+        setVoteValue(null);
+      }
+    };
+
+    recalculateVoteValue();
+  }, [voteWeight, upvoteModalVisible, username, globalProps, rewardFund, hivePrice, voteWeightLoading]);
 
   const openUpvoteModal = useCallback(
     async (target: UpvoteTarget) => {
