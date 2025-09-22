@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.anonymous.hivesnaps'
+    namespace 'com.menobass.hivesnaps'
     defaultConfig {
-        applicationId 'com.anonymous.hivesnaps'
+        applicationId 'com.menobass.hivesnaps'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

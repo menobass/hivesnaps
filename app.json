@@ -1,11 +1,14 @@
 {
   "expo": {
-    "name": "hivesnaps",
+    "name": "hivesnaps-nuclear",
     "owner": "menobass",
-    "slug": "hivesnaps",
+    "slug": "hivesnaps-nuclear",
     "version": "1.1.1",
     "orientation": "portrait",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "icon": "./assets/images/appicon.png",
     "scheme": "hivesnaps",
     "userInterfaceStyle": "automatic",
@@ -36,7 +39,9 @@
       "intentFilters": [
         {
           "action": "android.intent.action.SEND",
-          "category": ["android.intent.category.DEFAULT"],
+          "category": [
+            "android.intent.category.DEFAULT"
+          ],
           "data": [
             {
               "mimeType": "image/*"
@@ -51,7 +56,9 @@
         },
         {
           "action": "android.intent.action.SEND_MULTIPLE",
-          "category": ["android.intent.category.DEFAULT"],
+          "category": [
+            "android.intent.category.DEFAULT"
+          ],
           "data": [
             {
               "mimeType": "image/*"
@@ -80,7 +87,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "d1d4438f-f85d-4fd3-b1d4-75f5c9f395c4"
+        "projectId": "6fe62f55-980c-4645-bf42-32deee29c4a1"
       }
     }
   }
