@@ -174,7 +174,7 @@ export default function LoginScreen() {
         // Show loading screen during auto-login check
         <View style={[styles.flexContainer, styles.loadingContainer]}>
           <Image
-            source={require('../../assets/images/logo.png')}
+            source={require('../assets/images/logo.png')}
             style={styles.logo}
             resizeMode='contain'
           />
@@ -198,7 +198,7 @@ export default function LoginScreen() {
               <View style={styles.innerContainer}>
                 {/* App logo at the top */}
                 <Image
-                  source={require('../../assets/images/logo.png')}
+                  source={require('../assets/images/logo.png')}
                   style={styles.logo}
                   resizeMode='contain'
                 />
