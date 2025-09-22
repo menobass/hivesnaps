@@ -1,4 +1,4 @@
-package com.anonymous.hivesnaps
+package com.meno.hivesnaps
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build
