@@ -804,7 +804,7 @@ const ProfileScreen = () => {
                   style={[styles.logoutButton, { backgroundColor: '#E74C3C' }]}
                   onPress={async () => {
                     await handleLogout();
-                    router.replace('/(tabs)');
+                    router.replace('/LoginScreen');
                   }}
                 >
                   <FontAwesome name='sign-out' size={18} color='#fff' />
