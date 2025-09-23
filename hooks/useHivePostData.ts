@@ -117,7 +117,7 @@ export const useHivePostData = (
       postAuthor: string,
       postPermlink: string,
       depth = 0,
-      maxDepth = 3
+      maxDepth = 10
     ): Promise<HiveCommentData[]> => {
       if (depth > maxDepth) return [];
 
