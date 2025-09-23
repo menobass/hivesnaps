@@ -199,7 +199,7 @@ const NotificationsScreen = () => {
       console.log(
         '[NotificationsScreen] Navigating to ProfileScreen for follow notification'
       );
-      router.push('/screens/ProfileScreen');
+      router.push(`/screens/ProfileScreen?username=${notification.actionUser}`);
       return;
     }
 
