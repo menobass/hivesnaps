@@ -63,7 +63,5 @@ async function fetchPersonalMutedList(): Promise<string[]> {
   const muted = Array.isArray(data)
     ? data
     : [];
-
-  console.log('[HiveMuteService] Personal muted list:', muted, 'users');
   return muted;
 }
