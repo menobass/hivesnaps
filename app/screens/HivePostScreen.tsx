@@ -17,21 +17,21 @@ import {
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image';
-import PostBody from './components/PostBody';
+import PostBody from '../components/PostBody';
 import { Dimensions } from 'react-native';
-import { useUserAuth } from '../hooks/useUserAuth';
-import { useUpvote } from '../hooks/useUpvote';
-import { useHiveData } from '../hooks/useHiveData';
-import { useHivePostData } from '../hooks/useHivePostData';
-import { HivePostScreenStyles } from '../styles/HivePostScreenStyles';
-import { useReply, ReplyTarget } from '../hooks/useReply';
-import { useGifPicker } from '../hooks/useGifPickerV2';
-import UpvoteModal from '../components/UpvoteModal';
-import { useMutedList } from '../store/context';
-import Snap from './components/Snap';
-import ContentModal from './components/ContentModal';
-import { GifPickerModal } from '../components/GifPickerModalV2';
-import genericAvatar from '../assets/images/generic-avatar.png';
+import { useUserAuth } from '../../hooks/useUserAuth';
+import { useUpvote } from '../../hooks/useUpvote';
+import { useHiveData } from '../../hooks/useHiveData';
+import { useHivePostData } from '../../hooks/useHivePostData';
+import { HivePostScreenStyles } from '../../styles/HivePostScreenStyles';
+import { useReply, ReplyTarget } from '../../hooks/useReply';
+import { useGifPicker } from '../../hooks/useGifPickerV2';
+import UpvoteModal from '../../components/UpvoteModal';
+import { useMutedList } from '../../store/context';
+import Snap from '../components/Snap';
+import ContentModal from '../components/ContentModal';
+import { GifPickerModal } from '../../components/GifPickerModalV2';
+import genericAvatar from '../../assets/images/generic-avatar.png';
 
 const HivePostScreen = () => {
   const { author, permlink } = useLocalSearchParams<{
@@ -144,7 +144,7 @@ const HivePostScreen = () => {
   const handleResnap = useCallback(() => {
     if (!post?.author || !post?.permlink) return;
     const snapUrl = `https://hive.blog/@${post.author}/${post.permlink}`;
-    router.push({ pathname: '/ComposeScreen', params: { resnapUrl: snapUrl } });
+    router.push({ pathname: '/screens/ComposeScreen', params: { resnapUrl: snapUrl } });
   }, [post, router]);
 
   // Handle GIF picker opening
@@ -551,7 +551,7 @@ const HivePostScreen = () => {
                     // TODO: Implement edit functionality
                   }}
                   onUserPress={username => {
-                    router.push(`/ProfileScreen?username=${username}` as any);
+                    router.push(`/screens/ProfileScreen?username=${username}` as any);
                   }}
                   onImagePress={handleImagePress}
                   currentUsername={currentUsername}

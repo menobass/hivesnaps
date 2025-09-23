@@ -322,7 +322,7 @@ const Snap: React.FC<SnapProps> = ({
             key={uniqueKey}
             onPress={() => {
               if (isReply) {
-                router.push(`/ProfileScreen?username=${username}` as any);
+                router.push(`/screens/ProfileScreen?username=${username}` as any);
               } else {
                 onUserPress && onUserPress(username);
               }
@@ -344,7 +344,7 @@ const Snap: React.FC<SnapProps> = ({
             key={uniqueKey}
             onPress={() => {
               if (isReply) {
-                router.push({ pathname: '/DiscoveryScreen', params: { hashtag: tag } } as any);
+                router.push({ pathname: '/screens/DiscoveryScreen', params: { hashtag: tag } } as any);
               } else {
                 onHashtagPress && onHashtagPress(tag);
               }

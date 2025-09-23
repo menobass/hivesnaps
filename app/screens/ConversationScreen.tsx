@@ -21,7 +21,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import RenderHtml from 'react-native-render-html';
-import { ConversationScreenStyles } from '../styles/ConversationScreenStyles';
+import { ConversationScreenStyles } from '../../styles/ConversationScreenStyles';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Modal from 'react-native-modal';
@@ -30,42 +30,42 @@ import {
   extractVideoInfo,
   removeTwitterUrls,
   removeEmbedUrls,
-} from '../utils/extractVideoInfo';
+} from '../../utils/extractVideoInfo';
 import { Image as ExpoImage } from 'expo-image';
 import { Dimensions } from 'react-native';
 
-import { extractImageUrls } from '../utils/extractImageUrls';
+import { extractImageUrls } from '../../utils/extractImageUrls';
 import {
   extractRawImageUrls as extractRawImageUrlsUtil,
   removeRawImageUrls as removeRawImageUrlsUtil,
-} from '../utils/rawImageUrls';
+} from '../../utils/rawImageUrls';
 import ImageView from 'react-native-image-viewing';
-import genericAvatar from '../assets/images/generic-avatar.png';
-import { extractBlogPostUrls } from '../utils/extractHivePostInfo';
-import { ContextHivePostPreviewRenderer } from '../components/ContextHivePostPreviewRenderer';
-import { convertSpoilerSyntax, SpoilerData } from '../utils/spoilerParser';
-import SpoilerText from './components/SpoilerText';
-import TwitterEmbed from './components/TwitterEmbed';
-import UpvoteModal from '../components/UpvoteModal';
-import Snap from './components/Snap';
+import genericAvatar from '../../assets/images/generic-avatar.png';
+import { extractBlogPostUrls } from '../../utils/extractHivePostInfo';
+import { ContextHivePostPreviewRenderer } from '../../components/ContextHivePostPreviewRenderer';
+import { convertSpoilerSyntax, SpoilerData } from '../../utils/spoilerParser';
+import SpoilerText from '../components/SpoilerText';
+import TwitterEmbed from '../components/TwitterEmbed';
+import UpvoteModal from '../../components/UpvoteModal';
+import Snap from '../components/Snap';
 
-import ContentModal from './components/ContentModal';
+import ContentModal from '../components/ContentModal';
 
 // Custom hooks for business logic
-import { useUserAuth } from '../hooks/useUserAuth';
+import { useUserAuth } from '../../hooks/useUserAuth';
 import {
   useConversationData,
   SnapData,
   ReplyData,
-} from '../hooks/useConversationData';
-import { useUpvote } from '../hooks/useUpvote';
-import { useHiveData } from '../hooks/useHiveData';
-import { useReply } from '../hooks/useReply';
-import { useEdit } from '../hooks/useEdit';
-import { useGifPicker, GifPickerMode, GifSelectionCallback } from '../hooks/useGifPickerV2';
-import { GifPickerModal } from '../components/GifPickerModalV2';
+} from '../../hooks/useConversationData';
+import { useUpvote } from '../../hooks/useUpvote';
+import { useHiveData } from '../../hooks/useHiveData';
+import { useReply } from '../../hooks/useReply';
+import { useEdit } from '../../hooks/useEdit';
+import { useGifPicker, GifPickerMode, GifSelectionCallback } from '../../hooks/useGifPickerV2';
+import { GifPickerModal } from '../../components/GifPickerModalV2';
 
-import { useMutedList } from '../store/context';
+import { useMutedList } from '../../store/context';
 
 
 const ConversationScreenRefactored = () => {
@@ -218,7 +218,7 @@ const ConversationScreenRefactored = () => {
     }
 
     router.push({
-      pathname: '/ConversationScreen',
+      pathname: '/screens/ConversationScreen',
       params: {
         author: snap.parent_author,
         permlink: snap.parent_permlink,
@@ -265,7 +265,7 @@ const ConversationScreenRefactored = () => {
     permlink: string;
   }) => {
     // Find the target snap (could be main snap or a reply)
-    let targetSnap = null;
+    let targetSnap: SnapData | ReplyData | null = null;
     const correctAuthor = author;
     const correctPermlink = permlink;
 
@@ -579,7 +579,7 @@ const ConversationScreenRefactored = () => {
               textDecorationLine: 'underline',
             }}
             onPress={() =>
-              router.push(`/ProfileScreen?username=${username}` as any)
+              router.push(`/screens/ProfileScreen?username=${username}` as any)
             }
             accessibilityRole='link'
             accessibilityLabel={`View @${username}'s profile`}
@@ -602,7 +602,7 @@ const ConversationScreenRefactored = () => {
             }}
             onPress={() =>
               router.push({
-                pathname: '/DiscoveryScreen',
+                pathname: '/screens/DiscoveryScreen',
                 params: { hashtag: tag },
               })
             }
@@ -721,7 +721,7 @@ const ConversationScreenRefactored = () => {
           <View style={ConversationScreenStyles.authorRow}>
             <Pressable
               onPress={() =>
-                router.push(`/ProfileScreen?username=${reply.author}` as any)
+                router.push(`/screens/ProfileScreen?username=${reply.author}` as any)
               }
               style={({ pressed }) => [
                 {
@@ -1009,7 +1009,7 @@ const ConversationScreenRefactored = () => {
         <View style={ConversationScreenStyles.authorRow}>
           <Pressable
             onPress={() =>
-              router.push(`/ProfileScreen?username=${snap.author}` as any)
+              router.push(`/screens/ProfileScreen?username=${snap.author}` as any)
             }
             style={({ pressed }) => [
               {
@@ -1385,13 +1385,13 @@ const ConversationScreenRefactored = () => {
                 onSpeechBubblePress={() => {}} // Disable in conversation view
                 onContentPress={() => {}} // Disable in conversation view
                 onUserPress={username => {
-                  router.push(`/ProfileScreen?username=${username}` as any);
+                  router.push(`/screens/ProfileScreen?username=${username}` as any);
                 }}
                 onImagePress={handleImagePress}
                 showAuthor={true}
                 onHashtagPress={tag => {
                   router.push({
-                    pathname: '/DiscoveryScreen',
+                    pathname: '/screens/DiscoveryScreen',
                     params: { hashtag: tag },
                   });
                 }}
@@ -1409,7 +1409,7 @@ const ConversationScreenRefactored = () => {
                 onResnapPress={(author, permlink) => {
                   const snapUrl = `https://hive.blog/@${author}/${permlink}`;
                   router.push({
-                    pathname: '/ComposeScreen',
+                    pathname: '/screens/ComposeScreen',
                     params: { resnapUrl: snapUrl },
                   });
                 }}
@@ -1429,7 +1429,7 @@ const ConversationScreenRefactored = () => {
                       handleOpenEditModal(snapData, 'reply')
                     }
                     onUserPress={username => {
-                      router.push(`/ProfileScreen?username=${username}` as any);
+                      router.push(`/screens/ProfileScreen?username=${username}` as any);
                     }}
                     onImagePress={handleImagePress}
                     currentUsername={currentUsername}
