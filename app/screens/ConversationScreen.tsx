@@ -265,7 +265,7 @@ const ConversationScreenRefactored = () => {
     permlink: string;
   }) => {
     // Find the target snap (could be main snap or a reply)
-    let targetSnap = null;
+    let targetSnap: SnapData | ReplyData | null = null;
     const correctAuthor = author;
     const correctPermlink = permlink;
 

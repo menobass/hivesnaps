@@ -13,12 +13,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useState, useEffect } from 'react';
-import { Text, View } from '@/components/Themed';
+import { Text, View } from '../../components/Themed';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { Client, PrivateKey } from '@hiveio/dhive';
 import * as Linking from 'expo-linking';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '../../hooks/useAuth';
 
 const twitterColors = {
   light: {
