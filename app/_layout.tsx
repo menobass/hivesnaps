@@ -8,6 +8,7 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
@@ -15,16 +16,16 @@ import { HivePostPreviewProvider } from '../context/HivePostPreviewContext';
 import { ShareProvider } from '../context/ShareContext';
 import { AppProvider } from '../store/context';
 import TOSWrapper from '../components/TOSWrapper';
+import NotFoundScreen from './NotFoundScreen';
 
 export {
   // Catch any errors thrown by the Layout component.
   ErrorBoundary,
 } from 'expo-router';
 
-export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: 'LoginScreen',
-};
+// export const unstable_settings = {
+//   initialRouteName: 'LoginScreen',
+// };
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -55,7 +56,23 @@ export default function RootLayout() {
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
-  // Do NOT call useUserProfile or useSetUserProfile here!
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    // Log navigation state and attempted route
+    if (navigation && navigation.getState) {
+      const state = navigation.getState();
+      console.log('[Navigation State]', state);
+      if (state && state.routes && state.routes.length > 0) {
+        const lastRoute = state.routes[state.routes.length - 1];
+        console.log('[Attempted Route]', lastRoute);
+      }
+    }
+    console.log('[Router Params]', params);
+  }, [navigation, params]);
+
   return (
     <AppProvider>
       <ShareProvider>
@@ -72,6 +89,7 @@ function RootLayoutNav() {
                 <Stack.Screen name='HivePostScreen' />
                 <Stack.Screen name='ProfileScreen' />
                 <Stack.Screen name='ComposeScreen' />
+                <Stack.Screen name='DiscoveryScreen' />
                 <Stack.Screen name='modal' options={{ presentation: 'modal' }} />
               </Stack>
             </TOSWrapper>
