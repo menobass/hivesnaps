@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, ReactNode } from 'react';
 import { useRouter } from 'expo-router';
-import { useSharedContent, SharedContent } from '@/hooks/useSharedContent';
-import { getHivePostNavigationInfo } from '@/utils/extractHivePostInfo';
+import { useSharedContent, SharedContent } from '../hooks/useSharedContent';
+import { getHivePostNavigationInfo } from '../utils/extractHivePostInfo';
 
 interface ShareContextType {
   sharedContent: SharedContent | null;
