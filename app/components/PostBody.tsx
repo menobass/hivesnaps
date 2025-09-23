@@ -382,7 +382,7 @@ const PostBody: React.FC<PostBodyProps> = ({ body, colors, isDark }) => {
                   <Text
                     key={node.key}
                     onPress={() =>
-                      router.push(`/ProfileScreen?username=${username}` as any)
+                      router.push(`/screens/ProfileScreen?username=${username}` as any)
                     }
                     style={{
                       color: colors.button,

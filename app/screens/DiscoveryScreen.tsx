@@ -14,17 +14,17 @@ import {
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
-import ContentModal from './components/ContentModal';
+import ContentModal from '../components/ContentModal';
 import Slider from '@react-native-community/slider';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { avatarService } from '../services/AvatarService';
-import { calculateVoteValue } from '../utils/calculateVoteValue';
+import { avatarService } from '../../services/AvatarService';
+import { calculateVoteValue } from '../../utils/calculateVoteValue';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import Snap from './components/Snap';
+import Snap from '../components/Snap';
 import { Client } from '@hiveio/dhive';
-import UpvoteModal from '../components/UpvoteModal';
-import { useEdit } from '../hooks/useEdit';
+import UpvoteModal from '../../components/UpvoteModal';
+import { useEdit } from '../../hooks/useEdit';
 
 // Use local twitterColors definition (copied from FeedScreen)
 const twitterColors = {
@@ -508,23 +508,23 @@ const DiscoveryScreen = () => {
                 onUpvotePress={handleUpvotePress}
                 onSpeechBubblePress={() => {
                   router.push({
-                    pathname: '/ConversationScreen',
+                    pathname: '/screens/ConversationScreen',
                     params: { author: item.author, permlink: item.permlink },
                   });
                 }}
                 onContentPress={() => {
                   router.push({
-                    pathname: '/ConversationScreen',
+                    pathname: '/screens/ConversationScreen',
                     params: { author: item.author, permlink: item.permlink },
                   });
                 }}
                 onUserPress={username => {
-                  router.push(`/ProfileScreen?username=${username}` as any);
+                  router.push(`/screens/ProfileScreen?username=${username}` as any);
                 }}
                 showAuthor
                 onHashtagPress={tag => {
                   router.push({
-                    pathname: '/DiscoveryScreen',
+                    pathname: '/screens/DiscoveryScreen',
                     params: { hashtag: tag },
                   });
                 }}
@@ -532,7 +532,7 @@ const DiscoveryScreen = () => {
                 onResnapPress={(author, permlink) => {
                   const snapUrl = `https://hive.blog/@${author}/${permlink}`;
                   router.push({
-                    pathname: '/ComposeScreen',
+                    pathname: '/screens/ComposeScreen',
                     params: { resnapUrl: snapUrl },
                   });
                 }}

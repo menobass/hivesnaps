@@ -96,7 +96,7 @@ export default function LoginScreen() {
               }
               
               // Navigate to feed regardless of JWT success (graceful fallback)
-              router.push('/FeedScreen');
+              router.push('/screens/FeedScreen');
               return;
             }
           }
@@ -155,7 +155,7 @@ export default function LoginScreen() {
       
       // Step 4: Navigate to feed screen
       setLoading(false);
-      router.push('/FeedScreen');
+      router.push('/screens/FeedScreen');
     } catch (e) {
       setLoading(false);
       setError('Invalid username or posting key. Please try again.');
@@ -174,7 +174,7 @@ export default function LoginScreen() {
         // Show loading screen during auto-login check
         <View style={[styles.flexContainer, styles.loadingContainer]}>
           <Image
-            source={require('../assets/images/logo.png')}
+            source={require('../../assets/images/logo.png')}
             style={styles.logo}
             resizeMode='contain'
           />
@@ -198,7 +198,7 @@ export default function LoginScreen() {
               <View style={styles.innerContainer}>
                 {/* App logo at the top */}
                 <Image
-                  source={require('../assets/images/logo.png')}
+                  source={require('../../assets/images/logo.png')}
                   style={styles.logo}
                   resizeMode='contain'
                 />

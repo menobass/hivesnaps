@@ -721,7 +721,7 @@ export async function getHivePostPreviewNavigationInfo(url: string): Promise<{
       }
     }
 
-    const route = isSnap ? '/ConversationScreen' : '/HivePostScreen';
+    const route = isSnap ? '/screens/ConversationScreen' : '/screens/HivePostScreen';
 
     console.log('[extractHivePostInfo] Preview navigation info:', {
       isSnap,

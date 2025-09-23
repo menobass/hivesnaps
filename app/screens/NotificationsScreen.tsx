@@ -22,9 +22,9 @@ import {
   formatNotificationTime,
   isActionableNotification,
   type ParsedNotification,
-} from '../utils/notifications';
-import { useNotifications } from '../hooks/useNotifications';
-import { detectPostType, type PostInfo } from '../utils/postTypeDetector';
+} from '../../utils/notifications';
+import { useNotifications } from '../../hooks/useNotifications';
+import { detectPostType, type PostInfo } from '../../utils/postTypeDetector';
 import { Client } from '@hiveio/dhive';
 
 const HIVE_NODES = [
@@ -199,12 +199,7 @@ const NotificationsScreen = () => {
       console.log(
         '[NotificationsScreen] Navigating to ProfileScreen for follow notification'
       );
-      router.push({
-        pathname: '/ProfileScreen',
-        params: {
-          username: notification.actionUser,
-        },
-      });
+      router.push('/screens/ProfileScreen');
       return;
     }
 
@@ -257,10 +252,10 @@ const NotificationsScreen = () => {
               '[NotificationsScreen] Navigating to ConversationScreen (snap)'
             );
             router.push({
-              pathname: '/ConversationScreen',
+              pathname: '/screens/ConversationScreen',
               params: {
-                author: notification.targetContent.author,
-                permlink: notification.targetContent.permlink,
+                author: postData.author,
+                permlink: postData.permlink,
               },
             });
           } else {
@@ -268,10 +263,10 @@ const NotificationsScreen = () => {
               '[NotificationsScreen] Navigating to HivePostScreen (regular post)'
             );
             router.push({
-              pathname: '/HivePostScreen',
+              pathname: '/screens/HivePostScreen',
               params: {
-                author: notification.targetContent.author,
-                permlink: notification.targetContent.permlink,
+                author: postData.author,
+                permlink: postData.permlink,
               },
             });
           }

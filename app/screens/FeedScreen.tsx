@@ -24,29 +24,29 @@ import {
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import ImageView from 'react-native-image-viewing';
-import { createFeedScreenStyles } from '../styles/FeedScreenStyles';
+import { createFeedScreenStyles } from '../../styles/FeedScreenStyles';
 
 // Custom hooks for business logic
-import { useUserAuth } from '../hooks/useUserAuth';
-import { useFeedData, FeedFilter } from '../hooks/useFeedData';
-import { useUpvote } from '../hooks/useUpvote';
-import { useSearch } from '../hooks/useSearch';
-import { useHiveData } from '../hooks/useHiveData';
-import { useNotifications } from '../hooks/useNotifications';
-import { useVotingPower } from '../hooks/useVotingPower';
-import { useResourceCredits } from '../hooks/useResourceCredits';
-import { useUserProfile } from '../hooks/useUserProfile';
+import { useUserAuth } from '../../hooks/useUserAuth';
+import { useFeedData, FeedFilter } from '../../hooks/useFeedData';
+import { useUpvote } from '../../hooks/useUpvote';
+import { useSearch } from '../../hooks/useSearch';
+import { useHiveData } from '../../hooks/useHiveData';
+import { useNotifications } from '../../hooks/useNotifications';
+import { useVotingPower } from '../../hooks/useVotingPower';
+import { useResourceCredits } from '../../hooks/useResourceCredits';
+import { useUserProfile } from '../../hooks/useUserProfile';
 
 // Shared state management
-import { useAppStore, useCurrentUser, useAppDebug, useFollowCacheManagement } from '../store/context';
+import { useAppStore, useCurrentUser, useAppDebug, useFollowCacheManagement } from '../../store/context';
 
 // Components
-import Snap from './components/Snap';
-import NotificationBadge from './components/NotificationBadge';
-import SmallButton from '../components/SmallButton';
-import StaticContentModal from '../components/StaticContentModal';
-import UpvoteModal from '../components/UpvoteModal';
-import { addPromiseIfValid } from '../utils/promiseUtils';
+import Snap from '../components/Snap';
+import NotificationBadge from '../components/NotificationBadge';
+import SmallButton from '../../components/SmallButton';
+import StaticContentModal from '../../components/StaticContentModal';
+import UpvoteModal from '../../components/UpvoteModal';
+import { addPromiseIfValid } from '../../utils/promiseUtils';
 
 
 // Modal content constants
@@ -537,7 +537,7 @@ const FeedScreenRefactored = () => {
       if (cleanHashtag) {
         await saveToRecentHashtags(cleanHashtag);
         router.push(
-          `/DiscoveryScreen?hashtag=${encodeURIComponent(cleanHashtag)}`
+          `/screens/DiscoveryScreen?hashtag=${encodeURIComponent(cleanHashtag)}`
         );
         setIsSearchModalVisible(false);
         clearSearch();
@@ -681,7 +681,7 @@ const FeedScreenRefactored = () => {
               onPress={() => {
                 if (username) {
                   console.log('Navigating to profile for username:', username);
-                  router.push(`/ProfileScreen?username=${username}` as any);
+                  router.push(`/screens/ProfileScreen?username=${username}` as any);
                 } else {
                   console.log(
                     'Cannot navigate to profile: username is undefined'
@@ -710,7 +710,7 @@ const FeedScreenRefactored = () => {
                     source={
                       avatarUrl
                         ? { uri: avatarUrl }
-                        : require('../assets/images/generic-avatar.png')
+                        : require('../../assets/images/generic-avatar.png')
                     }
                     style={styles.avatar}
                   />
@@ -806,7 +806,7 @@ const FeedScreenRefactored = () => {
           <View style={styles.sloganRow}>
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => router.push('/ComposeScreen')}
+              onPress={() => router.push('/screens/ComposeScreen')}
               accessibilityLabel='Create new snap (slogan)'
             >
               <Text style={[styles.slogan, { color: colors.text }]}> 
@@ -824,7 +824,7 @@ const FeedScreenRefactored = () => {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.bellBtn}
-              onPress={() => router.push('/NotificationsScreen')}
+              onPress={() => router.push('/screens/NotificationsScreen')}
             >
               <View style={{ position: 'relative' }}>
                 <FontAwesome name='bell' size={22} color={colors.icon} />
@@ -962,31 +962,31 @@ const FeedScreenRefactored = () => {
                   }
                   onSpeechBubblePress={() => {
                     router.push({
-                      pathname: '/ConversationScreen',
+                      pathname: '/screens/ConversationScreen',
                       params: { author: item.author, permlink: item.permlink },
                     });
                   }}
                   onContentPress={() => {
                     router.push({
-                      pathname: '/ConversationScreen',
+                      pathname: '/screens/ConversationScreen',
                       params: { author: item.author, permlink: item.permlink },
                     });
                   }}
                   onUserPress={username => {
-                    router.push(`/ProfileScreen?username=${username}` as any);
+                    router.push(`/screens/ProfileScreen?username=${username}` as any);
                   }}
                   onImagePress={handleImagePress}
                   showAuthor
                   onHashtagPress={tag => {
                     router.push({
-                      pathname: '/DiscoveryScreen',
+                      pathname: '/screens/DiscoveryScreen',
                       params: { hashtag: tag },
                     });
                   }}
                   onResnapPress={(author, permlink) => {
                     const snapUrl = `https://hive.blog/@${author}/${permlink}`;
                     router.push({
-                      pathname: '/ComposeScreen',
+                      pathname: '/screens/ComposeScreen',
                       params: { resnapUrl: snapUrl },
                     });
                   }}
@@ -1025,7 +1025,7 @@ const FeedScreenRefactored = () => {
           },
         ]}
         activeOpacity={0.8}
-        onPress={() => router.push('/ComposeScreen' as any)}
+        onPress={() => router.push('/screens/ComposeScreen' as any)}
         accessibilityLabel='Create new snap'
       >
         <Text style={styles.fabIcon}>+</Text>
