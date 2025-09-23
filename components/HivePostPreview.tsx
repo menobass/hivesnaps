@@ -74,7 +74,7 @@ export const HivePostPreview: React.FC<HivePostPreviewProps> = ({
         // Fallback to HivePostScreen if we can't determine the type
         console.log('[HivePostPreview] Fallback to HivePostScreen');
         router.push({
-          pathname: '/screens/ComposeScreen',
+          pathname: '/screens/HivePostScreen',
           params: {
             author: postInfo.author,
             permlink: postInfo.permlink,
@@ -88,7 +88,7 @@ export const HivePostPreview: React.FC<HivePostPreviewProps> = ({
       );
       // Fallback to HivePostScreen on error
       router.push({
-        pathname: '/screens/ComposeScreen',
+        pathname: '/screens/HivePostScreen',
         params: {
           author: postInfo.author,
           permlink: postInfo.permlink,

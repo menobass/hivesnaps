@@ -218,7 +218,7 @@ const ConversationScreenRefactored = () => {
     }
 
     router.push({
-      pathname: '/screens/ComposeScreen',
+      pathname: '/screens/ConversationScreen',
       params: {
         author: snap.parent_author,
         permlink: snap.parent_permlink,
@@ -1391,7 +1391,7 @@ const ConversationScreenRefactored = () => {
                 showAuthor={true}
                 onHashtagPress={tag => {
                   router.push({
-                    pathname: '/screens/ComposeScreen',
+                    pathname: '/screens/DiscoveryScreen',
                     params: { hashtag: tag },
                   });
                 }}
