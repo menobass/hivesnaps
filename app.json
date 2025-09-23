@@ -12,7 +12,7 @@
     "icon": "./assets/images/appicon.png",
     "scheme": "hivesnaps",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/images/logo.png",
       "resizeMode": "contain",
