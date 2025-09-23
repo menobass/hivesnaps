@@ -16,7 +16,6 @@ import { HivePostPreviewProvider } from '../context/HivePostPreviewContext';
 import { ShareProvider } from '../context/ShareContext';
 import { AppProvider } from '../store/context';
 import TOSWrapper from '../components/TOSWrapper';
-import NotFoundScreen from './NotFoundScreen';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -82,14 +81,14 @@ function RootLayoutNav() {
           >
             <TOSWrapper>
               <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name='LoginScreen' />
-                <Stack.Screen name='FeedScreen' />
-                <Stack.Screen name='NotificationsScreen' />
-                <Stack.Screen name='ConversationScreen' />
-                <Stack.Screen name='HivePostScreen' />
-                <Stack.Screen name='ProfileScreen' />
-                <Stack.Screen name='ComposeScreen' />
-                <Stack.Screen name='DiscoveryScreen' />
+                <Stack.Screen name='screens/LoginScreen' />
+                <Stack.Screen name='screens/FeedScreen' />
+                <Stack.Screen name='screens/NotificationsScreen' />
+                <Stack.Screen name='screens/ConversationScreen' />
+                <Stack.Screen name='screens/HivePostScreen' />
+                <Stack.Screen name='screens/ProfileScreen' />
+                <Stack.Screen name='screens/ComposeScreen' />
+                <Stack.Screen name='screens/DiscoveryScreen' />
                 <Stack.Screen name='modal' options={{ presentation: 'modal' }} />
               </Stack>
             </TOSWrapper>

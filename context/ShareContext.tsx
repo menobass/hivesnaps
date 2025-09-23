@@ -73,14 +73,14 @@ export function ShareProvider({ children }: ShareProviderProps) {
           console.log(
             '📱 ShareProvider navigating to compose screen for non-Hive post content'
           );
-          router.push('/ComposeScreen' as any);
+          router.push('/screens/ComposeScreen' as any);
         } catch (error) {
           console.error(
             '📱 ShareProvider error handling shared content:',
             error
           );
           // Fallback to compose screen on error
-          router.push('/ComposeScreen' as any);
+          router.push('/screens/ComposeScreen' as any);
         }
       };
 
