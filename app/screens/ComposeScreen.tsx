@@ -24,12 +24,12 @@ import * as SecureStore from 'expo-secure-store';
 import * as ImagePicker from 'expo-image-picker';
 import { FontAwesome } from '@expo/vector-icons';
 import { Client, PrivateKey } from '@hiveio/dhive';
-import { avatarService } from '../services/AvatarService';
-import { uploadImageSmart } from '../utils/imageUploadService';
-import { useSharedContent } from '@/hooks/useSharedContent';
-import { useShare } from '@/context/ShareContext';
-import { useGifPicker } from '../hooks/useGifPickerV2';
-import { GifPickerModal } from '../components/GifPickerModalV2';
+import { avatarService } from '../../services/AvatarService';
+import { uploadImageSmart } from '../../utils/imageUploadService';
+import { useSharedContent } from '../../hooks/useSharedContent';
+import { useShare } from '../../context/ShareContext';
+import { useGifPicker } from '../../hooks/useGifPickerV2';
+import { GifPickerModal } from '../../components/GifPickerModalV2';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -439,7 +439,7 @@ export default function ComposeScreen() {
           {
             text: 'OK',
             onPress: () => {
-              router.push('/FeedScreen');
+              router.push('/screens/FeedScreen');
             },
           },
         ]

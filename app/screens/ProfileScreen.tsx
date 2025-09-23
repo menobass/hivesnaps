@@ -17,21 +17,21 @@ import {
 import { FontAwesome } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { createProfileScreenStyles } from '../styles/ProfileScreenStyles';
-import Snap from './components/Snap';
-import UpvoteModal from '../components/UpvoteModal';
-import ContentModal from './components/ContentModal';
+import { createProfileScreenStyles } from '../../styles/ProfileScreenStyles';
+import Snap from '../components/Snap';
+import UpvoteModal from '../../components/UpvoteModal';
+import ContentModal from '../components/ContentModal';
 
 // Import custom hooks
-import { useProfileData } from '../hooks/useProfileData';
-import { useFollowManagement } from '../hooks/useFollowManagement';
-import { useUserSnaps } from '../hooks/useUserSnaps';
-import { useAvatarManagement } from '../hooks/useAvatarManagement';
-import { useRewardsManagement } from '../hooks/useRewardsManagement';
-import { useUserAuth } from '../hooks/useUserAuth';
-import { useUpvote } from '../hooks/useUpvote';
-import { useHiveData } from '../hooks/useHiveData';
-import { useEdit } from '../hooks/useEdit';
+import { useProfileData } from '../../hooks/useProfileData';
+import { useFollowManagement } from '../../hooks/useFollowManagement';
+import { useUserSnaps } from '../../hooks/useUserSnaps';
+import { useAvatarManagement } from '../../hooks/useAvatarManagement';
+import { useRewardsManagement } from '../../hooks/useRewardsManagement';
+import { useUserAuth } from '../../hooks/useUserAuth';
+import { useUpvote } from '../../hooks/useUpvote';
+import { useHiveData } from '../../hooks/useHiveData';
+import { useEdit } from '../../hooks/useEdit';
 
 const ProfileScreen = () => {
   const colorScheme = useColorScheme() || 'light';
@@ -205,7 +205,7 @@ const ProfileScreen = () => {
   // Handle snap bubble press (navigate to conversation)
   const handleSnapPress = (snap: any) => {
     router.push({
-      pathname: '/ConversationScreen',
+      pathname: '/screens/ConversationScreen',
       params: {
         author: snap.author,
         permlink: snap.permlink,
@@ -216,7 +216,7 @@ const ProfileScreen = () => {
   // Handle reply to profile snap bubble
   const handleSnapReply = (snap: any) => {
     router.push({
-      pathname: '/ConversationScreen',
+      pathname: '/screens/ConversationScreen',
       params: {
         author: snap.author,
         permlink: snap.permlink,
@@ -734,7 +734,7 @@ const ProfileScreen = () => {
                               onResnapPress={(author, permlink) => {
                                 const snapUrl = `https://hive.blog/@${author}/${permlink}`;
                                 router.push({
-                                  pathname: '/ComposeScreen',
+                                  pathname: '/screens/ComposeScreen',
                                   params: { resnapUrl: snapUrl },
                                 });
                               }}
@@ -804,7 +804,7 @@ const ProfileScreen = () => {
                   style={[styles.logoutButton, { backgroundColor: '#E74C3C' }]}
                   onPress={async () => {
                     await handleLogout();
-                    router.replace('/(tabs)');
+                    router.replace('/');
                   }}
                 >
                   <FontAwesome name='sign-out' size={18} color='#fff' />

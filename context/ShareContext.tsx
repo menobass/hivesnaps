@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, ReactNode } from 'react';
 import { useRouter } from 'expo-router';
-import { useSharedContent, SharedContent } from '@/hooks/useSharedContent';
-import { getHivePostNavigationInfo } from '@/utils/extractHivePostInfo';
+import { useSharedContent, SharedContent } from '../hooks/useSharedContent';
+import { getHivePostNavigationInfo } from '../utils/extractHivePostInfo';
 
 interface ShareContextType {
   sharedContent: SharedContent | null;
@@ -73,14 +73,14 @@ export function ShareProvider({ children }: ShareProviderProps) {
           console.log(
             '📱 ShareProvider navigating to compose screen for non-Hive post content'
           );
-          router.push('/ComposeScreen' as any);
+          router.push('/screens/ComposeScreen' as any);
         } catch (error) {
           console.error(
             '📱 ShareProvider error handling shared content:',
             error
           );
           // Fallback to compose screen on error
-          router.push('/ComposeScreen' as any);
+          router.push('/screens/ComposeScreen' as any);
         }
       };
 

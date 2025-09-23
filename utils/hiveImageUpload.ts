@@ -2,7 +2,7 @@
 // Uses images.hive.blog - Zero cost image hosting on Hive blockchain
 // Usage: const url = await uploadImageToHive({ uri, name, type }, { username, privateKey });
 
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { PrivateKey } from '@hiveio/dhive';
 import { Buffer } from 'buffer';
 import { sha256 } from 'js-sha256';
