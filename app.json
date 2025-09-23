@@ -33,7 +33,11 @@
         "foregroundImage": "./assets/images/appicon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
+      "edgeToEdgeEnabled": false,
+      "statusBar": {
+        "style": "dark",
+        "backgroundColor": "#ffffff"
+      },
       "package": "com.menobass.hivesnaps",
       "versionCode": 1,
       "intentFilters": [
