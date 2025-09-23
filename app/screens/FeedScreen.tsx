@@ -1265,7 +1265,7 @@ const FeedScreenRefactored = () => {
                         style={styles.searchResultItem}
                         onPress={() => {
                           router.push(
-                            `/ProfileScreen?username=${result.name}` as any
+                            `/screens/ProfileScreen?username=${result.name}` as any
                           );
                           setIsSearchModalVisible(false);
                         }}
