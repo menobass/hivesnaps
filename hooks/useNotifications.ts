@@ -12,6 +12,8 @@ import {
   type ParsedNotification,
 } from '../utils/notifications';
 
+import { useMutedList } from '../store/context';
+
 interface UseNotificationsResult {
   notifications: ParsedNotification[];
   unreadCount: number;
@@ -41,6 +43,9 @@ export const useNotifications = (
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState(getDefaultNotificationSettings());
+
+  // Use shared state for muted list (same pattern as FeedScreen)
+  const { mutedList } = useMutedList(username || '');
 
   const appState = useRef(AppState.currentState);
   const lastFetchTime = useRef<number>(0);
@@ -129,19 +134,34 @@ export const useNotifications = (
       if (!username) return [];
 
       try {
+        console.log('[useNotifications] Fetching notifications for:', username);
+        
+        // Fetch notifications from Hive API
         const rawNotifications = await fetchNotifications(username, 50);
         const parsed = rawNotifications.map(parseNotification);
 
         // Load read status
         const readNotifications = await loadReadStatus();
-        const withReadStatus = parsed.map(notification => ({
+        const withReadStatus = parsed.map((notification: ParsedNotification) => ({
           ...notification,
           read: readNotifications.includes(notification.id),
         }));
 
+        // Filter out notifications from muted/blacklisted users (same pattern as FeedScreen)
+        const notMuted = withReadStatus.filter((notification: ParsedNotification) => {
+          if (!notification.actionUser) return true; // Keep notifications without actionUser
+          const isMuted = mutedList && mutedList.includes(notification.actionUser);
+          if (isMuted) {
+            console.log('[useNotifications] Filtering out notification from muted user:', notification.actionUser, notification.type);
+          }
+          return !isMuted;
+        });
+
+        console.log('[useNotifications] Filtered notifications:', withReadStatus.length, '→', notMuted.length);
+
         // Filter by settings and sort chronologically
         const filtered = filterNotificationsBySettings(
-          withReadStatus,
+          notMuted,
           settings
         );
         return sortNotifications(filtered, 'chronological');
@@ -151,7 +171,7 @@ export const useNotifications = (
         );
       }
     },
-    [username, settings, loadReadStatus]
+    [username, settings, loadReadStatus, mutedList] // Add mutedList to dependencies
   );
 
   // Main refresh function
