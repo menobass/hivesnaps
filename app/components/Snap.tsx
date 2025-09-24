@@ -223,9 +223,10 @@ const Snap: React.FC<SnapProps> = ({
   }, [author, avatarUrl]);
   // Process hashtags in text, converting them to clickable markdown links
   function processHashtags(text: string): string {
-    return text.replace(/(#\w+)/g, (match, hashtag) => {
-      const tag = hashtag.replace('#', '');
-      return `[${hashtag}](hashtag://${tag})`;
+    // Only match hashtags that are NOT part of URLs (not preceded by /)
+    return text.replace(/(^|[^\/\w])#(\w+)/g, (match, prefix, hashtag) => {
+      const tag = hashtag;
+      return `${prefix}[#${hashtag}](hashtag://${tag})`;
     });
   }
   const colorScheme = useColorScheme() || 'light';

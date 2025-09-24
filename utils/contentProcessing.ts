@@ -42,8 +42,9 @@ export const linkifyMentions = (text: string): string => {
  * Linkifies hashtags (#tag) in text content
  */
 export const linkifyHashtags = (text: string): string => {
-  const hashtagRegex = /#([a-zA-Z0-9]+)/g;
-  return text.replace(hashtagRegex, '[$&](https://peakd.com/trending/$1)');
+  // Only match hashtags that are NOT part of URLs (not preceded by /)
+  const hashtagRegex = /(^|[^\/\w])#([a-zA-Z0-9]+)/g;
+  return text.replace(hashtagRegex, '$1[#$2](https://peakd.com/trending/$2)');
 };
 
 /**
