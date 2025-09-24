@@ -224,7 +224,9 @@ const Snap: React.FC<SnapProps> = ({
   // Process hashtags in text, converting them to clickable markdown links
   function processHashtags(text: string): string {
     // Only match hashtags that are NOT part of URLs (not preceded by /)
-    return text.replace(/(^|[^\/\w])#(\w+)/g, (match, prefix, hashtag) => {
+    // Support hyphens within hashtags: #react-native, #covid-19, etc.
+    // Pattern: #word(s) optionally followed by -word(s) (prevents starting/ending with -)
+    return text.replace(/(^|[^\/\w])#([a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*)/g, (match, prefix, hashtag) => {
       const tag = hashtag;
       return `${prefix}[#${hashtag}](hashtag://${tag})`;
     });
