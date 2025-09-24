@@ -480,7 +480,9 @@ const ConversationScreenRefactored = () => {
 
   const linkifyHashtags = (text: string): string => {
     return text.replace(
-      /(^|[^\w/#])#(\w+)(?![a-z0-9\-\.])/gi,
+      // Support hyphens within hashtags: #react-native, #covid-19, etc.
+      // Pattern: #word(s) optionally followed by -word(s) (prevents starting/ending with -)
+      /(^|[^\w/#])#([a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*)/gi,
       (match, pre, hashtag, offset, string) => {
         const beforeMatch = string.substring(0, offset);
         const afterMatch = string.substring(offset + match.length);
