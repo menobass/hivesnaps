@@ -227,8 +227,7 @@ const Snap: React.FC<SnapProps> = ({
     // Support hyphens within hashtags: #react-native, #covid-19, etc.
     // Pattern: #word(s) optionally followed by -word(s) (prevents starting/ending with -)
     return text.replace(/(^|[^\/\w])#([a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*)/g, (match, prefix, hashtag) => {
-      const tag = hashtag;
-      return `${prefix}[#${hashtag}](hashtag://${tag})`;
+      return `${prefix}[#${hashtag}](hashtag://${hashtag})`;
     });
   }
   const colorScheme = useColorScheme() || 'light';
