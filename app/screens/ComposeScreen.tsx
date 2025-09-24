@@ -7,16 +7,13 @@ import {
   TouchableOpacity,
   Image,
   useColorScheme,
-  Dimensions,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   Alert,
-  Pressable,
-  FlatList,
   Modal,
-  ActionSheetIOS, // <-- statically import ActionSheetIOS
+  ActionSheetIOS,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -30,8 +27,11 @@ import { useSharedContent } from '../../hooks/useSharedContent';
 import { useShare } from '../../context/ShareContext';
 import { useGifPicker } from '../../hooks/useGifPickerV2';
 import { GifPickerModal } from '../../components/GifPickerModalV2';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+import VideoUploadButton from '../../components/VideoUploadButton';
+import * as VideoThumbnails from 'expo-video-thumbnails';
+import { getMimeTypeFromUri, getPresignedVideoUrl } from '../../utils/videoUploadUtils';
+import { useVideoUpload } from '../../hooks/useVideoUpload';
+import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -45,6 +45,7 @@ export default function ComposeScreen() {
   const isDark = colorScheme === 'dark';
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { uploadVideoToBackend, notifyUploadSuccess, error } = useVideoUpload();
 
   // Share extension integration
   const { sharedContent, hasSharedContent, clearSharedContent } =
@@ -79,6 +80,11 @@ export default function ComposeScreen() {
     // Remove loadTrendingOnOpen to use default (false)
     limit: 20,
   });
+
+  // Video state
+  const [video, setVideo] = useState<string | null>(null);
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [videoThumbnail, setVideoThumbnail] = useState<string | null>(null);
 
   const colors = {
     background: isDark ? '#15202B' : '#fff',
@@ -349,6 +355,47 @@ export default function ComposeScreen() {
 
   const handleRemoveGif = (indexToRemove: number) => {
     setGifs(prev => prev.filter((_, index) => index !== indexToRemove));
+  };
+
+  // Video picker handler
+  const handleAddVideo = async () => {
+    try {
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['videos'],
+        allowsEditing: false,
+        quality: 1,
+      });
+      if (!result || result.canceled || !result.assets || result.assets.length === 0) return;
+      const asset = result.assets[0];
+      const videoUri = asset.uri;
+      const { mimeType: contentType , filename } = getMimeTypeFromUri(videoUri);
+      if (!contentType.startsWith('video/')) {
+        Alert.alert('Invalid File', 'Please select a valid video file.');
+        return;
+      }
+      console.log('Selected video URI:', videoUri);
+      setVideo(videoUri);
+      // Generate thumbnail
+      try {
+        const { uri: thumbnailUri } = await VideoThumbnails.getThumbnailAsync(videoUri, { time: 1000 });
+        setVideoThumbnail(thumbnailUri);
+      } catch (thumbErr) {
+        console.warn('Could not generate video thumbnail:', thumbErr);
+        setVideoThumbnail(null);
+      }
+      setVideoUploading(true);
+
+      const { url, key } = await getPresignedVideoUrl(filename, contentType);
+      await uploadVideoToBackend(videoUri, url, contentType);
+      const finalUrl = await notifyUploadSuccess(key);
+      
+      console.log('Video successfully uploaded. Accessible at:', finalUrl);
+
+      setVideoUploading(false);
+    } catch (err) {
+      console.error('Video picker error:', err);
+      Alert.alert('Error', 'Failed to pick video. Please try again.');
+    }
   };
 
   const handleSubmit = async () => {
@@ -865,6 +912,35 @@ export default function ComposeScreen() {
             </View>
           )}
 
+          {/* Video preview */}
+          {video && (
+            <View style={styles.imagesContainer}>
+              <View style={styles.imagesHeader}>
+                <Text style={[styles.imagesCount, { color: colors.text }]}>Video</Text>
+                <TouchableOpacity
+                  style={styles.clearAllButton}
+                  onPress={() => {
+                    setVideo(null);
+                    setVideoThumbnail(null);
+                  }}
+                  disabled={videoUploading}
+                >
+                  <Text style={[styles.clearAllText, { color: colors.text }]}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={{ alignItems: 'center' }}>
+                {videoThumbnail ? (
+                  <Image source={{ uri: videoThumbnail }} style={{ width: 120, height: 120, borderRadius: 8, backgroundColor: '#000' }} />
+                ) : (
+                  <FontAwesome name='video-camera' size={48} color={colors.button} />
+                )}
+                <Text style={{ color: colors.info, marginTop: 8, fontSize: 12 }}>
+                  Video selected. Upload will start after backend integration.
+                </Text>
+              </View>
+            </View>
+          )}
+
           {/* Action buttons */}
           <View style={styles.actions}>
             {/* Markdown formatting toolbar */}
@@ -944,6 +1020,15 @@ export default function ComposeScreen() {
                   </>
                 )}
               </TouchableOpacity>
+
+              {/* Video upload button (refactored) */}
+              <VideoUploadButton
+                video={video}
+                videoUploading={videoUploading}
+                onPress={handleAddVideo}
+                colors={colors}
+                style={{ marginLeft: 12 }}
+              />
 
               <TouchableOpacity
                 style={[
