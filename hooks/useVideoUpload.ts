@@ -79,10 +79,10 @@ export function useVideoUpload(): UseVideoUpload {
                 headers: { 'Content-Type': 'application/json' },
             });
             console.log('[notifyUploadSuccess] Backend response:', response);
-            if (!response.body || !response.body.url) {
+            if (!response.body || !response.body.videoUrl) {
                 throw new Error('No URL returned from backend');
             }
-            return response.body.url;
+            return response.body.videoUrl;
         } catch (err: any) {
             setError(err.message || 'Failed to notify backend of upload success');
             Alert.alert('Notification Failed', err.message || 'Failed to notify backend');

@@ -31,7 +31,6 @@ import VideoUploadButton from '../../components/VideoUploadButton';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import { getMimeTypeFromUri, getPresignedVideoUrl } from '../../utils/videoUploadUtils';
 import { useVideoUpload } from '../../hooks/useVideoUpload';
-import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -388,7 +387,7 @@ export default function ComposeScreen() {
       const { url, key } = await getPresignedVideoUrl(filename, contentType);
       await uploadVideoToBackend(videoUri, url, contentType);
       const finalUrl = await notifyUploadSuccess(key);
-      
+
       console.log('Video successfully uploaded. Accessible at:', finalUrl);
 
       setVideoUploading(false);

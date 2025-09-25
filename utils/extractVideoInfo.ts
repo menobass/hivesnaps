@@ -9,7 +9,7 @@
  */
 
 export interface VideoInfo {
-  type: 'youtube' | '3speak' | 'ipfs' | 'twitter' | 'instagram';
+  type: 'youtube' | '3speak' | 'ipfs' | 'twitter' | 'instagram' | 'direct';
   id?: string;
   username?: string;
   videoId?: string;
@@ -129,6 +129,19 @@ export function extractVideoInfo(text: string): VideoInfo | null {
     };
   }
 
+  // Direct video file detection (mp4, mov, avi, webm, etc.)
+  // Matches URLs ending with video file extensions, including query parameters
+  const directVideoMatch = text.match(
+    /(https?:\/\/[^\s]+\.(?:mp4|mov|avi|webm|mkv|flv|wmv|m4v|3gp|3g2|mts|m2ts|ts)(?:\?[^\s]*)?)/i
+  );
+  if (directVideoMatch) {
+    return {
+      type: 'direct',
+      embedUrl: directVideoMatch[1], // Use the direct URL as embed URL
+      originalUrl: directVideoMatch[0],
+    };
+  }
+
   return null;
 }
 
@@ -192,6 +205,11 @@ export function removeInstagramUrls(text: string): string {
       // Remove Instagram post/reel/tv URLs
       .replace(
         /(?:https?:\/\/)?(?:www\.)?instagram\.com\/(p|reel|tv)\/[A-Za-z0-9_-]+\/?(\S*)?/gi,
+        ''
+      )
+      // Remove direct video file URLs
+      .replace(
+        /https?:\/\/[^\s]+\.(?:mp4|mov|avi|webm|mkv|flv|wmv|m4v|3gp|3g2|mts|m2ts|ts)(?:\?[^\s]*)?/gi,
         ''
       )
       .replace(/\s{2,}/g, ' ')
