@@ -31,6 +31,7 @@ import VideoUploadButton from '../../components/VideoUploadButton';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import { getMimeTypeFromUri, getPresignedVideoUrl } from '../../utils/videoUploadUtils';
 import { useVideoUpload } from '../../hooks/useVideoUpload';
+import { set } from 'date-fns';
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -58,6 +59,7 @@ export default function ComposeScreen() {
   const [posting, setPosting] = useState(false);
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [directVideoUrl, setDirectVideoUrl] = useState<string | null>(null);
 
   // Text selection state for markdown formatting
   const [selectionStart, setSelectionStart] = useState(0);
@@ -390,6 +392,7 @@ export default function ComposeScreen() {
 
       console.log('Video successfully uploaded. Accessible at:', finalUrl);
 
+      setDirectVideoUrl(finalUrl || null);
       setVideoUploading(false);
     } catch (err) {
       console.error('Video picker error:', err);
@@ -434,6 +437,10 @@ export default function ComposeScreen() {
         gifs.forEach((gifUrl, index) => {
           body += `\n![gif${index + 1}](${gifUrl})`;
         });
+      }
+
+      if (directVideoUrl) {
+        body += `\n${directVideoUrl}`;
       }
 
       // Get latest @peak.snaps post (container) - Same as FeedScreen
