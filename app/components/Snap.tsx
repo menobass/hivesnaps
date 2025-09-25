@@ -31,6 +31,7 @@ import TwitterEmbed from './TwitterEmbed';
 import YouTubeEmbed from './YouTubeEmbed';
 import ThreeSpeakEmbed from './ThreeSpeakEmbed';
 import InstagramEmbed from './InstagramEmbed';
+import VideoPlayer from '../../components/VideoPlayer';
 import { extractBlogPostUrls } from '../../utils/extractHivePostInfo';
 import { OptimizedHivePostPreviewRenderer } from '../../components/OptimizedHivePostPreviewRenderer';
 import { classifyUrl } from '../../utils/urlClassifier';
@@ -478,6 +479,8 @@ const Snap: React.FC<SnapProps> = ({
   // Remove embedded content URLs and image URLs from text body if present
   let textBody = stripImageTags(body);
   if (embeddedContent) {
+    console.log('[Snap] Found embedded content:', embeddedContent);
+    console.log('[Snap] Removing embedded content URLs from text body');
     textBody = removeVideoUrls(textBody);
     textBody = removeInstagramUrls(textBody);
     textBody = removeYouTubeUrl(textBody);
@@ -707,6 +710,11 @@ const Snap: React.FC<SnapProps> = ({
             <ThreeSpeakEmbed
               embedUrl={embeddedContent.embedUrl}
               isDark={isDark}
+            />
+          ) : embeddedContent.type === 'direct' ? (
+            <VideoPlayer
+              url={embeddedContent.embedUrl}
+              style={{ marginVertical: 8 }}
             />
           ) : null}
         </View>
