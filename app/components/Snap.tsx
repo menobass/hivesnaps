@@ -20,7 +20,7 @@ import { extractVideoInfo, removeVideoUrls, removeInstagramUrls } from '../../ut
 import IPFSVideoPlayer from './IPFSVideoPlayer';
 import { WebView } from 'react-native-webview';
 import Markdown from 'react-native-markdown-display';
-import RenderHtml from 'react-native-render-html';
+import RenderHtml, { HTMLElementModel, HTMLContentModel } from 'react-native-render-html';
 import { Video, ResizeMode } from 'expo-av';
 import {
   convertSpoilerSyntax,
@@ -38,6 +38,14 @@ import { canBeResnapped } from '../../utils/postTypeDetector';
 import { getMarkdownStyles } from '../../styles/markdownStyles';
 import { linkStyles, useLinkTextStyle } from '../../styles/linkStyles';
 import { extractRawImageUrls as extractRawImageUrlsUtil, removeRawImageUrls as removeRawImageUrlsUtil } from '../../utils/rawImageUrls';
+
+// Custom HTML element model for video tags
+const customHTMLElementModels = {
+  video: HTMLElementModel.fromCustomModel({
+    tagName: 'video',
+    contentModel: HTMLContentModel.block,
+  }),
+};
 import ModerationRequestModal, { ModerationReason, ModerationRequestPayload } from './moderation/ModerationRequestModal';
 import { formatRelativeShort } from '../../utils/time';
 import ActionSheet from './common/ActionSheet';
@@ -392,9 +400,9 @@ const Snap: React.FC<SnapProps> = ({
     html: (node: any, children: any, parent: any, styles: any) => {
       const htmlContent = node.content || '';
 
-      // Handle <video> tags for mp4
+      // Handle <video> tags for mp4 - more flexible regex that allows URL parameters/fragments after .mp4
       const videoTagMatch = htmlContent.match(
-        /<video[^>]*src=["']([^"']+\.mp4)["'][^>]*>(.*?)<\/video>/i
+        /<video[^>]*src=["']([^"']*\.mp4[^"']*)["'][^>]*>(.*?)<\/video>/i
       );
       if (videoTagMatch) {
         const mp4Url = videoTagMatch[1];
@@ -791,6 +799,7 @@ const Snap: React.FC<SnapProps> = ({
                   <RenderHtml
                     contentWidth={contentWidth}
                     source={{ html: cleanTextBody }}
+                    customHTMLElementModels={customHTMLElementModels}
                     baseStyle={{
                       color: colors.text,
                       fontSize: isReply ? 14 : 15,
@@ -807,7 +816,8 @@ const Snap: React.FC<SnapProps> = ({
                       video: (props: any) => {
                         const src = props?.tnode?.attributes?.src;
                         const TDefaultRenderer = props?.TDefaultRenderer;
-                        if (src && src.endsWith('.mp4')) {
+                        // More flexible MP4 detection - check if URL contains .mp4 anywhere
+                        if (src && src.includes('.mp4')) {
                           return renderMp4Video(src);
                         }
                         return TDefaultRenderer ? (
@@ -831,6 +841,7 @@ const Snap: React.FC<SnapProps> = ({
               <RenderHtml
                 contentWidth={contentWidth}
                 source={{ html: cleanTextBody }}
+                customHTMLElementModels={customHTMLElementModels}
                 baseStyle={{
                   color: colors.text,
                   fontSize: isReply ? 14 : 15,
@@ -847,7 +858,8 @@ const Snap: React.FC<SnapProps> = ({
                   video: (props: any) => {
                     const src = props?.tnode?.attributes?.src;
                     const TDefaultRenderer = props?.TDefaultRenderer;
-                    if (src && src.endsWith('.mp4')) {
+                    // More flexible MP4 detection - check if URL contains .mp4 anywhere
+                    if (src && src.includes('.mp4')) {
                       return renderMp4Video(src);
                     }
                     return TDefaultRenderer ? (
