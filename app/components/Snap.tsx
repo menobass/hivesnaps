@@ -214,9 +214,11 @@ const Snap: React.FC<SnapProps> = ({
   useEffect(() => {
     if (prevAvatarRef.current !== avatarUrl) {
       try {
-        console.log(
-          `[Avatar][Snap] ${author} -> ${avatarUrl || 'EMPTY'}`
-        );
+        if (__DEV__) {
+          console.log(
+            `[Avatar][Snap] ${author} -> ${avatarUrl || 'EMPTY'}`
+          );
+        }
       } catch {}
       prevAvatarRef.current = avatarUrl;
     }
@@ -524,7 +526,9 @@ const Snap: React.FC<SnapProps> = ({
         reason: mapped.reason,
         details: mapped.details,
       });
-      console.log('[Report][API] status:', res.status, res.body);
+      if (__DEV__) {
+        console.log('[Report][API] status:', res.status, res.body);
+      }
       
       // Show success or failure feedback to user
       if (res.ok) {

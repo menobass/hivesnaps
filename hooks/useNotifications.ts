@@ -134,7 +134,9 @@ export const useNotifications = (
       if (!username) return [];
 
       try {
-        console.log('[useNotifications] Fetching notifications for:', username);
+        if (__DEV__) {
+          console.log('[useNotifications] Fetching notifications for:', username);
+        }
         
         // Fetch notifications from Hive API
         const rawNotifications = await fetchNotifications(username, 50);
@@ -151,13 +153,15 @@ export const useNotifications = (
         const notMuted = withReadStatus.filter((notification: ParsedNotification) => {
           if (!notification.actionUser) return true; // Keep notifications without actionUser
           const isMuted = mutedList && mutedList.includes(notification.actionUser);
-          if (isMuted) {
+          if (__DEV__ && isMuted) {
             console.log('[useNotifications] Filtering out notification from muted user:', notification.actionUser, notification.type);
           }
           return !isMuted;
         });
 
-        console.log('[useNotifications] Filtered notifications:', withReadStatus.length, '→', notMuted.length);
+        if (__DEV__) {
+          console.log('[useNotifications] Filtered notifications:', withReadStatus.length, '→', notMuted.length);
+        }
 
         // Filter by settings and sort chronologically
         const filtered = filterNotificationsBySettings(
