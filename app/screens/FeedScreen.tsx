@@ -328,11 +328,13 @@ const FeedScreenRefactored = () => {
 
   // Handle when user reaches near the end of the list
   const handleEndReached = () => {
-    console.log(`\n📜 [FeedScreen] ===== USER REACHED END OF LIST =====`);
-    console.log(`📜 [SCROLL-DEBUG] Current filter: ${currentFilter}`);
-    console.log(`📜 [SCROLL-DEBUG] Current snaps count: ${snaps.length}`);
-    console.log(`📜 [SCROLL-DEBUG] Filtered snaps count: ${filteredSnaps.length}`);
-    console.log(`📜 [SCROLL-DEBUG] Feed loading: ${feedLoading}`);
+    if (__DEV__) {
+      console.log(`\n📜 [FeedScreen] ===== USER REACHED END OF LIST =====`);
+      console.log(`📜 [SCROLL-DEBUG] Current filter: ${currentFilter}`);
+      console.log(`📜 [SCROLL-DEBUG] Current snaps count: ${snaps.length}`);
+      console.log(`📜 [SCROLL-DEBUG] Filtered snaps count: ${filteredSnaps.length}`);
+      console.log(`📜 [SCROLL-DEBUG] Feed loading: ${feedLoading}`);
+    }
     
     if (!canFetchMore()) {
       console.log(`⏹️ [FeedScreen] Not fetching more snaps, limit reached`);
@@ -391,29 +393,20 @@ const FeedScreenRefactored = () => {
 
   // Handle filter button presses
   const handleFilterPress = (filter: FeedFilter) => {
-    console.log(`\n🎯 [FeedScreen] User tapped "${filter}" filter button`);
-    console.log(
-      `� [FeedScreen] Current filter: "${currentFilter}" → New filter: "${filter}"`
-    );
+    if (__DEV__) {
+      console.log(`\n🎯 [FeedScreen][DEBUG] handleFilterPress called with: ${filter}`);
+      console.log(`🎯 [FeedScreen][DEBUG] Current filter: ${currentFilter}`);
+      console.log(`🎯 [FeedScreen][DEBUG] Function references: setFilter=${setFilter}`);
+    }
 
     if (filter === currentFilter) {
-      console.log(`ℹ️ [FeedScreen] Same filter selected - no action needed`);
       return;
     }
 
-    console.log(
-      `🔄 [FeedScreen] Switching filters - this should use client-side filtering if data is cached!`
-    );
 
     // If switching to "following" filter, ensure following list is cached
     if (filter === 'following' && username) {
-      console.log(
-        `👥 [FeedScreen] Switching to following filter - ensuring following list is cached...`
-      );
       ensureFollowingListCached(username).then(() => {
-        console.log(
-          `👥 [FeedScreen] Following list is now cached, proceeding with filter change`
-        );
         setFilter(filter);
       });
     } else {
@@ -452,27 +445,24 @@ const FeedScreenRefactored = () => {
   const handleGlobalRefresh = async () => {
     const now = Date.now();
     if (globalRefreshing) {
-      console.log('⏳ [FeedScreen] Ignoring refresh: already in progress');
       return;
     }
     if (now - lastRefreshTimeRef.current < MIN_REFRESH_INTERVAL_MS) {
-      console.log('⏱️ [FeedScreen] Ignoring refresh: throttled');
       return;
     }
     lastRefreshTimeRef.current = now;
 
-    console.log('🔄 [FeedScreen] Pull-to-refresh started (global refresh)');
     setGlobalRefreshing(true);
     const ops: Promise<any>[] = [];
     try {
       if (username) {
         // Invalidate follow/mute caches first to ensure fresh data
-        console.log('🗑️ [FeedScreen] Invalidating follow/mute caches for fresh data');
+       
         invalidateFollowingCache(username);
         invalidateMutedCache(username);
 
         // Ensure fresh muted and following lists are cached BEFORE refreshing feed
-        console.log('📋 [FeedScreen] Ensuring fresh follow/mute lists are cached');
+
         try {
           await ensureFollowingListCached(username);
           await ensureMutedListCached(username);
@@ -604,12 +594,13 @@ const FeedScreenRefactored = () => {
         const scrollPercent = Math.round(
           (scrollY / (totalHeight - screenHeight)) * 100
         );
-        console.log(
-          `📊 [Scroll] Item ${currentIndex}, ${scrollPercent}% scrolled, Memory: ${stats.memoryUsage}`
-        );
-        console.log(
-          `📊 [Scroll] Containers: ${stats.containersInMemory}, Total snaps: ${stats.totalSnaps}`
-        );
+        // For Debugging when we need to improve memory management
+        // console.log(
+        //   `📊 [Scroll] Item ${currentIndex}, ${scrollPercent}% scrolled, Memory: ${stats.memoryUsage}`
+        // );
+        // console.log(
+        //   `📊 [Scroll] Containers: ${stats.containersInMemory}, Total snaps: ${stats.totalSnaps}`
+        // );
       }
     }
   }).current;
