@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { Clipboard } from 'react-native';
 import { extractImageUrls } from '../../utils/extractImageUrls';
 import { stripImageTags } from '../../utils/stripImageTags';
 import { extractVideoInfo, removeVideoUrls, removeInstagramUrls } from '../../utils/extractVideoInfo';
@@ -558,6 +559,13 @@ const Snap: React.FC<SnapProps> = ({
     } finally {
       setModerationVisible(false);
     }
+  };
+
+  // Copy to clipboard handler
+  const handleCopyToClipboard = () => {
+    Clipboard.setString(cleanTextBody);
+    setMoreMenuVisible(false);
+    Alert.alert('Copied!', 'Snap content copied to clipboard');
   };
   // Overflow (three-dots) menu
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
@@ -1136,6 +1144,11 @@ const Snap: React.FC<SnapProps> = ({
                 onUserPress(snap.author);
               }
             },
+          },
+          {
+            label: 'Copy to Clipboard',
+            accessibilityLabel: 'Copy snap content to clipboard',
+            onPress: handleCopyToClipboard,
           },
           {
             label: 'Report Content',
