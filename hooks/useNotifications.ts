@@ -13,6 +13,7 @@ import {
 } from '../utils/notifications';
 
 import { useMutedList } from '../store/context';
+import { fetchMutedList } from '../services/HiveMuteService';
 
 interface UseNotificationsResult {
   notifications: ParsedNotification[];
@@ -45,7 +46,46 @@ export const useNotifications = (
   const [settings, setSettings] = useState(getDefaultNotificationSettings());
 
   // Use shared state for muted list (same pattern as FeedScreen)
-  const { mutedList } = useMutedList(username || '');
+  const { 
+    mutedList, 
+    needsRefresh: needsMutedRefresh,
+    setMutedList,
+    setLoading: setMutedLoading,
+    setError: setMutedError,
+  } = useMutedList(username || '');
+
+  // Ensure muted list is loaded
+  const ensureMutedListLoaded = useCallback(async () => {
+    if (!username) return;
+    
+    if (!mutedList || mutedList.length === 0 || needsMutedRefresh) {
+      if (__DEV__) {
+        console.log('[useNotifications] Loading muted list for:', username);
+      }
+      
+      try {
+        setMutedLoading(true);
+        const mutedSet = await fetchMutedList(username);
+        const mutedArray = Array.from(mutedSet);
+        setMutedList(mutedArray);
+        setMutedError(null);
+        
+        if (__DEV__) {
+          console.log('[useNotifications] Loaded muted list:', mutedArray.length, 'users');
+        }
+      } catch (error) {
+        console.error('[useNotifications] Error loading muted list:', error);
+        setMutedError(error instanceof Error ? error.message : 'Failed to load muted list');
+      } finally {
+        setMutedLoading(false);
+      }
+    }
+  }, [username, mutedList, needsMutedRefresh, setMutedList, setMutedLoading, setMutedError]);
+
+  // Load muted list on mount and when username changes
+  useEffect(() => {
+    ensureMutedListLoaded();
+  }, [ensureMutedListLoaded]);
 
   const appState = useRef(AppState.currentState);
   const lastFetchTime = useRef<number>(0);
@@ -153,15 +193,9 @@ export const useNotifications = (
         const notMuted = withReadStatus.filter((notification: ParsedNotification) => {
           if (!notification.actionUser) return true; // Keep notifications without actionUser
           const isMuted = mutedList && mutedList.includes(notification.actionUser);
-          if (__DEV__ && isMuted) {
-            console.log('[useNotifications] Filtering out notification from muted user:', notification.actionUser, notification.type);
-          }
+          
           return !isMuted;
         });
-
-        if (__DEV__) {
-          console.log('[useNotifications] Filtered notifications:', withReadStatus.length, '→', notMuted.length);
-        }
 
         // Filter by settings and sort chronologically
         const filtered = filterNotificationsBySettings(
