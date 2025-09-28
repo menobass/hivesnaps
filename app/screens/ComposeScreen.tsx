@@ -31,7 +31,7 @@ import { useShare } from '../../context/ShareContext';
 import { useGifPicker } from '../../hooks/useGifPickerV2';
 import { GifPickerModal } from '../../components/GifPickerModalV2';
 import { SnapData } from '../../hooks/useConversationData';
-import Snap from '../components/Snap';
+import Preview from '../components/Preview';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -1162,58 +1162,17 @@ export default function ComposeScreen() {
       </Modal>
 
       {/* Preview Modal */}
-      <Modal
+      <Preview
         visible={previewVisible}
-        animationType='slide'
-        presentationStyle='pageSheet'
-        onRequestClose={() => setPreviewVisible(false)}
-      >
-        <SafeAreaView
-          style={[
-            { flex: 1 },
-            { backgroundColor: colors.background }
-          ]}
-        >
-          {/* Preview Header */}
-          <View
-            style={[
-              styles.header,
-              { borderBottomColor: colors.inputBorder }
-            ]}
-          >
-            <TouchableOpacity
-              onPress={() => setPreviewVisible(false)}
-              style={styles.headerButton}
-            >
-              <Text style={[styles.headerButtonText, { color: colors.text }]}>
-                Close
-              </Text>
-            </TouchableOpacity>
-
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
-              Preview
-            </Text>
-
-            <View style={styles.headerButton} />
-          </View>
-
-          {/* Preview Content */}
-          <ScrollView
-            style={{ flex: 1, padding: 16 }}
-            showsVerticalScrollIndicator={false}
-          >
-            <Snap
-              snap={createPreviewSnapData()}
-              showAuthor={true}
-              onUserPress={() => {}}
-              onContentPress={() => {}}
-              onImagePress={() => {}}
-              onHashtagPress={() => {}}
-              currentUsername={currentUsername}
-            />
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
+        onClose={() => setPreviewVisible(false)}
+        snapData={createPreviewSnapData()}
+        currentUsername={currentUsername}
+        colors={{
+          background: colors.background,
+          text: colors.text,
+          inputBorder: colors.inputBorder,
+        }}
+      />
     </SafeAreaView>
   );
 }
