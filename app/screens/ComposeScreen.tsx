@@ -30,6 +30,8 @@ import { useSharedContent } from '../../hooks/useSharedContent';
 import { useShare } from '../../context/ShareContext';
 import { useGifPicker } from '../../hooks/useGifPickerV2';
 import { GifPickerModal } from '../../components/GifPickerModalV2';
+import { SnapData } from '../../hooks/useConversationData';
+import Preview from '../components/Preview';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -67,6 +69,9 @@ export default function ComposeScreen() {
   // Spoiler modal state
   const [spoilerModalVisible, setSpoilerModalVisible] = useState(false);
   const [spoilerButtonText, setSpoilerButtonText] = useState('');
+
+  // Preview modal state
+  const [previewVisible, setPreviewVisible] = useState(false);
 
   // GIF state for composer (array of GIF URLs)
   const [gifs, setGifs] = useState<string[]>([]);
@@ -569,6 +574,40 @@ export default function ComposeScreen() {
     setSelectionEnd(end);
   };
 
+  // Create preview SnapData from current compose state
+  const createPreviewSnapData = (): SnapData => {
+    // Process body same way as in handleSubmit
+    let body = text.trim();
+    if (images.length > 0) {
+      images.forEach((imageUrl, index) => {
+        body += `\n![image${index + 1}](${imageUrl})`;
+      });
+    }
+    if (gifs.length > 0) {
+      gifs.forEach((gifUrl, index) => {
+        body += `\n![gif${index + 1}](${gifUrl})`;
+      });
+    }
+
+    return {
+      author: currentUsername || 'preview-user',
+      avatarUrl: avatarUrl || undefined,
+      body: body,
+      created: new Date().toISOString().slice(0, -1), // Remove 'Z' to match Hive format
+      voteCount: 0,
+      replyCount: 0,
+      payout: 0,
+      permlink: `preview-${Date.now()}`,
+      hasUpvoted: false,
+      active_votes: [],
+      json_metadata: undefined,
+      posting_json_metadata: undefined,
+      parent_author: undefined,
+      parent_permlink: undefined,
+      community: undefined,
+    };
+  };
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -908,6 +947,21 @@ export default function ComposeScreen() {
               >
                 <FontAwesome name='eye-slash' size={16} color={colors.button} />
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.markdownButton,
+                  { backgroundColor: colors.inputBg },
+                ]}
+                onPress={() => setPreviewVisible(true)}
+                disabled={!text.trim() && images.length === 0 && gifs.length === 0}
+              >
+                <FontAwesome 
+                  name='eye' 
+                  size={16} 
+                  color={(!text.trim() && images.length === 0 && gifs.length === 0) ? colors.info : colors.button} 
+                />
+              </TouchableOpacity>
             </View>
 
             {/* Image and GIF buttons */}
@@ -1106,6 +1160,19 @@ export default function ComposeScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Preview Modal */}
+      <Preview
+        visible={previewVisible}
+        onClose={() => setPreviewVisible(false)}
+        snapData={createPreviewSnapData()}
+        currentUsername={currentUsername}
+        colors={{
+          background: colors.background,
+          text: colors.text,
+          inputBorder: colors.inputBorder,
+        }}
+      />
     </SafeAreaView>
   );
 }
