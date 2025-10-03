@@ -11,7 +11,7 @@ import { useEffect } from 'react';
 import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/components/useColorScheme';
+import { useColorScheme } from '../components/useColorScheme';
 import { HivePostPreviewProvider } from '../context/HivePostPreviewContext';
 import { ShareProvider } from '../context/ShareContext';
 import { AppProvider } from '../store/context';
