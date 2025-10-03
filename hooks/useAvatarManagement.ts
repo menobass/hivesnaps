@@ -109,7 +109,7 @@ export const useAvatarManagement = (currentUsername: string | null) => {
                     IntentLauncher.startActivityAsync(
                       IntentLauncher.ActivityAction
                         .APPLICATION_DETAILS_SETTINGS,
-                      { data: 'package:com.anonymous.hivesnaps' }
+                      { data: 'package:com.menobass.hivesnaps' }
                     ).catch(() => {
                       // Fallback for older Android versions
                       Linking.openURL('app-settings:');
@@ -155,7 +155,7 @@ export const useAvatarManagement = (currentUsername: string | null) => {
                     IntentLauncher.startActivityAsync(
                       IntentLauncher.ActivityAction
                         .APPLICATION_DETAILS_SETTINGS,
-                      { data: 'package:com.anonymous.hivesnaps' }
+                      { data: 'package:com.menobass.hivesnaps' }
                     ).catch(() => {
                       // Fallback for older Android versions
                       Linking.openURL('app-settings:');
