@@ -47,7 +47,7 @@ import SmallButton from '../../components/SmallButton';
 import StaticContentModal from '../../components/StaticContentModal';
 import UpvoteModal from '../../components/UpvoteModal';
 import { addPromiseIfValid } from '../../utils/promiseUtils';
-import { subscribeGlobalRefresh } from '../utils/globalEvents';
+import { subscribeGlobalRefresh } from '../../utils/globalEvents';
 
 
 // Modal content constants
