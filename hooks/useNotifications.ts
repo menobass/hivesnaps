@@ -11,6 +11,7 @@ import {
   filterNotificationsBySettings,
   type ParsedNotification,
 } from '../utils/notifications';
+import { emitGlobalRefresh } from '../app/utils/globalEvents';
 
 import { useMutedList } from '../store/context';
 import { fetchMutedList } from '../services/HiveMuteService';
@@ -256,21 +257,32 @@ export const useNotifications = (
   // Mark single notification as read
   const markAsRead = useCallback(
     async (notificationId: number) => {
-      const updatedNotifications = notifications.map(notification =>
-        notification.id === notificationId
-          ? { ...notification, read: true }
-          : notification
-      );
+      let changed = false;
+      const updatedNotifications = notifications.map(notification => {
+        if (notification.id === notificationId && !notification.read) {
+          changed = true;
+          return { ...notification, read: true };
+        }
+        return notification;
+      });
       setNotifications(updatedNotifications);
 
       const readIds = updatedNotifications.filter(n => n.read).map(n => n.id);
       await saveReadStatus(readIds);
+
+      // If we actually changed read state, request a global refresh so the feed updates
+      if (changed) {
+        try { emitGlobalRefresh(); } catch (e) { /* ignore */ }
+      }
     },
     [notifications, saveReadStatus]
   );
 
   // Mark all notifications as read
   const markAllAsRead = useCallback(async () => {
+    // Only emit refresh if there were unread items
+    const hadUnread = notifications.some(n => !n.read);
+
     const updatedNotifications = notifications.map(notification => ({
       ...notification,
       read: true,
@@ -280,6 +292,10 @@ export const useNotifications = (
     const readIds = updatedNotifications.map(n => n.id);
     await saveReadStatus(readIds);
     await updateLastCheck();
+
+    if (hadUnread) {
+      try { emitGlobalRefresh(); } catch (e) { /* ignore */ }
+    }
   }, [notifications, saveReadStatus, updateLastCheck]);
 
   // Calculate unread count

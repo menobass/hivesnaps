@@ -47,6 +47,7 @@ import SmallButton from '../../components/SmallButton';
 import StaticContentModal from '../../components/StaticContentModal';
 import UpvoteModal from '../../components/UpvoteModal';
 import { addPromiseIfValid } from '../../utils/promiseUtils';
+import { subscribeGlobalRefresh } from '../utils/globalEvents';
 
 
 // Modal content constants
@@ -506,6 +507,15 @@ const FeedScreenRefactored = () => {
       setGlobalRefreshing(false);
     }
   };
+
+  // Subscribe to programmatic global refresh events (e.g., notifications marked read)
+  useEffect(() => {
+    const unsub = subscribeGlobalRefresh(() => {
+      // Reuse existing handler which contains throttling and guards
+      try { handleGlobalRefresh(); } catch (e) { console.warn('[FeedScreen] Programmatic global refresh failed', e); }
+    });
+    return () => unsub();
+  }, [handleGlobalRefresh]);
 
   // Handle search modal close
   const handleCloseSearchModal = () => {
