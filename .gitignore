@@ -51,3 +51,6 @@ Thumbs.db
 test-*.js
 test-*.ts
 /test
+
+# Local design / implementation notes
+TRENDING_FEED_IMPLEMENTATION_GUIDE.md
