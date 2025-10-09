@@ -11,7 +11,7 @@ import {
   filterNotificationsBySettings,
   type ParsedNotification,
 } from '../utils/notifications';
-import { emitGlobalRefresh } from '../app/utils/globalEvents';
+import { emitGlobalRefresh } from '../utils/globalEvents';
 
 import { useMutedList } from '../store/context';
 import { fetchMutedList } from '../services/HiveMuteService';
