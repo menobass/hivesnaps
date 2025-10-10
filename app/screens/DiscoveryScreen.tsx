@@ -372,11 +372,19 @@ const DiscoveryScreen = () => {
             snap.author === upvoteTarget.author &&
             snap.permlink === upvoteTarget.permlink
           ) {
+            const currentPayout =
+              snap.payout ||
+              parseFloat(
+                snap.pending_payout_value?.replace(' HBD', '') || '0'
+              );
+            const newPayout = currentPayout + estimatedValueIncrease;
+            
             return {
               ...snap,
               hasUpvoted: true,
               net_votes: (snap.net_votes || 0) + 1,
-              payout: (snap.payout || 0) + estimatedValueIncrease,
+              payout: newPayout,
+              pending_payout_value: `${newPayout.toFixed(3)} HBD`,
               active_votes: Array.isArray(snap.active_votes)
                 ? [
                     ...snap.active_votes,
