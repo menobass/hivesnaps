@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Client } from '@hiveio/dhive';
 import * as SecureStore from 'expo-secure-store';
+import { calculateVotingPower } from '../utils/calculateVotingPower';
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -24,21 +25,26 @@ export const useVotingPower = (username: string | null) => {
     setError(null);
 
     try {
-      const accounts = await client.database.getAccounts([username]);
-      if (accounts && accounts.length > 0) {
-        const account = accounts[0];
-        // Voting power is stored as a percentage (0-10000, where 10000 = 100%)
-        const vp = account.voting_power || 0;
-        setVotingPower(vp);
-      } else {
-        setVotingPower(null);
-        setError('Account not found');
+      const username = await SecureStore.getItemAsync('hive_username');
+      if (!username) {
+        console.log('No username found, cannot fetch voting power');
+        setLoading(false);
+        return;
       }
-    } catch (err) {
-      console.error('Error fetching voting power:', err);
-      setError('Failed to fetch voting power');
-      setVotingPower(null);
-    } finally {
+
+      const [account] = await client.database.getAccounts([username]);
+      if (!account) {
+        console.log('Account not found');
+        setLoading(false);
+        return;
+      }
+
+      // Use the accurate voting power calculation with regeneration
+      const vp = calculateVotingPower(account);
+      setVotingPower(vp);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching voting power:', error);
       setLoading(false);
     }
   }, [username]);
