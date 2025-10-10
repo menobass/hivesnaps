@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Client } from '@hiveio/dhive';
-import * as SecureStore from 'expo-secure-store';
 import { calculateVotingPower } from '../utils/calculateVotingPower';
+import { useCurrentUser } from '../store/context';
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -10,12 +10,14 @@ const HIVE_NODES = [
 ];
 const client = new Client(HIVE_NODES);
 
-export const useVotingPower = (username: string | null) => {
+export const useVotingPower = () => {
+  const username = useCurrentUser(); // Get current user from global state
   const [votingPower, setVotingPower] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchVotingPower = useCallback(async () => {
+    // Only fetch if we have a logged-in user
     if (!username) {
       setVotingPower(null);
       return;
@@ -25,16 +27,9 @@ export const useVotingPower = (username: string | null) => {
     setError(null);
 
     try {
-      const username = await SecureStore.getItemAsync('hive_username');
-      if (!username) {
-        console.log('No username found, cannot fetch voting power');
-        setLoading(false);
-        return;
-      }
-
       const [account] = await client.database.getAccounts([username]);
       if (!account) {
-        console.log('Account not found');
+        console.log('Account not found:', username);
         setLoading(false);
         return;
       }
