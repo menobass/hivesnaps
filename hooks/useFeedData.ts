@@ -254,6 +254,7 @@ class OrderedContainerMap {
 interface FeedState {
   snaps: Snap[];
   loading: boolean;
+  loadingMore: boolean; // Loading more containers (pagination)
   error: string | null;
   containerMap: OrderedContainerMap;
   currentFilter: FeedFilter; // Add internal filter state
@@ -299,6 +300,7 @@ export function useFeedData(): UseFeedDataReturn {
   const [state, setState] = useState<FeedState>({
     snaps: [],
     loading: false,
+    loadingMore: false,
     error: null,
     containerMap: new OrderedContainerMap(MAX_CONTAINERS_IN_MEMORY),
     currentFilter: 'newest', // Default filter
@@ -350,21 +352,6 @@ export function useFeedData(): UseFeedDataReturn {
     }
   }, [username]);
 
-  // Memoized helper for following list filtering (most expensive operation)
-  const memoizedFollowingFilter = useMemo(() => {
-    return (snaps: Snap[]) => {
-      const followingSet = new Set(followingList || []);
-      return snaps.filter(snap => followingSet.has(snap.author));
-    };
-  }, [followingList]);
-
-  // Memoized helper for user's own posts filtering
-  const memoizedMyPostsFilter = useMemo(() => {
-    return (snaps: Snap[]) => {
-      return snaps.filter(snap => snap.author === username);
-    };
-  }, [username]);
-
   // Utility function to apply filtering to snaps
   const applyFilter = useCallback(
     (
@@ -381,18 +368,19 @@ export function useFeedData(): UseFeedDataReturn {
 
       switch (filter) {
         case 'following':
-          // Use memoized following filter for better performance
-          console.log('🔍 [applyFilter] followingList:', followingList);
-          filteredSnaps = memoizedFollowingFilter(snaps);
+          // Filter by following list - use passed parameter directly to avoid stale closure
+          console.log('🔍 [applyFilter] followingList length:', followingList?.length || 0);
+          const followingSet = new Set(followingList || []);
+          filteredSnaps = snaps.filter(snap => followingSet.has(snap.author));
           console.log(
             `🔍 [applyFilter] Following filter: ${snaps.length} → ${filteredSnaps.length} snaps`
           );
           break;
 
         case 'my':
-          // Use memoized user posts filter for better performance
+          // Filter by current user - use passed parameter directly
           console.log('🔍 [applyFilter] Current user:', currentUsername);
-          filteredSnaps = memoizedMyPostsFilter(snaps);
+          filteredSnaps = snaps.filter(snap => snap.author === currentUsername);
           console.log(
             `🔍 [applyFilter] My snaps filter: ${snaps.length} → ${filteredSnaps.length} snaps`
           );
@@ -447,7 +435,7 @@ export function useFeedData(): UseFeedDataReturn {
 
       return afterModeration;
     },
-    [memoizedFollowingFilter, memoizedMyPostsFilter]
+    [] // No dependencies - use passed parameters directly
   ); // Include memoized filters for optimization
 
   // Helper: identifies snaps without loaded active_votes and with negative net_votes
@@ -773,10 +761,13 @@ export function useFeedData(): UseFeedDataReturn {
     console.log(`📄 [useFeedData] Loading more snaps for filter: ${state.currentFilter}`);
 
     // Prevent concurrent loading
-    if (state.loading) {
+    if (state.loading || state.loadingMore) {
       console.log('📄 [useFeedData] Already loading, ignoring request');
       return;
     }
+
+    // Set loadingMore flag
+    setState(prev => ({ ...prev, loadingMore: true }));
 
     try {
       // Only proceed if we have at least one container (to get the next one)
@@ -789,8 +780,11 @@ export function useFeedData(): UseFeedDataReturn {
       }
     } catch (error) {
       console.error('📄 [useFeedData] Failed to load more snaps:', error);
+    } finally {
+      // Clear loadingMore flag
+      setState(prev => ({ ...prev, loadingMore: false }));
     }
-  }, [fetchSnaps, state.currentFilter, state.loading, state.containerMap]);
+  }, [fetchSnaps, state.currentFilter, state.loading, state.loadingMore, state.containerMap]);
 
   const clearError = useCallback(() => {
     setState(prev => ({ ...prev, error: null }));
