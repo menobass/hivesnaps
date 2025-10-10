@@ -27,6 +27,4 @@ export function emitGlobalRefresh(): void {
   }
 }
 
-export const EVENTS = {
-  GLOBAL_REFRESH: 'GLOBAL_REFRESH',
-};
+
