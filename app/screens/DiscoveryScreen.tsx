@@ -351,16 +351,23 @@ const DiscoveryScreen = () => {
       if (!postingKeyStr)
         throw new Error('No posting key found. Please log in again.');
       const postingKey = PrivateKey.fromString(postingKeyStr);
+      
+      // Ensure user is logged in
+      if (!currentUsername) {
+        throw new Error('User not logged in. Please log in again.');
+      }
+      
       // Broadcast vote
       await client.broadcast.vote(
         {
-          voter: currentUsername || '',
+          voter: currentUsername,
           author: upvoteTarget.author,
           permlink: upvoteTarget.permlink,
           weight: voteWeight * 100, // dhive expects 10000 = 100%
         },
         postingKey
       );
+      
       // Persist the vote weight after successful vote
       await AsyncStorage.setItem('hivesnaps_vote_weight', String(voteWeight));
 
@@ -388,9 +395,9 @@ const DiscoveryScreen = () => {
               active_votes: Array.isArray(snap.active_votes)
                 ? [
                     ...snap.active_votes,
-                    { voter: currentUsername || '', percent: voteWeight * 100 },
+                    { voter: currentUsername, percent: voteWeight * 100 },
                   ]
-                : [{ voter: currentUsername || '', percent: voteWeight * 100 }],
+                : [{ voter: currentUsername, percent: voteWeight * 100 }],
             };
           }
           return snap;
