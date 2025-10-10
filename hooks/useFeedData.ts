@@ -350,21 +350,6 @@ export function useFeedData(): UseFeedDataReturn {
     }
   }, [username]);
 
-  // Memoized helper for following list filtering (most expensive operation)
-  const memoizedFollowingFilter = useMemo(() => {
-    return (snaps: Snap[]) => {
-      const followingSet = new Set(followingList || []);
-      return snaps.filter(snap => followingSet.has(snap.author));
-    };
-  }, [followingList]);
-
-  // Memoized helper for user's own posts filtering
-  const memoizedMyPostsFilter = useMemo(() => {
-    return (snaps: Snap[]) => {
-      return snaps.filter(snap => snap.author === username);
-    };
-  }, [username]);
-
   // Utility function to apply filtering to snaps
   const applyFilter = useCallback(
     (
@@ -381,18 +366,19 @@ export function useFeedData(): UseFeedDataReturn {
 
       switch (filter) {
         case 'following':
-          // Use memoized following filter for better performance
-          console.log('🔍 [applyFilter] followingList:', followingList);
-          filteredSnaps = memoizedFollowingFilter(snaps);
+          // Filter by following list - use passed parameter directly to avoid stale closure
+          console.log('🔍 [applyFilter] followingList length:', followingList?.length || 0);
+          const followingSet = new Set(followingList || []);
+          filteredSnaps = snaps.filter(snap => followingSet.has(snap.author));
           console.log(
             `🔍 [applyFilter] Following filter: ${snaps.length} → ${filteredSnaps.length} snaps`
           );
           break;
 
         case 'my':
-          // Use memoized user posts filter for better performance
+          // Filter by current user - use passed parameter directly
           console.log('🔍 [applyFilter] Current user:', currentUsername);
-          filteredSnaps = memoizedMyPostsFilter(snaps);
+          filteredSnaps = snaps.filter(snap => snap.author === currentUsername);
           console.log(
             `🔍 [applyFilter] My snaps filter: ${snaps.length} → ${filteredSnaps.length} snaps`
           );
@@ -447,7 +433,7 @@ export function useFeedData(): UseFeedDataReturn {
 
       return afterModeration;
     },
-    [memoizedFollowingFilter, memoizedMyPostsFilter]
+    [] // No dependencies - use passed parameters directly
   ); // Include memoized filters for optimization
 
   // Helper: identifies snaps without loaded active_votes and with negative net_votes

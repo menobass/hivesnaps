@@ -906,7 +906,7 @@ const FeedScreenRefactored = () => {
               Loading snaps...
             </Text>
           </View>
-        ) : snaps.length === 0 ? (
+        ) : filteredSnaps.length === 0 ? (
           <Text style={{ color: colors.text, marginTop: 24 }}>
             No snaps to display.
           </Text>
