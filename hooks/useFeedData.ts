@@ -254,6 +254,7 @@ class OrderedContainerMap {
 interface FeedState {
   snaps: Snap[];
   loading: boolean;
+  loadingMore: boolean; // Loading more containers (pagination)
   error: string | null;
   containerMap: OrderedContainerMap;
   currentFilter: FeedFilter; // Add internal filter state
@@ -299,6 +300,7 @@ export function useFeedData(): UseFeedDataReturn {
   const [state, setState] = useState<FeedState>({
     snaps: [],
     loading: false,
+    loadingMore: false,
     error: null,
     containerMap: new OrderedContainerMap(MAX_CONTAINERS_IN_MEMORY),
     currentFilter: 'newest', // Default filter
@@ -759,10 +761,13 @@ export function useFeedData(): UseFeedDataReturn {
     console.log(`📄 [useFeedData] Loading more snaps for filter: ${state.currentFilter}`);
 
     // Prevent concurrent loading
-    if (state.loading) {
+    if (state.loading || state.loadingMore) {
       console.log('📄 [useFeedData] Already loading, ignoring request');
       return;
     }
+
+    // Set loadingMore flag
+    setState(prev => ({ ...prev, loadingMore: true }));
 
     try {
       // Only proceed if we have at least one container (to get the next one)
@@ -775,8 +780,11 @@ export function useFeedData(): UseFeedDataReturn {
       }
     } catch (error) {
       console.error('📄 [useFeedData] Failed to load more snaps:', error);
+    } finally {
+      // Clear loadingMore flag
+      setState(prev => ({ ...prev, loadingMore: false }));
     }
-  }, [fetchSnaps, state.currentFilter, state.loading, state.containerMap]);
+  }, [fetchSnaps, state.currentFilter, state.loading, state.loadingMore, state.containerMap]);
 
   const clearError = useCallback(() => {
     setState(prev => ({ ...prev, error: null }));

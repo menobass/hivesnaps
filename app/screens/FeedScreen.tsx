@@ -78,6 +78,26 @@ Don't worry—RC recharges over time!
 Even if you're out of credits, just wait a bit. Your RC will slowly refill, and you'll be able to use Hive again without doing anything else.`,
 };
 
+// Loading footer style constants
+const LOADING_FOOTER_PADDING_VERTICAL = 20;
+const LOADING_TEXT_MARGIN_TOP = 8;
+const LOADING_TEXT_FONT_SIZE = 14;
+const LOADING_TEXT_OPACITY = 0.7;
+
+// Empty state style constants
+const EMPTY_STATE_MARGIN_TOP = 40;
+const EMPTY_STATE_PADDING_HORIZONTAL = 24;
+const EMPTY_STATE_FONT_SIZE = 16;
+const EMPTY_STATE_LINE_HEIGHT = 24;
+
+// Empty state messages by filter
+const EMPTY_STATE_MESSAGES = {
+  my: "You've been too quiet lately... Why don't you share a little?",
+  following: "No snaps from people you follow yet. Check back soon!",
+  trending: "Nothing trending right now. Be the first to create something!",
+  newest: "No snaps to display.",
+} as const;
+
 const twitterColors = {
   light: {
     background: '#FFFFFF',
@@ -150,6 +170,7 @@ const FeedScreenRefactored = () => {
     followingList,
     mutedList,
     loading: feedLoading,
+    loadingMore,
     error: feedError,
     currentFilter,
     fetchSnaps,
@@ -642,6 +663,34 @@ const FeedScreenRefactored = () => {
     };
   }
 
+  // Render footer with loading indicator
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    
+    return (
+      <View style={{ 
+        paddingVertical: LOADING_FOOTER_PADDING_VERTICAL, 
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <ActivityIndicator size="small" color={colors.icon} />
+        <Text style={{ 
+          color: colors.text, 
+          marginTop: LOADING_TEXT_MARGIN_TOP,
+          fontSize: LOADING_TEXT_FONT_SIZE,
+          opacity: LOADING_TEXT_OPACITY
+        }}>
+          Loading more snaps...
+        </Text>
+      </View>
+    );
+  };
+
+  // Get contextual empty state message based on current filter
+  const getEmptyStateMessage = (): string => {
+    return EMPTY_STATE_MESSAGES[currentFilter] || EMPTY_STATE_MESSAGES.newest;
+  };
+
   return (
     <View style={styles.container}>
       {/* Upvote Modal */}
@@ -907,9 +956,20 @@ const FeedScreenRefactored = () => {
             </Text>
           </View>
         ) : filteredSnaps.length === 0 ? (
-          <Text style={{ color: colors.text, marginTop: 24 }}>
-            No snaps to display.
-          </Text>
+          <View style={{ 
+            alignItems: 'center', 
+            marginTop: EMPTY_STATE_MARGIN_TOP, 
+            paddingHorizontal: EMPTY_STATE_PADDING_HORIZONTAL 
+          }}>
+            <Text style={{ 
+              color: colors.text, 
+              fontSize: EMPTY_STATE_FONT_SIZE,
+              textAlign: 'center',
+              lineHeight: EMPTY_STATE_LINE_HEIGHT
+            }}>
+              {getEmptyStateMessage()}
+            </Text>
+          </View>
         ) : (
           <FlatList
             ref={flatListRef}
@@ -990,6 +1050,7 @@ const FeedScreenRefactored = () => {
             onRefresh={handleGlobalRefresh}
             onEndReached={handleEndReached}
             onEndReachedThreshold={0.3}
+            ListFooterComponent={renderFooter}
             onScrollToIndexFailed={({ index }) => {
               flatListRef.current?.scrollToOffset({
                 offset: Math.max(0, index - 2) * 220,
