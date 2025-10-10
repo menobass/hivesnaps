@@ -272,7 +272,7 @@ export const useNotifications = (
 
       // If we actually changed read state, request a global refresh so the feed updates
       if (changed) {
-        try { emitGlobalRefresh(); } catch (e) { /* ignore */ }
+        try { emitGlobalRefresh(); } catch (e) { console.log('unable to refresh') }
       }
     },
     [notifications, saveReadStatus]
@@ -294,7 +294,7 @@ export const useNotifications = (
     await updateLastCheck();
 
     if (hadUnread) {
-      try { emitGlobalRefresh(); } catch (e) { /* ignore */ }
+      try { emitGlobalRefresh(); } catch (e) { console.log('unable to refresh') }
     }
   }, [notifications, saveReadStatus, updateLastCheck]);
 
