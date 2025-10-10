@@ -243,7 +243,6 @@ const DiscoveryScreen = () => {
     hbd: string;
     usd: string;
   } | null>(null);
-  const [username, setUsername] = useState('');
   const [globalProps, setGlobalProps] = useState<any | null>(null);
   const [rewardFund, setRewardFund] = useState<any | null>(null);
   const [hivePrice, setHivePrice] = useState<number>(1);
@@ -301,8 +300,8 @@ const DiscoveryScreen = () => {
       }
       // Calculate vote value if possible
       let accountObj = null;
-      if (username) {
-        const accounts = await client.database.getAccounts([username]);
+      if (currentUsername) {
+        const accounts = await client.database.getAccounts([currentUsername]);
         accountObj = accounts && accounts[0] ? accounts[0] : null;
       }
       if (accountObj && globalProps && rewardFund) {
@@ -355,7 +354,7 @@ const DiscoveryScreen = () => {
       // Broadcast vote
       await client.broadcast.vote(
         {
-          voter: username,
+          voter: currentUsername || '',
           author: upvoteTarget.author,
           permlink: upvoteTarget.permlink,
           weight: voteWeight * 100, // dhive expects 10000 = 100%
@@ -381,9 +380,9 @@ const DiscoveryScreen = () => {
               active_votes: Array.isArray(snap.active_votes)
                 ? [
                     ...snap.active_votes,
-                    { voter: username, percent: voteWeight * 100 },
+                    { voter: currentUsername || '', percent: voteWeight * 100 },
                   ]
-                : [{ voter: username, percent: voteWeight * 100 }],
+                : [{ voter: currentUsername || '', percent: voteWeight * 100 }],
             };
           }
           return snap;
@@ -427,8 +426,8 @@ const DiscoveryScreen = () => {
           setVoteWeight(val);
           // Live update vote value
           let accountObj = null;
-          if (username) {
-            const accounts = await client.database.getAccounts([username]);
+          if (currentUsername) {
+            const accounts = await client.database.getAccounts([currentUsername]);
             accountObj = accounts && accounts[0] ? accounts[0] : null;
           }
           if (accountObj && globalProps && rewardFund) {
