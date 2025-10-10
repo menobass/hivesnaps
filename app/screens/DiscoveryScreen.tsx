@@ -243,7 +243,6 @@ const DiscoveryScreen = () => {
     hbd: string;
     usd: string;
   } | null>(null);
-  const [username, setUsername] = useState('');
   const [globalProps, setGlobalProps] = useState<any | null>(null);
   const [rewardFund, setRewardFund] = useState<any | null>(null);
   const [hivePrice, setHivePrice] = useState<number>(1);
@@ -301,8 +300,8 @@ const DiscoveryScreen = () => {
       }
       // Calculate vote value if possible
       let accountObj = null;
-      if (username) {
-        const accounts = await client.database.getAccounts([username]);
+      if (currentUsername) {
+        const accounts = await client.database.getAccounts([currentUsername]);
         accountObj = accounts && accounts[0] ? accounts[0] : null;
       }
       if (accountObj && globalProps && rewardFund) {
@@ -352,16 +351,23 @@ const DiscoveryScreen = () => {
       if (!postingKeyStr)
         throw new Error('No posting key found. Please log in again.');
       const postingKey = PrivateKey.fromString(postingKeyStr);
+      
+      // Ensure user is logged in
+      if (!currentUsername) {
+        throw new Error('User not logged in. Please log in again.');
+      }
+      
       // Broadcast vote
       await client.broadcast.vote(
         {
-          voter: username,
+          voter: currentUsername,
           author: upvoteTarget.author,
           permlink: upvoteTarget.permlink,
           weight: voteWeight * 100, // dhive expects 10000 = 100%
         },
         postingKey
       );
+      
       // Persist the vote weight after successful vote
       await AsyncStorage.setItem('hivesnaps_vote_weight', String(voteWeight));
 
@@ -373,17 +379,25 @@ const DiscoveryScreen = () => {
             snap.author === upvoteTarget.author &&
             snap.permlink === upvoteTarget.permlink
           ) {
+            const currentPayout =
+              snap.payout ||
+              parseFloat(
+                snap.pending_payout_value?.replace(' HBD', '') || '0'
+              );
+            const newPayout = currentPayout + estimatedValueIncrease;
+            
             return {
               ...snap,
               hasUpvoted: true,
               net_votes: (snap.net_votes || 0) + 1,
-              payout: (snap.payout || 0) + estimatedValueIncrease,
+              payout: newPayout,
+              pending_payout_value: `${newPayout.toFixed(3)} HBD`,
               active_votes: Array.isArray(snap.active_votes)
                 ? [
                     ...snap.active_votes,
-                    { voter: username, percent: voteWeight * 100 },
+                    { voter: currentUsername, percent: voteWeight * 100 },
                   ]
-                : [{ voter: username, percent: voteWeight * 100 }],
+                : [{ voter: currentUsername, percent: voteWeight * 100 }],
             };
           }
           return snap;
@@ -427,8 +441,8 @@ const DiscoveryScreen = () => {
           setVoteWeight(val);
           // Live update vote value
           let accountObj = null;
-          if (username) {
-            const accounts = await client.database.getAccounts([username]);
+          if (currentUsername) {
+            const accounts = await client.database.getAccounts([currentUsername]);
             accountObj = accounts && accounts[0] ? accounts[0] : null;
           }
           if (accountObj && globalProps && rewardFund) {
