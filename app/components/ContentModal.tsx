@@ -165,7 +165,7 @@ const ContentModal: React.FC<ContentModalProps> = ({
             contentContainerStyle={{ paddingRight: 10 }}
           >
             {images.map((imageUrl, index) => (
-              <View key={`image-${index}`} style={{ marginRight: 10 }}>
+              <View key={imageUrl} style={{ marginRight: 10 }}>
                 <ExpoImage
                   source={{ uri: imageUrl }}
                   style={{ width: 120, height: 120, borderRadius: 10 }}
@@ -244,7 +244,7 @@ const ContentModal: React.FC<ContentModalProps> = ({
             contentContainerStyle={{ paddingRight: 10 }}
           >
             {gifs.map((gifUrl, index) => (
-              <View key={`gif-${index}`} style={{ marginRight: 10 }}>
+              <View key={gifUrl} style={{ marginRight: 10 }}>
                 <ExpoImage
                   source={{ uri: gifUrl }}
                   style={{ width: 120, height: 120, borderRadius: 10 }}
