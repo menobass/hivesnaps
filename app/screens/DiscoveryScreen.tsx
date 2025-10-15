@@ -94,8 +94,8 @@ const DiscoveryScreen = () => {
   const {
     editModalVisible,
     editText,
-    editImage,
-    editGif,
+    editImages,
+    editGifs,
     editTarget,
     editing,
     error: editError,
@@ -104,8 +104,8 @@ const DiscoveryScreen = () => {
     openEditModal,
     closeEditModal,
     setEditText,
-    setEditImage,
-    setEditGif,
+    removeEditImage,
+    removeEditGif,
     submitEdit,
     addImage: addEditImage,
     addGif: addEditGif,
@@ -570,10 +570,10 @@ const DiscoveryScreen = () => {
         target={editTarget}
         text={editText}
         onTextChange={setEditText}
-        image={editImage}
-        gif={editGif}
-        onImageRemove={() => setEditImage(null)}
-        onGifRemove={() => setEditGif(null)}
+        images={editImages}
+        gifs={editGifs}
+        onImageRemove={removeEditImage}
+        onGifRemove={removeEditGif}
         onAddImage={() => addEditImage('edit')}
         onAddGif={() => addEditGif('edit')}
         posting={editing}
