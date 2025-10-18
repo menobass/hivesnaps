@@ -161,7 +161,7 @@ const FeedScreenRefactored = () => {
     refreshProfile,
   } = useUserProfile(username);
 
-  const { votingPower, loading: vpLoading, refreshVotingPower } = useVotingPower(username);
+  const { votingPower, loading: vpLoading, refreshVotingPower } = useVotingPower();
   const { resourceCredits, loading: rcLoading, refreshResourceCredits } = useResourceCredits(username);
 
   // Feed data and related functions

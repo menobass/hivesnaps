@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Client } from '@hiveio/dhive';
-import * as SecureStore from 'expo-secure-store';
+import { calculateVotingPower } from '../utils/calculateVotingPower';
+import { useCurrentUser } from '../store/context';
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -9,12 +10,14 @@ const HIVE_NODES = [
 ];
 const client = new Client(HIVE_NODES);
 
-export const useVotingPower = (username: string | null) => {
+export const useVotingPower = () => {
+  const username = useCurrentUser(); // Get current user from global state
   const [votingPower, setVotingPower] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchVotingPower = useCallback(async () => {
+    // Only fetch if we have a logged-in user
     if (!username) {
       setVotingPower(null);
       return;
@@ -24,21 +27,19 @@ export const useVotingPower = (username: string | null) => {
     setError(null);
 
     try {
-      const accounts = await client.database.getAccounts([username]);
-      if (accounts && accounts.length > 0) {
-        const account = accounts[0];
-        // Voting power is stored as a percentage (0-10000, where 10000 = 100%)
-        const vp = account.voting_power || 0;
-        setVotingPower(vp);
-      } else {
-        setVotingPower(null);
-        setError('Account not found');
+      const [account] = await client.database.getAccounts([username]);
+      if (!account) {
+        console.log('Account not found:', username);
+        setLoading(false);
+        return;
       }
-    } catch (err) {
-      console.error('Error fetching voting power:', err);
-      setError('Failed to fetch voting power');
-      setVotingPower(null);
-    } finally {
+
+      // Use the accurate voting power calculation with regeneration
+      const vp = calculateVotingPower(account);
+      setVotingPower(vp);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching voting power:', error);
       setLoading(false);
     }
   }, [username]);
