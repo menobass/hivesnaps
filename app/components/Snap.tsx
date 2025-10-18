@@ -906,7 +906,7 @@ const Snap: React.FC<SnapProps> = ({
             />
           )}
           <Text style={[styles.voteCount, { color: colors.text, fontSize: 14 }]}>
-            {voteCount}
+            {typeof voteCount === 'number' ? Math.abs(voteCount) : '0'}
           </Text>
           
           <FontAwesome
@@ -1000,7 +1000,7 @@ const Snap: React.FC<SnapProps> = ({
             />
           )}
           <Text style={[styles.voteCount, { color: colors.text }]}>
-            {voteCount}
+            {typeof voteCount === 'number' ? Math.abs(voteCount) : '0'}
           </Text>
           {onSpeechBubblePress ? (
             <Pressable
