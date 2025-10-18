@@ -19,8 +19,8 @@ export interface ReplyTarget {
 interface ReplyState {
   replyModalVisible: boolean;
   replyText: string;
-  replyImage: string | null;
-  replyGif: string | null;
+  replyImages: string[]; // Changed to array
+  replyGifs: string[]; // Changed to array
   replyTarget: ReplyTarget | null;
   posting: boolean;
   uploading: boolean;
@@ -32,8 +32,12 @@ interface UseReplyReturn extends ReplyState {
   openReplyModal: (target: ReplyTarget) => void;
   closeReplyModal: () => void;
   setReplyText: (text: string) => void;
-  setReplyImage: (image: string | null) => void;
-  setReplyGif: (gif: string | null) => void;
+  setReplyImages: (images: string[]) => void;
+  setReplyGifs: (gifs: string[]) => void;
+  addReplyImage: (imageUrl: string) => void;
+  removeReplyImage: (imageUrl: string) => void;
+  addReplyGif: (gifUrl: string) => void;
+  removeReplyGif: (gifUrl: string) => void;
   submitReply: () => Promise<void>;
   addImage: (mode: 'reply') => Promise<void>;
   addGif: (gifUrl: string) => void;
@@ -48,8 +52,8 @@ export const useReply = (
   const [state, setState] = useState<ReplyState>({
     replyModalVisible: false,
     replyText: '',
-    replyImage: null,
-    replyGif: null,
+    replyImages: [], // Changed to array
+    replyGifs: [], // Changed to array
     replyTarget: null,
     posting: false,
     uploading: false,
@@ -70,8 +74,8 @@ export const useReply = (
       ...prev,
       replyModalVisible: false,
       replyText: '',
-      replyImage: null,
-      replyGif: null,
+      replyImages: [], // Changed to array
+      replyGifs: [], // Changed to array
       replyTarget: null,
       error: null,
     }));
@@ -81,12 +85,34 @@ export const useReply = (
     setState(prev => ({ ...prev, replyText: text }));
   }, []);
 
-  const setReplyImage = useCallback((image: string | null) => {
-    setState(prev => ({ ...prev, replyImage: image }));
+  const setReplyImages = useCallback((images: string[]) => {
+    setState(prev => ({ ...prev, replyImages: images }));
   }, []);
 
-  const setReplyGif = useCallback((gif: string | null) => {
-    setState(prev => ({ ...prev, replyGif: gif }));
+  const setReplyGifs = useCallback((gifs: string[]) => {
+    setState(prev => ({ ...prev, replyGifs: gifs }));
+  }, []);
+
+  const addReplyImage = useCallback((imageUrl: string) => {
+    setState(prev => ({ ...prev, replyImages: [...prev.replyImages, imageUrl] }));
+  }, []);
+
+  const removeReplyImage = useCallback((imageUrl: string) => {
+    setState(prev => ({ 
+      ...prev, 
+      replyImages: prev.replyImages.filter(img => img !== imageUrl) 
+    }));
+  }, []);
+
+  const addReplyGif = useCallback((gifUrl: string) => {
+    setState(prev => ({ ...prev, replyGifs: [...prev.replyGifs, gifUrl] }));
+  }, []);
+
+  const removeReplyGif = useCallback((gifUrl: string) => {
+    setState(prev => ({ 
+      ...prev, 
+      replyGifs: prev.replyGifs.filter(gif => gif !== gifUrl) 
+    }));
   }, []);
 
   const addImage = useCallback(async (mode: 'reply') => {
@@ -115,7 +141,12 @@ export const useReply = (
 
         const uploadResult = await uploadImageSmart(fileToUpload, currentUsername);
         console.log(`[useReply] Image uploaded via ${uploadResult.provider} (cost: $${uploadResult.cost})`);
-        setState(prev => ({ ...prev, replyImage: uploadResult.url }));
+        
+        // Add to array instead of replacing
+        setState(prev => ({ 
+          ...prev, 
+          replyImages: [...prev.replyImages, uploadResult.url] 
+        }));
       }
     } catch (error) {
       console.error('Image upload error:', error);
@@ -127,16 +158,16 @@ export const useReply = (
     } finally {
       setState(prev => ({ ...prev, uploading: false }));
     }
-  }, []);
+  }, [currentUsername]);
 
   const addGif = useCallback((gifUrl: string) => {
-    setState(prev => ({ ...prev, replyGif: gifUrl }));
+    setState(prev => ({ ...prev, replyGifs: [...prev.replyGifs, gifUrl] }));
   }, []);
 
   const submitReply = useCallback(async () => {
     if (
       !state.replyTarget ||
-      (!state.replyText.trim() && !state.replyImage && !state.replyGif) ||
+      (!state.replyText.trim() && state.replyImages.length === 0 && state.replyGifs.length === 0) ||
       !currentUsername
     ) {
       return;
@@ -153,12 +184,16 @@ export const useReply = (
       const postingKey = PrivateKey.fromString(postingKeyStr);
 
       let body = state.replyText.trim();
-      if (state.replyImage) {
-        body += `\n![image](${state.replyImage})`;
-      }
-      if (state.replyGif) {
-        body += `\n![gif](${state.replyGif})`;
-      }
+      
+      // Add all images
+      state.replyImages.forEach(imageUrl => {
+        body += `\n![image](${imageUrl})`;
+      });
+      
+      // Add all GIFs
+      state.replyGifs.forEach(gifUrl => {
+        body += `\n![gif](${gifUrl})`;
+      });
 
       const parent_author = state.replyTarget.author;
       const parent_permlink = state.replyTarget.permlink;
@@ -176,12 +211,10 @@ export const useReply = (
         tags: ['hivesnaps', 'reply'],
       };
 
-      if (state.replyImage) {
-        json_metadata.image = [state.replyImage];
-      }
-      if (state.replyGif) {
-        if (!json_metadata.image) json_metadata.image = [];
-        json_metadata.image.push(state.replyGif);
+      // Add all images and GIFs to metadata
+      const allMedia = [...state.replyImages, ...state.replyGifs];
+      if (allMedia.length > 0) {
+        json_metadata.image = allMedia;
       }
 
       // Post to Hive blockchain
@@ -254,8 +287,8 @@ export const useReply = (
   }, [
     state.replyTarget,
     state.replyText,
-    state.replyImage,
-    state.replyGif,
+    state.replyImages,
+    state.replyGifs,
     currentUsername,
     closeReplyModal,
     onRefresh,
@@ -271,8 +304,12 @@ export const useReply = (
     openReplyModal,
     closeReplyModal,
     setReplyText,
-    setReplyImage,
-    setReplyGif,
+    setReplyImages,
+    setReplyGifs,
+    addReplyImage,
+    removeReplyImage,
+    addReplyGif,
+    removeReplyGif,
     submitReply,
     addImage,
     addGif,

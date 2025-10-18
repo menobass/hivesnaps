@@ -122,8 +122,8 @@ const ConversationScreenRefactored = () => {
   const {
     replyModalVisible,
     replyText,
-    replyImage,
-    replyGif,
+    replyImages,
+    replyGifs,
     replyTarget,
     posting,
     uploading,
@@ -132,8 +132,8 @@ const ConversationScreenRefactored = () => {
     openReplyModal,
     closeReplyModal,
     setReplyText,
-    setReplyImage,
-    setReplyGif,
+    removeReplyImage,
+    removeReplyGif,
     submitReply,
     addImage: addReplyImage,
     addGif: addReplyGif,
@@ -142,8 +142,8 @@ const ConversationScreenRefactored = () => {
   const {
     editModalVisible,
     editText,
-    editImage,
-    editGif,
+    editImages,
+    editGifs,
     editTarget,
     editing,
     uploading: editUploading,
@@ -152,8 +152,8 @@ const ConversationScreenRefactored = () => {
     openEditModal,
     closeEditModal,
     setEditText,
-    setEditImage,
-    setEditGif,
+    removeEditImage,
+    removeEditGif,
     submitEdit,
     addImage: addEditImage,
     addGif: addEditGif,
@@ -1460,10 +1460,10 @@ const ConversationScreenRefactored = () => {
           target={replyTarget}
           text={replyText}
           onTextChange={setReplyText}
-          image={replyImage}
-          gif={replyGif}
-          onImageRemove={() => setReplyImage(null)}
-          onGifRemove={() => setReplyGif(null)}
+          images={replyImages}
+          gifs={replyGifs}
+          onImageRemove={removeReplyImage}
+          onGifRemove={removeReplyGif}
           onAddImage={() => addReplyImage('reply')}
           onAddGif={() => handleOpenGifPicker('reply')}
           posting={posting}
@@ -1482,10 +1482,10 @@ const ConversationScreenRefactored = () => {
           target={editTarget}
           text={editText}
           onTextChange={setEditText}
-          image={editImage}
-          gif={editGif}
-          onImageRemove={() => setEditImage(null)}
-          onGifRemove={() => setEditGif(null)}
+          images={editImages}
+          gifs={editGifs}
+          onImageRemove={removeEditImage}
+          onGifRemove={removeEditGif}
           onAddImage={() => addEditImage('edit')}
           onAddGif={() => handleOpenGifPicker('edit')}
           posting={editing}
