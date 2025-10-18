@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Platform,
   useColorScheme,
+  ScrollView,
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
@@ -28,10 +29,10 @@ interface ContentModalProps {
   target: ContentTarget | null;
   text: string;
   onTextChange: (text: string) => void;
-  image: string | null;
-  gif: string | null;
-  onImageRemove: () => void;
-  onGifRemove: () => void;
+  images: string[]; // Changed from single image to array
+  gifs: string[]; // Changed from single gif to array
+  onImageRemove: (imageUrl: string) => void; // Now takes URL parameter
+  onGifRemove: (gifUrl: string) => void; // Now takes URL parameter
   onAddImage: () => void;
   onAddGif: () => void;
   posting: boolean;
@@ -52,8 +53,8 @@ const ContentModal: React.FC<ContentModalProps> = ({
   target,
   text,
   onTextChange,
-  image,
-  gif,
+  images,
+  gifs,
   onImageRemove,
   onGifRemove,
   onAddImage,
@@ -155,110 +156,137 @@ const ContentModal: React.FC<ContentModalProps> = ({
           {getTitle()}
         </Text>
 
-        {/* Image preview */}
-        {image ? (
-          <View style={{ marginBottom: 10 }}>
-            <ExpoImage
-              source={{ uri: image }}
-              style={{ width: 120, height: 120, borderRadius: 10 }}
-              contentFit='cover'
-            />
-            <TouchableOpacity
-              onPress={onImageRemove}
-              style={{ position: 'absolute', top: 4, right: 4 }}
-              disabled={posting}
-            >
-              <FontAwesome name='close' size={20} color={colors.icon} />
-            </TouchableOpacity>
+        {/* Images preview - Horizontal scrollable list */}
+        {images.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginBottom: 10 }}
+            contentContainerStyle={{ paddingRight: 10 }}
+          >
+            {images.map((imageUrl, index) => (
+              <View key={imageUrl} style={{ marginRight: 10 }}>
+                <ExpoImage
+                  source={{ uri: imageUrl }}
+                  style={{ width: 120, height: 120, borderRadius: 10 }}
+                  contentFit='cover'
+                />
+                <TouchableOpacity
+                  onPress={() => onImageRemove(imageUrl)}
+                  style={{ position: 'absolute', top: 4, right: 4 }}
+                  disabled={posting}
+                >
+                  <View
+                    style={{
+                      backgroundColor: 'rgba(0,0,0,0.7)',
+                      borderRadius: 12,
+                      width: 24,
+                      height: 24,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <FontAwesome name='close' size={16} color='#fff' />
+                  </View>
+                </TouchableOpacity>
 
-            {/* Image information for edit mode */}
-            {mode === 'edit' && (
-              <View
-                style={{
-                  backgroundColor: colors.bubble,
-                  padding: 8,
-                  borderRadius: 6,
-                  marginTop: 4,
-                }}
-              >
-                <Text
+                {/* Image counter badge */}
+                <View
                   style={{
-                    color: colors.text,
-                    fontSize: 12,
-                    fontWeight: 'bold',
-                    marginBottom: 2,
+                    position: 'absolute',
+                    bottom: 4,
+                    left: 4,
+                    backgroundColor: 'rgba(0,0,0,0.7)',
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    borderRadius: 4,
                   }}
                 >
-                  Image URL:
-                </Text>
-                <Text
-                  style={{
-                    color: colors.text,
-                    fontSize: 11,
-                    fontFamily: 'monospace',
-                    marginBottom: 4,
-                  }}
-                  numberOfLines={2}
-                >
-                  {image}
-                </Text>
-                <Text
-                  style={{
-                    color: colors.text,
-                    fontSize: 12,
-                    fontWeight: 'bold',
-                    marginBottom: 2,
-                  }}
-                >
-                  Markdown:
-                </Text>
-                <Text
-                  style={{
-                    color: colors.text,
-                    fontSize: 11,
-                    fontFamily: 'monospace',
-                  }}
-                  numberOfLines={2}
-                >
-                  ![image]({image})
-                </Text>
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+                    {index + 1}/{images.length}
+                  </Text>
+                </View>
+
+                {/* Image information for edit mode (only show for first image to save space) */}
+                {mode === 'edit' && index === 0 && (
+                  <View
+                    style={{
+                      backgroundColor: colors.bubble,
+                      padding: 8,
+                      borderRadius: 6,
+                      marginTop: 4,
+                      width: 120,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: colors.text,
+                        fontSize: 10,
+                        fontWeight: 'bold',
+                        marginBottom: 2,
+                      }}
+                    >
+                      {images.length} image{images.length > 1 ? 's' : ''}
+                    </Text>
+                  </View>
+                )}
               </View>
-            )}
-          </View>
-        ) : null}
+            ))}
+          </ScrollView>
+        )}
 
-        {/* GIF preview */}
-        {gif ? (
-          <View style={{ marginBottom: 10 }}>
-            <ExpoImage
-              source={{ uri: gif }}
-              style={{ width: 120, height: 120, borderRadius: 10 }}
-              contentFit='cover'
-            />
-            <TouchableOpacity
-              onPress={onGifRemove}
-              style={{ position: 'absolute', top: 4, right: 4 }}
-              disabled={posting}
-            >
-              <FontAwesome name='close' size={20} color={colors.icon} />
-            </TouchableOpacity>
-            <View
-              style={{
-                position: 'absolute',
-                bottom: 4,
-                left: 4,
-                backgroundColor: 'rgba(0,0,0,0.7)',
-                paddingHorizontal: 6,
-                paddingVertical: 2,
-                borderRadius: 4,
-              }}
-            >
-              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
-                GIF
-              </Text>
-            </View>
-          </View>
-        ) : null}
+        {/* GIFs preview - Horizontal scrollable list */}
+        {gifs.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginBottom: 10 }}
+            contentContainerStyle={{ paddingRight: 10 }}
+          >
+            {gifs.map((gifUrl, index) => (
+              <View key={gifUrl} style={{ marginRight: 10 }}>
+                <ExpoImage
+                  source={{ uri: gifUrl }}
+                  style={{ width: 120, height: 120, borderRadius: 10 }}
+                  contentFit='cover'
+                />
+                <TouchableOpacity
+                  onPress={() => onGifRemove(gifUrl)}
+                  style={{ position: 'absolute', top: 4, right: 4 }}
+                  disabled={posting}
+                >
+                  <View
+                    style={{
+                      backgroundColor: 'rgba(0,0,0,0.7)',
+                      borderRadius: 12,
+                      width: 24,
+                      height: 24,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <FontAwesome name='close' size={16} color='#fff' />
+                  </View>
+                </TouchableOpacity>
+                <View
+                  style={{
+                    position: 'absolute',
+                    bottom: 4,
+                    left: 4,
+                    backgroundColor: 'rgba(0,0,0,0.7)',
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    borderRadius: 4,
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+                    GIF {index + 1}/{gifs.length}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        )}
 
         {/* Error message */}
         {error ? (

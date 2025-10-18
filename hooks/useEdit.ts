@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { Client, PrivateKey } from '@hiveio/dhive';
 import * as SecureStore from 'expo-secure-store';
 import { uploadImageSmart } from '../utils/imageUploadService';
-import { stripImageTags, getFirstImageUrl } from '../utils/extractImageInfo';
+import { stripImageTags, getAllImageUrls } from '../utils/extractImageInfo';
 import * as ImagePicker from 'expo-image-picker';
 
 const HIVE_NODES = [
@@ -21,8 +21,8 @@ export interface EditTarget {
 interface EditState {
   editModalVisible: boolean;
   editText: string;
-  editImage: string | null;
-  editGif: string | null;
+  editImages: string[]; // Changed from single image to array
+  editGifs: string[]; // Changed from single gif to array
   editTarget: EditTarget | null;
   editing: boolean;
   uploading: boolean;
@@ -34,8 +34,12 @@ interface UseEditReturn extends EditState {
   openEditModal: (target: EditTarget, currentBody: string) => void;
   closeEditModal: () => void;
   setEditText: (text: string) => void;
-  setEditImage: (image: string | null) => void;
-  setEditGif: (gif: string | null) => void;
+  setEditImages: (images: string[]) => void;
+  setEditGifs: (gifs: string[]) => void;
+  addEditImage: (imageUrl: string) => void;
+  removeEditImage: (imageUrl: string) => void;
+  addEditGif: (gifUrl: string) => void;
+  removeEditGif: (gifUrl: string) => void;
   submitEdit: () => Promise<void>;
   addImage: (mode: 'edit') => Promise<void>;
   addGif: (gifUrl: string) => void;
@@ -50,8 +54,8 @@ export const useEdit = (
   const [state, setState] = useState<EditState>({
     editModalVisible: false,
     editText: '',
-    editImage: null,
-    editGif: null,
+    editImages: [], // Changed to array
+    editGifs: [], // Changed to array
     editTarget: null,
     editing: false,
     uploading: false,
@@ -62,14 +66,14 @@ export const useEdit = (
   const openEditModal = useCallback(
     (target: EditTarget, currentBody: string) => {
       const textBody = stripImageTags(currentBody);
-      const existingImageUrl = getFirstImageUrl(currentBody);
+      const existingImages = getAllImageUrls(currentBody); // Get ALL images
 
       setState(prev => ({
         ...prev,
         editTarget: target,
         editText: textBody,
-        editImage: existingImageUrl,
-        editGif: null,
+        editImages: existingImages, // Array of all images
+        editGifs: [], // Reset GIFs (we'll extract these if needed later)
         editModalVisible: true,
         error: null,
       }));
@@ -82,8 +86,8 @@ export const useEdit = (
       ...prev,
       editModalVisible: false,
       editText: '',
-      editImage: null,
-      editGif: null,
+      editImages: [], // Clear array
+      editGifs: [], // Clear array
       editTarget: null,
       error: null,
     }));
@@ -93,12 +97,34 @@ export const useEdit = (
     setState(prev => ({ ...prev, editText: text }));
   }, []);
 
-  const setEditImage = useCallback((image: string | null) => {
-    setState(prev => ({ ...prev, editImage: image }));
+  const setEditImages = useCallback((images: string[]) => {
+    setState(prev => ({ ...prev, editImages: images }));
   }, []);
 
-  const setEditGif = useCallback((gif: string | null) => {
-    setState(prev => ({ ...prev, editGif: gif }));
+  const setEditGifs = useCallback((gifs: string[]) => {
+    setState(prev => ({ ...prev, editGifs: gifs }));
+  }, []);
+
+  const addEditImage = useCallback((imageUrl: string) => {
+    setState(prev => ({ ...prev, editImages: [...prev.editImages, imageUrl] }));
+  }, []);
+
+  const removeEditImage = useCallback((imageUrl: string) => {
+    setState(prev => ({ 
+      ...prev, 
+      editImages: prev.editImages.filter(img => img !== imageUrl) 
+    }));
+  }, []);
+
+  const addEditGif = useCallback((gifUrl: string) => {
+    setState(prev => ({ ...prev, editGifs: [...prev.editGifs, gifUrl] }));
+  }, []);
+
+  const removeEditGif = useCallback((gifUrl: string) => {
+    setState(prev => ({ 
+      ...prev, 
+      editGifs: prev.editGifs.filter(gif => gif !== gifUrl) 
+    }));
   }, []);
 
   const addImage = useCallback(async (mode: 'edit') => {
@@ -127,7 +153,12 @@ export const useEdit = (
 
         const uploadResult = await uploadImageSmart(fileToUpload, currentUsername);
         console.log(`[useEdit] Image uploaded via ${uploadResult.provider} (cost: $${uploadResult.cost})`);
-        setState(prev => ({ ...prev, editImage: uploadResult.url }));
+        
+        // Add to array instead of replacing
+        setState(prev => ({ 
+          ...prev, 
+          editImages: [...prev.editImages, uploadResult.url] 
+        }));
       }
     } catch (error) {
       console.error('Image upload error:', error);
@@ -139,16 +170,16 @@ export const useEdit = (
     } finally {
       setState(prev => ({ ...prev, uploading: false }));
     }
-  }, []);
+  }, [currentUsername]);
 
   const addGif = useCallback((gifUrl: string) => {
-    setState(prev => ({ ...prev, editGif: gifUrl }));
+    setState(prev => ({ ...prev, editGifs: [...prev.editGifs, gifUrl] }));
   }, []);
 
   const submitEdit = useCallback(async () => {
     if (
       !state.editTarget ||
-      (!state.editText.trim() && !state.editImage && !state.editGif) ||
+      (!state.editText.trim() && state.editImages.length === 0 && state.editGifs.length === 0) ||
       !currentUsername
     ) {
       return;
@@ -165,12 +196,16 @@ export const useEdit = (
       const postingKey = PrivateKey.fromString(postingKeyStr);
 
       let body = state.editText.trim();
-      if (state.editImage) {
-        body += `\n![image](${state.editImage})`;
-      }
-      if (state.editGif) {
-        body += `\n![gif](${state.editGif})`;
-      }
+      
+      // Add all images
+      state.editImages.forEach(imageUrl => {
+        body += `\n![image](${imageUrl})`;
+      });
+      
+      // Add all GIFs
+      state.editGifs.forEach(gifUrl => {
+        body += `\n![gif](${gifUrl})`;
+      });
 
       // Get the original post to preserve parent relationships
       const originalPost = await client.database.call('get_content', [
@@ -196,12 +231,10 @@ export const useEdit = (
         edit_timestamp: new Date().toISOString(),
       };
 
-      if (state.editImage && !json_metadata.image) {
-        json_metadata.image = [state.editImage];
-      }
-      if (state.editGif) {
-        if (!json_metadata.image) json_metadata.image = [];
-        json_metadata.image.push(state.editGif);
+      // Add all images and GIFs to metadata
+      const allMedia = [...state.editImages, ...state.editGifs];
+      if (allMedia.length > 0) {
+        json_metadata.image = allMedia;
       }
 
       // Edit the post/reply using same author/permlink with new content
@@ -275,8 +308,8 @@ export const useEdit = (
   }, [
     state.editTarget,
     state.editText,
-    state.editImage,
-    state.editGif,
+    state.editImages,
+    state.editGifs,
     currentUsername,
     closeEditModal,
     onRefresh,
@@ -292,8 +325,12 @@ export const useEdit = (
     openEditModal,
     closeEditModal,
     setEditText,
-    setEditImage,
-    setEditGif,
+    setEditImages,
+    setEditGifs,
+    addEditImage,
+    removeEditImage,
+    addEditGif,
+    removeEditGif,
     submitEdit,
     addImage,
     addGif,
