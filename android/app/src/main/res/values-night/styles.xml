@@ -1,0 +1,26 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+  <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+    <item name="colorPrimary">@color/colorPrimary</item>
+    <item name="android:statusBarColor">#000000</item>
+    <!-- Alert/Dialog theming for dark mode -->
+    <item name="android:colorBackground">#121212</item>
+    <item name="android:textColorPrimary">#ffffff</item>
+    <item name="android:textColorSecondary">#b3b3b3</item>
+    <item name="alertDialogTheme">@style/DarkAlertDialogTheme</item>
+  </style>
+  
+  <!-- Custom dark alert dialog theme -->
+  <style name="DarkAlertDialogTheme" parent="ThemeOverlay.MaterialComponents.Dialog.Alert">
+    <item name="android:colorBackground">#1e1e1e</item>
+    <item name="android:textColorPrimary">#ffffff</item>
+    <item name="android:textColorSecondary">#b3b3b3</item>
+    <item name="colorPrimary">#8e44ad</item>
+  </style>
+  
+  <style name="Theme.App.SplashScreen" parent="Theme.SplashScreen">
+    <item name="windowSplashScreenBackground">@color/splashscreen_background</item>
+    <item name="windowSplashScreenAnimatedIcon">@drawable/splashscreen_logo</item>
+    <item name="postSplashScreenTheme">@style/AppTheme</item>
+  </style>
+</resources>
