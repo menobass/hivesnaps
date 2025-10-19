@@ -88,8 +88,8 @@ const HivePostScreen = () => {
   const {
     replyModalVisible,
     replyText,
-    replyImage,
-    replyGif,
+    replyImages,
+    replyGifs,
     replyTarget,
     posting: replyPosting,
     uploading: replyUploading,
@@ -98,11 +98,15 @@ const HivePostScreen = () => {
     openReplyModal,
     closeReplyModal,
     setReplyText,
-    setReplyImage,
-    setReplyGif,
+    setReplyImages,
+    setReplyGifs,
+    addReplyImage,
+    removeReplyImage,
+    addReplyGif,
+    removeReplyGif,
     submitReply,
-    addImage: addReplyImage,
-    addGif: addReplyGif,
+    addImage: addImage,
+    addGif,
     clearError: clearReplyError,
   } = useReply(currentUsername, async () => {
     await refreshAll();
@@ -112,7 +116,7 @@ const HivePostScreen = () => {
     // GIF picker functionality - using new professional hook
   const gifPicker = useGifPicker({
     onGifSelected: (gifUrl: string) => {
-      setReplyGif(gifUrl);
+      addGif(gifUrl);
     },
     loadTrendingOnOpen: true,
     limit: 20,
@@ -591,11 +595,11 @@ const HivePostScreen = () => {
         target={replyTarget}
         text={replyText}
         onTextChange={setReplyText}
-        image={replyImage}
-        gif={replyGif}
-        onImageRemove={() => setReplyImage(null)}
-        onGifRemove={() => setReplyGif(null)}
-        onAddImage={() => addReplyImage('reply')}
+        images={replyImages}
+        gifs={replyGifs}
+        onImageRemove={removeReplyImage}
+        onGifRemove={removeReplyGif}
+        onAddImage={() => addImage('reply')}
         onAddGif={() => handleOpenGifPicker('reply')}
         posting={replyPosting}
         uploading={replyUploading}
