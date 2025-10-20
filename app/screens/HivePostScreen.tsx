@@ -599,7 +599,7 @@ const HivePostScreen = () => {
         gifs={replyGifs}
         onImageRemove={removeReplyImage}
         onGifRemove={removeReplyGif}
-        onAddImage={() => addImage('reply')}
+        onAddImage={addImage}
         onAddGif={() => handleOpenGifPicker('reply')}
         posting={replyPosting}
         uploading={replyUploading}
