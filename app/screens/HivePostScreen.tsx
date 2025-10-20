@@ -287,11 +287,16 @@ const HivePostScreen = () => {
           { backgroundColor: colors.background },
         ]}
       >
-        <View style={HivePostScreenStyles.errorContainer}>
-          <FontAwesome
-            name='clock-o'
-            size={48}
+        <View 
+          style={HivePostScreenStyles.errorContainer}
+          accessible={true}
+          accessibilityLabel="Loading post"
+          accessibilityHint="Please wait while the post content is being loaded"
+        >
+          <ActivityIndicator
+            size="large"
             color={colors.icon}
+            accessibilityLabel="Loading post content"
           />
           <Text
             style={[HivePostScreenStyles.errorText, { color: colors.text }]}
