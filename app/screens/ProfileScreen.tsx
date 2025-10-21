@@ -1364,7 +1364,7 @@ const ProfileScreen = () => {
         onImageRemove={removeEditImage}
         onGifRemove={removeEditGif}
         onAddImage={() => addEditImageFromPicker('edit')}
-        onAddGif={() => console.log('GIF picker not implemented in ProfileScreen')}
+        onAddGif={() => addEditGifFromPicker('edit')}
         posting={editing}
         uploading={editUploading}
         processing={editProcessing}
