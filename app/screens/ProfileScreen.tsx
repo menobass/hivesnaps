@@ -134,8 +134,8 @@ const ProfileScreen = () => {
   const {
     editModalVisible,
     editText,
-    editImage,
-    editGif,
+    editImages,
+    editGifs,
     editTarget,
     editing,
     error: editError,
@@ -144,11 +144,13 @@ const ProfileScreen = () => {
     openEditModal,
     closeEditModal,
     setEditText,
-    setEditImage,
-    setEditGif,
+    addEditImage,
+    removeEditImage,
+    addEditGif,
+    removeEditGif,
     submitEdit,
-    addImage: addEditImage,
-    addGif: addEditGif,
+    addImage: addEditImageFromPicker,
+    addGif: addEditGifFromPicker,
   } = useEdit(currentUsername);
 
   // Initialize styles
@@ -1357,12 +1359,12 @@ const ProfileScreen = () => {
         target={editTarget}
         text={editText}
         onTextChange={setEditText}
-        image={editImage}
-        gif={editGif}
-        onImageRemove={() => setEditImage(null)}
-        onGifRemove={() => setEditGif(null)}
-        onAddImage={() => addEditImage('edit')}
-        onAddGif={() => addEditGif('edit')}
+        images={editImages}
+        gifs={editGifs}
+        onImageRemove={removeEditImage}
+        onGifRemove={removeEditGif}
+        onAddImage={() => addEditImageFromPicker('edit')}
+        onAddGif={() => addEditGifFromPicker('edit')}
         posting={editing}
         uploading={editUploading}
         processing={editProcessing}
