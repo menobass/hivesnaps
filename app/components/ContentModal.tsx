@@ -157,7 +157,7 @@ const ContentModal: React.FC<ContentModalProps> = ({
         </Text>
 
         {/* Images preview - Horizontal scrollable list */}
-        {images.length > 0 && (
+        {images && images.length > 0 && (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -203,7 +203,7 @@ const ContentModal: React.FC<ContentModalProps> = ({
                   }}
                 >
                   <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
-                    {index + 1}/{images.length}
+                    {index + 1}/{images?.length || 0}
                   </Text>
                 </View>
 
@@ -226,7 +226,7 @@ const ContentModal: React.FC<ContentModalProps> = ({
                         marginBottom: 2,
                       }}
                     >
-                      {images.length} image{images.length > 1 ? 's' : ''}
+                      {images?.length || 0} image{(images?.length || 0) > 1 ? 's' : ''}
                     </Text>
                   </View>
                 )}
@@ -236,7 +236,7 @@ const ContentModal: React.FC<ContentModalProps> = ({
         )}
 
         {/* GIFs preview - Horizontal scrollable list */}
-        {gifs.length > 0 && (
+        {gifs && gifs.length > 0 && (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -280,7 +280,7 @@ const ContentModal: React.FC<ContentModalProps> = ({
                   }}
                 >
                   <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
-                    GIF {index + 1}/{gifs.length}
+                    GIF {index + 1}/{gifs?.length || 0}
                   </Text>
                 </View>
               </View>
