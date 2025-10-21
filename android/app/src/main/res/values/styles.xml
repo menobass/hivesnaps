@@ -3,6 +3,16 @@
     <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
     <item name="colorPrimary">@color/colorPrimary</item>
     <item name="android:statusBarColor">#ffffff</item>
+    <!-- Alert/Dialog theming for light mode -->
+    <item name="alertDialogTheme">@style/LightAlertDialogTheme</item>
+  </style>
+  
+  <!-- Custom light alert dialog theme -->
+  <style name="LightAlertDialogTheme" parent="ThemeOverlay.MaterialComponents.Dialog.Alert">
+    <item name="android:colorBackground">#ffffff</item>
+    <item name="android:textColorPrimary">#000000</item>
+    <item name="android:textColorSecondary">#666666</item>
+    <item name="colorPrimary">#023c69</item>
   </style>
   <style name="Theme.App.SplashScreen" parent="Theme.SplashScreen">
     <item name="windowSplashScreenBackground">@color/splashscreen_background</item>
