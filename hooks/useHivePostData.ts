@@ -74,10 +74,12 @@ export const useHivePostData = (
   permlink: string | undefined,
   currentUsername: string | null
 ): UseHivePostDataReturn => {
+  // Start with loading: true if we have post params to prevent "Post not found" flash
+  const hasPostParams = Boolean(author && permlink);
   const [state, setState] = useState<HivePostState>({
     post: null,
     comments: [],
-    loading: false,
+    loading: hasPostParams,
     commentsLoading: false,
     error: null,
     commentsError: null,
