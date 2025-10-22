@@ -282,7 +282,37 @@ const HivePostScreen = () => {
     );
   }
 
-  if (error || !post) {
+  // Show loading state during initial fetch, only show error after actual failure
+  if (loading && !post && !error) {
+    return (
+      <SafeAreaViewSA
+        style={[
+          HivePostScreenStyles.safeArea,
+          { backgroundColor: colors.background },
+        ]}
+      >
+        <View 
+          style={HivePostScreenStyles.errorContainer}
+          accessible={true}
+          accessibilityLabel="Loading post"
+          accessibilityHint="Please wait while the post content is being loaded"
+        >
+          <ActivityIndicator
+            size="large"
+            color={colors.icon}
+            accessibilityLabel="Loading post content"
+          />
+          <Text
+            style={[HivePostScreenStyles.errorText, { color: colors.text }]}
+          >
+            Loading post...
+          </Text>
+        </View>
+      </SafeAreaViewSA>
+    );
+  }
+
+  if (error || (!post && !loading)) {
     return (
       <SafeAreaViewSA
         style={[
@@ -320,6 +350,11 @@ const HivePostScreen = () => {
         </View>
       </SafeAreaViewSA>
     );
+  }
+
+  // Ensure post exists before rendering (should not happen due to above checks)
+  if (!post) {
+    return null;
   }
 
   return (
