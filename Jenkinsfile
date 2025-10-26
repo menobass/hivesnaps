@@ -21,48 +21,38 @@ pipeline {
             }
         }
 
-        // Stage 2: Android build with EAS (cloud-based)
-        stage('EAS Android Build') {
-            when { expression { return fileExists('app.json') } }  // Check for Expo project
-            environment {
-                EXPO_TOKEN = credentials('EXPO_TOKEN')  // Your secure token
-            }
+
+        // Stage 2: Android local build with Gradle
+        stage('Android Local Build') {
+            when { expression { return fileExists('android/gradlew') } }
             steps {
-                sh '''
-                    # Run EAS build for Android (AAB, production profile)
-                    eas build --platform android --profile production --non-interactive
-                '''
-            }
-            post {
-                success {
-                    archiveArtifacts artifacts: 'dist/*.aab', fingerprint: true  // Save build output
+                dir('android') {
+                    sh './gradlew assembleRelease'
                 }
+                // Archive the generated APK/AAB (adjust path as needed)
+                archiveArtifacts artifacts: 'android/app/build/outputs/**/*.apk', fingerprint: true
+                archiveArtifacts artifacts: 'android/app/build/outputs/**/*.aab', fingerprint: true
             }
         }
 
-        // Stage 3: iOS build with EAS (skips if no macOS agent)
-        stage('EAS iOS Build') {
-            when {
-                allOf {
-                    expression { return fileExists('app.json') }
-                    expression { return env.AGENT_LABELS?.contains('macos') || true }  // Run only if Mac agent available
-                }
-            }
-                agent { label 'macos' }  // Switch to Mac agent (add/rent one later)
-            environment {
-                EXPO_TOKEN = credentials('EXPO_TOKEN')
-            }
-            steps {
-                sh '''
-                    eas build --platform ios --profile production --non-interactive
-                '''
-            }
-            post {
-                success {
-                    archiveArtifacts artifacts: 'dist/*.ipa', fingerprint: true
-                }
-            }
-        }
+        // Stage 3: iOS local build (uncomment if you have a Mac agent and want to build for iOS)
+        // stage('iOS Local Build') {
+        //     when {
+        //         allOf {
+        //             expression { return fileExists('ios/Podfile') }
+        //             expression { return env.AGENT_LABELS?.contains('macos') }
+        //         }
+        //     }
+        //     agent { label 'macos' }
+        //     steps {
+        //         dir('ios') {
+        //             sh 'pod install'
+        //             sh 'xcodebuild -workspace YourApp.xcworkspace -scheme YourApp -configuration Release -sdk iphoneos'
+        //         }
+        //         // Archive the generated IPA (adjust path as needed)
+        //         archiveArtifacts artifacts: 'ios/build/**/*.ipa', fingerprint: true
+        //     }
+        // }
     }
 
     post {
