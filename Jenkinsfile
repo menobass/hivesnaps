@@ -2,7 +2,7 @@
 pipeline {
     agent any // Runs on any available agent. Change to a specific label if needed.
     options {
-        timeout(time: 15, unit: 'MINUTES') // Fail if stuck in queue for 15 minutes
+        timeout(time: 30, unit: 'MINUTES') // Fail if stuck in queue for 30 minutes
     }
 
     environment {
