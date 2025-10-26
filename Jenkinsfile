@@ -1,6 +1,9 @@
 // Jenkinsfile (full, npm-based for React Native + EAS)
 pipeline {
-    agent { label 'linux' }  // Your OVH VPS for Android; iOS needs 'macos' agent
+    agent any // Runs on any available agent. Change to a specific label if needed.
+    options {
+        timeout(time: 15, unit: 'MINUTES') // Fail if stuck in queue for 15 minutes
+    }
 
     environment {
         // Speed up npm
@@ -50,7 +53,7 @@ pipeline {
                     expression { return env.AGENT_LABELS?.contains('macos') || true }  // Run only if Mac agent available
                 }
             }
-            agent { label 'macos' }  // Switch to Mac slave (add/rent one later)
+                agent { label 'macos' }  // Switch to Mac agent (add/rent one later)
             environment {
                 EXPO_TOKEN = credentials('EXPO_TOKEN')
             }
