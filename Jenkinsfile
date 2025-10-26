@@ -29,9 +29,6 @@ pipeline {
             }
             steps {
                 sh '''
-                    # Login to Expo non-interactively
-                    echo "$EXPO_TOKEN" | eas login --non-interactive
-
                     # Run EAS build for Android (AAB, production profile)
                     eas build --platform android --profile production --non-interactive
                 '''
@@ -57,7 +54,6 @@ pipeline {
             }
             steps {
                 sh '''
-                    echo "$EXPO_TOKEN" | eas login --non-interactive
                     eas build --platform ios --profile production --non-interactive
                 '''
             }
