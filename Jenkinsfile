@@ -16,10 +16,8 @@ pipeline {
             steps {
                 checkout scm
 
-                // Cache node_modules between builds (add this if not present)
-                cache(path: 'node_modules', key: "${env.JOB_NAME}-${env.BRANCH_NAME}-node-modules") {
-                    sh 'npm ci'  // Install deps (replaces 'yarn install --frozen-lockfile')
-                }
+                // Install dependencies
+                sh 'npm ci'  // Clean install for CI environments
             }
         }
 
