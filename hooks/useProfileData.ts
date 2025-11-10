@@ -99,15 +99,15 @@ export const useProfileData = (username: string | undefined) => {
 
       const account = accounts[0];
 
-      // Method 2: Fetch reputation using techcoderx.com API (much more reliable!)
+      // Method 2: Fetch reputation using syncad.com API (much more reliable!)
       let reputation = 25; // fallback
       try {
         console.log(
-          'Fetching reputation from techcoderx.com API for:',
+          'Fetching reputation from syncad.com API for:',
           username
         );
         const reputationResponse = await fetch(
-          `https://techcoderx.com/reputation-api/accounts/${username}/reputation`
+          `https://api.syncad.com/reputation-api/accounts/${username}/reputation`
         );
         if (reputationResponse.ok) {
           const reputationText = await reputationResponse.text();
