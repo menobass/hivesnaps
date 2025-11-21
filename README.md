@@ -92,6 +92,15 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
 - **React Native Markdown** for rich text rendering
 - **Custom Icon System** with FontAwesome
 
+## 📲 Download
+
+**HiveSnaps is now available on the App Store!**
+
+[![Download on the App Store](https://img.shields.io/badge/App%20Store-Download-blue?logo=app-store&logoColor=white)](https://apps.apple.com/us/app/hive-snaps/id6748106413)
+
+- **iOS**: [Download from App Store](https://apps.apple.com/us/app/hive-snaps/id6748106413)
+- **Android**: Coming Soon to Google Play Store
+
 ## 🚀 Getting Started
 
 1. **Clone the repository:**

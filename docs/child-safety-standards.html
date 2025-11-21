@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Child Safety Standards - HiveSnaps - Snapie</title>
+    <meta name="description" content="HiveSnaps Child Sexual Abuse and Exploitation (CSAE) Safety Standards and Prevention Measures">
+    <link rel="icon" type="image/png" href="../assets/images/logo.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f8f9fa;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        .header {
+            background: white;
+            padding: 1rem 0;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        .logo img {
+            width: 40px;
+            height: 40px;
+            margin-right: 10px;
+            border-radius: 8px;
+        }
+        
+        .back-link {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .content {
+            background: white;
+            padding: 3rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            margin-bottom: 3rem;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 1rem;
+            font-size: 2.5rem;
+        }
+        
+        h2 {
+            color: #d63384;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+            border-left: 4px solid #d63384;
+            padding-left: 1rem;
+        }
+        
+        h3 {
+            color: #495057;
+            margin-top: 1.5rem;
+            margin-bottom: 0.5rem;
+            font-size: 1.2rem;
+        }
+        
+        p {
+            margin-bottom: 1rem;
+            text-align: justify;
+        }
+        
+        .critical-notice {
+            background: #fff3cd;
+            border: 2px solid #ffeaa7;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 2rem 0;
+            border-left: 6px solid #d63384;
+        }
+        
+        .critical-notice strong {
+            color: #d63384;
+            font-size: 1.1rem;
+        }
+        
+        .emergency-contact {
+            background: #d1ecf1;
+            border: 2px solid #bee5eb;
+            padding: 2rem;
+            border-radius: 8px;
+            margin: 2rem 0;
+            text-align: center;
+        }
+        
+        .emergency-contact h3 {
+            color: #0c5460;
+            margin-bottom: 1rem;
+            font-size: 1.4rem;
+        }
+        
+        .emergency-contact .phone {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #d63384;
+            margin: 1rem 0;
+        }
+        
+        .last-updated {
+            font-style: italic;
+            color: #666;
+            margin-bottom: 2rem;
+        }
+        
+        ul {
+            margin-left: 2rem;
+            margin-bottom: 1rem;
+        }
+        
+        li {
+            margin-bottom: 0.5rem;
+        }
+        
+        .policy-section {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            border-left: 4px solid #667eea;
+        }
+        
+        .reporting-steps {
+            background: #e8f5e8;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            border-left: 4px solid #28a745;
+        }
+        
+        .zero-tolerance {
+            background: #f8d7da;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            border-left: 4px solid #dc3545;
+            color: #721c24;
+        }
+        
+        .contact-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+        
+        .contact-card {
+            background: #fff;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        
+        .contact-card h4 {
+            color: #667eea;
+            margin-bottom: 1rem;
+        }
+        
+        .contact-card a {
+            color: #d63384;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        
+        .contact-card a:hover {
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 768px) {
+            .content {
+                padding: 1.5rem;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .contact-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <nav class="nav container">
+            <a href="index.html" class="logo">
+                <img src="../assets/images/logo.png" alt="HiveSnaps Logo">
+                HiveSnaps
+            </a>
+            <a href="index.html" class="back-link">← Back to Home</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div class="content">
+            <h1>Child Safety Standards</h1>
+            <p class="last-updated">Last updated: November 21, 2025</p>
+            
+            <div class="critical-notice">
+                <strong>Zero Tolerance Policy:</strong> HiveSnaps has absolutely zero tolerance for Child Sexual Abuse and Exploitation (CSAE) content. We are committed to protecting children and maintaining a safe platform for all users.
+            </div>
+
+            <div class="emergency-contact">
+                <h3>🚨 Report Child Abuse Immediately</h3>
+                <p><strong>If you encounter child abuse content or suspect a child is in immediate danger:</strong></p>
+                <div class="phone">📞 Call 911 (USA) or your local emergency services</div>
+                <p>Then report to the National Center for Missing & Exploited Children:</p>
+                <div class="phone">📞 1-800-THE-LOST (1-800-843-5678)</div>
+                <p><strong>Online:</strong> <a href="https://www.missingkids.org/gethelpnow/cybertipline" target="_blank">CyberTipline</a></p>
+            </div>
+
+            <h2>1. Our Commitment</h2>
+            <div class="zero-tolerance">
+                <p><strong>HiveSnaps is committed to:</strong></p>
+                <ul>
+                    <li>Protecting children from sexual abuse and exploitation</li>
+                    <li>Preventing the creation, distribution, or storage of CSAE content</li>
+                    <li>Cooperating fully with law enforcement agencies</li>
+                    <li>Supporting survivors and promoting child safety awareness</li>
+                    <li>Maintaining industry-leading safety standards and technologies</li>
+                </ul>
+            </div>
+
+            <h2>2. Prohibited Content and Activities</h2>
+            <div class="policy-section">
+                <p><strong>The following are strictly prohibited on HiveSnaps:</strong></p>
+                <ul>
+                    <li>Child Sexual Abuse Material (CSAM) in any form</li>
+                    <li>Content that sexualizes, grooms, or endangers minors</li>
+                    <li>Solicitation or facilitation of sexual activity with minors</li>
+                    <li>Content that promotes or normalizes child exploitation</li>
+                    <li>Sharing personal information of minors without consent</li>
+                    <li>Any content that could facilitate harm to children</li>
+                </ul>
+                <p><strong>This includes but is not limited to:</strong> images, videos, text, comments, or any other form of public communication that violates these standards.</p>
+            </div>
+
+            <h2>3. Age Verification and Access Controls</h2>
+            <div class="policy-section">
+                <h3>Minimum Age Requirements</h3>
+                <ul>
+                    <li>Users must be at least 13 years old to use HiveSnaps</li>
+                    <li>Age verification is handled by Hive.io during Hive account creation</li>
+                    <li>HiveSnaps interfaces with existing Hive accounts that have already met age requirements</li>
+                </ul>
+                
+                <h3>Protection Measures</h3>
+                <ul>
+                    <li>All interactions on HiveSnaps are public (no private messaging)</li>
+                    <li>Content moderation through blockchain-based downvoting system</li>
+                    <li>Partnership with Hive blockchain security organizations</li>
+                    <li>Community-driven reporting and moderation</li>
+                </ul>
+            </div>
+
+            <h2>4. Detection and Prevention Technology</h2>
+            <div class="policy-section">
+                <h3>Blockchain-based Moderation</h3>
+                <ul>
+                    <li>Content moderation through the Hive blockchain voting system</li>
+                    <li>Community-driven reporting and flagging mechanisms</li>
+                    <li>Integration with Hive blockchain security organizations</li>
+                    <li>Partnership with <a href="https://hivewatchers.io" target="_blank">HiveWatchers</a> for blockchain-wide content monitoring</li>
+                </ul>
+                
+                <h3>Manual Review Process</h3>
+                <ul>
+                    <li>Reports are reviewed by the app developer</li>
+                    <li>Content moderation via blockchain downvotes (@snapie account)</li>
+                    <li>Cooperation with established Hive blockchain security teams</li>
+                    <li>Immediate escalation of child safety concerns to appropriate authorities</li>
+                </ul>
+            </div>
+
+            <h2>5. Reporting Mechanisms</h2>
+            <div class="reporting-steps">
+                <h3>How to Report Suspicious Content or Behavior</h3>
+                
+                <h4>In-App Reporting</h4>
+                <ol>
+                    <li>Tap the three-dots menu (⋯) on any post or comment</li>
+                    <li>Select "Report Content"</li>
+                    <li>Choose "Child Safety Concern" from the options</li>
+                    <li>Provide detailed information about the concern</li>
+                    <li>Submit the report - it will be prioritized immediately</li>
+                </ol>
+                
+                <h4>Direct Contact</h4>
+                <ul>
+                    <li><strong>Email:</strong> <a href="mailto:snapieapp@proton.me">snapieapp@proton.me</a></li>
+                    <li><strong>Urgent reports:</strong> Mark subject line with "URGENT - Child Safety"</li>
+                    <li><strong>Response time:</strong> Child safety reports are prioritized and reviewed as soon as possible</li>
+                </ul>
+                
+                <h4>What to Include in Your Report</h4>
+                <ul>
+                    <li>Username(s) of accounts involved</li>
+                    <li>URLs or post identifiers</li>
+                    <li>Description of the concerning content or behavior</li>
+                    <li>Screenshots (if safe to capture)</li>
+                    <li>Any additional context that may be helpful</li>
+                </ul>
+            </div>
+
+            <h2>6. Response and Enforcement</h2>
+            <div class="policy-section">
+                <h3>Immediate Actions</h3>
+                <ul>
+                    <li>Suspected CSAE content is immediately removed and preserved for investigation</li>
+                    <li>Accounts involved are immediately blacklisted pending investigation</li>
+                    <li>Law enforcement is contacted within 24 hours as required by law</li>
+                    <li>NCMEC CyberTipline reports are filed for US-based incidents</li>
+                </ul>
+                
+                <h3>Investigation Process</h3>
+                <ul>
+                    <li>All reports are investigated by the app developer in coordination with blockchain security teams</li>
+                    <li>Evidence is preserved in compliance with legal requirements</li>
+                    <li>Cooperation with law enforcement investigations is mandatory</li>
+                    <li>Content moderation through blockchain downvoting for confirmed violations</li>
+                </ul>
+                
+                <h3>Legal Compliance</h3>
+                <ul>
+                    <li>Full compliance with applicable laws including:
+                        <ul>
+                            <li>US: 18 U.S.C. § 2258A (NCMEC reporting requirements)</li>
+                            <li>EU: Article 12 of Directive 2011/93/EU</li>
+                            <li>UK: Sexual Offences Act 2003</li>
+                            <li>International: UN Convention on the Rights of the Child</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+
+            <h2>7. Reporting to Authorities and Organizations</h2>
+            <div class="policy-section">
+                <p><strong>When child safety concerns are identified, HiveSnaps will report to appropriate authorities including:</strong></p>
+                <ul>
+                    <li><strong>National Center for Missing & Exploited Children (NCMEC)</strong> - Required US reporting for CSAE content</li>
+                    <li><strong>Local law enforcement agencies</strong> - As required by law and jurisdiction</li>
+                    <li><strong>Internet Watch Foundation (IWF)</strong> - For international coordination when applicable</li>
+                </ul>
+                
+                <p><strong>Users can also directly report to:</strong></p>
+                <ul>
+                    <li><strong>INHOPE network</strong> - International hotline network</li>
+                    <li><strong>Local authorities</strong> - Emergency services and police</li>
+                    <li><strong>Specialized hotlines</strong> - Country-specific child protection services</li>
+                </ul>
+            </div>
+
+            <h2>8. User Education and Safety</h2>
+            <div class="policy-section">
+                <h3>Safety Resources</h3>
+                <ul>
+                    <li>Digital citizenship and online safety education</li>
+                    <li>Resources for parents and guardians</li>
+                    <li>Information about recognizing and reporting abuse</li>
+                    <li>Support resources for survivors</li>
+                </ul>
+                
+                <h3>Community Guidelines</h3>
+                <ul>
+                    <li>Clear community standards regarding child safety</li>
+                    <li>Regular safety reminders and updates</li>
+                    <li>Promotion of positive online behavior</li>
+                    <li>Education about digital consent and privacy</li>
+                </ul>
+            </div>
+
+            <h2>9. Transparency and Accountability</h2>
+            <div class="policy-section">
+                <h3>Blockchain Transparency</h3>
+                <ul>
+                    <li>All moderation actions are visible on the Hive blockchain</li>
+                    <li>Public record of content moderation through downvoting system</li>
+                    <li>Open source development and community oversight</li>
+                    <li>Regular updates on policy changes and safety improvements</li>
+                </ul>
+                
+                <h3>Community Accountability</h3>
+                <ul>
+                    <li>Partnership with established Hive blockchain security organizations</li>
+                    <li>Community-driven moderation and reporting systems</li>
+                    <li>Public GitHub repository for transparency and community contributions</li>
+                </ul>
+            </div>
+
+            <h2>10. Support and Resources</h2>
+            <div class="contact-grid">
+                <div class="contact-card">
+                    <h4>🇺🇸 United States</h4>
+                    <p><strong>NCMEC CyberTipline</strong></p>
+                    <p><a href="https://www.missingkids.org/gethelpnow/cybertipline" target="_blank">Report Online</a></p>
+                    <p>📞 1-800-THE-LOST</p>
+                </div>
+                
+                <div class="contact-card">
+                    <h4>🇬🇧 United Kingdom</h4>
+                    <p><strong>Internet Watch Foundation</strong></p>
+                    <p><a href="https://www.iwf.org.uk/report" target="_blank">Report Online</a></p>
+                    <p><strong>CEOP</strong></p>
+                    <p><a href="https://www.ceop.police.uk/safety-centre/" target="_blank">Safety Centre</a></p>
+                </div>
+                
+                <div class="contact-card">
+                    <h4>🇪🇺 European Union</h4>
+                    <p><strong>INHOPE</strong></p>
+                    <p><a href="https://www.inhope.org/EN" target="_blank">Find Local Hotline</a></p>
+                    <p><strong>Safer Internet Centres</strong></p>
+                    <p><a href="https://www.betterinternetforkids.eu/" target="_blank">Resources</a></p>
+                </div>
+                
+                <div class="contact-card">
+                    <h4>🌍 International</h4>
+                    <p><strong>ECPAT International</strong></p>
+                    <p><a href="https://www.ecpat.org/" target="_blank">Global Network</a></p>
+                    <p><strong>Virtual Global Taskforce</strong></p>
+                    <p><a href="https://www.virtualglobaltaskforce.com/" target="_blank">Resources</a></p>
+                </div>
+            </div>
+
+            <h2>11. Contact Information</h2>
+            <div class="policy-section">
+                <p><strong>For child safety concerns or questions about these standards:</strong></p>
+                <ul>
+                    <li><strong>HiveSnaps Contact:</strong> <a href="mailto:snapieapp@proton.me">snapieapp@proton.me</a></li>
+                    <li><strong>GitHub:</strong> <a href="https://github.com/menobass/hivesnaps" target="_blank">github.com/menobass/hivesnaps</a></li>
+                    <li><strong>Hive Blockchain Security:</strong> <a href="https://hivewatchers.io" target="_blank">HiveWatchers</a></li>
+                </ul>
+            </div>
+
+            <div class="critical-notice">
+                <strong>Remember:</strong> If you believe a child is in immediate danger, contact your local emergency services immediately. These safety standards are part of our ongoing commitment to protecting children and maintaining a safe community for all users.
+            </div>
+        </div>
+    </div>
+</body>
+</html>
