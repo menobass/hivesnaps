@@ -4,11 +4,11 @@
 
 export const SAFETY_CONFIG = {
   // Child Safety Standards URL for Google Play compliance
-  CHILD_SAFETY_STANDARDS_URL: 'https://hivesnaps.app/child-safety-standards.html',
+  CHILD_SAFETY_STANDARDS_URL: 'https://menobass.github.io/hivesnaps/child-safety-standards.html',
   
   // Other safety-related URLs
-  PRIVACY_POLICY_URL: 'https://hivesnaps.app/privacy-policy.html',
-  TERMS_OF_SERVICE_URL: 'https://hivesnaps.app/index.html#terms',
+  PRIVACY_POLICY_URL: 'https://menobass.github.io/hivesnaps/privacy-policy.html',
+  TERMS_OF_SERVICE_URL: 'https://menobass.github.io/hivesnaps/index.html',
   
   // Emergency contact information
   EMERGENCY_CONTACTS: {
