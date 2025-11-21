@@ -86,7 +86,7 @@ We may update these Terms periodically. Continued use after changes constitutes 
 For questions about these Terms or to report violations:
 • Contact: snapieapp@proton.me
 • Report content through in-app reporting features
-• Child Safety Standards: Available at hivesnaps.app/child-safety-standards
+• Child Safety Standards: Available at https://menobass.github.io/hivesnaps/child-safety-standards.html
 
 12. GOVERNING LAW
 These Terms are governed by applicable laws. Disputes will be resolved through appropriate legal channels.
