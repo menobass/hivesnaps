@@ -1,14 +1,14 @@
 // This file was moved from app/services/reportService.ts
 import { authenticatedApiCall } from './AuthenticatedRequest';
 
-export type ReportReason = 'violence' | 'harmful' | 'scam' | 'other' | 'spam';
+export type ReportReason = 'violence' | 'harmful' | 'scam' | 'other' | 'spam' | 'child_safety';
 
 export interface ReportPayload {
   community: string; // e.g., '@khaleelkazi'
   author: string;    // e.g., 'khaleelkazi'
   permlink: string;  // e.g., 're-leothreads-2daxu2czj'
   reason: string;    // API expects a string reason; we'll map from our UI
-  details?: string;  // optional free text if 'other'
+  details?: string;  // optional free text for 'other' and 'child_safety' reports
 }
 
 export async function submitReport(payload: ReportPayload): Promise<{ ok: boolean; status: number; body?: any }> {
@@ -43,6 +43,8 @@ export function mapUiReasonToApi(reason: string, details?: string): { reason: st
       return { reason: 'scam' };
     case 'spam':
       return { reason: 'spam' };
+    case 'child_safety':
+      return { reason: 'URGENT - Child Safety Concern', details };
     case 'other':
       // API expects the explanation included in the reason field
       if (details && details.trim().length > 0) {
