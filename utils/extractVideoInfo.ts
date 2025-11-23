@@ -48,7 +48,7 @@ export function extractVideoInfo(text: string): VideoInfo | null {
       type: '3speak',
       username: playThreeSpeakIframeMatch[1],
       videoId: playThreeSpeakIframeMatch[2],
-      embedUrl: `https://play.3speak.tv/embed?v=${playThreeSpeakIframeMatch[1]}/${playThreeSpeakIframeMatch[2]}&mode=iframe`,
+      embedUrl: `https://play.3speak.tv/embed?v=${playThreeSpeakIframeMatch[1]}/${playThreeSpeakIframeMatch[2]}&mode=iframe&layout=mobile`,
       originalUrl: playThreeSpeakIframeMatch[0],
     };
   }
@@ -62,7 +62,7 @@ export function extractVideoInfo(text: string): VideoInfo | null {
       type: '3speak',
       username: threeSpeakIframeMatch[1],
       videoId: threeSpeakIframeMatch[2],
-      embedUrl: `https://play.3speak.tv/embed?v=${threeSpeakIframeMatch[1]}/${threeSpeakIframeMatch[2]}&mode=iframe`,
+      embedUrl: `https://play.3speak.tv/embed?v=${threeSpeakIframeMatch[1]}/${threeSpeakIframeMatch[2]}&mode=iframe&layout=mobile`,
       originalUrl: threeSpeakIframeMatch[0],
     };
   }
@@ -76,7 +76,7 @@ export function extractVideoInfo(text: string): VideoInfo | null {
       type: '3speak',
       username: playThreeSpeakDirectMatch[1],
       videoId: playThreeSpeakDirectMatch[2],
-      embedUrl: `https://play.3speak.tv/embed?v=${playThreeSpeakDirectMatch[1]}/${playThreeSpeakDirectMatch[2]}&mode=iframe`,
+      embedUrl: `https://play.3speak.tv/embed?v=${playThreeSpeakDirectMatch[1]}/${playThreeSpeakDirectMatch[2]}&mode=iframe&layout=mobile`,
       originalUrl: playThreeSpeakDirectMatch[0],
     };
   }
@@ -90,7 +90,7 @@ export function extractVideoInfo(text: string): VideoInfo | null {
       type: '3speak',
       username: threeSpeakMatch[1],
       videoId: threeSpeakMatch[2],
-      embedUrl: `https://play.3speak.tv/embed?v=${threeSpeakMatch[1]}/${threeSpeakMatch[2]}&mode=iframe`,
+      embedUrl: `https://play.3speak.tv/embed?v=${threeSpeakMatch[1]}/${threeSpeakMatch[2]}&mode=iframe&layout=mobile`,
       originalUrl: threeSpeakMatch[0],
     };
   }
