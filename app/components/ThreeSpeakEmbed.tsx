@@ -33,10 +33,11 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
         mediaPlaybackRequiresUserAction={true}
         allowsInlineMediaPlayback={true}
         onShouldStartLoadWithRequest={request => {
-          // Allow 3Speak URLs, block others
+          // Allow 3Speak URLs (legacy and new play subdomain), block others
           return (
             request.url.includes('3speak.tv') ||
-            request.url.includes('3speak.online')
+            request.url.includes('3speak.online') ||
+            request.url.includes('play.3speak.tv')
           );
         }}
       />

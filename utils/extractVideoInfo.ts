@@ -39,7 +39,21 @@ export function extractVideoInfo(text: string): VideoInfo | null {
     };
   }
 
-  // 3Speak detection - iframe embeds first (more common in Hive posts)
+  // 3Speak detection - play.3speak.tv (new player) iframe embeds
+  const playThreeSpeakIframeMatch = text.match(
+    /<iframe[^>]+src=["']https:\/\/play\.3speak\.tv\/embed\?v=([^\/\s"'&]+)\/([a-zA-Z0-9_-]+)["'][^>]*>/i
+  );
+  if (playThreeSpeakIframeMatch) {
+    return {
+      type: '3speak',
+      username: playThreeSpeakIframeMatch[1],
+      videoId: playThreeSpeakIframeMatch[2],
+      embedUrl: `https://play.3speak.tv/embed?v=${playThreeSpeakIframeMatch[1]}/${playThreeSpeakIframeMatch[2]}&mode=iframe`,
+      originalUrl: playThreeSpeakIframeMatch[0],
+    };
+  }
+
+  // 3Speak detection - legacy 3speak.tv iframe embeds
   const threeSpeakIframeMatch = text.match(
     /<iframe[^>]+src=["']https:\/\/3speak\.tv\/embed\?v=([^\/\s"']+)\/([a-zA-Z0-9_-]+)["'][^>]*>/i
   );
@@ -48,12 +62,26 @@ export function extractVideoInfo(text: string): VideoInfo | null {
       type: '3speak',
       username: threeSpeakIframeMatch[1],
       videoId: threeSpeakIframeMatch[2],
-      embedUrl: `https://3speak.tv/embed?v=${threeSpeakIframeMatch[1]}/${threeSpeakIframeMatch[2]}`,
+      embedUrl: `https://play.3speak.tv/embed?v=${threeSpeakIframeMatch[1]}/${threeSpeakIframeMatch[2]}&mode=iframe`,
       originalUrl: threeSpeakIframeMatch[0],
     };
   }
 
-  // 3Speak direct URLs (less common but still supported)
+  // 3Speak direct URLs - play.3speak.tv/embed (new direct uploads)
+  const playThreeSpeakDirectMatch = text.match(
+    /https:\/\/play\.3speak\.tv\/embed\?v=([^\/\s&]+)\/([a-zA-Z0-9_-]+)/
+  );
+  if (playThreeSpeakDirectMatch) {
+    return {
+      type: '3speak',
+      username: playThreeSpeakDirectMatch[1],
+      videoId: playThreeSpeakDirectMatch[2],
+      embedUrl: `https://play.3speak.tv/embed?v=${playThreeSpeakDirectMatch[1]}/${playThreeSpeakDirectMatch[2]}&mode=iframe`,
+      originalUrl: playThreeSpeakDirectMatch[0],
+    };
+  }
+
+  // 3Speak direct URLs - legacy 3speak.tv/watch (convert to new player)
   const threeSpeakMatch = text.match(
     /https:\/\/3speak\.tv\/watch\?v=([^\/\s]+)\/([a-zA-Z0-9_-]+)/
   );
@@ -62,7 +90,7 @@ export function extractVideoInfo(text: string): VideoInfo | null {
       type: '3speak',
       username: threeSpeakMatch[1],
       videoId: threeSpeakMatch[2],
-      embedUrl: `https://3speak.tv/embed?v=${threeSpeakMatch[1]}/${threeSpeakMatch[2]}`,
+      embedUrl: `https://play.3speak.tv/embed?v=${threeSpeakMatch[1]}/${threeSpeakMatch[2]}&mode=iframe`,
       originalUrl: threeSpeakMatch[0],
     };
   }
@@ -145,12 +173,19 @@ export function removeVideoUrls(text: string): string {
         /(?:https?:\/\/(?:www\.)?)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)\w{11}(\S*)?/gi,
         ''
       )
-      // Remove 3speak iframe embeds (common in Hive posts)
+      // Remove play.3speak.tv iframe embeds
+      .replace(
+        /<iframe[^>]+src=["']https:\/\/play\.3speak\.tv\/embed\?v=[^"']*["'][^>]*><\/iframe>/gi,
+        ''
+      )
+      // Remove legacy 3speak iframe embeds
       .replace(
         /<iframe[^>]+src=["']https:\/\/3speak\.tv\/embed\?v=[^"']*["'][^>]*><\/iframe>/gi,
         ''
       )
-      // Remove 3speak direct URLs
+      // Remove play.3speak.tv direct URLs
+      .replace(/https:\/\/play\.3speak\.tv\/embed\?v=[^\/\s&]+\/[a-zA-Z0-9_-]+/gi, '')
+      // Remove legacy 3speak direct URLs
       .replace(/https:\/\/3speak\.tv\/watch\?v=[^\/\s]+\/[a-zA-Z0-9_-]+/gi, '')
       // Remove IPFS iframe tags
       .replace(/<iframe[^>]+src=["'][^"']*ipfs[^"']*["'][^>]*><\/iframe>/gi, '')
