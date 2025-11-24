@@ -18,7 +18,7 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
     <View
       style={{
         width: '100%',
-        height: 380,
+        height: 398,
         borderRadius: 12,
         overflow: 'hidden',
         position: 'relative',
