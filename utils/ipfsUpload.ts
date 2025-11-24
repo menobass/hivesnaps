@@ -5,7 +5,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
 
 // Environment configuration with fallback
-const IPFS_UPLOAD_ENDPOINT = process.env.EXPO_PUBLIC_IPFS_UPLOAD_ENDPOINT || 'http://65.21.201.94:5002/api/v0/add';
+const IPFS_UPLOAD_ENDPOINT = process.env.EXPO_PUBLIC_IPFS_UPLOAD_ENDPOINT || 'https://ipfs.3speak.tv/api/v0/add';
 const IPFS_GATEWAY_URL = process.env.EXPO_PUBLIC_IPFS_GATEWAY_URL || 'https://ipfs.3speak.tv/ipfs';
 const IPFS_API_KEY = process.env.EXPO_PUBLIC_IPFS_API_KEY; // Optional
 
