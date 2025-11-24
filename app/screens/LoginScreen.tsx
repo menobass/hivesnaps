@@ -19,6 +19,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Client, PrivateKey } from '@hiveio/dhive';
 import * as Linking from 'expo-linking';
 import { useAuth } from '../../hooks/useAuth';
+import { useAppStore } from '../../store/context';
 
 const twitterColors = {
   light: {
@@ -63,6 +64,7 @@ export default function LoginScreen() {
   const colors = twitterColors[colorScheme];
   const router = useRouter();
   const { authenticate } = useAuth();
+  const { setCurrentUser } = useAppStore();
 
   // Auto-login functionality
   useEffect(() => {
@@ -140,6 +142,10 @@ export default function LoginScreen() {
       // Step 2: Store credentials securely
       await SecureStore.setItemAsync('hive_username', cleanUsername);
       await SecureStore.setItemAsync('hive_posting_key', postingWif);
+      
+      // Step 2.5: Update app store with current user
+      setCurrentUser(cleanUsername);
+      console.log('[Login] Updated app store with username:', cleanUsername);
       
       // Step 3: Get JWT token via challenge-response authentication
       console.log('[Login] Starting JWT authentication...');
