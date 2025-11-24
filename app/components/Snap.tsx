@@ -406,57 +406,6 @@ const Snap: React.FC<SnapProps> = ({
         return renderMp4Video(mp4Url, mp4Url);
       }
 
-      // Handle 3Speak iframe embeds
-      const threeSpeakIframeMatch = htmlContent.match(
-        /<iframe[^>]+src=["']https:\/\/3speak\.tv\/embed\?v=([^\/\s"']+)\/([a-zA-Z0-9_-]+)["'][^>]*>/i
-      );
-      if (threeSpeakIframeMatch) {
-        const username = threeSpeakIframeMatch[1];
-        const videoId = threeSpeakIframeMatch[2];
-        const uniqueKey = `3speak-${username}-${videoId}-${Math.random().toString(36).substr(2, 9)}`;
-        return (
-          <View
-            key={uniqueKey}
-            style={{
-              width: '100%',
-              aspectRatio: 16 / 9,
-              borderRadius: 12,
-              overflow: 'hidden',
-              position: 'relative',
-              marginVertical: 10,
-            }}
-          >
-            <WebView
-              source={{
-                uri: `https://3speak.tv/embed?v=${username}/${videoId}&autoplay=0`,
-              }}
-              style={{ flex: 1, backgroundColor: '#000' }}
-              allowsFullscreenVideo
-              javaScriptEnabled
-              domStorageEnabled
-              mediaPlaybackRequiresUserAction={true}
-              allowsInlineMediaPlayback={true}
-            />
-            {/* Video type indicator */}
-            <View
-              style={{
-                position: 'absolute',
-                top: 8,
-                right: 8,
-                backgroundColor: 'rgba(0,0,0,0.7)',
-                paddingHorizontal: 6,
-                paddingVertical: 2,
-                borderRadius: 4,
-              }}
-            >
-              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
-                3SPEAK
-              </Text>
-            </View>
-          </View>
-        );
-      }
-
       // Handle IPFS iframe embeds
       const ipfsIframeMatch = htmlContent.match(
         /<iframe[^>]+src=["']([^"']*\/ipfs\/([A-Za-z0-9]+)[^"']*?)["'][^>]*>/i
