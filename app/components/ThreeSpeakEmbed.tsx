@@ -14,6 +14,37 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
   const colorScheme = useColorScheme();
   const themeIsDark = isDark ?? colorScheme === 'dark';
 
+  // JavaScript to auto-trigger fullscreen when video plays
+  const injectedJavaScript = `
+    (function() {
+      // Wait for video element to be ready
+      const checkVideo = setInterval(() => {
+        const video = document.querySelector('video');
+        if (video) {
+          clearInterval(checkVideo);
+          
+          // Listen for play event
+          video.addEventListener('play', () => {
+            setTimeout(() => {
+              if (video.requestFullscreen) {
+                video.requestFullscreen();
+              } else if (video.webkitRequestFullscreen) {
+                video.webkitRequestFullscreen();
+              } else if (video.mozRequestFullScreen) {
+                video.mozRequestFullScreen();
+              } else if (video.msRequestFullscreen) {
+                video.msRequestFullscreen();
+              } else if (video.webkitEnterFullscreen) {
+                video.webkitEnterFullscreen();
+              }
+            }, 100);
+          });
+        }
+      }, 100);
+    })();
+    true;
+  `;
+
   return (
     <View
       style={{
@@ -30,6 +61,7 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
         allowsFullscreenVideo
         javaScriptEnabled
         domStorageEnabled
+        injectedJavaScript={injectedJavaScript}
         mediaPlaybackRequiresUserAction={true}
         allowsInlineMediaPlayback={true}
         onShouldStartLoadWithRequest={request => {
