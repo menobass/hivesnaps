@@ -2,7 +2,7 @@
 // Uploads files directly to IPFS supernode (3Speak's IPFS gateway by default)
 // Usage: const url = await uploadToIPFS({ uri, name, type });
 
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system';
 
 // Environment configuration with fallback
 const IPFS_UPLOAD_ENDPOINT = process.env.EXPO_PUBLIC_IPFS_UPLOAD_ENDPOINT || 'https://ipfs.3speak.tv/api/v0/add';

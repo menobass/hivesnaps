@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, useColorScheme } from 'react-native';
+import { View, Text, StyleSheet, useColorScheme, useWindowDimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 interface ThreeSpeakEmbedProps {
@@ -7,12 +7,25 @@ interface ThreeSpeakEmbedProps {
   isDark?: boolean;
 }
 
+// Video aspect ratio constant - 1:1 square for better preview on vertical screens
+// Works well for both vertical and horizontal videos since playback is fullscreen
+const VIDEO_ASPECT_RATIO = 1;
+
+// Border radius for video container
+const CONTAINER_BORDER_RADIUS = 12;
+
 const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
   embedUrl,
   isDark,
 }) => {
   const colorScheme = useColorScheme();
   const themeIsDark = isDark ?? colorScheme === 'dark';
+  const { width } = useWindowDimensions();
+  
+  // Calculate responsive height based on screen width (1:1 square)
+  // Assumes some padding/margins in the parent container
+  const containerWidth = width - 32; // Account for horizontal padding
+  const videoHeight = containerWidth; // Square aspect ratio
 
   // JavaScript to auto-trigger fullscreen when video plays
   const injectedJavaScript = `
@@ -49,8 +62,8 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
     <View
       style={{
         width: '100%',
-        height: 398,
-        borderRadius: 12,
+        height: videoHeight,
+        borderRadius: CONTAINER_BORDER_RADIUS,
         overflow: 'hidden',
         position: 'relative',
       }}
