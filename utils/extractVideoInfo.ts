@@ -81,8 +81,9 @@ export function extractVideoInfo(text: string): VideoInfo | null {
     };
   }
 
-  // 3Speak direct URLs - legacy 3speak.tv/watch (keep as watch, just add play. prefix)
-  // Supports both ?v= and ?= formats
+   // 3Speak direct URLs - legacy 3speak.tv/watch
+  // Converts legacy watch URLs to the new play.3speak.tv domain, preserving the watch path format.
+  
   const threeSpeakMatch = text.match(
     /https:\/\/3speak\.tv\/watch\?v?=([^\/\s]+)\/([a-zA-Z0-9_-]+)/
   );
