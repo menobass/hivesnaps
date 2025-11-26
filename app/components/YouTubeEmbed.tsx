@@ -1,12 +1,18 @@
-import React, { useState, useRef } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, useColorScheme } from 'react-native';
 import { WebView } from 'react-native-webview';
-import type { WebViewErrorEvent, WebViewNavigationEvent } from 'react-native-webview';
 
 interface YouTubeEmbedProps {
   embedUrl: string;
   isDark?: boolean;
 }
+
+// Container height for mobile YouTube watch page
+// This fixed height shows the video player while hiding comments and related videos below
+const YOUTUBE_CONTAINER_HEIGHT = 384;
+
+// Border radius for video container
+const CONTAINER_BORDER_RADIUS = 12;
 
 const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({ embedUrl, isDark }) => {
   const colorScheme = useColorScheme();
@@ -21,11 +27,15 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({ embedUrl, isDark }) => {
 
   const videoId = getVideoId(embedUrl);
   
-  console.log('[YouTubeEmbed] Processing URL:', embedUrl);
-  console.log('[YouTubeEmbed] Extracted videoId:', videoId);
+  if (__DEV__) {
+    console.log('[YouTubeEmbed] Processing URL:', embedUrl);
+    console.log('[YouTubeEmbed] Extracted videoId:', videoId);
+  }
 
   if (!videoId) {
-    console.log('[YouTubeEmbed] ERROR: Invalid video ID');
+    if (__DEV__) {
+      console.log('[YouTubeEmbed] ERROR: Invalid video ID');
+    }
     return (
       <View
         style={[
@@ -44,14 +54,17 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({ embedUrl, isDark }) => {
 
   // Use mobile YouTube watch page directly (no embed, avoids Error 153)
   const mobileWatchUrl = `https://m.youtube.com/watch?v=${videoId}`;
-  console.log('[YouTubeEmbed] Loading mobile YouTube:', mobileWatchUrl);
+  
+  if (__DEV__) {
+    console.log('[YouTubeEmbed] Loading mobile YouTube:', mobileWatchUrl);
+  }
 
   return (
     <View
       style={{
         width: '100%',
-        height: 384, // 480 * 0.80 = 384 (20% shorter to crop bottom UI)
-        borderRadius: 12,
+        height: YOUTUBE_CONTAINER_HEIGHT,
+        borderRadius: CONTAINER_BORDER_RADIUS,
         overflow: 'hidden',
         position: 'relative',
         backgroundColor: '#000',
@@ -94,7 +107,7 @@ const styles = StyleSheet.create({
   errorContainer: {
     width: '100%',
     aspectRatio: 16 / 9,
-    borderRadius: 12,
+    borderRadius: CONTAINER_BORDER_RADIUS,
     justifyContent: 'center',
     alignItems: 'center',
   },
