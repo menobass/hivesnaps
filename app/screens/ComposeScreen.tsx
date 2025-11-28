@@ -26,6 +26,7 @@ import { FontAwesome } from '@expo/vector-icons';
 import { Client, PrivateKey } from '@hiveio/dhive';
 import { avatarService } from '../../services/AvatarService';
 import { uploadImageSmart } from '../../utils/imageUploadService';
+import { postSnapWithBeneficiaries } from '../../services/snapPostingService';
 import { useSharedContent } from '../../hooks/useSharedContent';
 import { useShare } from '../../context/ShareContext';
 import { useGifPicker } from '../../hooks/useGifPickerV2';
@@ -691,16 +692,18 @@ export default function ComposeScreen() {
         shared: hasSharedContent, // Additional flag for shared content
       });
 
-      // Post to Hive blockchain as reply to container (same as FeedScreen)
-      await client.broadcast.comment(
+      // Post to Hive blockchain as reply to container with beneficiaries if video is present
+      await postSnapWithBeneficiaries(
+        client,
         {
-          parent_author: container.author,
-          parent_permlink: container.permlink,
+          parentAuthor: container.author,
+          parentPermlink: container.permlink,
           author: currentUsername,
           permlink,
           title: '',
           body,
-          json_metadata,
+          jsonMetadata: json_metadata,
+          hasVideo: !!videoEmbedUrl, // Add beneficiaries if there's a video
         },
         postingKey
       );
