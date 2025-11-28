@@ -1694,6 +1694,71 @@ export default function ComposeScreen() {
             </View>
           )}
 
+          {/* Audio Preview */}
+          {audioEmbedUrl && (
+            <View style={[styles.imagesContainer, { paddingVertical: 12 }]}>
+              <View style={styles.imagesHeader}>
+                <Text style={[styles.imagesCount, { color: colors.text }]}>
+                  Audio
+                </Text>
+                <TouchableOpacity onPress={handleRemoveAudio}>
+                  <Text style={[styles.clearAllText, { color: colors.info }]}>
+                    Remove
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={{
+                marginTop: 8,
+                padding: 12,
+                backgroundColor: colors.inputBg,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: colors.inputBorder
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <FontAwesome
+                    name='music'
+                    size={24}
+                    color={colors.button}
+                    style={{ marginRight: 12 }}
+                  />
+                  <Text style={{ color: colors.text, fontSize: 14, fontWeight: '500', flex: 1 }}>
+                    Audio Snap Ready
+                  </Text>
+                  {!audioUploading && (
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <TouchableOpacity
+                        onPress={handleRemoveAudio}
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 6,
+                          backgroundColor: colors.inputBorder,
+                          borderRadius: 6
+                        }}
+                      >
+                        <Text style={{ color: colors.text, fontSize: 12, fontWeight: '500' }}>
+                          Remove
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              {audioEmbedUrl && (
+                <Text style={{
+                  fontSize: 11,
+                  color: colors.text,
+                  opacity: 0.6,
+                  marginTop: 8
+                }}>
+                  One audio per snap • Max 50 MB
+                </Text>
+              )}
+            </View>
+          )}
+
           {/* Action buttons */}
           <View style={styles.actions}>
             {/* Markdown formatting toolbar */}
@@ -1842,6 +1907,31 @@ export default function ComposeScreen() {
                   </View>
                 )}
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  { backgroundColor: colors.inputBg, marginLeft: 12 },
+                ]}
+                onPress={() => setAudioRecorderVisible(true)}
+                disabled={audioEmbedUrl !== null || audioUploading}
+              >
+                <FontAwesome
+                  name="microphone"
+                  size={20}
+                  color={audioEmbedUrl !== null || audioUploading ? colors.info : colors.button}
+                />
+                {audioEmbedUrl && (
+                  <View
+                    style={[
+                      styles.imageBadge,
+                      { backgroundColor: colors.button },
+                    ]}
+                  >
+                    <Text style={styles.imageBadgeText}>♪</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
             </View>
 
             {images.length >= 10 && (
@@ -1891,6 +1981,13 @@ export default function ComposeScreen() {
           inputBorder: colors.inputBorder,
           button: colors.button,
         }}
+      />
+
+      {/* Audio Recorder Modal */}
+      <AudioRecorderModal
+        isVisible={audioRecorderVisible}
+        onClose={() => setAudioRecorderVisible(false)}
+        onAudioRecorded={handleAudioRecorded}
       />
 
       {/* Spoiler Modal */}
