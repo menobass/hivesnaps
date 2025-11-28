@@ -135,18 +135,31 @@ const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({
         await soundRef.current.pauseAsync();
         setIsPlaying(false);
       } else if (!soundRef.current) {
-        // Create blob URI for playback
-        const blobUrl = URL.createObjectURL(audioBlob);
-        const sound = new Audio.Sound();
-        await sound.loadAsync({ uri: blobUrl });
-        sound.setOnPlaybackStatusUpdate((status: any) => {
-          if (status.didJustFinish) {
-            setIsPlaying(false);
+        // Convert blob to data URI for playback
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const dataUri = reader.result as string;
+            const sound = new Audio.Sound();
+            await sound.loadAsync({ uri: dataUri });
+            sound.setOnPlaybackStatusUpdate((status: any) => {
+              if (status.didJustFinish) {
+                setIsPlaying(false);
+              }
+            });
+            await sound.playAsync();
+            soundRef.current = sound;
+            setIsPlaying(true);
+          } catch (err) {
+            console.error('Error loading sound:', err);
+            Alert.alert('Playback Error', 'Failed to load audio');
           }
-        });
-        await sound.playAsync();
-        soundRef.current = sound;
-        setIsPlaying(true);
+        };
+        reader.onerror = () => {
+          console.error('FileReader error:', reader.error);
+          Alert.alert('Playback Error', 'Failed to read audio file');
+        };
+        reader.readAsDataURL(audioBlob);
       } else {
         await soundRef.current.playAsync();
         setIsPlaying(true);
