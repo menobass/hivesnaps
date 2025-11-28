@@ -4,7 +4,7 @@
  */
 
 import * as FileSystem from 'expo-file-system/legacy';
-import { THREE_SPEAK_API_KEY } from '../app/config/env';
+import { THREE_SPEAK_API_KEY, AUDIO_API_ENDPOINT } from '../app/config/env';
 
 export interface AudioUploadOptions {
   title?: string;
@@ -20,7 +20,6 @@ export interface AudioUploadResult {
   error?: string;
 }
 
-const AUDIO_API_BASE = 'https://audio.3speak.tv';
 const MAX_AUDIO_FILE_BYTES = 50 * 1024 * 1024; // 50MB limit
 
 /**
@@ -71,13 +70,43 @@ export async function uploadAudioTo3Speak(
       };
     }
 
+    console.log('[Audio Upload] Starting upload...');
+    console.log('[Audio Upload] Blob type:', audioBlob.type);
+    console.log('[Audio Upload] Blob size:', audioBlob.size, 'bytes');
+    console.log('[Audio Upload] Duration:', durationSeconds, 'seconds');
+    console.log('[Audio Upload] Username:', username);
+
+    // In React Native, we need to convert the Blob to base64 for FormData
+    // This is because React Native's fetch doesn't handle Blob objects the same way as the browser
+    const reader = new FileReader();
+    const base64Data = await new Promise<string>((resolve, reject) => {
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Extract the base64 part (after "data:audio/...;base64,")
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = () => {
+        reject(new Error('Failed to read audio blob'));
+      };
+      reader.readAsDataURL(audioBlob);
+    });
+
+    console.log('[Audio Upload] Converted to base64, length:', base64Data.length);
+
     // Create FormData for multipart upload
     const formData = new FormData();
 
-    // Append audio blob
-    formData.append('audio', audioBlob, `audio-${Date.now()}.webm`);
+    // In React Native, append base64 data with explicit type info
+    // The API will handle this correctly
+    formData.append('audio', {
+      uri: `data:${audioBlob.type || 'audio/mpeg'};base64,${base64Data}`,
+      type: audioBlob.type || 'audio/mpeg',
+      name: `audio-${Date.now()}.m4a`,
+    } as any);
+    
     formData.append('duration', durationSeconds.toString());
-    formData.append('format', 'webm');
+    formData.append('format', 'm4a');
 
     // Append optional metadata
     if (options.title) {
@@ -88,7 +117,11 @@ export async function uploadAudioTo3Speak(
     }
 
     // Upload to 3Speak Audio API
-    const response = await fetch(`${AUDIO_API_BASE}/api/audio/upload`, {
+    const uploadUrl = `${AUDIO_API_ENDPOINT}/api/audio/upload`;
+    console.log('[Audio Upload] URL:', uploadUrl);
+    console.log('[Audio Upload] Sending FormData...');
+
+    const response = await fetch(uploadUrl, {
       method: 'POST',
       headers: {
         'X-API-Key': THREE_SPEAK_API_KEY,
@@ -97,12 +130,17 @@ export async function uploadAudioTo3Speak(
       body: formData,
     });
 
+    console.log('[Audio Upload] Response status:', response.status);
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage =
-        errorData.message ||
-        errorData.error ||
-        `Upload failed with status ${response.status}`;
+      const errorText = await response.text();
+      console.error('[Audio Upload] Upload failed:', response.status, errorText);
+
+      let errorMessage = `Upload failed with status ${response.status}`;
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error || errorData.message || errorMessage;
+      } catch {}
 
       return {
         success: false,
@@ -115,6 +153,7 @@ export async function uploadAudioTo3Speak(
     }
 
     const result = await response.json();
+    console.log('[Audio Upload] Success! Permlink:', result.permlink);
 
     return {
       success: true,
@@ -124,7 +163,8 @@ export async function uploadAudioTo3Speak(
       apiUrl: result.apiUrl,
     };
   } catch (error: any) {
-    console.error('Audio upload error:', error);
+    console.error('[Audio Upload] Error:', error.message);
+    console.error('[Audio Upload] Full error:', error);
     return {
       success: false,
       permlink: '',
@@ -156,5 +196,5 @@ export function extractAudioPermlink(url: string): string | null {
  * @returns iFrame src URL
  */
 export function generateAudioEmbedUrl(permlink: string): string {
-  return `${AUDIO_API_BASE}/play?a=${permlink}&mode=minimal&iframe=1`;
+  return `${AUDIO_API_ENDPOINT}/play?a=${permlink}&mode=minimal&iframe=1`;
 }

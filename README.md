@@ -28,7 +28,9 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
 
 ### 🎨 Rich Media Support
 
-- **Image Uploads** - Camera capture or gallery selection with Cloudinary hosting
+- **Image Uploads** - Camera capture or gallery selection with HEIC conversion support
+- **Video Snaps** - Record and upload videos directly to 3Speak with automatic beneficiaries
+- **Audio Snaps** - Record and upload up to 5-minute audio clips to 3Speak Audio API
 - **GIF Integration** - Powered by Tenor API with search functionality
 - **Video Embedding** - YouTube, 3Speak, and IPFS video support
 - **Instagram Embeds** - Native Instagram post rendering in feed
@@ -80,9 +82,11 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
 
 ### Media & Storage
 
-- **Cloudinary** as fallback for image hosting and optimization
+- **3Speak Video & Audio API** - Direct uploads for video and audio snaps with IPFS storage
 - **Tenor API** for GIF search and integration
-- **Expo Image Picker** for camera/gallery access
+- **Expo Image Picker** for camera/gallery access with HEIC/JPEG auto-conversion
+- **Expo AV** for audio recording and playback
+- **images.hive.blog** for decentralized image hosting
 - **AsyncStorage** for local data persistence
 
 ### UI/UX
@@ -120,15 +124,21 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
    Create a `.env` file with your API keys:
 
    ```env
-   CLOUDINARY_CLOUD_NAME=your_cloud_name
-   CLOUDINARY_API_KEY=your_api_key
-   CLOUDINARY_API_SECRET=your_api_secret
-   TENOR_API_KEY=your_tenor_key
+   # 3Speak API (required for video/audio uploads)
    EXPO_PUBLIC_3SPEAK_API_KEY=your_3speak_api_key
+
+   # IPFS Configuration (for decentralized storage)
    EXPO_PUBLIC_IPFS_UPLOAD_ENDPOINT=https://ipfs.3speak.tv/api/v0/add
    EXPO_PUBLIC_IPFS_GATEWAY_URL=https://ipfs.3speak.tv/ipfs
-   # EXPO_PUBLIC_IPFS_API_KEY=optional_ipfs_key
+
+   # Tenor API (for GIF search)
+   TENOR_API_KEY=your_tenor_key
+
+   # Optional: Audio API base URL (defaults to https://audio.3speak.tv)
+   # EXPO_PUBLIC_AUDIO_API_BASE=https://audio.3speak.tv
    ```
+
+   See `.env.example` for all available options.
 
 4. **Start the development server:**
 
@@ -163,6 +173,25 @@ HiveSnaps implements a comprehensive content moderation system:
 - **Terms of Service** - Required acceptance with App Store compliance for community standards
 
 See `docs/moderation.md` for detailed policy, configuration, and technical implementation.
+
+### Audio Snaps Feature
+
+HiveSnaps now supports audio snaps - record and share audio clips directly from your phone:
+
+- **Recording** - Record up to 5 minutes of audio with real-time timer and progress bar
+- **Playback** - Preview recordings before posting
+- **Upload** - Automatic upload to 3Speak Audio API with IPFS storage
+- **Metadata** - Audio metadata stored on-chain with your snap
+- **Beneficiaries** - 5% automatic beneficiary to @snapie on audio snaps
+- **Feed Display** - Minimal audio player in feed with one-click playback
+
+**How to use:**
+1. In the composer, tap the microphone button to open the audio recorder
+2. Tap "Start Recording" and record your audio (max 5 minutes)
+3. Tap "Stop Recording" when done
+4. Preview your audio with the "Play" button
+5. Tap "Use Audio" to include it in your snap
+6. Post as normal - audio embed will display in the feed
 
 ### Testing
 
