@@ -48,6 +48,7 @@ import SpoilerText from '../components/SpoilerText';
 import TwitterEmbed from '../components/TwitterEmbed';
 import UpvoteModal from '../../components/UpvoteModal';
 import Snap from '../components/Snap';
+import AudioRecorderModal from '../components/AudioRecorderModal';
 
 import ContentModal from '../components/ContentModal';
 
@@ -124,9 +125,11 @@ const ConversationScreenRefactored = () => {
     replyText,
     replyImages,
     replyGifs,
+    replyAudioUrl,
     replyTarget,
     posting,
     uploading,
+    audioUploading: replyAudioUploading,
     processing: replyProcessing,
     error: replyError,
     openReplyModal,
@@ -134,9 +137,11 @@ const ConversationScreenRefactored = () => {
     setReplyText,
     removeReplyImage,
     removeReplyGif,
+    removeReplyAudio,
     submitReply,
     addImage: addReplyImage,
     addGif: addReplyGif,
+    handleAudioRecorded: handleReplyAudioRecorded,
   } = useReply(currentUsername, checkForNewContent);
 
   const {
@@ -195,6 +200,9 @@ const ConversationScreenRefactored = () => {
   const gifPicker = useGifPicker({
     onGifSelected: handleGifSelection,
   });
+
+  // Audio recorder state for replies
+  const [replyAudioRecorderVisible, setReplyAudioRecorderVisible] = useState(false);
 
   // Local UI state
   const [imageModalVisible, setImageModalVisible] = useState(false);
@@ -1462,12 +1470,16 @@ const ConversationScreenRefactored = () => {
           onTextChange={setReplyText}
           images={replyImages}
           gifs={replyGifs}
+          audioUrl={replyAudioUrl}
           onImageRemove={removeReplyImage}
           onGifRemove={removeReplyGif}
+          onAudioRemove={removeReplyAudio}
           onAddImage={() => addReplyImage('reply')}
           onAddGif={() => handleOpenGifPicker('reply')}
+          onAddAudio={() => setReplyAudioRecorderVisible(true)}
           posting={posting}
           uploading={uploading}
+          audioUploading={replyAudioUploading}
           processing={replyProcessing}
           error={replyError}
           currentUsername={currentUsername}
@@ -1484,15 +1496,26 @@ const ConversationScreenRefactored = () => {
           onTextChange={setEditText}
           images={editImages}
           gifs={editGifs}
+          audioUrl={null}
           onImageRemove={removeEditImage}
           onGifRemove={removeEditGif}
+          onAudioRemove={() => {}}
           onAddImage={() => addEditImage('edit')}
           onAddGif={() => handleOpenGifPicker('edit')}
+          onAddAudio={() => {}}
           posting={editing}
           uploading={editUploading}
+          audioUploading={false}
           processing={editProcessing}
           error={editError}
           currentUsername={currentUsername}
+        />
+
+        {/* Reply Audio Recorder Modal */}
+        <AudioRecorderModal
+          isVisible={replyAudioRecorderVisible}
+          onClose={() => setReplyAudioRecorderVisible(false)}
+          onAudioRecorded={handleReplyAudioRecorded}
         />
 
         {/* Upvote Modal */}
