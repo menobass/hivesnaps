@@ -112,7 +112,9 @@ export async function prepareLocalVideoAsset(
   }
 
   if (sizeBytes > MAX_VIDEO_FILE_BYTES) {
-    throw new Error('Videos are limited to 100MB for direct 3Speak uploads.');
+    throw new Error(
+      `Video file is too large (${(sizeBytes / (1024 * 1024)).toFixed(1)} MB). Videos are limited to 100 MB for 3Speak uploads.`
+    );
   }
 
   const filename = options.filename || uri.split('/').pop() || `snapie-video-${Date.now()}.mp4`;
