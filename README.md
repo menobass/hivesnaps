@@ -124,6 +124,10 @@ HiveSnaps is a cutting-edge React Native mobile app built with Expo and TypeScri
    CLOUDINARY_API_KEY=your_api_key
    CLOUDINARY_API_SECRET=your_api_secret
    TENOR_API_KEY=your_tenor_key
+   EXPO_PUBLIC_3SPEAK_API_KEY=your_3speak_api_key
+   EXPO_PUBLIC_IPFS_UPLOAD_ENDPOINT=https://ipfs.3speak.tv/api/v0/add
+   EXPO_PUBLIC_IPFS_GATEWAY_URL=https://ipfs.3speak.tv/ipfs
+   # EXPO_PUBLIC_IPFS_API_KEY=optional_ipfs_key
    ```
 
 4. **Start the development server:**
