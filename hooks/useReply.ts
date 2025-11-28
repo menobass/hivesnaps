@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import { Client, PrivateKey } from '@hiveio/dhive';
 import * as SecureStore from 'expo-secure-store';
 import { uploadImageSmart } from '../utils/imageUploadService';
+import { uploadAudioTo3Speak } from '../services/audioUploadService';
+import { postSnapWithBeneficiaries } from '../services/snapPostingService';
 import * as ImagePicker from 'expo-image-picker';
 
 const HIVE_NODES = [
@@ -21,9 +23,11 @@ interface ReplyState {
   replyText: string;
   replyImages: string[]; // Changed to array
   replyGifs: string[]; // Changed to array
+  replyAudioUrl: string | null; // Audio embed URL from 3Speak
   replyTarget: ReplyTarget | null;
   posting: boolean;
   uploading: boolean;
+  audioUploading: boolean; // Separate state for audio upload
   processing: boolean; // New state for blockchain processing
   error: string | null;
 }
@@ -38,6 +42,9 @@ interface UseReplyReturn extends ReplyState {
   removeReplyImage: (imageUrl: string) => void;
   addReplyGif: (gifUrl: string) => void;
   removeReplyGif: (gifUrl: string) => void;
+  addReplyAudio: (audioUrl: string) => void;
+  removeReplyAudio: () => void;
+  handleAudioRecorded: (audioBlob: Blob, durationSeconds: number) => Promise<void>;
   submitReply: () => Promise<void>;
   addImage: (mode: 'reply') => Promise<void>;
   addGif: (gifUrl: string) => void;
@@ -54,9 +61,11 @@ export const useReply = (
     replyText: '',
     replyImages: [], // Changed to array
     replyGifs: [], // Changed to array
+    replyAudioUrl: null,
     replyTarget: null,
     posting: false,
     uploading: false,
+    audioUploading: false,
     processing: false,
     error: null,
   });
@@ -76,6 +85,7 @@ export const useReply = (
       replyText: '',
       replyImages: [], // Changed to array
       replyGifs: [], // Changed to array
+      replyAudioUrl: null,
       replyTarget: null,
       error: null,
     }));
@@ -114,6 +124,47 @@ export const useReply = (
       replyGifs: prev.replyGifs.filter(gif => gif !== gifUrl) 
     }));
   }, []);
+
+  const addReplyAudio = useCallback((audioUrl: string) => {
+    setState(prev => ({ ...prev, replyAudioUrl: audioUrl }));
+  }, []);
+
+  const removeReplyAudio = useCallback(() => {
+    setState(prev => ({ ...prev, replyAudioUrl: null }));
+  }, []);
+
+  const handleAudioRecorded = useCallback(async (audioBlob: Blob, durationSeconds: number) => {
+    setState(prev => ({ ...prev, audioUploading: true, error: null }));
+
+    try {
+      if (!currentUsername) {
+        throw new Error('Not logged in');
+      }
+
+      const result = await uploadAudioTo3Speak(
+        audioBlob,
+        durationSeconds,
+        currentUsername,
+        {
+          title: `Audio Reply by ${currentUsername}`,
+        }
+      );
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to upload audio');
+      }
+
+      addReplyAudio(result.playUrl);
+    } catch (error: any) {
+      console.error('Error uploading reply audio:', error);
+      setState(prev => ({
+        ...prev,
+        error: error.message || 'Failed to upload audio',
+      }));
+    } finally {
+      setState(prev => ({ ...prev, audioUploading: false }));
+    }
+  }, [currentUsername]);
 
   const addImage = useCallback(async (mode: 'reply') => {
     if (mode !== 'reply') return;
@@ -167,7 +218,7 @@ export const useReply = (
   const submitReply = useCallback(async () => {
     if (
       !state.replyTarget ||
-      (!state.replyText.trim() && state.replyImages.length === 0 && state.replyGifs.length === 0) ||
+      (!state.replyText.trim() && state.replyImages.length === 0 && state.replyGifs.length === 0 && !state.replyAudioUrl) ||
       !currentUsername
     ) {
       return;
@@ -195,6 +246,11 @@ export const useReply = (
         body += `\n![gif](${gifUrl})`;
       });
 
+      // Add audio URL (without markdown link, just the embed URL)
+      if (state.replyAudioUrl) {
+        body += `\n${state.replyAudioUrl}`;
+      }
+
       const parent_author = state.replyTarget.author;
       const parent_permlink = state.replyTarget.permlink;
       const author = currentUsername;
@@ -217,16 +273,23 @@ export const useReply = (
         json_metadata.image = allMedia;
       }
 
-      // Post to Hive blockchain
-      await client.broadcast.comment(
+      // Add audio to metadata if present
+      if (state.replyAudioUrl) {
+        json_metadata.audio = { platform: '3speak', url: state.replyAudioUrl };
+      }
+
+      // Use postSnapWithBeneficiaries to handle audio beneficiaries (5% to @snapie)
+      await postSnapWithBeneficiaries(
+        client,
         {
-          parent_author,
-          parent_permlink,
+          parentAuthor: parent_author,
+          parentPermlink: parent_permlink,
           author,
           permlink,
           title: '',
           body,
-          json_metadata: JSON.stringify(json_metadata),
+          jsonMetadata: JSON.stringify(json_metadata),
+          hasAudio: !!state.replyAudioUrl,
         },
         postingKey
       );
@@ -289,6 +352,7 @@ export const useReply = (
     state.replyText,
     state.replyImages,
     state.replyGifs,
+    state.replyAudioUrl,
     currentUsername,
     closeReplyModal,
     onRefresh,
@@ -310,6 +374,9 @@ export const useReply = (
     removeReplyImage,
     addReplyGif,
     removeReplyGif,
+    addReplyAudio,
+    removeReplyAudio,
+    handleAudioRecorded,
     submitReply,
     addImage,
     addGif,

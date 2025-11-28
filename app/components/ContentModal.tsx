@@ -12,6 +12,15 @@ import { FontAwesome } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
 import Modal from 'react-native-modal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AudioEmbed from './AudioEmbed';
+import {
+  AUDIO_PREVIEW_ICON_SIZE,
+  AUDIO_PREVIEW_REMOVE_ICON_SIZE,
+  AUDIO_PREVIEW_TEXT_SIZE,
+  AUDIO_PREVIEW_MARGIN_LEFT,
+  AUDIO_PREVIEW_MARGIN_BOTTOM,
+  AUDIO_PREVIEW_MARGIN_TOP,
+} from '../constants/ui';
 
 export type ContentModalMode = 'reply' | 'edit';
 
@@ -31,12 +40,16 @@ interface ContentModalProps {
   onTextChange: (text: string) => void;
   images: string[]; // Changed from single image to array
   gifs: string[]; // Changed from single gif to array
+  audioUrl: string | null; // Audio embed URL from 3Speak
   onImageRemove: (imageUrl: string) => void; // Now takes URL parameter
   onGifRemove: (gifUrl: string) => void; // Now takes URL parameter
+  onAudioRemove: () => void; // Remove audio
   onAddImage: () => void;
   onAddGif: () => void;
+  onAddAudio: () => void; // Add audio (open recorder)
   posting: boolean;
   uploading: boolean;
+  audioUploading: boolean; // Separate state for audio upload
   processing: boolean;
   error: string | null;
   currentUsername: string | null;
@@ -55,12 +68,16 @@ const ContentModal: React.FC<ContentModalProps> = ({
   onTextChange,
   images,
   gifs,
+  audioUrl,
   onImageRemove,
   onGifRemove,
+  onAudioRemove,
   onAddImage,
   onAddGif,
+  onAddAudio,
   posting,
   uploading,
+  audioUploading,
   processing,
   error,
   currentUsername,
@@ -288,6 +305,28 @@ const ContentModal: React.FC<ContentModalProps> = ({
           </ScrollView>
         )}
 
+        {/* Audio preview */}
+        {audioUrl && (
+          <View style={{ marginBottom: AUDIO_PREVIEW_MARGIN_BOTTOM }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <FontAwesome name='music' size={AUDIO_PREVIEW_ICON_SIZE} color={colors.primary} />
+                <Text style={{ color: colors.text, marginLeft: AUDIO_PREVIEW_MARGIN_LEFT, fontSize: AUDIO_PREVIEW_TEXT_SIZE, flex: 1 }}>Audio attached</Text>
+              </View>
+              <TouchableOpacity
+                onPress={onAudioRemove}
+                disabled={posting || audioUploading}
+                style={{ marginLeft: AUDIO_PREVIEW_MARGIN_LEFT }}
+              >
+                <FontAwesome name='times-circle' size={AUDIO_PREVIEW_REMOVE_ICON_SIZE} color={colors.error} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ marginTop: AUDIO_PREVIEW_MARGIN_TOP }}>
+              <AudioEmbed embedUrl={audioUrl} />
+            </View>
+          </View>
+        )}
+
         {/* Error message */}
         {error ? (
           <Text style={{ color: colors.error, marginBottom: 8 }}>{error}</Text>
@@ -374,7 +413,17 @@ const ContentModal: React.FC<ContentModalProps> = ({
                 <Text style={{ fontSize: 18, color: colors.icon }}>GIF</Text>
               </TouchableOpacity>
             )}
-            {uploading && (
+            <TouchableOpacity
+              onPress={onAddAudio}
+              disabled={audioUrl !== null || audioUploading || uploading || posting || processing}
+              style={{
+                marginRight: 16,
+                opacity: audioUrl !== null || audioUploading || uploading || posting || processing ? 0.5 : 1,
+              }}
+            >
+              <FontAwesome name='microphone' size={22} color={colors.icon} />
+            </TouchableOpacity>
+            {(uploading || audioUploading) && (
               <FontAwesome name='spinner' size={16} color={colors.icon} />
             )}
           </View>
