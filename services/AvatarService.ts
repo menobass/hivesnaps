@@ -25,7 +25,15 @@ class AvatarService {
   private readonly STORAGE_KEY = 'hivesnaps_unified_avatar_cache';
 
   private constructor() {
-    this.loadCacheFromStorage();
+    // Only attempt to load from storage on native platforms
+    // Web environment will have AsyncStorage unavailable
+    if (typeof window === 'undefined') {
+      this.loadCacheFromStorage().catch(error => {
+        if (this.DEBUG) {
+          console.warn('Failed to initialize avatar cache:', error);
+        }
+      });
+    }
   }
 
   static getInstance(): AvatarService {
@@ -254,6 +262,10 @@ class AvatarService {
    */
   private async loadCacheFromStorage(): Promise<void> {
     try {
+      // Guard against web environment where AsyncStorage may not be available
+      if (typeof window !== 'undefined') {
+        return;
+      }
       const cacheData = await AsyncStorage.getItem(this.STORAGE_KEY);
       if (cacheData) {
         const parsed = JSON.parse(cacheData);
@@ -284,6 +296,11 @@ class AvatarService {
    */
   private persistTimer: ReturnType<typeof setTimeout> | null = null;
   private persistCacheToStorage(): void {
+    // Skip persistence on web environment
+    if (typeof window !== 'undefined') {
+      return;
+    }
+    
     if (this.persistTimer) {
       clearTimeout(this.persistTimer);
     }
