@@ -18,6 +18,7 @@ import { Clipboard } from 'react-native';
 import { extractImageUrls } from '../../utils/extractImageUrls';
 import { stripImageTags } from '../../utils/stripImageTags';
 import { extractVideoInfo, removeVideoUrls, removeInstagramUrls } from '../../utils/extractVideoInfo';
+import { detectMediaInBody } from '../../utils/mediaDetection';
 import IPFSVideoPlayer from './IPFSVideoPlayer';
 import { WebView } from 'react-native-webview';
 import Markdown from 'react-native-markdown-display';
@@ -31,6 +32,7 @@ import SpoilerText from './SpoilerText';
 import TwitterEmbed from './TwitterEmbed';
 import YouTubeEmbed from './YouTubeEmbed';
 import ThreeSpeakEmbed from './ThreeSpeakEmbed';
+import AudioEmbed from './AudioEmbed';
 import InstagramEmbed from './InstagramEmbed';
 import { extractBlogPostUrls } from '../../utils/extractHivePostInfo';
 import { OptimizedHivePostPreviewRenderer } from '../../components/OptimizedHivePostPreviewRenderer';
@@ -240,6 +242,7 @@ const Snap: React.FC<SnapProps> = ({
   const imageUrls = extractImageUrls(body);
   const rawImageUrls = extractRawImageUrlsUtil(body);
   const embeddedContent = extractVideoInfo(body); // Renamed from videoInfo to be more accurate
+  const mediaInfo = detectMediaInBody(body); // Detect audio and video media
   const hivePostUrls = extractBlogPostUrls(body); // Extract Hive post URLs for previews
   const router = useRouter(); // For navigation in reply mode
 
@@ -666,6 +669,13 @@ const Snap: React.FC<SnapProps> = ({
               isDark={isDark}
             />
           ) : null}
+        </View>
+      )}
+
+      {/* Audio embeds from 3Speak Audio */}
+      {mediaInfo.hasAudio && mediaInfo.audioUrl && (
+        <View style={{ marginBottom: 8 }}>
+          <AudioEmbed embedUrl={mediaInfo.audioUrl} isDark={isDark} />
         </View>
       )}
 

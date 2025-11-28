@@ -9,12 +9,13 @@ import { WebView } from 'react-native-webview';
 
 interface AudioEmbedProps {
   embedUrl: string;
+  isDark?: boolean;
 }
 
 // Minimal mode height for audio player
 const AUDIO_PLAYER_HEIGHT = 80;
 
-const AudioEmbed: React.FC<AudioEmbedProps> = ({ embedUrl }) => {
+const AudioEmbed: React.FC<AudioEmbedProps> = ({ embedUrl, isDark }) => {
   return (
     <View style={styles.container}>
       <WebView
