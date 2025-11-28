@@ -30,28 +30,31 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
   // JavaScript to auto-trigger fullscreen when video plays
   const injectedJavaScript = `
     (function() {
-      // Wait for video element to be ready
+      // Wait for video element to be ready with timeout protection
+      let checks = 0;
+      const maxChecks = 50; // 5 seconds max at 100ms interval
       const checkVideo = setInterval(() => {
         const video = document.querySelector('video');
-        if (video) {
+        if (video || ++checks >= maxChecks) {
           clearInterval(checkVideo);
-          
-          // Listen for play event
-          video.addEventListener('play', () => {
-            setTimeout(() => {
-              if (video.requestFullscreen) {
-                video.requestFullscreen();
-              } else if (video.webkitRequestFullscreen) {
-                video.webkitRequestFullscreen();
-              } else if (video.mozRequestFullScreen) {
-                video.mozRequestFullScreen();
-              } else if (video.msRequestFullscreen) {
-                video.msRequestFullscreen();
-              } else if (video.webkitEnterFullscreen) {
-                video.webkitEnterFullscreen();
-              }
-            }, 100);
-          });
+          if (video) {
+            // Listen for play event
+            video.addEventListener('play', () => {
+              setTimeout(() => {
+                if (video.requestFullscreen) {
+                  video.requestFullscreen();
+                } else if (video.webkitRequestFullscreen) {
+                  video.webkitRequestFullscreen();
+                } else if (video.mozRequestFullScreen) {
+                  video.mozRequestFullScreen();
+                } else if (video.msRequestFullscreen) {
+                  video.msRequestFullscreen();
+                } else if (video.webkitEnterFullscreen) {
+                  video.webkitEnterFullscreen();
+                }
+              }, 100);
+            });
+          }
         }
       }, 100);
     })();
