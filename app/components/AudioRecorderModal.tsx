@@ -362,7 +362,7 @@ const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({
             {isUploading ? (
               <ActivityIndicator color="white" size="small" />
             ) : (
-              <Text style={styles.footerButtonText}>Use Audio</Text>
+              <Text style={[styles.footerButtonText, { color: 'white' }]}>Use Audio</Text>
             )}
           </TouchableOpacity>
         </View>

@@ -452,6 +452,19 @@ const Snap: React.FC<SnapProps> = ({
       .join('\n');
   }
 
+  // Remove 3Speak audio URLs from text body to avoid showing raw URLs
+  // (they're rendered as audio embeds above)
+  const audioUrlPattern = /https?:\/\/audio\.3speak\.tv\/play\?[^\s]+/gi;
+  if (audioUrlPattern.test(textBody)) {
+    textBody = textBody.replace(audioUrlPattern, '').trim();
+    // Clean up extra whitespace
+    textBody = textBody
+      .replace(/\r\n/g,'\n')
+      .split('\n')
+      .map(l => l.replace(/[ \t]{2,}/g,' ').replace(/ +$/,''))
+      .join('\n');
+  }
+
   // Process spoiler syntax first, before other text processing
   const spoilerData = convertSpoilerSyntax(textBody);
   textBody = spoilerData.processedText;
