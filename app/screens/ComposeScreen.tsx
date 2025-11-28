@@ -27,6 +27,8 @@ import { Client, PrivateKey } from '@hiveio/dhive';
 import { avatarService } from '../../services/AvatarService';
 import { uploadImageSmart } from '../../utils/imageUploadService';
 import { postSnapWithBeneficiaries } from '../../services/snapPostingService';
+import AudioRecorderModal from '../components/AudioRecorderModal';
+import { uploadAudioTo3Speak } from '../../services/audioUploadService';
 import { useSharedContent } from '../../hooks/useSharedContent';
 import { useShare } from '../../context/ShareContext';
 import { useGifPicker } from '../../hooks/useGifPickerV2';
@@ -98,6 +100,12 @@ export default function ComposeScreen() {
   const videoCancelRequestedRef = useRef(false);
   const thumbnailIpfsUploadPromiseRef = useRef<Promise<string | null> | null>(null);
 
+  // Audio upload state
+  const [audioRecorderVisible, setAudioRecorderVisible] = useState(false);
+  const [audioEmbedUrl, setAudioEmbedUrl] = useState<string | null>(null);
+  const [audioUploading, setAudioUploading] = useState(false);
+  const [audioUploadError, setAudioUploadError] = useState<string | null>(null);
+
   // GIF picker state - using our new professional hook
   const gifPicker = useGifPicker({
     onGifSelected: (gifUrl: string) => {
@@ -120,7 +128,7 @@ export default function ComposeScreen() {
 
   // Computed video variables
   const videoEmbedUrl = videoAssetId || null;
-  const hasPostableContent = Boolean(text.trim() || images.length > 0 || gifs.length > 0 || videoEmbedUrl);
+  const hasPostableContent = Boolean(text.trim() || images.length > 0 || gifs.length > 0 || videoEmbedUrl || audioEmbedUrl);
   const disablePostButton = posting || videoUploading || !hasPostableContent;
   const hasDraftContent = Boolean(
     text.trim() || images.length > 0 || gifs.length > 0 || videoAsset || videoAssetId || videoUploading
@@ -620,6 +628,53 @@ export default function ComposeScreen() {
     setGifs(prev => prev.filter((_, index) => index !== indexToRemove));
   };
 
+  const handleAudioRecorded = async (audioBlob: Blob, durationSeconds: number) => {
+    setAudioUploading(true);
+    setAudioUploadError(null);
+
+    try {
+      if (!currentUsername) {
+        throw new Error('Not logged in');
+      }
+
+      const result = await uploadAudioTo3Speak(
+        audioBlob,
+        durationSeconds,
+        currentUsername,
+        {
+          title: `Audio Snap by ${currentUsername}`,
+        }
+      );
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to upload audio');
+      }
+
+      setAudioEmbedUrl(result.playUrl);
+      setAudioRecorderVisible(false);
+
+      Alert.alert(
+        'Audio Uploaded',
+        'Your audio has been uploaded successfully!',
+        [{ text: 'OK' }]
+      );
+    } catch (error: any) {
+      console.error('Error uploading audio:', error);
+      setAudioUploadError(error.message || 'Failed to upload audio');
+      Alert.alert(
+        'Upload Error',
+        error.message || 'Failed to upload audio. Please try again.'
+      );
+    } finally {
+      setAudioUploading(false);
+    }
+  };
+
+  const handleRemoveAudio = () => {
+    setAudioEmbedUrl(null);
+    setAudioUploadError(null);
+  };
+
   const handleSubmit = async () => {
     if (videoUploading) {
       Alert.alert('Video Uploading', 'Please wait for the video upload to finish.');
@@ -668,6 +723,9 @@ export default function ComposeScreen() {
       if (videoEmbedUrl) {
         body += `\n${videoEmbedUrl}`;
       }
+      if (audioEmbedUrl) {
+        body += `\n${audioEmbedUrl}`;
+      }
 
       // Get latest @peak.snaps post (container) - Same as FeedScreen
       const discussions = await client.database.call(
@@ -689,10 +747,11 @@ export default function ComposeScreen() {
         tags: ['hive-178315', 'snaps'],
         image: allMedia, // Include all images and GIFs in metadata
         video: videoEmbedUrl ? { platform: '3speak', url: videoEmbedUrl, uploadUrl: videoUploadUrl } : undefined,
+        audio: audioEmbedUrl ? { platform: '3speak', url: audioEmbedUrl } : undefined,
         shared: hasSharedContent, // Additional flag for shared content
       });
 
-      // Post to Hive blockchain as reply to container with beneficiaries if video is present
+      // Post to Hive blockchain as reply to container with beneficiaries if video/audio present
       await postSnapWithBeneficiaries(
         client,
         {
@@ -703,7 +762,8 @@ export default function ComposeScreen() {
           title: '',
           body,
           jsonMetadata: json_metadata,
-          hasVideo: !!videoEmbedUrl, // Add beneficiaries if there's a video
+          hasVideo: !!videoEmbedUrl,
+          hasAudio: !!audioEmbedUrl,
         },
         postingKey
       );
@@ -713,6 +773,7 @@ export default function ComposeScreen() {
       setImages([]);
       setGifs([]);
       clearVideoState();
+      setAudioEmbedUrl(null);
       clearSharedContent(); // Clear any shared content
 
       Alert.alert(
