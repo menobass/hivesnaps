@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 interface AvatarCacheEntry {
   url: string;
@@ -26,8 +27,8 @@ class AvatarService {
 
   private constructor() {
     // Only attempt to load from storage on native platforms
-    // Web environment will have AsyncStorage unavailable
-    if (typeof window === 'undefined') {
+    // Web environment does not support AsyncStorage
+    if (Platform.OS !== 'web') {
       this.loadCacheFromStorage().catch(error => {
         if (this.DEBUG) {
           console.warn('Failed to initialize avatar cache:', error);
@@ -263,7 +264,7 @@ class AvatarService {
   private async loadCacheFromStorage(): Promise<void> {
     try {
       // Guard against web environment where AsyncStorage may not be available
-      if (typeof window !== 'undefined') {
+      if (Platform.OS === 'web') {
         return;
       }
       const cacheData = await AsyncStorage.getItem(this.STORAGE_KEY);
@@ -297,7 +298,7 @@ class AvatarService {
   private persistTimer: ReturnType<typeof setTimeout> | null = null;
   private persistCacheToStorage(): void {
     // Skip persistence on web environment
-    if (typeof window !== 'undefined') {
+    if (Platform.OS === 'web') {
       return;
     }
     
