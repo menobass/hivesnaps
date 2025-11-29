@@ -27,7 +27,7 @@ import ImageView from 'react-native-image-viewing';
 import { createFeedScreenStyles } from '../../styles/FeedScreenStyles';
 
 // Custom hooks for business logic
-import { useUserAuth } from '../../hooks/useUserAuth';
+import { useAuth } from '../../store/context';
 import { useFeedData, FeedFilter } from '../../hooks/useFeedData';
 import { useUpvote } from '../../hooks/useUpvote';
 import { useSearch } from '../../hooks/useSearch';
@@ -152,7 +152,7 @@ const FeedScreenRefactored = () => {
   // Custom hooks for business logic
   // Always use the context username for all logic
   const username = useCurrentUser();
-  const { handleLogout: logout } = useUserAuth();
+  const { handleLogout: logout } = useAuth();
 
   // User profile and voting power data
   const {

@@ -106,6 +106,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [state, dispatch] = useReducer(appReducer, initialAppState);
   console.log('🚀 [AppProvider] useReducer successful');
   
+  // Initialize current user from SecureStore on app mount
+  useEffect(() => {
+    const initializeUser = async () => {
+      try {
+        const SecureStore = await import('expo-secure-store');
+        const storedUsername = await SecureStore.getItemAsync('hive_username');
+        if (storedUsername) {
+          console.log('🔐 [AppProvider] Loaded username from SecureStore:', storedUsername);
+          dispatch({ type: 'USER_SET_CURRENT', payload: storedUsername });
+        } else {
+          console.log('🔐 [AppProvider] No stored username found');
+        }
+      } catch (error) {
+        console.error('🔐 [AppProvider] Error loading username from SecureStore:', error);
+      }
+    };
+    
+    initializeUser();
+  }, []); // Only run on mount
+  
   // 🔍 Debug: Track provider initialization
   useEffect(() => {
     console.log('🏗️ [AppProvider] Provider initialized/re-initialized');
@@ -311,6 +331,34 @@ export function useAppStore() {
 export function useCurrentUser() {
   const { selectors } = useAppStore();
   return selectors.getCurrentUser();
+}
+
+/**
+ * Hook for authentication operations (login/logout)
+ * Consolidates auth logic previously in useUserAuth
+ */
+export function useAuth() {
+  const { setCurrentUser } = useAppStore();
+  const currentUsername = useCurrentUser();
+
+  const handleLogout = React.useCallback(async () => {
+    try {
+      const SecureStore = await import('expo-secure-store');
+      await SecureStore.deleteItemAsync('hive_username');
+      await SecureStore.deleteItemAsync('hive_posting_key');
+      setCurrentUser(null);
+    } catch (err) {
+      throw new Error(
+        'Logout failed: ' +
+          (err instanceof Error ? err.message : JSON.stringify(err))
+      );
+    }
+  }, [setCurrentUser]);
+
+  return {
+    currentUsername,
+    handleLogout,
+  };
 }
 
 export function useUserProfile(username: string) {

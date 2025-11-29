@@ -28,7 +28,7 @@ import { useFollowManagement } from '../../hooks/useFollowManagement';
 import { useUserSnaps } from '../../hooks/useUserSnaps';
 import { useAvatarManagement } from '../../hooks/useAvatarManagement';
 import { useRewardsManagement } from '../../hooks/useRewardsManagement';
-import { useUserAuth } from '../../hooks/useUserAuth';
+import { useAuth } from '../../store/context';
 import { useUpvote } from '../../hooks/useUpvote';
 import { useHiveData } from '../../hooks/useHiveData';
 import { useEdit } from '../../hooks/useEdit';
@@ -48,7 +48,7 @@ const ProfileScreen = () => {
   const username = params.username as string | undefined;
 
   // Use custom hooks
-  const { currentUsername, handleLogout } = useUserAuth();
+  const { currentUsername, handleLogout } = useAuth();
 
   // Define isOwnProfile early to avoid undefined issues
   const isOwnProfile = currentUsername === username;

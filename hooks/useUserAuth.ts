@@ -2,6 +2,22 @@ import { useState, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { useAppStore } from '../store/context';
 
+/**
+ * @deprecated This hook is deprecated and will be removed in a future version.
+ * Use `useAuth()` from '../store/context' for logout functionality
+ * Use `useCurrentUser()` from '../store/context' to get the current username
+ * 
+ * Migration example:
+ * ```ts
+ * // Old:
+ * const { currentUsername, handleLogout } = useUserAuth();
+ * 
+ * // New:
+ * import { useAuth, useCurrentUser } from '../store/context';
+ * const { handleLogout } = useAuth(); // if you need logout
+ * const currentUsername = useCurrentUser(); // if you only need username
+ * ```
+ */
 export const useUserAuth = () => {
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
   const { setCurrentUser } = useAppStore();
