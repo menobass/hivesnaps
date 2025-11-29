@@ -46,6 +46,7 @@ import { ContextHivePostPreviewRenderer } from '../../components/ContextHivePost
 import { convertSpoilerSyntax, SpoilerData } from '../../utils/spoilerParser';
 import SpoilerText from '../components/SpoilerText';
 import TwitterEmbed from '../components/TwitterEmbed';
+import YouTubeEmbed from '../components/YouTubeEmbed';
 import UpvoteModal from '../../components/UpvoteModal';
 import Snap from '../components/Snap';
 
@@ -802,6 +803,13 @@ const ConversationScreenRefactored = () => {
                   />
                 </Pressable>
               ))}
+            </View>
+          )}
+
+          {/* Video Content */}
+          {videoInfo && videoInfo.type === 'youtube' && (
+            <View style={{ marginBottom: 8 }}>
+              <YouTubeEmbed embedUrl={videoInfo.embedUrl} isDark={isDark} />
             </View>
           )}
 
