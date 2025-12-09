@@ -7,6 +7,13 @@ interface YouTubeEmbedProps {
   isDark?: boolean;
 }
 
+// Container height for mobile YouTube watch page
+// This fixed height shows the video player while hiding comments and related videos below
+const YOUTUBE_CONTAINER_HEIGHT = 384;
+
+// Border radius for video container
+const CONTAINER_BORDER_RADIUS = 12;
+
 const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({ embedUrl, isDark }) => {
   const colorScheme = useColorScheme();
   const themeIsDark = isDark ?? colorScheme === 'dark';
@@ -19,8 +26,16 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({ embedUrl, isDark }) => {
   };
 
   const videoId = getVideoId(embedUrl);
+  
+  if (__DEV__) {
+    console.log('[YouTubeEmbed] Processing URL:', embedUrl);
+    console.log('[YouTubeEmbed] Extracted videoId:', videoId);
+  }
 
   if (!videoId) {
+    if (__DEV__) {
+      console.log('[YouTubeEmbed] ERROR: Invalid video ID');
+    }
     return (
       <View
         style={[
@@ -37,64 +52,34 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({ embedUrl, isDark }) => {
     );
   }
 
-  const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-          body {
-            margin: 0;
-            padding: 0;
-            background-color: ${themeIsDark ? '#000' : '#fff'};
-          }
-          .video-container {
-            position: relative;
-            width: 100%;
-            height: 100vh;
-          }
-          iframe {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            border: none;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="video-container">
-          <iframe
-            src="https://www.youtube.com/embed/${videoId}?rel=0&showinfo=0&modestbranding=1&playsinline=1"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowfullscreen>
-          </iframe>
-        </div>
-      </body>
-    </html>
-  `;
+  // Use mobile YouTube watch page directly (no embed, avoids Error 153)
+  const mobileWatchUrl = `https://m.youtube.com/watch?v=${videoId}`;
+  
+  if (__DEV__) {
+    console.log('[YouTubeEmbed] Loading mobile YouTube:', mobileWatchUrl);
+  }
 
   return (
     <View
       style={{
         width: '100%',
-        aspectRatio: 16 / 9,
-        borderRadius: 12,
+        height: YOUTUBE_CONTAINER_HEIGHT,
+        borderRadius: CONTAINER_BORDER_RADIUS,
         overflow: 'hidden',
         position: 'relative',
+        backgroundColor: '#000',
       }}
     >
       <WebView
-        source={{ html: htmlContent }}
-        style={{ flex: 1, backgroundColor: themeIsDark ? '#000' : '#fff' }}
+        source={{ uri: mobileWatchUrl }}
+        style={{ flex: 1, backgroundColor: '#000' }}
         allowsFullscreenVideo
         javaScriptEnabled
         domStorageEnabled
-        mediaPlaybackRequiresUserAction={false}
+        mediaPlaybackRequiresUserAction={true}
         allowsInlineMediaPlayback={true}
         startInLoadingState={true}
-        originWhitelist={['*']}
+        userAgent="Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
       />
       {/* YouTube type indicator */}
       <View
@@ -122,7 +107,7 @@ const styles = StyleSheet.create({
   errorContainer: {
     width: '100%',
     aspectRatio: 16 / 9,
-    borderRadius: 12,
+    borderRadius: CONTAINER_BORDER_RADIUS,
     justifyContent: 'center',
     alignItems: 'center',
   },
