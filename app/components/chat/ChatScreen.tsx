@@ -183,24 +183,46 @@ const MessageBubble: React.FC<{
           </Text>
           
           {/* Existing reactions - always show if present */}
-          {message.metadata?.reactions && Object.keys(message.metadata.reactions).length > 0 && (
-            <View style={styles.reactionsContainer}>
-              {Object.entries(message.metadata.reactions).map(([emojiName, userIds]) => (
-                <TouchableOpacity
-                  key={emojiName}
-                  style={[styles.reactionChip, { backgroundColor: colors.reactionBg }]}
-                  onPress={() => handleReaction(ecencyChatService.emojiNameToChar(emojiName))}
-                >
-                  <Text style={styles.reactionEmoji}>
-                    {ecencyChatService.emojiNameToChar(emojiName)}
-                  </Text>
-                  <Text style={[styles.reactionCount, { color: colors.textSecondary }]}>
-                    {userIds.length}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+          {message.metadata?.reactions && Object.keys(message.metadata.reactions).length > 0 && (() => {
+            // Transform reactions from indexed object to grouped by emoji
+            // API returns: { "0": {emoji_name, user_id}, "1": {emoji_name, user_id}, ... }
+            // We need: { "fire": ["user1", "user2"], "laughing": ["user3"], ... }
+            const reactionsByEmoji: Record<string, string[]> = {};
+            
+            Object.values(message.metadata.reactions).forEach((reaction: any) => {
+              if (reaction && reaction.emoji_name) {
+                const emojiName = reaction.emoji_name;
+                if (!reactionsByEmoji[emojiName]) {
+                  reactionsByEmoji[emojiName] = [];
+                }
+                if (reaction.user_id && !reactionsByEmoji[emojiName].includes(reaction.user_id)) {
+                  reactionsByEmoji[emojiName].push(reaction.user_id);
+                }
+              }
+            });
+            
+            const emojiEntries = Object.entries(reactionsByEmoji);
+            if (emojiEntries.length === 0) return null;
+            
+            return (
+              <View style={styles.reactionsContainer}>
+                {emojiEntries.map(([emojiName, userIds]) => (
+                  <TouchableOpacity
+                    key={emojiName}
+                    style={[styles.reactionChip, { backgroundColor: colors.reactionBg }]}
+                    onPress={() => handleReaction(ecencyChatService.emojiNameToChar(emojiName))}
+                  >
+                    <Text style={styles.reactionEmoji}>
+                      {ecencyChatService.emojiNameToChar(emojiName)}
+                    </Text>
+                    <Text style={[styles.reactionCount, { color: colors.textSecondary }]}>
+                      {userIds.length}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            );
+          })()}
         </View>
 
         {/* Quick reaction buttons - only show when message is selected */}
@@ -230,7 +252,8 @@ const DMChannelItem: React.FC<{
   onPress: () => void;
   isDark: boolean;
   styles: ReturnType<typeof createChatScreenStyles>;
-}> = ({ channel, onPress, isDark, styles }) => {
+  unreadCount?: number;
+}> = ({ channel, onPress, isDark, styles, unreadCount = 0 }) => {
   const colors = getChatColors(isDark);
   // Clean username - remove leading @ if present
   const rawUsername = channel.dm_partner?.username || channel.display_name;
@@ -251,12 +274,12 @@ const DMChannelItem: React.FC<{
         <Text style={[styles.dmUsername, { color: colors.text }]}>
           @{partnerUsername}
         </Text>
-        {channel.unread_count && channel.unread_count > 0 && (
-          <View style={[styles.dmBadge, { backgroundColor: colors.badge }]}>
-            <Text style={styles.dmBadgeText}>{channel.unread_count}</Text>
-          </View>
-        )}
       </View>
+      {unreadCount > 0 && (
+        <View style={[styles.dmBadge, { backgroundColor: colors.badge }]}>
+          <Text style={styles.dmBadgeText}>{unreadCount}</Text>
+        </View>
+      )}
       <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
     </TouchableOpacity>
   );
@@ -293,6 +316,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ username, onClose }) => 
     messagesLoading,
     communityUnread,
     dmsUnread,
+    channelUnreads,
     activeTab,
     setActiveTab,
     selectChannel,
@@ -406,20 +430,20 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ username, onClose }) => 
   // Render DM channel
   const renderDMChannel = useCallback(
     ({ item }: { item: EcencyChatChannel }) => {
-      console.log('[ChatScreen] Rendering DM channel:', item.id, item.display_name, item.type);
+      const unreadCount = channelUnreads[item.id] || 0;
       return (
         <DMChannelItem
           channel={item}
           onPress={() => {
-            console.log('[ChatScreen] DM channel tapped:', item.id, item.type);
             selectChannel(item);
           }}
           isDark={isDark}
           styles={styles}
+          unreadCount={unreadCount}
         />
       );
     },
-    [isDark, selectChannel, styles]
+    [isDark, selectChannel, styles, channelUnreads]
   );
 
   // Loading state
@@ -508,30 +532,35 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ username, onClose }) => 
       >
         {activeTab === 'community' || (activeTab === 'dms' && selectedChannel?.type === 'D') ? (
           <>
-            {/* Messages - inverted list so newest at bottom */}
-            <FlatList
-              ref={flatListRef}
-              data={[...messages].reverse()}
-              renderItem={renderMessage}
-              keyExtractor={(item) => item.id}
-              style={styles.messageList}
-              contentContainerStyle={styles.messageListContent}
-              inverted={true}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={handleRefresh}
-                  tintColor={colors.accent}
+            {/* Show loading overlay when switching channels */}
+            {messagesLoading && messages.length === 0 ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator
+                  size="large"
+                  color={colors.accent}
                 />
-              }
-              ListEmptyComponent={
-                messagesLoading ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={colors.accent}
-                    style={styles.messagesLoading}
+                <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+                  Loading messages...
+                </Text>
+              </View>
+            ) : (
+              /* Messages - inverted list so newest at bottom */
+              <FlatList
+                ref={flatListRef}
+                data={[...messages].reverse()}
+                renderItem={renderMessage}
+                keyExtractor={(item) => item.id}
+                style={styles.messageList}
+                contentContainerStyle={styles.messageListContent}
+                inverted={true}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={handleRefresh}
+                    tintColor={colors.accent}
                   />
-                ) : (
+                }
+                ListEmptyComponent={
                   <View style={styles.emptyMessages}>
                     <Ionicons
                       name="chatbubbles-outline"
@@ -542,9 +571,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ username, onClose }) => 
                       No messages yet
                     </Text>
                   </View>
-                )
-              }
-            />
+                }
+              />
+            )}
 
             {/* Input */}
             <View style={[styles.inputContainer, { backgroundColor: colors.headerBg }]}>

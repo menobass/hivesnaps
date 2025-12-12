@@ -45,6 +45,7 @@ export interface UseEcencyChatResult {
   totalUnread: number;
   communityUnread: number;
   dmsUnread: number;
+  channelUnreads: Record<string, number>;  // Per-channel unread counts by channelId
   
   // UI state
   activeTab: ChatTab['id'];
@@ -113,6 +114,7 @@ export const useEcencyChat = (
   const [totalUnread, setTotalUnread] = useState(0);
   const [communityUnread, setCommunityUnread] = useState(0);
   const [dmsUnread, setDmsUnread] = useState(0);
+  const [channelUnreads, setChannelUnreads] = useState<Record<string, number>>({});
   
   // UI state
   const [activeTab, setActiveTab] = useState<ChatTab['id']>('community');
@@ -166,6 +168,15 @@ export const useEcencyChat = (
         setTotalUnread(unreads.totalUnread);
         setCommunityUnread(unreads.totalUnread - unreads.totalDMs);
         setDmsUnread(unreads.totalDMs);
+        
+        // Build per-channel unread map
+        const perChannelUnreads: Record<string, number> = {};
+        if (unreads.channels && Array.isArray(unreads.channels)) {
+          for (const ch of unreads.channels) {
+            perChannelUnreads[ch.channelId] = ch.message_count || 0;
+          }
+        }
+        setChannelUnreads(perChannelUnreads);
         
         // Auto-select Snapie community channel specifically (using ID from bootstrap)
         const snapieChannel = channelsList.find(c => c.id === snapieId);
@@ -242,12 +253,17 @@ export const useEcencyChat = (
   // --------------------------------------------------------------------------
 
   const selectChannel = useCallback((channel: EcencyChatChannel | null) => {
-    setSelectedChannel(channel);
+    // Clear messages FIRST and set loading state BEFORE changing channel
+    // This prevents showing stale messages from the previous channel
     setMessages([]);
+    setMessagesLoading(true);
+    setSelectedChannel(channel);
     
     if (channel?.id) {
       // Load messages for the selected channel
       loadMessages(channel.id);
+    } else {
+      setMessagesLoading(false);
     }
   }, [loadMessages]);
 
@@ -263,6 +279,15 @@ export const useEcencyChat = (
       setTotalUnread(unreads.totalUnread);
       setCommunityUnread(unreads.totalUnread - unreads.totalDMs);
       setDmsUnread(unreads.totalDMs);
+      
+      // Build per-channel unread map
+      const perChannelUnreads: Record<string, number> = {};
+      if (unreads.channels && Array.isArray(unreads.channels)) {
+        for (const ch of unreads.channels) {
+          perChannelUnreads[ch.channelId] = ch.message_count || 0;
+        }
+      }
+      setChannelUnreads(perChannelUnreads);
     } catch (error) {
       console.error('[useEcencyChat] Refresh channels error:', error);
     }
@@ -402,11 +427,20 @@ export const useEcencyChat = (
       // Calculate community unreads (total - DMs)
       const commUnread = totalUnread - dmUnread;
       
+      // Build per-channel unread map
+      const perChannelUnreads: Record<string, number> = {};
+      if (unreads.channels && Array.isArray(unreads.channels)) {
+        for (const ch of unreads.channels) {
+          perChannelUnreads[ch.channelId] = ch.message_count || 0;
+        }
+      }
+      
       console.log(`[useEcencyChat] Unreads - DMs: ${dmUnread}, Community: ${commUnread}, Total: ${totalUnread}`);
       
       setTotalUnread(totalUnread);
       setCommunityUnread(commUnread);
       setDmsUnread(dmUnread);
+      setChannelUnreads(perChannelUnreads);
       
       // If chat is open and we have a selected channel, refresh messages
       if (isChatOpen && selectedChannel) {
@@ -511,6 +545,7 @@ export const useEcencyChat = (
     totalUnread,
     communityUnread,
     dmsUnread,
+    channelUnreads,
     
     // UI state
     activeTab,

@@ -302,15 +302,14 @@ export const createChatScreenStyles = () => {
     dmInfo: {
       flex: 1,
       marginLeft: 12,
-      flexDirection: 'row',
-      alignItems: 'center',
+      justifyContent: 'center',
     },
     dmUsername: {
       fontSize: 16,
       fontWeight: '500',
     },
     dmBadge: {
-      marginLeft: 8,
+      marginRight: 8,
       minWidth: 20,
       height: 20,
       borderRadius: 10,
