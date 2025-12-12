@@ -4,12 +4,10 @@
  * Can be dragged around the screen, positioned above the FAB by default
  */
 
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
-  TouchableOpacity,
   useWindowDimensions,
   useColorScheme,
 } from 'react-native';
@@ -22,6 +20,16 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+
+import {
+  createChatBubbleStyles,
+  getChatColors,
+  CHAT_BUBBLE_SIZE,
+  CHAT_EDGE_PADDING,
+  CHAT_FAB_SIZE,
+  CHAT_FAB_BOTTOM_OFFSET,
+  CHAT_GAP_ABOVE_FAB,
+} from '../../../styles/ChatStyles';
 
 // ============================================================================
 // Types
@@ -42,19 +50,11 @@ interface ChatBubbleProps {
 // Constants
 // ============================================================================
 
-const BUBBLE_SIZE = 52;
-const BADGE_SIZE = 20;
 const SPRING_CONFIG = {
   damping: 15,
   stiffness: 150,
   mass: 0.5,
 };
-
-// Spacing from edges and other elements
-const EDGE_PADDING = 16;
-const FAB_SIZE = 56;
-const FAB_BOTTOM_OFFSET = 24; // From FeedScreen FAB positioning
-const GAP_ABOVE_FAB = 12;
 
 // ============================================================================
 // Component
@@ -71,9 +71,13 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
   const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
+  // Memoize styles and colors
+  const styles = useMemo(() => createChatBubbleStyles(), []);
+  const colors = useMemo(() => getChatColors(isDark), [isDark]);
+
   // Calculate initial position (above the FAB)
-  const initialX = screenWidth - EDGE_PADDING - BUBBLE_SIZE;
-  const initialY = screenHeight - insets.bottom - FAB_BOTTOM_OFFSET - FAB_SIZE - GAP_ABOVE_FAB - BUBBLE_SIZE;
+  const initialX = screenWidth - CHAT_EDGE_PADDING - CHAT_BUBBLE_SIZE;
+  const initialY = screenHeight - insets.bottom - CHAT_FAB_BOTTOM_OFFSET - CHAT_FAB_SIZE - CHAT_GAP_ABOVE_FAB - CHAT_BUBBLE_SIZE;
 
   // Animated values for position
   const translateX = useSharedValue(initialX);
@@ -85,10 +89,10 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
   const contextY = useSharedValue(0);
 
   // Bounds for keeping bubble on screen
-  const minX = EDGE_PADDING;
-  const maxX = screenWidth - EDGE_PADDING - BUBBLE_SIZE;
-  const minY = insets.top + EDGE_PADDING;
-  const maxY = screenHeight - insets.bottom - EDGE_PADDING - BUBBLE_SIZE;
+  const minX = CHAT_EDGE_PADDING;
+  const maxX = screenWidth - CHAT_EDGE_PADDING - CHAT_BUBBLE_SIZE;
+  const minY = insets.top + CHAT_EDGE_PADDING;
+  const maxY = screenHeight - insets.bottom - CHAT_EDGE_PADDING - CHAT_BUBBLE_SIZE;
 
   // Snap to nearest edge when drag ends
   const snapToEdge = useCallback(() => {
@@ -148,15 +152,6 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
     return null;
   }
 
-  // Colors based on theme
-  const colors = {
-    bubble: isDark ? '#1DA1F2' : '#1DA1F2',
-    bubbleShadow: isDark ? '#000' : '#1DA1F2',
-    icon: '#FFFFFF',
-    badge: '#FF3B30',
-    badgeText: '#FFFFFF',
-  };
-
   return (
     <GestureDetector gesture={composedGesture}>
       <Animated.View style={[styles.container, animatedStyle]}>
@@ -169,7 +164,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
             },
           ]}
         >
-          <Ionicons name="chatbubble-ellipses" size={24} color={colors.icon} />
+          <Ionicons name="chatbubble-ellipses" size={24} color={colors.bubbleIcon} />
           
           {/* Unread badge */}
           {unreadCount > 0 && (
@@ -184,44 +179,5 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
     </GestureDetector>
   );
 };
-
-// ============================================================================
-// Styles
-// ============================================================================
-
-const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    zIndex: 1000,
-  },
-  bubble: {
-    width: BUBBLE_SIZE,
-    height: BUBBLE_SIZE,
-    borderRadius: BUBBLE_SIZE / 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    minWidth: BADGE_SIZE,
-    height: BADGE_SIZE,
-    borderRadius: BADGE_SIZE / 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-});
 
 export default ChatBubble;

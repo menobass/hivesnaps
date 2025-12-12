@@ -7,11 +7,10 @@
  * - DM channel list
  */
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   TextInput,
   FlatList,
@@ -40,6 +39,7 @@ import {
   ecencyChatService,
 } from '../../../services/ecencyChatService';
 import { AvatarService } from '../../../services/AvatarService';
+import { createChatScreenStyles, getChatColors } from '../../../styles/ChatStyles';
 
 // ============================================================================
 // Types
@@ -65,8 +65,9 @@ const ChatTabBar: React.FC<{
   communityUnread: number;
   dmsUnread: number;
   isDark: boolean;
-}> = ({ activeTab, onTabChange, communityUnread, dmsUnread, isDark }) => {
-  const colors = getColors(isDark);
+  styles: ReturnType<typeof createChatScreenStyles>;
+}> = ({ activeTab, onTabChange, communityUnread, dmsUnread, isDark, styles }) => {
+  const colors = getChatColors(isDark);
 
   return (
     <View style={[styles.tabBar, { backgroundColor: colors.headerBg }]}>
@@ -113,8 +114,9 @@ const MessageBubble: React.FC<{
   isOwnMessage: boolean;
   isDark: boolean;
   onReaction: (emoji: string) => void;
-}> = ({ message, isOwnMessage, isDark, onReaction }) => {
-  const colors = getColors(isDark);
+  styles: ReturnType<typeof createChatScreenStyles>;
+}> = ({ message, isOwnMessage, isDark, onReaction, styles }) => {
+  const colors = getChatColors(isDark);
   const avatarUrl = AvatarService.imagesAvatarUrl(message.username || '');
   const formattedTime = ecencyChatService.formatMessageTime(message.create_at);
 
@@ -211,8 +213,9 @@ const DMChannelItem: React.FC<{
   channel: EcencyChatChannel;
   onPress: () => void;
   isDark: boolean;
-}> = ({ channel, onPress, isDark }) => {
-  const colors = getColors(isDark);
+  styles: ReturnType<typeof createChatScreenStyles>;
+}> = ({ channel, onPress, isDark, styles }) => {
+  const colors = getChatColors(isDark);
   const partnerUsername = channel.dm_partner?.username || channel.display_name;
   const avatarUrl = AvatarService.imagesAvatarUrl(partnerUsername);
 
@@ -248,8 +251,11 @@ const DMChannelItem: React.FC<{
 export const ChatScreen: React.FC<ChatScreenProps> = ({ username, onClose }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const colors = getColors(isDark);
   const insets = useSafeAreaInsets();
+
+  // Memoize styles and colors
+  const styles = useMemo(() => createChatScreenStyles(), []);
+  const colors = useMemo(() => getChatColors(isDark), [isDark]);
 
   const [messageInput, setMessageInput] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -341,10 +347,11 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ username, onClose }) => 
           isOwnMessage={isOwnMessage}
           isDark={isDark}
           onReaction={(emoji) => handleReaction(item.id, emoji)}
+          styles={styles}
         />
       );
     },
-    [username, isDark, handleReaction]
+    [username, isDark, handleReaction, styles]
   );
 
   // Render DM channel
@@ -354,9 +361,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ username, onClose }) => 
         channel={item}
         onPress={() => selectChannel(item)}
         isDark={isDark}
+        styles={styles}
       />
     ),
-    [isDark, selectChannel]
+    [isDark, selectChannel, styles]
   );
 
   // Loading state
@@ -434,6 +442,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ username, onClose }) => 
         communityUnread={communityUnread}
         dmsUnread={dmsUnread}
         isDark={isDark}
+        styles={styles}
       />
 
       {/* Content */}
@@ -555,299 +564,5 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ username, onClose }) => 
     </SafeAreaView>
   );
 };
-
-// ============================================================================
-// Colors Helper
-// ============================================================================
-
-const getColors = (isDark: boolean) => ({
-  background: isDark ? '#000000' : '#FFFFFF',
-  headerBg: isDark ? '#1C1C1E' : '#F5F5F5',
-  cardBg: isDark ? '#1C1C1E' : '#FFFFFF',
-  text: isDark ? '#FFFFFF' : '#000000',
-  textSecondary: isDark ? '#8E8E93' : '#6B7280',
-  accent: '#1DA1F2',
-  badge: '#FF3B30',
-  messageBg: isDark ? '#2C2C2E' : '#E5E5EA',
-  inputBg: isDark ? '#2C2C2E' : '#FFFFFF',
-  reactionBg: isDark ? '#3A3A3C' : '#F0F0F0',
-});
-
-// ============================================================================
-// Styles
-// ============================================================================
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  errorText: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 12,
-  },
-  errorDetail: {
-    fontSize: 14,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  retryButton: {
-    marginTop: 24,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  closeButton: {
-    padding: 4,
-    width: 44,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  headerSpacer: {
-    width: 44,
-  },
-  backButton: {
-    padding: 4,
-    width: 44,
-  },
-  backText: {
-    fontSize: 16,
-  },
-
-  // Tab Bar
-  tabBar: {
-    flexDirection: 'row',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(128, 128, 128, 0.3)',
-  },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-  },
-  tabText: {
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  tabBadge: {
-    marginLeft: 6,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  tabBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-
-  // Content
-  content: {
-    flex: 1,
-  },
-
-  // Message List
-  messageList: {
-    flex: 1,
-  },
-  messageListContent: {
-    padding: 12,
-  },
-  messagesLoading: {
-    marginTop: 24,
-  },
-  emptyMessages: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 48,
-  },
-  emptyText: {
-    fontSize: 16,
-    marginTop: 12,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    marginTop: 4,
-  },
-
-  // Message Bubble
-  messageBubbleContainer: {
-    flexDirection: 'row',
-    marginVertical: 4,
-  },
-  ownMessageContainer: {
-    justifyContent: 'flex-end',
-  },
-  otherMessageContainer: {
-    justifyContent: 'flex-start',
-  },
-  messageAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    marginRight: 8,
-  },
-  messageContent: {
-    maxWidth: '75%',
-  },
-  messageUsername: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  messageBubble: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-  },
-  messageText: {
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  messageFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  messageTime: {
-    fontSize: 11,
-  },
-  reactionsContainer: {
-    flexDirection: 'row',
-    marginLeft: 8,
-  },
-  reactionChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
-    marginRight: 4,
-  },
-  reactionEmoji: {
-    fontSize: 12,
-  },
-  reactionCount: {
-    fontSize: 11,
-    marginLeft: 2,
-  },
-  quickReactions: {
-    flexDirection: 'row',
-    marginTop: 4,
-    opacity: 0.6,
-  },
-  quickReactionBtn: {
-    padding: 4,
-  },
-  quickReactionEmoji: {
-    fontSize: 14,
-  },
-
-  // Input
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    padding: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(128, 128, 128, 0.3)',
-  },
-  input: {
-    flex: 1,
-    minHeight: 40,
-    maxHeight: 100,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    fontSize: 15,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-
-  // DM List
-  dmList: {
-    flex: 1,
-  },
-  dmListContent: {
-    padding: 12,
-  },
-  dmChannelItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  dmAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-  },
-  dmInfo: {
-    flex: 1,
-    marginLeft: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  dmUsername: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  dmBadge: {
-    marginLeft: 8,
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-  },
-  dmBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-});
 
 export default ChatScreen;
