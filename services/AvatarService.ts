@@ -301,4 +301,6 @@ class AvatarService {
 
 // Export singleton instance
 export const avatarService = AvatarService.getInstance();
+// Export class for static method access
+export { AvatarService };
 export type { AvatarLoadResult };
