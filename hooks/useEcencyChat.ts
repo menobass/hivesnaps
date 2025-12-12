@@ -404,14 +404,11 @@ export const useEcencyChat = (
 
   const poll = useCallback(async () => {
     if (!isInitialized) {
-      console.log('[useEcencyChat] Poll skipped - not initialized');
       return;
     }
     
     const now = Date.now();
     lastPollTime.current = now;
-    
-    console.log('[useEcencyChat] Polling for unreads...');
     
     try {
       // Refresh unread counts (lightweight)
@@ -435,8 +432,6 @@ export const useEcencyChat = (
         }
       }
       
-      console.log(`[useEcencyChat] Unreads - DMs: ${dmUnread}, Community: ${commUnread}, Total: ${totalUnread}`);
-      
       setTotalUnread(totalUnread);
       setCommunityUnread(commUnread);
       setDmsUnread(dmUnread);
@@ -447,7 +442,9 @@ export const useEcencyChat = (
         await refreshMessages();
       }
     } catch (error) {
-      console.log('[useEcencyChat] Poll error:', error);
+      if (__DEV__) {
+        console.log('[useEcencyChat] Poll error:', error);
+      }
     }
   }, [isInitialized, isChatOpen, selectedChannel, refreshMessages]);
 

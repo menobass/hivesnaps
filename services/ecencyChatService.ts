@@ -424,16 +424,14 @@ class EcencyChatServiceImpl {
    */
   async getUnreadCounts(): Promise<UnreadResponse> {
     if (!this.userId) {
-      console.log('[EcencyChatService] No userId, cannot fetch unreads');
+      if (this.DEBUG) {
+        console.log('[EcencyChatService] No userId, cannot fetch unreads');
+      }
       return { channels: [], totalMentions: 0, totalDMs: 0, totalUnread: 0 };
     }
 
     try {
       const response = await this.makeRequest<UnreadResponse>('/channels/unreads');
-      
-      if (this.DEBUG) {
-        console.log('[EcencyChatService] /channels/unreads response:', JSON.stringify(response));
-      }
       
       // Response format: { channels: [...], totalMentions, totalDMs, totalUnread }
       return {
@@ -443,7 +441,9 @@ class EcencyChatServiceImpl {
         totalUnread: response.totalUnread || 0
       };
     } catch (e) {
-      console.log('[EcencyChatService] Failed to get unreads:', e);
+      if (this.DEBUG) {
+        console.log('[EcencyChatService] Failed to get unreads:', e);
+      }
       return { channels: [], totalMentions: 0, totalDMs: 0, totalUnread: 0 };
     }
   }
