@@ -3,7 +3,6 @@
  * Export all chat-related components from a single entry point
  */
 
-export { ChatBubble } from './ChatBubble';
 export { ChatScreen } from './ChatScreen';
 // Future exports:
 // export { MessageList } from './MessageList';

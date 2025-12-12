@@ -11,7 +11,6 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import {
   View,
   Text,
-  TouchableOpacity,
   TextInput,
   FlatList,
   KeyboardAvoidingView,
@@ -21,6 +20,7 @@ import {
   RefreshControl,
   Keyboard,
 } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -113,18 +113,30 @@ const MessageBubble: React.FC<{
   message: EcencyChatMessage;
   isOwnMessage: boolean;
   isDark: boolean;
+  isSelected: boolean;
   onReaction: (emoji: string) => void;
+  onUsernamePress?: (username: string) => void;
+  onSelect: () => void;
   styles: ReturnType<typeof createChatScreenStyles>;
-}> = ({ message, isOwnMessage, isDark, onReaction, styles }) => {
+}> = ({ message, isOwnMessage, isDark, isSelected, onReaction, onUsernamePress, onSelect, styles }) => {
   const colors = getChatColors(isDark);
-  const avatarUrl = AvatarService.imagesAvatarUrl(message.username || '');
+  // Clean username - remove leading @ if present
+  const cleanUsername = (message.username || '').replace(/^@+/, '');
+  const avatarUrl = AvatarService.imagesAvatarUrl(cleanUsername);
   const formattedTime = ecencyChatService.formatMessageTime(message.create_at);
 
   // Common reaction emojis
   const reactionEmojis = ['👍', '❤️', '😂', '🔥', '👀'];
 
+  const handleReaction = (emoji: string) => {
+    onReaction(emoji);
+    onSelect(); // Close menu after selecting
+  };
+
   return (
-    <View
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={onSelect}
       style={[
         styles.messageBubbleContainer,
         isOwnMessage ? styles.ownMessageContainer : styles.otherMessageContainer,
@@ -140,9 +152,11 @@ const MessageBubble: React.FC<{
       
       <View style={styles.messageContent}>
         {!isOwnMessage && (
-          <Text style={[styles.messageUsername, { color: colors.accent }]}>
-            @{message.username}
-          </Text>
+          <TouchableOpacity onPress={() => onUsernamePress?.(cleanUsername)}>
+            <Text style={[styles.messageUsername, { color: colors.accent }]}>
+              @{cleanUsername}
+            </Text>
+          </TouchableOpacity>
         )}
         
         <View
@@ -168,14 +182,14 @@ const MessageBubble: React.FC<{
             {formattedTime}
           </Text>
           
-          {/* Existing reactions */}
+          {/* Existing reactions - always show if present */}
           {message.metadata?.reactions && Object.keys(message.metadata.reactions).length > 0 && (
             <View style={styles.reactionsContainer}>
               {Object.entries(message.metadata.reactions).map(([emojiName, userIds]) => (
                 <TouchableOpacity
                   key={emojiName}
                   style={[styles.reactionChip, { backgroundColor: colors.reactionBg }]}
-                  onPress={() => onReaction(ecencyChatService.emojiNameToChar(emojiName))}
+                  onPress={() => handleReaction(ecencyChatService.emojiNameToChar(emojiName))}
                 >
                   <Text style={styles.reactionEmoji}>
                     {ecencyChatService.emojiNameToChar(emojiName)}
@@ -189,20 +203,22 @@ const MessageBubble: React.FC<{
           )}
         </View>
 
-        {/* Quick reaction buttons (shown on long press or always for simplicity) */}
-        <View style={styles.quickReactions}>
-          {reactionEmojis.map((emoji) => (
-            <TouchableOpacity
-              key={emoji}
-              style={styles.quickReactionBtn}
-              onPress={() => onReaction(emoji)}
-            >
-              <Text style={styles.quickReactionEmoji}>{emoji}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {/* Quick reaction buttons - only show when message is selected */}
+        {isSelected && (
+          <View style={[styles.quickReactions, { backgroundColor: colors.cardBg }]}>
+            {reactionEmojis.map((emoji) => (
+              <TouchableOpacity
+                key={emoji}
+                style={styles.quickReactionBtn}
+                onPress={() => handleReaction(emoji)}
+              >
+                <Text style={styles.quickReactionEmoji}>{emoji}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -216,7 +232,9 @@ const DMChannelItem: React.FC<{
   styles: ReturnType<typeof createChatScreenStyles>;
 }> = ({ channel, onPress, isDark, styles }) => {
   const colors = getChatColors(isDark);
-  const partnerUsername = channel.dm_partner?.username || channel.display_name;
+  // Clean username - remove leading @ if present
+  const rawUsername = channel.dm_partner?.username || channel.display_name;
+  const partnerUsername = rawUsername.replace(/^@+/, '');
   const avatarUrl = AvatarService.imagesAvatarUrl(partnerUsername);
 
   return (
@@ -259,7 +277,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ username, onClose }) => 
 
   const [messageInput, setMessageInput] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
+  const hasScrolledToEnd = useRef(false);
+  const previousChannelId = useRef<string | null>(null);
 
   const {
     isInitialized,
@@ -281,7 +302,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ username, onClose }) => 
     refreshChannels,
     markAsRead,
     initialize,
-  } = useEcencyChat(username);
+    startDm,
+  } = useEcencyChat(username, true); // true = chat is open, use faster polling
 
   // Initialize on mount
   useEffect(() => {
@@ -299,10 +321,18 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ username, onClose }) => 
 
   // Mark as read when viewing messages
   useEffect(() => {
-    if (selectedChannel && messages.length > 0) {
+    if (selectedChannel?.id && messages.length > 0) {
       markAsRead();
     }
-  }, [selectedChannel, messages.length, markAsRead]);
+  }, [selectedChannel?.id, messages.length, markAsRead]);
+
+  // Reset scroll flag when channel changes
+  useEffect(() => {
+    if (selectedChannel?.id !== previousChannelId.current) {
+      hasScrolledToEnd.current = false;
+      previousChannelId.current = selectedChannel?.id || null;
+    }
+  }, [selectedChannel?.id]);
 
   // Handle refresh
   const handleRefresh = useCallback(async () => {
@@ -337,33 +367,58 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ username, onClose }) => 
     [toggleReaction]
   );
 
+  // Handle starting a DM from a username tap
+  const handleUsernamePress = useCallback(async (targetUsername: string) => {
+    // Don't start DM with yourself
+    if (targetUsername.toLowerCase() === username.toLowerCase()) {
+      return;
+    }
+    setSelectedMessageId(null); // Close reaction menu
+    await startDm(targetUsername);
+  }, [username, startDm]);
+
+  // Handle message selection (toggle reaction menu)
+  const handleMessageSelect = useCallback((messageId: string) => {
+    setSelectedMessageId(prev => prev === messageId ? null : messageId);
+  }, []);
+
   // Render message
   const renderMessage = useCallback(
     ({ item }: { item: EcencyChatMessage }) => {
-      const isOwnMessage = item.username?.toLowerCase() === username.toLowerCase();
+      const cleanItemUsername = (item.username || '').replace(/^@+/, '');
+      const isOwnMessage = cleanItemUsername.toLowerCase() === username.toLowerCase();
       return (
         <MessageBubble
           message={item}
           isOwnMessage={isOwnMessage}
           isDark={isDark}
+          isSelected={selectedMessageId === item.id}
           onReaction={(emoji) => handleReaction(item.id, emoji)}
+          onUsernamePress={handleUsernamePress}
+          onSelect={() => handleMessageSelect(item.id)}
           styles={styles}
         />
       );
     },
-    [username, isDark, handleReaction, styles]
+    [username, isDark, selectedMessageId, handleReaction, handleUsernamePress, handleMessageSelect, styles]
   );
 
   // Render DM channel
   const renderDMChannel = useCallback(
-    ({ item }: { item: EcencyChatChannel }) => (
-      <DMChannelItem
-        channel={item}
-        onPress={() => selectChannel(item)}
-        isDark={isDark}
-        styles={styles}
-      />
-    ),
+    ({ item }: { item: EcencyChatChannel }) => {
+      console.log('[ChatScreen] Rendering DM channel:', item.id, item.display_name, item.type);
+      return (
+        <DMChannelItem
+          channel={item}
+          onPress={() => {
+            console.log('[ChatScreen] DM channel tapped:', item.id, item.type);
+            selectChannel(item);
+          }}
+          isDark={isDark}
+          styles={styles}
+        />
+      );
+    },
     [isDark, selectChannel, styles]
   );
 
@@ -420,7 +475,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ username, onClose }) => 
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           {activeTab === 'dms' && selectedChannel?.type === 'D'
-            ? `@${selectedChannel.dm_partner?.username || selectedChannel.display_name}`
+            ? `@${(selectedChannel.dm_partner?.username || selectedChannel.display_name || '').replace(/^@+/, '')}`
             : 'Chat'}
         </Text>
         {activeTab === 'dms' && selectedChannel?.type === 'D' ? (
@@ -453,15 +508,15 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ username, onClose }) => 
       >
         {activeTab === 'community' || (activeTab === 'dms' && selectedChannel?.type === 'D') ? (
           <>
-            {/* Messages */}
+            {/* Messages - inverted list so newest at bottom */}
             <FlatList
               ref={flatListRef}
-              data={messages}
+              data={[...messages].reverse()}
               renderItem={renderMessage}
               keyExtractor={(item) => item.id}
               style={styles.messageList}
               contentContainerStyle={styles.messageListContent}
-              inverted={false}
+              inverted={true}
               refreshControl={
                 <RefreshControl
                   refreshing={refreshing}

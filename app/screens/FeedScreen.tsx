@@ -39,6 +39,7 @@ import { useUserProfile } from '../../hooks/useUserProfile';
 
 // Shared state management
 import { useAppStore, useCurrentUser, useAppDebug, useFollowCacheManagement } from '../../store/context';
+import { useChat } from '../../context/ChatContext';
 
 // Components
 import Snap from '../components/Snap';
@@ -251,6 +252,7 @@ const FeedScreenRefactored = () => {
   } = useSearch();
 
   const { unreadCount, refresh: refreshNotifications } = useNotifications(username || null);
+  const { openChat, dmsUnreadCount } = useChat();
 
   const [isSearchModalVisible, setIsSearchModalVisible] = useState(false);
   const [vpInfoModalVisible, setVpInfoModalVisible] = useState(false);
@@ -871,6 +873,34 @@ const FeedScreenRefactored = () => {
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <FontAwesome name='search' size={22} color={colors.icon} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.searchBtn, { marginRight: 12 }]}
+              onPress={openChat}
+              accessibilityLabel='Open chat'
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <View style={{ position: 'relative' }}>
+                <FontAwesome name='comments' size={22} color={colors.icon} />
+                {dmsUnreadCount > 0 && (
+                  <View style={{
+                    position: 'absolute',
+                    top: -6,
+                    right: -8,
+                    backgroundColor: '#FF3B30',
+                    borderRadius: 10,
+                    minWidth: 18,
+                    height: 18,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    paddingHorizontal: 4,
+                  }}>
+                    <Text style={{ color: '#FFF', fontSize: 11, fontWeight: 'bold' }}>
+                      {dmsUnreadCount > 99 ? '99+' : dmsUnreadCount}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.bellBtn}

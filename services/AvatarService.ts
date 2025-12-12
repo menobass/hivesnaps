@@ -50,9 +50,9 @@ class AvatarService {
     const u = (username || '').trim().toLowerCase();
     const url = `https://images.ecency.com/u/${u}/avatar/original`;
     // Debug: Log URL construction to catch any /large issues
-    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    /* if (typeof __DEV__ !== 'undefined' && __DEV__) {
       console.log(`[AvatarService] imagesAvatarUrl(${username}) -> ${url}`);
-    }
+    } */
     return url;
   }
 

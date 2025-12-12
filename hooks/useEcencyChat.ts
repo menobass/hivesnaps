@@ -54,8 +54,6 @@ export interface UseEcencyChatResult {
   initialize: () => Promise<boolean>;
   selectChannel: (channel: EcencyChatChannel | null) => void;
   setActiveTab: (tab: ChatTab['id']) => void;
-  openChat: () => void;
-  closeChat: () => void;
   
   // Message actions
   sendMessage: (message: string, rootId?: string) => Promise<boolean>;
@@ -84,15 +82,18 @@ const POLLING_INTERVAL_INACTIVE = 60000; // 1 minute when app is backgrounded
 const CHAT_OPEN_KEY = 'ecency_chat_open';
 
 export const CHAT_TABS: ChatTab[] = [
-  { id: 'community', label: 'Snapie' },
-  { id: 'dms', label: 'Messages' },
+  { id: 'community', label: 'Snapie Community' },
+  { id: 'dms', label: 'Private Messages' },
 ];
 
 // ============================================================================
 // Hook Implementation
 // ============================================================================
 
-export const useEcencyChat = (username: string | null): UseEcencyChatResult => {
+export const useEcencyChat = (
+  username: string | null,
+  isChatOpen: boolean = false
+): UseEcencyChatResult => {
   // Session state
   const [isInitialized, setIsInitialized] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
@@ -101,6 +102,7 @@ export const useEcencyChat = (username: string | null): UseEcencyChatResult => {
   // Channels state
   const [channels, setChannels] = useState<EcencyChatChannel[]>([]);
   const [selectedChannel, setSelectedChannel] = useState<EcencyChatChannel | null>(null);
+  const [snapieChannelId, setSnapieChannelId] = useState<string | null>(null);
   
   // Messages state
   const [messages, setMessages] = useState<EcencyChatMessage[]>([]);
@@ -114,7 +116,6 @@ export const useEcencyChat = (username: string | null): UseEcencyChatResult => {
   
   // UI state
   const [activeTab, setActiveTab] = useState<ChatTab['id']>('community');
-  const [isChatOpen, setIsChatOpen] = useState(false);
   
   // Refs for polling
   const pollingInterval = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -125,7 +126,10 @@ export const useEcencyChat = (username: string | null): UseEcencyChatResult => {
   // Derived State
   // --------------------------------------------------------------------------
 
-  const communityChannel = channels.find(c => c.type === 'O') || null;
+  // Use the specific Snapie channel ID, not just any community channel
+  const communityChannel = snapieChannelId 
+    ? channels.find(c => c.id === snapieChannelId) || null
+    : null;
   const dmChannels = channels.filter(c => c.type === 'D');
 
   // --------------------------------------------------------------------------
@@ -147,32 +151,34 @@ export const useEcencyChat = (username: string | null): UseEcencyChatResult => {
       if (result.ok) {
         setIsInitialized(true);
         
+        // Get the Snapie community channel ID from bootstrap response
+        const snapieId = result.channelId;
+        if (snapieId) {
+          setSnapieChannelId(snapieId);
+        }
+        
         // Load channels immediately after init
         const channelsList = await ecencyChatService.getChannels();
         setChannels(channelsList);
         
-        // Calculate unread counts
+        // Calculate unread counts - API returns { channels, totalMentions, totalDMs, totalUnread }
         const unreads = await ecencyChatService.getUnreadCounts();
-        setTotalUnread(unreads.total_unread);
+        setTotalUnread(unreads.totalUnread);
+        setCommunityUnread(unreads.totalUnread - unreads.totalDMs);
+        setDmsUnread(unreads.totalDMs);
         
-        // Split unread by channel type
-        let commUnread = 0;
-        let dmUnread = 0;
-        channelsList.forEach(ch => {
-          const chUnread = unreads.channels[ch.id]?.unread || 0;
-          if (ch.type === 'O') {
-            commUnread += chUnread;
-          } else {
-            dmUnread += chUnread;
+        // Auto-select Snapie community channel specifically (using ID from bootstrap)
+        const snapieChannel = channelsList.find(c => c.id === snapieId);
+        if (snapieChannel) {
+          setSelectedChannel(snapieChannel);
+          if (__DEV__) {
+            console.log('[useEcencyChat] Selected Snapie channel:', snapieId);
           }
-        });
-        setCommunityUnread(commUnread);
-        setDmsUnread(dmUnread);
-        
-        // Auto-select community channel
-        const community = channelsList.find(c => c.type === 'O');
-        if (community) {
-          setSelectedChannel(community);
+        } else {
+          // Snapie channel not in list - this shouldn't happen
+          if (__DEV__) {
+            console.warn('[useEcencyChat] Snapie channel not found in channel list:', snapieId);
+          }
         }
         
         if (__DEV__) {
@@ -208,6 +214,30 @@ export const useEcencyChat = (username: string | null): UseEcencyChatResult => {
   }, [username, isInitialized]);
 
   // --------------------------------------------------------------------------
+  // Message Operations (defined early so selectChannel can use loadMessages)
+  // --------------------------------------------------------------------------
+
+  const loadMessages = useCallback(async (channelId: string) => {
+    // Guard against undefined/null channel ID
+    if (!channelId) {
+      console.warn('[useEcencyChat] loadMessages called with no channelId');
+      return;
+    }
+    
+    setMessagesLoading(true);
+    
+    try {
+      const data = await ecencyChatService.getMessages(channelId);
+      setMessages(data.posts || []);
+      setUsersMap(data.users || {});
+    } catch (error) {
+      console.error('[useEcencyChat] Load messages error:', error);
+    } finally {
+      setMessagesLoading(false);
+    }
+  }, []);
+
+  // --------------------------------------------------------------------------
   // Channel Operations
   // --------------------------------------------------------------------------
 
@@ -215,11 +245,11 @@ export const useEcencyChat = (username: string | null): UseEcencyChatResult => {
     setSelectedChannel(channel);
     setMessages([]);
     
-    if (channel) {
+    if (channel?.id) {
       // Load messages for the selected channel
       loadMessages(channel.id);
     }
-  }, []);
+  }, [loadMessages]);
 
   const refreshChannels = useCallback(async () => {
     if (!isInitialized) return;
@@ -228,29 +258,19 @@ export const useEcencyChat = (username: string | null): UseEcencyChatResult => {
       const channelsList = await ecencyChatService.getChannels();
       setChannels(channelsList);
       
-      // Update unread counts
+      // Update unread counts - API returns { channels, totalMentions, totalDMs, totalUnread }
       const unreads = await ecencyChatService.getUnreadCounts();
-      setTotalUnread(unreads.total_unread);
-      
-      let commUnread = 0;
-      let dmUnread = 0;
-      channelsList.forEach(ch => {
-        const chUnread = unreads.channels[ch.id]?.unread || 0;
-        if (ch.type === 'O') {
-          commUnread += chUnread;
-        } else {
-          dmUnread += chUnread;
-        }
-      });
-      setCommunityUnread(commUnread);
-      setDmsUnread(dmUnread);
+      setTotalUnread(unreads.totalUnread);
+      setCommunityUnread(unreads.totalUnread - unreads.totalDMs);
+      setDmsUnread(unreads.totalDMs);
     } catch (error) {
       console.error('[useEcencyChat] Refresh channels error:', error);
     }
   }, [isInitialized]);
 
   const markAsRead = useCallback(async () => {
-    if (!selectedChannel) return;
+    // Guard against missing channel or channel ID
+    if (!selectedChannel?.id) return;
     
     try {
       await ecencyChatService.markChannelViewed(selectedChannel.id);
@@ -265,36 +285,33 @@ export const useEcencyChat = (username: string | null): UseEcencyChatResult => {
     
     try {
       const channel = await ecencyChatService.createDirectChannel(targetUsername);
+      
+      // Validate channel has required fields
+      if (!channel?.id) {
+        console.warn('[useEcencyChat] Created DM channel has no ID');
+        return null;
+      }
+      
       await refreshChannels();
       setActiveTab('dms');
       setSelectedChannel(channel);
+      
+      // Load messages for the new channel
+      loadMessages(channel.id);
+      
       return channel;
     } catch (error) {
       console.error('[useEcencyChat] Start DM error:', error);
       return null;
     }
-  }, [isInitialized, refreshChannels]);
+  }, [isInitialized, refreshChannels, loadMessages]);
 
   // --------------------------------------------------------------------------
-  // Message Operations
+  // More Message Operations
   // --------------------------------------------------------------------------
-
-  const loadMessages = useCallback(async (channelId: string) => {
-    setMessagesLoading(true);
-    
-    try {
-      const data = await ecencyChatService.getMessages(channelId);
-      setMessages(data.posts || []);
-      setUsersMap(data.users || {});
-    } catch (error) {
-      console.error('[useEcencyChat] Load messages error:', error);
-    } finally {
-      setMessagesLoading(false);
-    }
-  }, []);
 
   const refreshMessages = useCallback(async () => {
-    if (!selectedChannel) return;
+    if (!selectedChannel?.id) return;
     await loadMessages(selectedChannel.id);
   }, [selectedChannel, loadMessages]);
 
@@ -357,48 +374,46 @@ export const useEcencyChat = (username: string | null): UseEcencyChatResult => {
   }, [selectedChannel, messages, refreshMessages]);
 
   // --------------------------------------------------------------------------
-  // UI State
-  // --------------------------------------------------------------------------
-
-  const openChat = useCallback(() => {
-    setIsChatOpen(true);
-    SecureStore.setItemAsync(CHAT_OPEN_KEY, 'true');
-    
-    // Auto-initialize if needed
-    if (!isInitialized && !isInitializing && username) {
-      initialize();
-    }
-  }, [isInitialized, isInitializing, username, initialize]);
-
-  const closeChat = useCallback(() => {
-    setIsChatOpen(false);
-    SecureStore.setItemAsync(CHAT_OPEN_KEY, 'false');
-  }, []);
-
-  // --------------------------------------------------------------------------
   // Polling
   // --------------------------------------------------------------------------
 
   const poll = useCallback(async () => {
-    if (!isInitialized) return;
+    if (!isInitialized) {
+      console.log('[useEcencyChat] Poll skipped - not initialized');
+      return;
+    }
     
     const now = Date.now();
     lastPollTime.current = now;
     
+    console.log('[useEcencyChat] Polling for unreads...');
+    
     try {
       // Refresh unread counts (lightweight)
       const unreads = await ecencyChatService.getUnreadCounts();
-      setTotalUnread(unreads.total_unread);
+      
+      // API returns: { channels: [...], totalMentions, totalDMs, totalUnread }
+      // Each channel has: { channelId, type, mention_count, message_count }
+      
+      // Use the pre-calculated totals from the API
+      const dmUnread = unreads.totalDMs || 0;
+      const totalUnread = unreads.totalUnread || 0;
+      
+      // Calculate community unreads (total - DMs)
+      const commUnread = totalUnread - dmUnread;
+      
+      console.log(`[useEcencyChat] Unreads - DMs: ${dmUnread}, Community: ${commUnread}, Total: ${totalUnread}`);
+      
+      setTotalUnread(totalUnread);
+      setCommunityUnread(commUnread);
+      setDmsUnread(dmUnread);
       
       // If chat is open and we have a selected channel, refresh messages
       if (isChatOpen && selectedChannel) {
         await refreshMessages();
       }
     } catch (error) {
-      // Silently fail polls to avoid spamming errors
-      if (__DEV__) {
-        console.log('[useEcencyChat] Poll error:', error);
-      }
+      console.log('[useEcencyChat] Poll error:', error);
     }
   }, [isInitialized, isChatOpen, selectedChannel, refreshMessages]);
 
@@ -505,8 +520,6 @@ export const useEcencyChat = (username: string | null): UseEcencyChatResult => {
     initialize,
     selectChannel,
     setActiveTab,
-    openChat,
-    closeChat,
     
     // Message actions
     sendMessage,

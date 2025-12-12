@@ -85,9 +85,19 @@ export interface MessagesResponse {
   order: string[]; // Ordered post IDs
 }
 
+// Ecency API response format for /channels/unreads
+export interface UnreadChannelItem {
+  channelId: string;
+  type: 'O' | 'D';  // O = Open/community, D = Direct message
+  mention_count: number;
+  message_count: number;
+}
+
 export interface UnreadResponse {
-  total_unread: number;
-  channels: Record<string, { unread: number; mentions: number }>;
+  channels: UnreadChannelItem[];
+  totalMentions: number;
+  totalDMs: number;      // Total unread DM messages
+  totalUnread: number;   // Total unread across all channels
 }
 
 // ============================================================================
@@ -155,8 +165,10 @@ class EcencyChatServiceImpl {
     // Attach signature
     payload.signatures = [signature];
     
-    // Base64url encode
-    const token = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    // Base64url encode (RN doesn't support 'base64url', so we convert manually)
+    const base64 = Buffer.from(JSON.stringify(payload)).toString('base64');
+    // Convert to URL-safe base64: replace + with -, / with _, remove trailing =
+    const token = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     
     if (this.DEBUG) {
       console.log('[EcencyChatService] Built access token for:', username);
@@ -188,18 +200,27 @@ class EcencyChatServiceImpl {
       const cachedUserId = await SecureStore.getItemAsync(MM_USER_ID_KEY);
       const cachedChannelId = await SecureStore.getItemAsync(MM_CHANNEL_ID_KEY);
       
-      if (cachedPat && cachedUserId) {
+      if (cachedPat && cachedUserId && cachedChannelId) {
         this.mmPat = cachedPat;
         this.userId = cachedUserId;
         this.communityChannelId = cachedChannelId;
         
         // Verify session is still valid by fetching channels
         try {
-          await this.getChannels();
-          if (this.DEBUG) {
-            console.log('[EcencyChatService] Using cached session');
+          const channels = await this.getChannels();
+          // Verify the cached channel exists and is the Snapie channel
+          const snapieChannel = channels.find(c => c.id === cachedChannelId);
+          if (snapieChannel) {
+            if (this.DEBUG) {
+              console.log('[EcencyChatService] Using cached session, channelId:', cachedChannelId);
+            }
+            return { ok: true, userId: cachedUserId, channelId: cachedChannelId };
+          } else {
+            // Cached channel not found, re-bootstrap to get Snapie
+            if (this.DEBUG) {
+              console.log('[EcencyChatService] Cached channel not found in channel list, re-bootstrapping');
+            }
           }
-          return { ok: true, userId: cachedUserId, channelId: cachedChannelId || undefined };
         } catch {
           // Session expired, continue to bootstrap
           if (this.DEBUG) {
@@ -399,9 +420,32 @@ class EcencyChatServiceImpl {
 
   /**
    * Get unread counts across all channels
+   * Uses Ecency's /channels/unreads endpoint which returns counts for all channels
    */
   async getUnreadCounts(): Promise<UnreadResponse> {
-    return this.makeRequest<UnreadResponse>('/channels/unreads');
+    if (!this.userId) {
+      console.log('[EcencyChatService] No userId, cannot fetch unreads');
+      return { channels: [], totalMentions: 0, totalDMs: 0, totalUnread: 0 };
+    }
+
+    try {
+      const response = await this.makeRequest<UnreadResponse>('/channels/unreads');
+      
+      if (this.DEBUG) {
+        console.log('[EcencyChatService] /channels/unreads response:', JSON.stringify(response));
+      }
+      
+      // Response format: { channels: [...], totalMentions, totalDMs, totalUnread }
+      return {
+        channels: response.channels || [],
+        totalMentions: response.totalMentions || 0,
+        totalDMs: response.totalDMs || 0,
+        totalUnread: response.totalUnread || 0
+      };
+    } catch (e) {
+      console.log('[EcencyChatService] Failed to get unreads:', e);
+      return { channels: [], totalMentions: 0, totalDMs: 0, totalUnread: 0 };
+    }
   }
 
   /**

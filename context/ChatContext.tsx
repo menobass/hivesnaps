@@ -8,13 +8,13 @@ import React, {
   useContext,
   useState,
   useCallback,
+  useEffect,
   ReactNode,
 } from 'react';
 import { Modal, useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useEcencyChat } from '../hooks/useEcencyChat';
-import { ChatBubble } from '../app/components/chat/ChatBubble';
 import { ChatScreen } from '../app/components/chat/ChatScreen';
 import { useCurrentUser } from '../store/context';
 
@@ -31,6 +31,8 @@ interface ChatContextValue {
   closeChat: () => void;
   /** Total unread message count */
   unreadCount: number;
+  /** Unread DM count only (excludes community chat) */
+  dmsUnreadCount: number;
   /** Start a DM with a specific user */
   startDmWithUser: (username: string) => Promise<void>;
   /** Whether chat is initialized */
@@ -74,10 +76,21 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
 
   const {
     isInitialized,
+    isInitializing,
     totalUnread,
+    dmsUnread,
     initialize,
     startDm,
-  } = useEcencyChat(username);
+  } = useEcencyChat(username, isChatOpen);
+
+  // Auto-initialize chat when user is logged in
+  // This enables polling for unread counts even before opening chat
+  useEffect(() => {
+    if (username && !isInitialized && !isInitializing) {
+      console.log('[ChatProvider] Auto-initializing chat for user:', username);
+      initialize();
+    }
+  }, [username, isInitialized, isInitializing, initialize]);
 
   // Open chat screen
   const openChat = useCallback(() => {
@@ -109,6 +122,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     openChat,
     closeChat,
     unreadCount: totalUnread,
+    dmsUnreadCount: dmsUnread,
     startDmWithUser,
     isInitialized,
     initializeChat,
@@ -117,14 +131,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   return (
     <ChatContext.Provider value={value}>
       {children}
-      
-      {/* Chat Bubble - floating overlay */}
-      <ChatBubble
-        unreadCount={totalUnread}
-        onPress={openChat}
-        isLoggedIn={!!username}
-        isChatOpen={isChatOpen}
-      />
       
       {/* Chat Screen - full screen modal */}
       <Modal

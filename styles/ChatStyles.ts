@@ -8,17 +8,6 @@ import { StyleSheet, Dimensions } from 'react-native';
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 // ============================================================================
-// Constants
-// ============================================================================
-
-export const CHAT_BUBBLE_SIZE = 52;
-export const CHAT_BADGE_SIZE = 20;
-export const CHAT_EDGE_PADDING = 16;
-export const CHAT_FAB_SIZE = 56;
-export const CHAT_FAB_BOTTOM_OFFSET = 24;
-export const CHAT_GAP_ABOVE_FAB = 12;
-
-// ============================================================================
 // Color Helpers
 // ============================================================================
 
@@ -48,47 +37,6 @@ export const getChatColors = (isDark: boolean) => ({
   // Borders
   border: isDark ? 'rgba(128, 128, 128, 0.3)' : 'rgba(128, 128, 128, 0.3)',
 });
-
-// ============================================================================
-// ChatBubble Styles
-// ============================================================================
-
-export const createChatBubbleStyles = () => {
-  return StyleSheet.create({
-    container: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      zIndex: 1000,
-    },
-    bubble: {
-      width: CHAT_BUBBLE_SIZE,
-      height: CHAT_BUBBLE_SIZE,
-      borderRadius: CHAT_BUBBLE_SIZE / 2,
-      justifyContent: 'center',
-      alignItems: 'center',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
-      elevation: 8,
-    },
-    badge: {
-      position: 'absolute',
-      top: -4,
-      right: -4,
-      minWidth: CHAT_BADGE_SIZE,
-      height: CHAT_BADGE_SIZE,
-      borderRadius: CHAT_BADGE_SIZE / 2,
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: 4,
-    },
-    badgeText: {
-      fontSize: 11,
-      fontWeight: 'bold',
-    },
-  });
-};
 
 // ============================================================================
 // ChatScreen Styles
@@ -169,6 +117,8 @@ export const createChatScreenStyles = () => {
     tabBar: {
       flexDirection: 'row',
       borderBottomWidth: StyleSheet.hairlineWidth,
+      minHeight: 44,
+      width: '100%',
     },
     tab: {
       flex: 1,
@@ -176,10 +126,12 @@ export const createChatScreenStyles = () => {
       alignItems: 'center',
       justifyContent: 'center',
       paddingVertical: 12,
+      paddingHorizontal: 8,
     },
     tabText: {
-      fontSize: 15,
-      fontWeight: '500',
+      fontSize: 14,
+      fontWeight: '600',
+      textAlign: 'center',
     },
     tabBadge: {
       marginLeft: 6,
@@ -289,14 +241,18 @@ export const createChatScreenStyles = () => {
     },
     quickReactions: {
       flexDirection: 'row',
-      marginTop: 4,
-      opacity: 0.6,
+      marginTop: 6,
+      paddingVertical: 6,
+      paddingHorizontal: 8,
+      borderRadius: 16,
+      alignSelf: 'flex-start',
     },
     quickReactionBtn: {
-      padding: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
     },
     quickReactionEmoji: {
-      fontSize: 14,
+      fontSize: 18,
     },
 
     // Input
