@@ -381,9 +381,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ username, onClose }) => 
     
     const success = await sendMessage(text);
     if (success) {
-      // Scroll to bottom
+      // Scroll to bottom (offset 0 for inverted list)
       setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
       }, 100);
     }
   }, [messageInput, sendMessage]);
