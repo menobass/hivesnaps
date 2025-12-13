@@ -574,7 +574,29 @@ class EcencyChatServiceImpl {
    * Create or get a DM channel with a user
    */
   async createDirectChannel(username: string): Promise<EcencyChatChannel> {
-    return this.makeRequest<EcencyChatChannel>('/direct', 'POST', { username });
+    const response = await this.makeRequest<any>('/direct', 'POST', { username });
+    
+    if (__DEV__) {
+      console.log('[EcencyChatService] createDirectChannel response:', JSON.stringify(response, null, 2));
+    }
+    
+    // The API might return the channel directly or wrapped in a property
+    // Handle both cases
+    if (response?.id) {
+      return response as EcencyChatChannel;
+    }
+    
+    // Check if it's wrapped (e.g., { channel: {...} } or { data: {...} })
+    if (response?.channel?.id) {
+      return response.channel as EcencyChatChannel;
+    }
+    
+    if (response?.data?.id) {
+      return response.data as EcencyChatChannel;
+    }
+    
+    // Return whatever we got - the caller will validate
+    return response;
   }
 
   /**

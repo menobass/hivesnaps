@@ -24,6 +24,13 @@ export interface ChatTab {
   label: string;
 }
 
+export interface StartDmResult {
+  success: boolean;
+  channel?: EcencyChatChannel;
+  error?: string;
+  errorType?: 'not_on_chat' | 'network' | 'unknown';
+}
+
 export interface UseEcencyChatResult {
   // Session state
   isInitialized: boolean;
@@ -66,7 +73,7 @@ export interface UseEcencyChatResult {
   refreshChannels: () => Promise<void>;
   refreshMessages: () => Promise<void>;
   markAsRead: () => Promise<void>;
-  startDm: (username: string) => Promise<EcencyChatChannel | null>;
+  startDm: (username: string) => Promise<StartDmResult>;
   
   // Polling control
   startPolling: () => void;
@@ -305,8 +312,10 @@ export const useEcencyChat = (
     }
   }, [selectedChannel, refreshChannels]);
 
-  const startDm = useCallback(async (targetUsername: string): Promise<EcencyChatChannel | null> => {
-    if (!isInitialized) return null;
+  const startDm = useCallback(async (targetUsername: string): Promise<StartDmResult> => {
+    if (!isInitialized) {
+      return { success: false, error: 'Chat not initialized', errorType: 'unknown' };
+    }
     
     try {
       const channel = await ecencyChatService.createDirectChannel(targetUsername);
@@ -314,7 +323,7 @@ export const useEcencyChat = (
       // Validate channel has required fields
       if (!channel?.id) {
         console.warn('[useEcencyChat] Created DM channel has no ID');
-        return null;
+        return { success: false, error: 'Invalid channel response', errorType: 'unknown' };
       }
       
       await refreshChannels();
@@ -324,10 +333,32 @@ export const useEcencyChat = (
       // Load messages for the new channel
       loadMessages(channel.id);
       
-      return channel;
+      return { success: true, channel };
     } catch (error) {
+      // Parse error message to detect "not on Ecency chat" errors
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Check for the specific "not on Ecency chat" error - this is expected, not an error
+      if (errorMessage.includes('not on Ecency chat') || errorMessage.includes('404')) {
+        // Extract username from error message if available
+        const match = errorMessage.match(/@(\w+) is not on Ecency chat/);
+        const username = match ? match[1] : targetUsername;
+        return {
+          success: false,
+          error: `@${username} hasn't joined Ecency chat yet. They need to sign in to Ecency chat before you can message them.`,
+          errorType: 'not_on_chat',
+        };
+      }
+      
+      // Only log unexpected errors
       console.error('[useEcencyChat] Start DM error:', error);
-      return null;
+      
+      // Network or other errors
+      return {
+        success: false,
+        error: 'Failed to start conversation. Please try again.',
+        errorType: 'network',
+      };
     }
   }, [isInitialized, refreshChannels, loadMessages]);
 

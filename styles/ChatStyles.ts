@@ -322,5 +322,54 @@ export const createChatScreenStyles = () => {
       fontSize: 12,
       fontWeight: 'bold',
     },
+
+    // DM Search
+    dmListContainer: {
+      flex: 1,
+    },
+    dmSearchContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      marginHorizontal: 12,
+      marginTop: 8,
+      marginBottom: 4,
+      borderRadius: 10,
+      gap: 8,
+    },
+    dmSearchInput: {
+      flex: 1,
+      fontSize: 15,
+      paddingVertical: 4,
+    },
+
+    // Start New DM
+    startNewDmItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 12,
+      marginHorizontal: 12,
+      marginVertical: 4,
+      borderRadius: 12,
+    },
+    startNewDmIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    startNewDmInfo: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    startNewDmText: {
+      fontSize: 14,
+    },
+    startNewDmUsername: {
+      fontSize: 16,
+      fontWeight: '600',
+    },
   });
 };

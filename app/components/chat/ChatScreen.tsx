@@ -19,6 +19,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Keyboard,
+  Alert,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import {
@@ -32,6 +33,7 @@ import {
   useEcencyChat,
   CHAT_TABS,
   type ChatTab,
+  type StartDmResult,
 } from '../../../hooks/useEcencyChat';
 import {
   EcencyChatMessage,
@@ -301,6 +303,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ username, onClose }) => 
   const [messageInput, setMessageInput] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [dmSearchQuery, setDmSearchQuery] = useState('');
+  const [isStartingDm, setIsStartingDm] = useState(false);
+  const [dmError, setDmError] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const hasScrolledToEnd = useRef(false);
   const previousChannelId = useRef<string | null>(null);
@@ -405,6 +410,63 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ username, onClose }) => 
   const handleMessageSelect = useCallback((messageId: string) => {
     setSelectedMessageId(prev => prev === messageId ? null : messageId);
   }, []);
+
+  // Filter DM channels based on search query
+  const filteredDmChannels = useMemo(() => {
+    if (!dmSearchQuery.trim()) {
+      return dmChannels;
+    }
+    const query = dmSearchQuery.toLowerCase().replace(/^@/, '');
+    return dmChannels.filter(channel => {
+      const partnerName = (channel.dm_partner?.username || channel.display_name || '')
+        .toLowerCase()
+        .replace(/^@/, '');
+      return partnerName.includes(query);
+    });
+  }, [dmChannels, dmSearchQuery]);
+
+  // Check if search query matches an existing DM
+  const searchMatchesExistingDm = useMemo(() => {
+    if (!dmSearchQuery.trim()) return true;
+    const query = dmSearchQuery.toLowerCase().replace(/^@/, '');
+    return dmChannels.some(channel => {
+      const partnerName = (channel.dm_partner?.username || channel.display_name || '')
+        .toLowerCase()
+        .replace(/^@/, '');
+      return partnerName === query;
+    });
+  }, [dmChannels, dmSearchQuery]);
+
+  // Handle starting a new DM from search
+  const handleStartNewDm = useCallback(async () => {
+    const targetUsername = dmSearchQuery.trim().replace(/^@/, '');
+    if (!targetUsername || isStartingDm) return;
+    
+    setIsStartingDm(true);
+    setDmError(null); // Clear previous error
+    
+    try {
+      const result = await startDm(targetUsername);
+      if (result.success) {
+        setDmSearchQuery(''); // Clear search on success
+      } else if (result.error) {
+        // Show error to user
+        if (result.errorType === 'not_on_chat') {
+          // Show an alert for "not on chat" errors
+          Alert.alert(
+            'User Not Available',
+            result.error,
+            [{ text: 'OK', style: 'default' }]
+          );
+        } else {
+          // Show inline error for other errors
+          setDmError(result.error);
+        }
+      }
+    } finally {
+      setIsStartingDm(false);
+    }
+  }, [dmSearchQuery, isStartingDm, startDm]);
 
   // Render message
   const renderMessage = useCallback(
@@ -613,36 +675,113 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ username, onClose }) => 
             </View>
           </>
         ) : (
-          /* DM Channel List */
-          <FlatList
-            data={dmChannels}
-            renderItem={renderDMChannel}
-            keyExtractor={(item) => item.id}
-            style={styles.dmList}
-            contentContainerStyle={styles.dmListContent}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-                tintColor={colors.accent}
+          /* DM Channel List with Search */
+          <View style={styles.dmListContainer}>
+            {/* Search Bar */}
+            <View style={[styles.dmSearchContainer, { backgroundColor: colors.headerBg }]}>
+              <Ionicons name="search" size={18} color={colors.textSecondary} />
+              <TextInput
+                style={[styles.dmSearchInput, { color: colors.text }]}
+                placeholder="Search or start new conversation..."
+                placeholderTextColor={colors.textSecondary}
+                value={dmSearchQuery}
+                onChangeText={(text) => {
+                  setDmSearchQuery(text);
+                  setDmError(null); // Clear error when typing
+                }}
+                autoCapitalize="none"
+                autoCorrect={false}
               />
-            }
-            ListEmptyComponent={
-              <View style={styles.emptyMessages}>
-                <Ionicons
-                  name="people-outline"
-                  size={48}
-                  color={colors.textSecondary}
-                />
-                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                  No direct messages yet
-                </Text>
-                <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                  Start a conversation from someone's profile
+              {dmSearchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => { setDmSearchQuery(''); setDmError(null); }}>
+                  <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Inline error message */}
+            {dmError && (
+              <View style={{ paddingHorizontal: 12, paddingVertical: 8, backgroundColor: isDark ? '#3D2020' : '#FFEBEE' }}>
+                <Text style={{ color: isDark ? '#FF8A80' : '#D32F2F', fontSize: 13 }}>
+                  {dmError}
                 </Text>
               </View>
-            }
-          />
+            )}
+
+            {/* Start New DM option - show when searching for someone not in DMs */}
+            {dmSearchQuery.trim().length > 0 && !searchMatchesExistingDm && (
+              <TouchableOpacity
+                style={[styles.startNewDmItem, { backgroundColor: colors.cardBg }]}
+                onPress={handleStartNewDm}
+                disabled={isStartingDm}
+              >
+                <View style={[styles.startNewDmIcon, { backgroundColor: colors.accent }]}>
+                  {isStartingDm ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Ionicons name="add" size={24} color="#FFFFFF" />
+                  )}
+                </View>
+                <View style={styles.startNewDmInfo}>
+                  <Text style={[styles.startNewDmText, { color: colors.text }]}>
+                    Start conversation with
+                  </Text>
+                  <Text style={[styles.startNewDmUsername, { color: colors.accent }]}>
+                    @{dmSearchQuery.trim().replace(/^@/, '')}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+
+            {/* DM List */}
+            <FlatList
+              data={filteredDmChannels}
+              renderItem={renderDMChannel}
+              keyExtractor={(item) => item.id}
+              style={styles.dmList}
+              contentContainerStyle={styles.dmListContent}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  tintColor={colors.accent}
+                />
+              }
+              keyboardShouldPersistTaps="handled"
+              ListEmptyComponent={
+                dmSearchQuery.trim() ? (
+                  <View style={styles.emptyMessages}>
+                    <Ionicons
+                      name="search-outline"
+                      size={48}
+                      color={colors.textSecondary}
+                    />
+                    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                      No matching conversations
+                    </Text>
+                    <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+                      Tap above to start a new chat
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.emptyMessages}>
+                    <Ionicons
+                      name="people-outline"
+                      size={48}
+                      color={colors.textSecondary}
+                    />
+                    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                      No direct messages yet
+                    </Text>
+                    <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+                      Search for a username to start chatting
+                    </Text>
+                  </View>
+                )
+              }
+            />
+          </View>
         )}
       </KeyboardAvoidingView>
     </SafeAreaView>
