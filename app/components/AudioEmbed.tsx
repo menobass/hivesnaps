@@ -20,10 +20,9 @@ import {
 
 interface AudioEmbedProps {
   embedUrl: string;
-  isDark?: boolean;
 }
 
-const AudioEmbed: React.FC<AudioEmbedProps> = ({ embedUrl, isDark }) => {
+const AudioEmbed: React.FC<AudioEmbedProps> = ({ embedUrl }) => {
   // Ensure URL has compact mode parameters
   const compactEmbedUrl = embedUrl.includes('mode=compact') 
     ? embedUrl 

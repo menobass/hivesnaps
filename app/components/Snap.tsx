@@ -461,9 +461,9 @@ const Snap: React.FC<SnapProps> = ({
     textBody = textBody.replace(audioUrlPattern, '').trim();
     // Clean up extra whitespace
     textBody = textBody
-      .replace(/\r\n/g,'\n')
+      .replace(/\r\n/g, '\n')
       .split('\n')
-      .map(l => l.replace(/[ \t]{2,}/g,' ').replace(/ +$/,''))
+      .map(l => l.replace(/[ \t]{2,}/g, ' ').replace(/ +$/, ''))
       .join('\n');
   }
 
@@ -725,7 +725,7 @@ const Snap: React.FC<SnapProps> = ({
         {/* Audio embeds from 3Speak Audio */}
         {mediaInfo.hasAudio && mediaInfo.audioUrl && (
           <View style={{ marginBottom: 8 }}>
-            <AudioEmbed embedUrl={mediaInfo.audioUrl} isDark={isDark} />
+            <AudioEmbed embedUrl={mediaInfo.audioUrl} />
           </View>
         )}
 
