@@ -184,9 +184,9 @@ const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({
     }
   };
 
-  const handleClose = () => {
+  const handleClose = async () => {
     if (isRecording) {
-      stopRecording();
+      await stopRecording();
     }
     deleteRecording();
     setDuration(0);
