@@ -46,13 +46,14 @@ import { ContextHivePostPreviewRenderer } from '../../components/ContextHivePost
 import { convertSpoilerSyntax, SpoilerData } from '../../utils/spoilerParser';
 import SpoilerText from '../components/SpoilerText';
 import TwitterEmbed from '../components/TwitterEmbed';
+import YouTubeEmbed from '../components/YouTubeEmbed';
 import UpvoteModal from '../../components/UpvoteModal';
 import Snap from '../components/Snap';
 
 import ContentModal from '../components/ContentModal';
 
 // Custom hooks for business logic
-import { useUserAuth } from '../../hooks/useUserAuth';
+import { useCurrentUser } from '../../store/context';
 import {
   useConversationData,
   SnapData,
@@ -80,7 +81,7 @@ const ConversationScreenRefactored = () => {
   const permlink = params.permlink as string | undefined;
 
   // Custom hooks for business logic
-  const { currentUsername } = useUserAuth();
+  const currentUsername = useCurrentUser();
   // Get muted list for current user
   const { mutedList } = useMutedList(currentUsername || '');
 
@@ -802,6 +803,13 @@ const ConversationScreenRefactored = () => {
                   />
                 </Pressable>
               ))}
+            </View>
+          )}
+
+          {/* Video Content */}
+          {videoInfo && videoInfo.type === 'youtube' && (
+            <View style={{ marginBottom: 8 }}>
+              <YouTubeEmbed embedUrl={videoInfo.embedUrl} isDark={isDark} />
             </View>
           )}
 

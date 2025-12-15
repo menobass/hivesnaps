@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, ScrollView,
 import { FontAwesome } from '@expo/vector-icons';
 import { useAppColors, type AppColors } from '../../styles/colors';
 
-export type ModerationReason = 'violence' | 'harmful' | 'scam' | 'spam' | 'other';
+export type ModerationReason = 'violence' | 'harmful' | 'scam' | 'spam' | 'other' | 'child_safety';
 
 export interface ModerationRequestPayload {
   reason: ModerationReason;
@@ -21,6 +21,7 @@ interface ModerationRequestModalProps {
 //
 
 const REASONS: { key: ModerationReason; label: string }[] = [
+  { key: 'child_safety', label: '🚨 Child Safety Concern' },
   { key: 'violence', label: 'Content incites violence' },
   { key: 'harmful', label: 'Harmful Content' },
   { key: 'scam', label: 'Scam / Impersonation' },
@@ -51,7 +52,7 @@ const ModerationRequestModal: React.FC<ModerationRequestModalProps> = ({
 
   const canSubmit = useMemo(() => {
     if (!selectedReason) return false;
-    if (selectedReason === 'other') return otherDetails.trim().length > 0;
+    if (selectedReason === 'other' || selectedReason === 'child_safety') return otherDetails.trim().length > 0;
     return true;
   }, [selectedReason, otherDetails]);
 
@@ -61,7 +62,7 @@ const ModerationRequestModal: React.FC<ModerationRequestModalProps> = ({
     try {
       await onSubmit({
         reason: selectedReason,
-        details: selectedReason === 'other' ? otherDetails.trim() : undefined,
+        details: (selectedReason === 'other' || selectedReason === 'child_safety') ? otherDetails.trim() : undefined,
       });
       // Optionally close the modal here if you want
       // onClose();
@@ -93,11 +94,11 @@ const ModerationRequestModal: React.FC<ModerationRequestModalProps> = ({
                 </TouchableOpacity>
               );
             })}
-            {selectedReason === 'other' && (
+            {(selectedReason === 'other' || selectedReason === 'child_safety') && (
               <View style={{ marginTop: 8 }}>
                 <TextInput
                   style={[styles.otherInput, { color: palette.text, borderColor: palette.border }]}
-                  placeholder="Please explain in detail."
+                  placeholder={selectedReason === 'child_safety' ? "Please provide detailed information about the child safety concern." : "Please explain in detail."}
                   placeholderTextColor={palette.placeholderText}
                   multiline
                   numberOfLines={4}

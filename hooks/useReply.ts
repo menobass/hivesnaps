@@ -3,6 +3,7 @@ import { Client, PrivateKey } from '@hiveio/dhive';
 import * as SecureStore from 'expo-secure-store';
 import { uploadImageSmart } from '../utils/imageUploadService';
 import * as ImagePicker from 'expo-image-picker';
+import { convertToJPEG } from '../utils/imageConverter';
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -133,8 +134,11 @@ export const useReply = (
       if (!result.canceled && result.assets && result.assets[0]) {
         const asset = result.assets[0];
 
+        // Convert HEIC and other formats to JPEG
+        const converted = await convertToJPEG(asset.uri, 0.8);
+
         const fileToUpload = {
-          uri: asset.uri,
+          uri: converted.uri,
           name: `reply-${Date.now()}.jpg`,
           type: 'image/jpeg',
         };

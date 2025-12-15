@@ -19,7 +19,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image';
 import PostBody from '../components/PostBody';
 import { Dimensions } from 'react-native';
-import { useUserAuth } from '../../hooks/useUserAuth';
+import { useCurrentUser } from '../../store/context';
 import { useUpvote } from '../../hooks/useUpvote';
 import { useHiveData } from '../../hooks/useHiveData';
 import { useHivePostData } from '../../hooks/useHivePostData';
@@ -41,7 +41,7 @@ const HivePostScreen = () => {
   const isDark = useColorScheme() === 'dark';
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { currentUsername } = useUserAuth();
+  const currentUsername = useCurrentUser();
   const { hivePrice, globalProps, rewardFund } = useHiveData();
 
   console.log('[HivePostScreen] Component loaded with params:', {

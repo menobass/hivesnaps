@@ -20,7 +20,7 @@ HiveSnaps maintains a zero-tolerance policy for abusive, harmful, or objectionab
   - Content that violates intellectual property rights
   - Illegal activities or content promoting illegal behavior
   - Misinformation that could cause harm
-  - Content that exploits or endangers minors
+  - Content that exploits or endangers minors (see our Child Safety Standards for detailed policies)
 
 • CONTENT ENFORCEMENT:
   - Users can report inappropriate content through our in-app reporting system
@@ -84,8 +84,9 @@ We may update these Terms periodically. Continued use after changes constitutes 
 
 11. CONTACT INFORMATION
 For questions about these Terms or to report violations:
-• Email: snapieapp@protonmail.me
+• Contact: snapieapp@proton.me
 • Report content through in-app reporting features
+• Child Safety Standards: Available at https://menobass.github.io/hivesnaps/child-safety-standards.html
 
 12. GOVERNING LAW
 These Terms are governed by applicable laws. Disputes will be resolved through appropriate legal channels.
