@@ -53,7 +53,7 @@ import Snap from '../components/Snap';
 import ContentModal from '../components/ContentModal';
 
 // Custom hooks for business logic
-import { useUserAuth } from '../../hooks/useUserAuth';
+import { useCurrentUser } from '../../store/context';
 import {
   useConversationData,
   SnapData,
@@ -81,7 +81,7 @@ const ConversationScreenRefactored = () => {
   const permlink = params.permlink as string | undefined;
 
   // Custom hooks for business logic
-  const { currentUsername } = useUserAuth();
+  const currentUsername = useCurrentUser();
   // Get muted list for current user
   const { mutedList } = useMutedList(currentUsername || '');
 
