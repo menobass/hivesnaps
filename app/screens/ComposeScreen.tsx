@@ -26,12 +26,21 @@ import { FontAwesome } from '@expo/vector-icons';
 import { Client, PrivateKey } from '@hiveio/dhive';
 import { avatarService } from '../../services/AvatarService';
 import { uploadImageSmart } from '../../utils/imageUploadService';
+import { postSnapWithBeneficiaries } from '../../services/snapPostingService';
 import { useSharedContent } from '../../hooks/useSharedContent';
 import { useShare } from '../../context/ShareContext';
 import { useGifPicker } from '../../hooks/useGifPickerV2';
 import { GifPickerModal } from '../../components/GifPickerModalV2';
 import { SnapData } from '../../hooks/useConversationData';
 import Preview from '../components/Preview';
+import {
+  generateVideoThumbnail,
+  prepareLocalVideoAsset,
+  uploadVideoToThreeSpeak,
+  LocalVideoAsset,
+  VideoThumbnail,
+  VideoUploadProgress,
+} from '../../services/threeSpeakUploadService';
 import { convertToJPEG, convertMultipleToJPEG } from '../../utils/imageConverter';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -77,6 +86,19 @@ export default function ComposeScreen() {
   // GIF state for composer (array of GIF URLs)
   const [gifs, setGifs] = useState<string[]>([]);
 
+  // Video upload state
+  const [videoAsset, setVideoAsset] = useState<LocalVideoAsset | null>(null);
+  const [videoThumbnail, setVideoThumbnail] = useState<VideoThumbnail | null>(null);
+  const [videoThumbnailIpfsUrl, setVideoThumbnailIpfsUrl] = useState<string | null>(null);
+  const [videoUploadProgress, setVideoUploadProgress] = useState<VideoUploadProgress | null>(null);
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [videoUploadError, setVideoUploadError] = useState<string | null>(null);
+  const [videoAssetId, setVideoAssetId] = useState<string | null>(null);
+  const [videoUploadUrl, setVideoUploadUrl] = useState<string | null>(null);
+  const videoUploadControllerRef = useRef<AbortController | null>(null);
+  const videoCancelRequestedRef = useRef(false);
+  const thumbnailIpfsUploadPromiseRef = useRef<Promise<string | null> | null>(null);
+
   // GIF picker state - using our new professional hook
   const gifPicker = useGifPicker({
     onGifSelected: (gifUrl: string) => {
@@ -96,6 +118,14 @@ export default function ComposeScreen() {
     buttonInactive: isDark ? '#22303C' : '#E1E8ED',
     info: isDark ? '#8899A6' : '#536471',
   };
+
+  // Computed video variables
+  const videoEmbedUrl = videoAssetId || null;
+  const hasPostableContent = Boolean(text.trim() || images.length > 0 || gifs.length > 0 || videoEmbedUrl);
+  const disablePostButton = posting || videoUploading || !hasPostableContent;
+  const hasDraftContent = Boolean(
+    text.trim() || images.length > 0 || gifs.length > 0 || videoAsset || videoAssetId || videoUploading
+  );
 
   // Load user credentials and avatar
   useEffect(() => {
@@ -189,6 +219,240 @@ export default function ComposeScreen() {
       }
     }
   }, [params.resnapUrl]);
+
+  // Video upload handlers
+  const clearVideoState = () => {
+    setVideoAsset(null);
+    setVideoThumbnail(null);
+    setVideoUploadProgress(null);
+    setVideoUploadError(null);
+    setVideoAssetId(null);
+    setVideoUploadUrl(null);
+  };
+
+  const startVideoUpload = async (asset: LocalVideoAsset) => {
+    try {
+      setVideoUploading(true);
+      setVideoUploadError(null);
+      setVideoAssetId(null);
+      setVideoUploadUrl(null);
+      setVideoUploadProgress({ bytesUploaded: 0, bytesTotal: asset.sizeBytes, percentage: 0 });
+
+      const controller = new AbortController();
+      videoUploadControllerRef.current = controller;
+      videoCancelRequestedRef.current = false;
+
+      let maxPercentageSeen = 0;
+
+      const result = await uploadVideoToThreeSpeak({
+        asset,
+        metadata: {
+          owner: currentUsername || undefined,
+        },
+        signal: controller.signal,
+        onProgress: progress => {
+          // Only update if progress is moving forward (prevents backtracking)
+          if (progress.percentage >= maxPercentageSeen) {
+            maxPercentageSeen = progress.percentage;
+            setVideoUploadProgress(progress);
+          }
+        },
+      });
+
+      setVideoAssetId(result.embedUrl);
+      setVideoUploadUrl(result.uploadUrl);
+      setVideoUploadProgress({ bytesUploaded: asset.sizeBytes, bytesTotal: asset.sizeBytes, percentage: 100 });
+
+      // Wait for thumbnail IPFS upload and set on 3Speak
+      if (thumbnailIpfsUploadPromiseRef.current && result.embedUrl) {
+        try {
+          console.log('⏳ Waiting for thumbnail IPFS upload to complete...');
+          const ipfsUrl = await thumbnailIpfsUploadPromiseRef.current;
+          
+          if (ipfsUrl) {
+            console.log('✅ Thumbnail IPFS upload complete, setting on 3Speak...');
+            const { uploadThumbnailToThreeSpeak, extractPermlinkFromEmbedUrl } = await import('../../services/threeSpeakUploadService');
+            const permlink = extractPermlinkFromEmbedUrl(result.embedUrl);
+            if (permlink) {
+              await uploadThumbnailToThreeSpeak(permlink, ipfsUrl);
+              console.log('✅ Thumbnail set on 3Speak for permlink:', permlink);
+            } else {
+              console.error('❌ Could not extract permlink from embedUrl:', result.embedUrl);
+            }
+          } else {
+            console.warn('⚠️ Thumbnail IPFS upload failed, skipping 3Speak thumbnail');
+          }
+        } catch (thumbnailError) {
+          console.error('❌ Failed to set thumbnail on 3Speak:', thumbnailError);
+        }
+      } else {
+        console.warn('⚠️ No thumbnail upload in progress');
+      }
+    } catch (error: any) {
+      if (videoCancelRequestedRef.current) {
+        clearVideoState();
+      } else {
+        console.error('3Speak video upload failed:', error);
+        setVideoUploadError(error instanceof Error ? error.message : 'Failed to upload video. Please try again.');
+      }
+    } finally {
+      setVideoUploading(false);
+      videoUploadControllerRef.current = null;
+      videoCancelRequestedRef.current = false;
+    }
+  };
+
+  const handleRetryVideoUpload = () => {
+    if (!videoAsset) return;
+    startVideoUpload(videoAsset);
+  };
+
+  const handleRemoveVideo = () => {
+    if (!videoAsset && !videoAssetId) return;
+
+    Alert.alert(
+      videoUploading ? 'Cancel Upload?' : 'Remove Video?',
+      videoUploading ? 'Do you want to cancel this video upload?' : 'Remove the attached video from your snap?',
+      [
+        { text: 'Keep', style: 'cancel' },
+        {
+          text: videoUploading ? 'Cancel Upload' : 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            if (videoUploading && videoUploadControllerRef.current) {
+              videoCancelRequestedRef.current = true;
+              videoUploadControllerRef.current.abort();
+            } else {
+              clearVideoState();
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleAddVideo = async () => {
+    try {
+      if (videoUploading) {
+        Alert.alert('Video Uploading', 'Please wait for the current video upload to finish.');
+        return;
+      }
+
+      if (videoAsset || videoAssetId) {
+        Alert.alert('Video Already Attached', 'Remove the current video before adding another one.');
+        return;
+      }
+
+      let pickType: 'camera' | 'gallery' | 'cancel';
+
+      if (Platform.OS === 'ios') {
+        pickType = await new Promise(resolve => {
+          ActionSheetIOS.showActionSheetWithOptions(
+            { options: ['Cancel', 'Record Video', 'Choose from Library'], cancelButtonIndex: 0 },
+            buttonIndex => {
+              if (buttonIndex === 0) resolve('cancel');
+              else if (buttonIndex === 1) resolve('camera');
+              else resolve('gallery');
+            }
+          );
+        });
+      } else {
+        pickType = await new Promise(resolve => {
+          Alert.alert(
+            'Add Video',
+            'Choose a source',
+            [
+              { text: 'Record Video', onPress: () => resolve('camera') },
+              { text: 'Choose from Library', onPress: () => resolve('gallery') },
+              { text: 'Cancel', style: 'cancel', onPress: () => resolve('cancel') },
+            ],
+            { cancelable: true }
+          );
+        });
+      }
+
+      if (pickType === 'cancel') return;
+
+      let result: ImagePicker.ImagePickerResult;
+      if (pickType === 'camera') {
+        const currentPermission = await ImagePicker.getCameraPermissionsAsync();
+        let finalStatus = currentPermission.status;
+        if (finalStatus !== 'granted') {
+          const requestPermission = await ImagePicker.requestCameraPermissionsAsync();
+          finalStatus = requestPermission.status;
+        }
+        if (finalStatus !== 'granted') {
+          Alert.alert('Camera Permission Required', 'HiveSnaps needs camera access to record video.');
+          return;
+        }
+
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+          videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium,
+          videoMaxDuration: 120,
+        });
+      } else {
+        const currentPermission = await ImagePicker.getMediaLibraryPermissionsAsync();
+        let finalStatus = currentPermission.status;
+        if (finalStatus !== 'granted') {
+          const requestPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          finalStatus = requestPermission.status;
+        }
+        if (finalStatus !== 'granted') {
+          Alert.alert('Library Permission Required', 'HiveSnaps needs photo library access to choose a video.');
+          return;
+        }
+
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+          allowsMultipleSelection: false,
+          quality: 1,
+        });
+      }
+
+      if (!result || result.canceled || !result.assets?.length) return;
+
+      const pickedVideo = result.assets[0];
+      if (!pickedVideo?.uri) throw new Error('Unable to access selected video.');
+
+      const preparedAsset = await prepareLocalVideoAsset(pickedVideo.uri, {
+        filename: pickedVideo.fileName || `snapie-video-${Date.now()}.mp4`,
+        mimeType: pickedVideo.mimeType || 'video/mp4',
+        durationMs: typeof pickedVideo.duration === 'number' ? Math.round(pickedVideo.duration * 1000) : undefined,
+      });
+
+      setVideoAsset(preparedAsset);
+      setVideoUploadError(null);
+
+      try {
+        const thumbnailResult = await generateVideoThumbnail(pickedVideo.uri);
+        setVideoThumbnail(thumbnailResult);
+
+        // Start uploading thumbnail to IPFS in parallel with video upload
+        console.log('Starting thumbnail upload to IPFS...');
+        thumbnailIpfsUploadPromiseRef.current = (async () => {
+          try {
+            const { uploadThumbnailToIPFS } = await import('../../utils/ipfsUpload');
+            const ipfsUrl = await uploadThumbnailToIPFS(thumbnailResult.uri);
+            setVideoThumbnailIpfsUrl(ipfsUrl);
+            console.log('✅ Thumbnail uploaded to IPFS:', ipfsUrl);
+            return ipfsUrl;
+          } catch (ipfsError) {
+            console.error('❌ Failed to upload thumbnail to IPFS:', ipfsError);
+            return null;
+          }
+        })();
+      } catch (thumbnailError) {
+        console.warn('Failed to generate video thumbnail', thumbnailError);
+        setVideoThumbnail(null);
+      }
+
+      await startVideoUpload(preparedAsset);
+    } catch (error: any) {
+      console.error('Video picker error:', error);
+      Alert.alert('Video Error', error instanceof Error ? error.message : 'Failed to add video. Please try again.');
+    }
+  };
 
   const handleAddImage = async () => {
     try {
@@ -364,11 +628,18 @@ export default function ComposeScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!text.trim() && images.length === 0 && gifs.length === 0) {
-      Alert.alert(
-        'Empty Post',
-        'Please add some text, images, or GIFs before posting.'
-      );
+    if (videoUploading) {
+      Alert.alert('Video Uploading', 'Please wait for the video upload to finish.');
+      return;
+    }
+
+    if (!hasPostableContent) {
+      Alert.alert('Empty Post', 'Please add text, images, GIFs, or a video before posting.');
+      return;
+    }
+
+    if (videoAsset && !videoAssetId) {
+      Alert.alert('Video Not Ready', 'Finish uploading or remove the video before posting.');
       return;
     }
 
@@ -401,6 +672,9 @@ export default function ComposeScreen() {
           body += `\n![gif${index + 1}](${gifUrl})`;
         });
       }
+      if (videoEmbedUrl) {
+        body += `\n${videoEmbedUrl}`;
+      }
 
       // Get latest @peak.snaps post (container) - Same as FeedScreen
       const discussions = await client.database.call(
@@ -421,19 +695,22 @@ export default function ComposeScreen() {
         app: 'hivesnaps/1.0',
         tags: ['hive-178315', 'snaps'],
         image: allMedia, // Include all images and GIFs in metadata
+        video: videoEmbedUrl ? { platform: '3speak', url: videoEmbedUrl, uploadUrl: videoUploadUrl } : undefined,
         shared: hasSharedContent, // Additional flag for shared content
       });
 
-      // Post to Hive blockchain as reply to container (same as FeedScreen)
-      await client.broadcast.comment(
+      // Post to Hive blockchain as reply to container with beneficiaries if video is present
+      await postSnapWithBeneficiaries(
+        client,
         {
-          parent_author: container.author,
-          parent_permlink: container.permlink,
+          parentAuthor: container.author,
+          parentPermlink: container.permlink,
           author: currentUsername,
           permlink,
           title: '',
           body,
-          json_metadata,
+          jsonMetadata: json_metadata,
+          hasVideo: !!videoEmbedUrl, // Add beneficiaries if there's a video
         },
         postingKey
       );
@@ -442,6 +719,7 @@ export default function ComposeScreen() {
       setText('');
       setImages([]);
       setGifs([]);
+      clearVideoState();
       clearSharedContent(); // Clear any shared content
 
       Alert.alert(
@@ -469,7 +747,7 @@ export default function ComposeScreen() {
   };
 
   const handleCancel = () => {
-    if (text.trim() || images.length > 0 || gifs.length > 0) {
+    if (hasDraftContent) {
       Alert.alert(
         'Discard Post?',
         'Are you sure you want to discard this post?',
@@ -482,6 +760,12 @@ export default function ComposeScreen() {
               setText('');
               setImages([]);
               setGifs([]);
+              if (videoUploadControllerRef.current) {
+                videoCancelRequestedRef.current = true;
+                videoUploadControllerRef.current.abort();
+              }
+              clearVideoState();
+              setVideoUploading(false);
               router.back();
             },
           },
@@ -595,6 +879,9 @@ export default function ComposeScreen() {
         body += `\n![gif${index + 1}](${gifUrl})`;
       });
     }
+    if (videoEmbedUrl) {
+      body += `\n${videoEmbedUrl}`;
+    }
 
     return {
       author: currentUsername || 'preview-user',
@@ -639,17 +926,12 @@ export default function ComposeScreen() {
 
           <TouchableOpacity
             onPress={handleSubmit}
-            disabled={
-              posting ||
-              (!text.trim() && images.length === 0 && gifs.length === 0)
-            }
+            disabled={disablePostButton}
             style={[
               styles.headerButton,
               styles.postButton,
               {
-                backgroundColor:
-                  posting ||
-                  (!text.trim() && images.length === 0 && gifs.length === 0)
+                backgroundColor: disablePostButton
                     ? colors.buttonInactive
                     : colors.button,
               },
@@ -911,6 +1193,179 @@ export default function ComposeScreen() {
             </View>
           )}
 
+          {/* Video Preview */}
+          {(videoAsset || videoAssetId || videoUploading || videoUploadError) && (
+            <View style={[styles.imagesContainer, { paddingVertical: 12 }]}>
+              <View style={styles.imagesHeader}>
+                <Text style={[styles.imagesCount, { color: colors.text }]}>
+                  Video
+                </Text>
+                {!videoUploading && (
+                  <TouchableOpacity onPress={handleRemoveVideo}>
+                    <Text style={[styles.clearAllText, { color: colors.info }]}>
+                      Remove
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              
+              <View style={{
+                marginTop: 8,
+                padding: 12,
+                backgroundColor: colors.inputBg,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: videoUploadError ? '#ff3b30' : colors.inputBorder
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  {videoThumbnail ? (
+                    <Image
+                      source={{ uri: videoThumbnail.uri }}
+                      style={{
+                        width: 60,
+                        height: 60,
+                        borderRadius: 6,
+                        marginRight: 12
+                      }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={{
+                      width: 60,
+                      height: 60,
+                      borderRadius: 6,
+                      marginRight: 12,
+                      backgroundColor: colors.inputBorder,
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <FontAwesome name="video-camera" size={24} color={colors.text} />
+                    </View>
+                  )}
+                  
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{ color: colors.text, fontSize: 14, fontWeight: '500' }}
+                      numberOfLines={1}
+                    >
+                      {videoAsset?.filename || 'Video'}
+                    </Text>
+                    <View style={{ flexDirection: 'row', marginTop: 4, flexWrap: 'wrap' }}>
+                      {videoAsset?.sizeBytes && (
+                        <View style={{
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          backgroundColor: colors.inputBorder,
+                          borderRadius: 4,
+                          marginRight: 6,
+                          marginTop: 2
+                        }}>
+                          <Text style={{ color: colors.text, fontSize: 11 }}>
+                            {(videoAsset.sizeBytes / (1024 * 1024)).toFixed(1)} MB
+                          </Text>
+                        </View>
+                      )}
+                      {videoAsset?.durationMs && (
+                        <View style={{
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          backgroundColor: colors.inputBorder,
+                          borderRadius: 4,
+                          marginTop: 2
+                        }}>
+                          <Text style={{ color: colors.text, fontSize: 11 }}>
+                            {Math.floor(videoAsset.durationMs / 60000)}:{String(Math.floor((videoAsset.durationMs % 60000) / 1000)).padStart(2, '0')}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                </View>
+                
+                {videoUploading && videoUploadProgress && (
+                  <View style={{ marginTop: 12 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <Text style={{ color: colors.text, fontSize: 12 }}>
+                        Uploading...
+                      </Text>
+                      <Text style={{ color: colors.text, fontSize: 12 }}>
+                        {videoUploadProgress.percentage}%
+                      </Text>
+                    </View>
+                    <View style={{
+                      height: 4,
+                      backgroundColor: colors.inputBorder,
+                      borderRadius: 2,
+                      overflow: 'hidden'
+                    }}>
+                      <View style={{
+                        height: 4,
+                        width: `${videoUploadProgress.percentage}%`,
+                        backgroundColor: colors.button,
+                      }} />
+                    </View>
+                  </View>
+                )}
+                
+                {videoUploadError && (
+                  <View style={{ marginTop: 12 }}>
+                    <Text style={{ color: '#ff3b30', fontSize: 12, marginBottom: 8 }}>
+                      {videoUploadError}
+                    </Text>
+                    <View style={{ flexDirection: 'row' }}>
+                      <TouchableOpacity
+                        onPress={handleRetryVideoUpload}
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 6,
+                          backgroundColor: colors.button,
+                          borderRadius: 6,
+                          marginRight: 8
+                        }}
+                      >
+                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '500' }}>
+                          Retry
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={handleRemoveVideo}
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 6,
+                          backgroundColor: colors.inputBorder,
+                          borderRadius: 6
+                        }}
+                      >
+                        <Text style={{ color: colors.text, fontSize: 12, fontWeight: '500' }}>
+                          Remove
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+                
+                {videoAssetId && !videoUploading && !videoUploadError && (
+                  <View style={{ marginTop: 8 }}>
+                    <Text style={{ color: '#34c759', fontSize: 12, fontWeight: '500' }}>
+                      ✓ Video ready to post
+                    </Text>
+                  </View>
+                )}
+              </View>
+              
+              {(videoAsset || videoAssetId) && (
+                <Text style={{
+                  fontSize: 11,
+                  color: colors.text,
+                  opacity: 0.6,
+                  marginTop: 8
+                }}>
+                  One video per snap • Max 100 MB
+                </Text>
+              )}
+            </View>
+          )}
+
           {/* Action buttons */}
           <View style={styles.actions}>
             {/* Markdown formatting toolbar */}
@@ -1031,6 +1486,31 @@ export default function ComposeScreen() {
                     ]}
                   >
                     <Text style={styles.imageBadgeText}>{gifs.length}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  { backgroundColor: colors.inputBg, marginLeft: 12 },
+                ]}
+                onPress={handleAddVideo}
+                disabled={videoAsset !== null || videoAssetId !== null || videoUploading}
+              >
+                <FontAwesome
+                  name="video-camera"
+                  size={20}
+                  color={(videoAsset || videoAssetId || videoUploading) ? colors.info : colors.button}
+                />
+                {(videoAsset || videoAssetId) && (
+                  <View
+                    style={[
+                      styles.imageBadge,
+                      { backgroundColor: colors.button },
+                    ]}
+                  >
+                    <Text style={styles.imageBadgeText}>1</Text>
                   </View>
                 )}
               </TouchableOpacity>
