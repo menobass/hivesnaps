@@ -28,7 +28,7 @@ const MAX_AUDIO_FILE_BYTES = 50 * 1024 * 1024; // 50MB limit
  * we could use expo-av or similar to extract duration
  */
 export function calculateAudioDuration(durationMs: number): number {
-  return Math.ceil(durationMs / 1000);
+  return Math.round(durationMs / 1000);
 }
 
 /**
