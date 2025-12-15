@@ -41,18 +41,20 @@ export function detectMediaInBody(body: string): DetectedMedia {
   let videoPermlink: string | null = null;
   let audioPermlink: string | null = null;
 
-  // Extract video URL
+  // Extract video URL (first match only - one video per snap)
   const videoMatches = body.match(VIDEO_URL_PATTERN);
   if (videoMatches && videoMatches.length > 0) {
     videoUrl = videoMatches[0];
-    cleanBody = cleanBody.replace(videoUrl, '').trim();
+    // Remove ALL video URLs from body (only first is used, but clean up any extras)
+    cleanBody = cleanBody.replace(VIDEO_URL_PATTERN, '').trim();
   }
 
-  // Extract audio URL
+  // Extract audio URL (first match only - one audio per snap)
   const audioMatches = cleanBody.match(AUDIO_URL_PATTERN);
   if (audioMatches && audioMatches.length > 0) {
     audioUrl = audioMatches[0];
-    cleanBody = cleanBody.replace(audioUrl, '').trim();
+    // Remove ALL audio URLs from body (only first is used, but clean up any extras)
+    cleanBody = cleanBody.replace(AUDIO_URL_PATTERN, '').trim();
 
     // Extract audio permlink from URL
     audioPermlink = extractAudioPermlink(audioUrl);
