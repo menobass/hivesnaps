@@ -105,7 +105,6 @@ export default function ComposeScreen() {
   const [audioRecorderVisible, setAudioRecorderVisible] = useState(false);
   const [audioEmbedUrl, setAudioEmbedUrl] = useState<string | null>(null);
   const [audioUploading, setAudioUploading] = useState(false);
-  const [audioUploadError, setAudioUploadError] = useState<string | null>(null);
 
   // GIF picker state - using our new professional hook
   const gifPicker = useGifPicker({
@@ -631,7 +630,6 @@ export default function ComposeScreen() {
 
   const handleAudioRecorded = async (audioBlob: Blob, durationSeconds: number) => {
     setAudioUploading(true);
-    setAudioUploadError(null);
 
     try {
       if (!currentUsername) {
@@ -661,7 +659,6 @@ export default function ComposeScreen() {
       );
     } catch (error: any) {
       console.error('Error uploading audio:', error);
-      setAudioUploadError(error.message || 'Failed to upload audio');
       Alert.alert(
         'Upload Error',
         error.message || 'Failed to upload audio. Please try again.'
@@ -673,7 +670,6 @@ export default function ComposeScreen() {
 
   const handleRemoveAudio = () => {
     setAudioEmbedUrl(null);
-    setAudioUploadError(null);
   };
 
   const handleSubmit = async () => {
