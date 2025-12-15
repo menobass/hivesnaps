@@ -45,29 +45,48 @@ const AudioEmbed: React.FC<AudioEmbedProps> = ({ embedUrl }) => {
         // Inject CSS to properly size the player without clipping
         injectedJavaScript={`
           (function() {
-            // Remove all default spacing
-            document.documentElement.style.margin = '0';
-            document.documentElement.style.padding = '0';
-            document.documentElement.style.border = 'none';
+            function stylePlayers() {
+              // Remove all default spacing
+              document.documentElement.style.margin = '0';
+              document.documentElement.style.padding = '0';
+              document.documentElement.style.border = 'none';
+              
+              document.body.style.margin = '0';
+              document.body.style.padding = '0';
+              document.body.style.border = 'none';
+              
+              // Allow body to size naturally but constrain to container width
+              document.body.style.width = '100%';
+              document.body.style.display = 'flex';
+              document.body.style.alignItems = 'center';
+              document.body.style.justifyContent = 'center';
+              
+              // Find and style any player elements
+              var players = document.querySelectorAll('[id*="player"], [class*="player"], audio, .audio-player, [role="application"]');
+              players.forEach(function(el) {
+                el.style.width = '100%';
+                el.style.maxWidth = '100%';
+                el.style.margin = '0';
+                el.style.padding = '0';
+              });
+            }
             
-            document.body.style.margin = '0';
-            document.body.style.padding = '0';
-            document.body.style.border = 'none';
+            // Run on DOMContentLoaded or immediately if already loaded
+            if (document.readyState === 'loading') {
+              document.addEventListener('DOMContentLoaded', stylePlayers);
+            } else {
+              stylePlayers();
+            }
             
-            // Allow body to size naturally but constrain to container width
-            document.body.style.width = '100%';
-            document.body.style.display = 'flex';
-            document.body.style.alignItems = 'center';
-            document.body.style.justifyContent = 'center';
-            
-            // Find and style any player elements
-            const players = document.querySelectorAll('[id*="player"], [class*="player"], audio, .audio-player, [role="application"]');
-            players.forEach(el => {
-              el.style.width = '100%';
-              el.style.maxWidth = '100%';
-              el.style.margin = '0';
-              el.style.padding = '0';
+            // Observe for dynamically added player elements
+            var observer = new MutationObserver(function(mutations) {
+              mutations.forEach(function(mutation) {
+                if (mutation.addedNodes && mutation.addedNodes.length > 0) {
+                  stylePlayers();
+                }
+              });
             });
+            observer.observe(document.body, { childList: true, subtree: true });
             
             true; // Confirm script executed
           })();
