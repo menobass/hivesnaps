@@ -14,7 +14,6 @@ import {
   useColorScheme,
   ActivityIndicator,
   Alert,
-  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesome } from '@expo/vector-icons';
