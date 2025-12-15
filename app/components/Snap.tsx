@@ -688,7 +688,7 @@ const Snap: React.FC<SnapProps> = ({
       {/* Audio embeds from 3Speak Audio */}
       {mediaInfo.hasAudio && mediaInfo.audioUrl && (
         <View style={{ marginBottom: 8 }}>
-          <AudioEmbed embedUrl={mediaInfo.audioUrl} isDark={isDark} />
+          <AudioEmbed embedUrl={mediaInfo.audioUrl} />
         </View>
       )}
 
