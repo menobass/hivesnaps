@@ -106,16 +106,20 @@ function extractVideoPermlink(url: string): string | null {
 
 /**
  * Check if body contains video embed
+ * Note: Creates new RegExp to avoid lastIndex state issues with global flag
  */
 export function hasVideoEmbed(body: string): boolean {
-  return VIDEO_URL_PATTERN.test(body);
+  const pattern = /https?:\/\/(play\.)?3speak\.(tv|online)\/[^\s]+/i;
+  return pattern.test(body);
 }
 
 /**
  * Check if body contains audio embed
+ * Note: Creates new RegExp to avoid lastIndex state issues with global flag
  */
 export function hasAudioEmbed(body: string): boolean {
-  return AUDIO_URL_PATTERN.test(body);
+  const pattern = /https?:\/\/audio\.3speak\.tv\/play\?[^\s]+/i;
+  return pattern.test(body);
 }
 
 /**
