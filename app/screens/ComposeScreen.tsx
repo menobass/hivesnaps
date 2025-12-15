@@ -41,6 +41,7 @@ import {
   VideoThumbnail,
   VideoUploadProgress,
 } from '../../services/threeSpeakUploadService';
+import { convertToJPEG, convertMultipleToJPEG } from '../../utils/imageConverter';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -562,9 +563,15 @@ export default function ComposeScreen() {
 
       setUploading(true);
       try {
-        const uploadPromises = result.assets.map(async (asset, index) => {
+        // Convert all HEIC and other formats to JPEG in parallel
+        const convertedImages = await convertMultipleToJPEG(
+          result.assets.map(asset => asset.uri),
+          0.8
+        );
+        
+        const uploadPromises = convertedImages.map(async (converted, index) => {
           const fileToUpload = {
-            uri: asset.uri,
+            uri: converted.uri,
             name: `compose-${Date.now()}-${index}.jpg`,
             type: 'image/jpeg',
           };
