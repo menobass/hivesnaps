@@ -153,14 +153,28 @@ export async function uploadAudioTo3Speak(
     }
 
     const result = await response.json();
+    
+    // Validate required fields in response
+    if (!result.permlink || !result.playUrl) {
+      console.error('[Audio Upload] Invalid response - missing required fields:', result);
+      return {
+        success: false,
+        permlink: '',
+        cid: '',
+        playUrl: '',
+        apiUrl: '',
+        error: 'Invalid response from server - missing required fields',
+      };
+    }
+    
     console.log('[Audio Upload] Success! Permlink:', result.permlink);
 
     return {
       success: true,
       permlink: result.permlink,
-      cid: result.cid,
+      cid: result.cid || '',
       playUrl: result.playUrl,
-      apiUrl: result.apiUrl,
+      apiUrl: result.apiUrl || '',
     };
   } catch (error: any) {
     console.error('[Audio Upload] Error:', error.message);
