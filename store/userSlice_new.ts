@@ -26,15 +26,18 @@ export const initialUserState: UserState = {
   profiles: {},
   followingLists: {},
   followerLists: {},
+  mutedLists: {},
   loading: {
     profile: {},
     following: {},
     followers: {},
+    muted: {},
   },
   errors: {
     profile: {},
     following: {},
     followers: {},
+    muted: {},
   },
 };
 
