@@ -28,6 +28,8 @@ import { avatarService } from '../../services/AvatarService';
 import { uploadImageSmart } from '../../utils/imageUploadService';
 import { postSnapWithBeneficiaries } from '../../services/snapPostingService';
 import { useSharedContent } from '../../hooks/useSharedContent';
+import { uploadThumbnailToThreeSpeak, extractPermlinkFromEmbedUrl } from '../../services/threeSpeakUploadService';
+import { uploadThumbnailToIPFS } from '../../utils/ipfsUpload';
 import { useShare } from '../../context/ShareContext';
 import { useGifPicker } from '../../hooks/useGifPickerV2';
 import { GifPickerModal } from '../../components/GifPickerModalV2';
@@ -271,7 +273,6 @@ export default function ComposeScreen() {
           
           if (ipfsUrl) {
             console.log('✅ Thumbnail IPFS upload complete, setting on 3Speak...');
-            const { uploadThumbnailToThreeSpeak, extractPermlinkFromEmbedUrl } = await import('../../services/threeSpeakUploadService');
             const permlink = extractPermlinkFromEmbedUrl(result.embedUrl);
             if (permlink) {
               await uploadThumbnailToThreeSpeak(permlink, ipfsUrl);
@@ -432,7 +433,6 @@ export default function ComposeScreen() {
         console.log('Starting thumbnail upload to IPFS...');
         thumbnailIpfsUploadPromiseRef.current = (async () => {
           try {
-            const { uploadThumbnailToIPFS } = await import('../../utils/ipfsUpload');
             const ipfsUrl = await uploadThumbnailToIPFS(thumbnailResult.uri);
             setVideoThumbnailIpfsUrl(ipfsUrl);
             console.log('✅ Thumbnail uploaded to IPFS:', ipfsUrl);
