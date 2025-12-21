@@ -13,5 +13,9 @@
     "expo-env.d.ts",
     "**/*",
     "images.d.ts"
+  ],
+  "exclude": [
+    "**/*_old.*",
+    "store/*_old.*"
   ]
 }

@@ -6,7 +6,7 @@ interface UseAvatarResult {
   loading: boolean;
   error: boolean;
   fromCache: boolean;
-  source: 'metadata' | 'hive-images' | 'fallback';
+  source: 'metadata' | 'ecency-images' | 'fallback';
   refresh: () => Promise<void>;
 }
 
@@ -18,7 +18,7 @@ export function useAvatar(username: string | null | undefined): UseAvatarResult 
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<boolean>(false);
   const [fromCache, setFromCache] = useState<boolean>(false);
-  const [source, setSource] = useState<'metadata' | 'hive-images' | 'fallback'>('fallback');
+  const [source, setSource] = useState<'metadata' | 'ecency-images' | 'fallback'>('fallback');
   const mountedRef = useRef(true);
 
   const loadAvatar = useCallback(async () => {
