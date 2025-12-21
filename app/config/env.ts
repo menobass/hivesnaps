@@ -24,10 +24,5 @@ if (!THREE_SPEAK_API_KEY) {
   }
 }
 
-export const THREE_SPEAK_API_KEY = process.env.EXPO_PUBLIC_3SPEAK_API_KEY || '';
-if (!THREE_SPEAK_API_KEY) {
-  console.warn('THREE_SPEAK_API_KEY is not set in .env');
-}
-
 export const IPFS_UPLOAD_ENDPOINT = process.env.EXPO_PUBLIC_IPFS_UPLOAD_ENDPOINT || 'https://ipfs.3speak.tv/api/v0/add';
 export const IPFS_GATEWAY_URL = process.env.EXPO_PUBLIC_IPFS_GATEWAY_URL || 'https://ipfs.3speak.tv/ipfs';

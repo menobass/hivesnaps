@@ -5,6 +5,7 @@
  */
 
 import React, { createContext, useContext, useReducer, useCallback, ReactNode, useEffect, useMemo } from 'react';
+import * as SecureStore from 'expo-secure-store';
 import { AppState, AppAction, UserProfile } from './types';
 import { appReducer, initialAppState, appSelectors } from './reducer';
 import { userSelectors } from './userSlice';
@@ -110,7 +111,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const initializeUser = async () => {
       try {
-        const SecureStore = await import('expo-secure-store');
         const storedUsername = await SecureStore.getItemAsync('hive_username');
         if (storedUsername) {
           console.log('🔐 [AppProvider] Loaded username from SecureStore:', storedUsername);
@@ -343,7 +343,6 @@ export function useAuth() {
 
   const handleLogout = React.useCallback(async () => {
     try {
-      const SecureStore = await import('expo-secure-store');
       await SecureStore.deleteItemAsync('hive_username');
       await SecureStore.deleteItemAsync('hive_posting_key');
       setCurrentUser(null);
