@@ -3,8 +3,10 @@ pipeline {
     agent any
     
     options {
-        timeout(time: 45, unit: 'MINUTES')
+        timeout(time: 60, unit: 'MINUTES')
         buildDiscarder(logRotator(numToKeepStr: '10'))
+        timestamps()
+        disableConcurrentBuilds()
     }
 
     environment {
@@ -16,13 +18,14 @@ pipeline {
         ANDROID_SDK_ROOT = "${env.ANDROID_HOME ?: '/opt/android-sdk'}"
         
         // Java - Jenkins usually has this, but you can override
-        JAVA_HOME = "${env.JAVA_HOME ?: '/usr/lib/jvm/java-17-openjdk-amd64'}"
+        JAVA_HOME = "${env.JAVA_HOME ?: '/usr/lib/jvm/java-21-openjdk-amd64'}"
         
         // Add Android tools to PATH
-        PATH = "${env.ANDROID_HOME}/cmdline-tools/latest/bin:${env.ANDROID_HOME}/platform-tools:${env.ANDROID_HOME}/build-tools/34.0.0:${env.PATH}"
+        PATH = "${env.ANDROID_HOME}/cmdline-tools/latest/bin:${env.ANDROID_HOME}/platform-tools:${env.ANDROID_HOME}/build-tools/34.0.0:${env.JAVA_HOME}/bin:${env.PATH}"
         
-        // Node version check
+        // Node memory and Gradle optimization
         NODE_OPTIONS = "--max-old-space-size=4096"
+        GRADLE_OPTS = "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=\"-Xmx3072m -XX:MaxMetaspaceSize=768m\" -Dorg.gradle.parallel=true"
     }
 
     stages {
@@ -90,7 +93,7 @@ pipeline {
                 
                 script {
                     echo "Installing Node dependencies..."
-                    sh 'npm ci'
+                    sh 'npm ci --prefer-offline --no-audit'
                 }
             }
         }
@@ -104,6 +107,7 @@ pipeline {
                         # Clean previous builds
                         rm -rf android/app/build
                         rm -rf android/build
+                        rm -rf android/.gradle
                         
                         # Run expo prebuild for Android only
                         npx expo prebuild --platform android --clean
@@ -116,6 +120,8 @@ pipeline {
                         
                         # Make gradlew executable
                         chmod +x android/gradlew
+                        
+                        echo "✓ Prebuild completed successfully"
                     '''
                 }
             }
@@ -128,14 +134,21 @@ pipeline {
                     script {
                         echo "Building Android release..."
                         sh '''
-                            # Clean build
-                            ./gradlew clean
+                            # Kill any existing Gradle daemons to prevent stale process issues
+                            ./gradlew --stop || true
                             
-                            # Build AAB (for Play Store)
-                            ./gradlew bundleRelease
+                            # Build with no daemon (more resilient to Jenkins restarts)
+                            # Use stacktrace for better error reporting
+                            # Use build cache for faster subsequent builds
+                            ./gradlew assembleRelease bundleRelease \
+                                --no-daemon \
+                                --stacktrace \
+                                --console=plain \
+                                --build-cache \
+                                --parallel \
+                                --max-workers=4
                             
-                            # Also build APK (for testing)
-                            ./gradlew assembleRelease
+                            echo "✓ Build completed successfully"
                         '''
                     }
                 }
@@ -193,11 +206,28 @@ pipeline {
                     fi
                 '''
             }
-            cleanWs(deleteDirs: true, patterns: [[pattern: 'android/app/build', type: 'INCLUDE']])
+            // Clean up build artifacts to save disk space, but keep node_modules for faster rebuilds
+            cleanWs(
+                deleteDirs: true,
+                patterns: [
+                    [pattern: 'android/app/build', type: 'INCLUDE'],
+                    [pattern: 'android/build', type: 'INCLUDE'],
+                    [pattern: 'android/.gradle', type: 'INCLUDE']
+                ]
+            )
         }
         success {
             echo "✓ Build completed successfully! Artifacts have been archived."
+            echo "Download artifacts from the 'Build Artifacts' section above."
         }
+        failure {
+            echo "✗ Build failed. Check the console output above for details."
+            echo "Common issues:"
+            echo "  - Jenkins restart during build (check 'Pausing (shutting down)' message)"
+            echo "  - Out of memory (increase GRADLE_OPTS heap size)"
+            echo "  - Missing dependencies (run 'Environment Check' stage)"
+        }
+    }
         failure {
             echo "✗ Build failed. Check the console output above for details."
         }
