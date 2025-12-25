@@ -17,6 +17,7 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
   embedUrl,
   isDark,
 }) => {
+  console.log('🎬 [ThreeSpeakEmbed.tsx] FALLBACK version loaded (should NOT be used on iOS!)');
   const colorScheme = useColorScheme();
   const themeIsDark = isDark ?? colorScheme === 'dark';
   const { width } = useWindowDimensions();
