@@ -35,7 +35,9 @@ export const useVotingPower = () => {
       }
 
       // Use the accurate voting power calculation with regeneration
-      const vp = calculateVotingPower(account);
+      let vp = calculateVotingPower(account);
+      // Defensive: sanitize non-finite values (e.g., division by zero cases)
+      if (!Number.isFinite(vp) || vp === null || typeof vp !== 'number') vp = 0;
       setVotingPower(vp);
       setLoading(false);
     } catch (error) {
