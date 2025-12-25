@@ -36,7 +36,7 @@ export function calculateVotingPower(account: ExtendedAccount): number {
     if (maxMana === 0) {
       // Fallback to snapshot voting_power if available, otherwise 0
       const snapshot = typeof account.voting_power === 'number' ? account.voting_power : 0;
-      return Math.max(0, Math.min(HIVE_100_PERCENT, snapshot || 0));
+      return Math.max(0, Math.min(HIVE_100_PERCENT, snapshot));
     }
 
     // Calculate elapsed time since last update
