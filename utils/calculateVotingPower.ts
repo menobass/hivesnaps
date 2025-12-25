@@ -24,10 +24,27 @@ export function calculateVotingPower(account: ExtendedAccount): number {
   // Try to use voting_manabar first (more accurate)
   if (account.voting_manabar) {
     const manabar = account.voting_manabar;
-    const currentMana = typeof manabar.current_mana === 'string'
-      ? parseInt(manabar.current_mana, 10)
-      : manabar.current_mana;
-    const lastUpdateTime = manabar.last_update_time;
+    // Robustly parse current_mana which can be string, number, or absent.
+    const rawCurrentMana: unknown = manabar?.current_mana;
+    let currentMana = 0;
+    if (typeof rawCurrentMana === 'string') {
+      const parsed = parseInt(rawCurrentMana, 10);
+      currentMana = Number.isFinite(parsed) ? parsed : 0;
+    } else if (typeof rawCurrentMana === 'number') {
+      currentMana = Number.isFinite(rawCurrentMana) ? rawCurrentMana : 0;
+    } else {
+      currentMana = 0;
+    }
+    // Validate last_update_time (could be string, number, or missing).
+    const rawLastUpdate: unknown = manabar?.last_update_time;
+    // Default to now (no regeneration) if last update is invalid/missing
+    let lastUpdateTime = Math.floor(Date.now() / 1000);
+    if (typeof rawLastUpdate === 'string') {
+      const parsed = parseInt(rawLastUpdate, 10);
+      lastUpdateTime = Number.isFinite(parsed) ? parsed : lastUpdateTime;
+    } else if (typeof rawLastUpdate === 'number') {
+      lastUpdateTime = Number.isFinite(rawLastUpdate) ? Math.floor(rawLastUpdate) : lastUpdateTime;
+    }
 
     // Calculate max mana (based on vesting shares)
     const maxMana = calculateMaxMana(account);
@@ -41,7 +58,8 @@ export function calculateVotingPower(account: ExtendedAccount): number {
 
     // Calculate elapsed time since last update
     const nowSeconds = Math.floor(Date.now() / 1000);
-    const elapsedSeconds = nowSeconds - lastUpdateTime;
+    // Ensure non-negative elapsed seconds to avoid NaN/negative regeneration
+    const elapsedSeconds = Math.max(0, nowSeconds - lastUpdateTime);
 
     // Calculate regenerated mana
     const regeneratedMana = (elapsedSeconds * maxMana) / HIVE_VOTING_MANA_REGENERATION_SECONDS;
