@@ -228,8 +228,4 @@ pipeline {
             echo "  - Missing dependencies (run 'Environment Check' stage)"
         }
     }
-        failure {
-            echo "✗ Build failed. Check the console output above for details."
-        }
-    }
 }
