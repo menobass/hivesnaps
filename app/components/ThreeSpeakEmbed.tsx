@@ -1,6 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet, useColorScheme, useWindowDimensions, Platform } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, useColorScheme, useWindowDimensions, Platform, TouchableOpacity } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { Ionicons } from '@expo/vector-icons';
 
 interface ThreeSpeakEmbedProps {
   embedUrl: string;
@@ -21,13 +22,36 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
   const colorScheme = useColorScheme();
   const themeIsDark = isDark ?? colorScheme === 'dark';
   const { width } = useWindowDimensions();
+  const webViewRef = useRef<WebView>(null);
+  const [showPlayButton, setShowPlayButton] = useState(false);
+  const hasPlayedOnce = useRef(false);
 
   // Calculate responsive height based on screen width (1:1 square)
   // Assumes some padding/margins in the parent container
   const containerWidth = width - 32; // Account for horizontal padding
   const videoHeight = containerWidth; // Square aspect ratio
 
-  // JavaScript to auto-trigger fullscreen when video plays
+  // Handle play button tap
+  const handlePlayButtonPress = () => {
+    setShowPlayButton(false);
+    // Inject JS to find and click the play button in the 3Speak player
+    webViewRef.current?.injectJavaScript(`
+      (function() {
+        const video = document.querySelector('video');
+        if (video) {
+          video.play();
+        }
+        // Also try to find and click any play button in the player UI
+        const playButton = document.querySelector('[class*="play"], [aria-label*="play" i], button[class*="control"]');
+        if (playButton) {
+          playButton.click();
+        }
+      })();
+      true;
+    `);
+  };
+
+  // JavaScript to auto-trigger fullscreen when video plays and detect fullscreen exit
   // Enhanced to handle both direct video elements and iframes (3Speak player architecture)
   const injectedJavaScript = `
     (function() {
@@ -64,12 +88,60 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
         return false;
       }
       
+      // Notify React Native when video exits fullscreen
+      function setupFullscreenExitDetection(video) {
+        if (!video) return;
+        
+        // iOS fullscreen exit events
+        video.addEventListener('webkitendfullscreen', () => {
+          window.ReactNativeWebView?.postMessage(JSON.stringify({
+            type: 'fullscreen-exit',
+            paused: video.paused
+          }));
+        });
+        
+        // Standard fullscreen change events
+        document.addEventListener('fullscreenchange', () => {
+          if (!document.fullscreenElement) {
+            window.ReactNativeWebView?.postMessage(JSON.stringify({
+              type: 'fullscreen-exit',
+              paused: video.paused
+            }));
+          }
+        });
+        
+        document.addEventListener('webkitfullscreenchange', () => {
+          if (!document.webkitFullscreenElement) {
+            window.ReactNativeWebView?.postMessage(JSON.stringify({
+              type: 'fullscreen-exit',
+              paused: video.paused
+            }));
+          }
+        });
+      }
+      
       // Check for video in main document
       function checkMainVideo() {
         const video = document.querySelector('video');
         if (video) {
+          setupFullscreenExitDetection(video);
+          
+          let isFirstPlay = true;
           video.addEventListener('play', () => {
-            setTimeout(() => requestFullscreen(video), 100);
+            if (isFirstPlay) {
+              isFirstPlay = false;
+              // Wait longer on first play to ensure video is properly rendered
+              // This fixes iOS centering/sizing issues on initial fullscreen
+              setTimeout(() => {
+                // Double-check video has dimensions before going fullscreen
+                if (video.videoWidth > 0 && video.videoHeight > 0) {
+                  requestFullscreen(video);
+                } else {
+                  // If dimensions not ready, wait a bit more
+                  setTimeout(() => requestFullscreen(video), 200);
+                }
+              }, 300);
+            }
           });
           return true;
         }
@@ -86,8 +158,21 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
             if (iframeDoc) {
               const video = iframeDoc.querySelector('video');
               if (video) {
+                setupFullscreenExitDetection(video);
+                
+                let isFirstPlay = true;
                 video.addEventListener('play', () => {
-                  setTimeout(() => requestFullscreen(video), 100);
+                  if (isFirstPlay) {
+                    isFirstPlay = false;
+                    // Wait longer on first play to ensure video is properly rendered
+                    setTimeout(() => {
+                      if (video.videoWidth > 0 && video.videoHeight > 0) {
+                        requestFullscreen(video);
+                      } else {
+                        setTimeout(() => requestFullscreen(video), 200);
+                      }
+                    }, 300);
+                  }
                 });
               }
             }
@@ -124,6 +209,7 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
       }}
     >
       <WebView
+        ref={webViewRef}
         source={{ uri: embedUrl }}
         style={{ flex: 1, backgroundColor: themeIsDark ? '#000' : '#fff' }}
         allowsFullscreenVideo
@@ -134,6 +220,20 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
         // iOS: Set allowsInlineMediaPlayback to false to force native fullscreen
         mediaPlaybackRequiresUserAction={Platform.OS === 'ios' ? false : true}
         allowsInlineMediaPlayback={Platform.OS === 'ios' ? false : true}
+        onMessage={(event) => {
+          try {
+            const data = JSON.parse(event.nativeEvent.data);
+            if (data.type === 'fullscreen-exit') {
+              hasPlayedOnce.current = true;
+              // Show play button overlay if video is paused after exiting fullscreen
+              if (data.paused) {
+                setShowPlayButton(true);
+              }
+            }
+          } catch (e) {
+            // Ignore parsing errors
+          }
+        }}
         onShouldStartLoadWithRequest={request => {
           // Allow 3Speak URLs (legacy and new play subdomain), block others
           return (
@@ -143,6 +243,18 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
           );
         }}
       />
+      {/* Custom play button overlay - shown after exiting fullscreen */}
+      {showPlayButton && (
+        <TouchableOpacity
+          style={styles.playButtonOverlay}
+          onPress={handlePlayButtonPress}
+          activeOpacity={0.8}
+        >
+          <View style={styles.playButtonContainer}>
+            <Ionicons name="play-circle" size={80} color="rgba(255,255,255,0.9)" />
+          </View>
+        </TouchableOpacity>
+      )}
       {/* 3Speak type indicator */}
       <View
         style={[styles.indicator, { backgroundColor: 'rgba(0,123,255,0.8)' }]}
@@ -165,6 +277,16 @@ const styles = StyleSheet.create({
   indicatorText: {
     fontSize: 10,
     fontWeight: 'bold',
+  },
+  playButtonOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  playButtonContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
