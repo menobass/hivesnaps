@@ -56,6 +56,7 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
   const injectedJavaScript = `
     (function() {
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const processedVideos = new WeakSet(); // Track videos that already have listeners
       
       // Function to attempt fullscreen on a video element
       function requestFullscreen(video) {
@@ -120,30 +121,41 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
         });
       }
       
+      // Attach listeners to a video element (only once per video)
+      function attachVideoListeners(video) {
+        if (!video || processedVideos.has(video)) {
+          return; // Already processed this video
+        }
+        
+        processedVideos.add(video);
+        setupFullscreenExitDetection(video);
+        
+        let isFirstPlay = true;
+        video.addEventListener('play', () => {
+          if (isFirstPlay) {
+            isFirstPlay = false;
+            // Wait longer on first play to ensure video is properly rendered
+            // This fixes iOS centering/sizing issues on initial fullscreen
+            setTimeout(() => {
+              // Double-check video has dimensions before going fullscreen
+              if (video.videoWidth > 0 && video.videoHeight > 0) {
+                requestFullscreen(video);
+              } else {
+                // If dimensions not ready, wait a bit more
+                setTimeout(() => requestFullscreen(video), 200);
+              }
+            }, 300);
+          }
+        });
+      }
+      
       // Check for video in main document
       function checkMainVideo() {
         const video = document.querySelector('video');
         if (video) {
-          setupFullscreenExitDetection(video);
-          
-          let isFirstPlay = true;
-          video.addEventListener('play', () => {
-            if (isFirstPlay) {
-              isFirstPlay = false;
-              // Wait longer on first play to ensure video is properly rendered
-              // This fixes iOS centering/sizing issues on initial fullscreen
-              setTimeout(() => {
-                // Double-check video has dimensions before going fullscreen
-                if (video.videoWidth > 0 && video.videoHeight > 0) {
-                  requestFullscreen(video);
-                } else {
-                  // If dimensions not ready, wait a bit more
-                  setTimeout(() => requestFullscreen(video), 200);
-                }
-              }, 300);
-            }
-          });
-          return true;
+          attachVideoListeners(video);
+          // Check if video has loaded dimensions
+          return video.videoWidth > 0 && video.videoHeight > 0;
         }
         return false;
       }
@@ -151,6 +163,8 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
       // Check for video in iframes (3Speak may use iframe-based player)
       function checkIframeVideos() {
         const iframes = document.querySelectorAll('iframe');
+        let foundWithDimensions = false;
+        
         iframes.forEach((iframe) => {
           try {
             // Try to access iframe content (will fail for cross-origin)
@@ -158,22 +172,11 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
             if (iframeDoc) {
               const video = iframeDoc.querySelector('video');
               if (video) {
-                setupFullscreenExitDetection(video);
-                
-                let isFirstPlay = true;
-                video.addEventListener('play', () => {
-                  if (isFirstPlay) {
-                    isFirstPlay = false;
-                    // Wait longer on first play to ensure video is properly rendered
-                    setTimeout(() => {
-                      if (video.videoWidth > 0 && video.videoHeight > 0) {
-                        requestFullscreen(video);
-                      } else {
-                        setTimeout(() => requestFullscreen(video), 200);
-                      }
-                    }, 300);
-                  }
-                });
+                attachVideoListeners(video);
+                // Check if video has loaded dimensions
+                if (video.videoWidth > 0 && video.videoHeight > 0) {
+                  foundWithDimensions = true;
+                }
               }
             }
           } catch (e) {
@@ -181,16 +184,20 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
             // For iOS, the native fullscreen should still work via allowsFullscreenVideo
           }
         });
+        
+        return foundWithDimensions;
       }
       
       // Poll for video elements with timeout protection
+      // Continue polling until video has proper dimensions
       let checks = 0;
       const maxChecks = 50; // 5 seconds max at 100ms interval
       const checkVideo = setInterval(() => {
-        const foundMain = checkMainVideo();
-        checkIframeVideos();
+        const mainReady = checkMainVideo();
+        const iframeReady = checkIframeVideos();
         
-        if (foundMain || ++checks >= maxChecks) {
+        // Stop polling when video is found AND has dimensions, or timeout
+        if ((mainReady || iframeReady) || ++checks >= maxChecks) {
           clearInterval(checkVideo);
         }
       }, 100);
