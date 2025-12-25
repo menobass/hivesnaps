@@ -52,8 +52,6 @@ export function calculateVotingPower(account: ExtendedAccount): number {
     // Convert to percentage (0-10000)
     const votingPower = Math.floor((totalMana / maxMana) * HIVE_100_PERCENT);
 
-    if (!Number.isFinite(votingPower)) return 0;
-
     return Math.min(HIVE_100_PERCENT, Math.max(0, votingPower));
   }
 
