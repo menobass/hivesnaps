@@ -2,6 +2,11 @@
 pipeline {
     agent any
     
+    // Trigger builds on GitHub push and PRs
+    triggers {
+        githubPush()
+    }
+    
     options {
         timeout(time: 60, unit: 'MINUTES')
         buildDiscarder(logRotator(numToKeepStr: '10'))
@@ -26,6 +31,9 @@ pipeline {
         // Node memory and Gradle optimization
         NODE_OPTIONS = "--max-old-space-size=4096"
         GRADLE_OPTS = "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=\"-Xmx3072m -XX:MaxMetaspaceSize=768m\" -Dorg.gradle.parallel=true"
+        
+        // Discord webhook for notifications (configure in Jenkins or set here)
+        DISCORD_WEBHOOK_URL = "${env.DISCORD_WEBHOOK_URL ?: ''}"
     }
 
     stages {
@@ -34,6 +42,17 @@ pipeline {
             steps {
                 script {
                     echo "=== Environment Diagnostics ==="
+                    echo "Building branch: ${env.BRANCH_NAME ?: env.GIT_BRANCH}"
+                    echo "Build cause: ${currentBuild.getBuildCauses()}"
+                    
+                    // Check if this is a PR build
+                    if (env.CHANGE_ID) {
+                        echo "Building Pull Request #${env.CHANGE_ID}"
+                        echo "PR Title: ${env.CHANGE_TITLE}"
+                        echo "PR Author: ${env.CHANGE_AUTHOR}"
+                        echo "Target Branch: ${env.CHANGE_TARGET}"
+                    }
+                    
                     sh '''
                         echo "Node version: $(node --version)"
                         echo "NPM version: $(npm --version)"
@@ -138,8 +157,7 @@ pipeline {
                             ./gradlew --stop || true
                             
                             # Build with no daemon (more resilient to Jenkins restarts)
-                            # Use stacktrace for better error reporting
-                            # Use build cache for faster subsequent builds
+                            # Use parallel builds and multiple workers for speed
                             ./gradlew assembleRelease bundleRelease \
                                 --no-daemon \
                                 --stacktrace \
@@ -219,13 +237,59 @@ pipeline {
         success {
             echo "✓ Build completed successfully! Artifacts have been archived."
             echo "Download artifacts from the 'Build Artifacts' section above."
+            
+            script {
+                if (env.CHANGE_ID) {
+                    echo "✓ Pull Request #${env.CHANGE_ID} build passed!"
+                }
+                
+                // Send Discord notification
+                def duration = currentBuild.durationString.replace(' and counting', '')
+                def branch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'unknown'
+                def prInfo = env.CHANGE_ID ? "\\n**PR:** #${env.CHANGE_ID} - ${env.CHANGE_TITLE}" : ''
+                
+                sh """
+                    curl -X POST \
+                      -H "Content-Type: application/json" \
+                      -d '{
+                        "embeds": [{
+                          "title": "✅ Build Successful!",
+                          "description": "**Job:** ${env.JOB_NAME}\\n**Build:** #${env.BUILD_NUMBER}\\n**Branch:** ${branch}${prInfo}\\n**Duration:** ${duration}\\n**Artifacts:** APK & AAB ready\\n[View Build](${env.BUILD_URL})",
+                          "color": 3066993,
+                          "footer": {"text": "HiveSnaps Android CI"}
+                        }]
+                      }' \
+                      ${env.DISCORD_WEBHOOK_URL}
+                """
+            }
         }
         failure {
             echo "✗ Build failed. Check the console output above for details."
-            echo "Common issues:"
-            echo "  - Jenkins restart during build (check 'Pausing (shutting down)' message)"
-            echo "  - Out of memory (increase GRADLE_OPTS heap size)"
-            echo "  - Missing dependencies (run 'Environment Check' stage)"
+            
+            script {
+                if (env.CHANGE_ID) {
+                    echo "✗ Pull Request #${env.CHANGE_ID} build failed!"
+                }
+                
+                // Send Discord notification
+                def duration = currentBuild.durationString.replace(' and counting', '')
+                def branch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'unknown'
+                def prInfo = env.CHANGE_ID ? "\\n**PR:** #${env.CHANGE_ID} - ${env.CHANGE_TITLE}" : ''
+                
+                sh """
+                    curl -X POST \
+                      -H "Content-Type: application/json" \
+                      -d '{
+                        "embeds": [{
+                          "title": "❌ Build Failed!",
+                          "description": "**Job:** ${env.JOB_NAME}\\n**Build:** #${env.BUILD_NUMBER}\\n**Branch:** ${branch}${prInfo}\\n**Duration:** ${duration}\\n[View Console Output](${env.BUILD_URL}console)",
+                          "color": 15158332,
+                          "footer": {"text": "HiveSnaps Android CI"}
+                        }]
+                      }' \
+                      ${env.DISCORD_WEBHOOK_URL}
+                """
+            }
         }
     }
 }
