@@ -5,7 +5,10 @@
     "slug": "hivesnaps",
     "version": "1.1.3",
     "orientation": "portrait",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "icon": "./assets/images/appicon.png",
     "scheme": "hivesnaps",
     "userInterfaceStyle": "automatic",
@@ -21,8 +24,9 @@
       "buildNumber": "1.1.3",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "This app uses the camera to take profile pictures and scan documents.",
-        "NSPhotoLibraryUsageDescription": "This app uses the photo library to select profile pictures and upload images."
+        "NSCameraUsageDescription": "This app uses the camera to take photos and record videos for your posts.",
+        "NSMicrophoneUsageDescription": "This app needs access to the microphone to record audio for your videos.",
+        "NSPhotoLibraryUsageDescription": "This app uses the photo library to select photos and videos to share in your posts."
       }
     },
     "android": {
@@ -36,7 +40,9 @@
       "intentFilters": [
         {
           "action": "android.intent.action.SEND",
-          "category": ["android.intent.category.DEFAULT"],
+          "category": [
+            "android.intent.category.DEFAULT"
+          ],
           "data": [
             {
               "mimeType": "image/*"
@@ -51,7 +57,9 @@
         },
         {
           "action": "android.intent.action.SEND_MULTIPLE",
-          "category": ["android.intent.category.DEFAULT"],
+          "category": [
+            "android.intent.category.DEFAULT"
+          ],
           "data": [
             {
               "mimeType": "image/*"
