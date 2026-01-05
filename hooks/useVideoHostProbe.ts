@@ -163,7 +163,7 @@ export function useVideoHostProbe(
                 retryTimeoutRef.current = null;
             }
         };
-    }, [url, enabled, probe]);
+    }, [url, enabled]);
 
     /**
      * Cleanup on unmount
