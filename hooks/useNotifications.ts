@@ -11,9 +11,8 @@ import {
   filterNotificationsBySettings,
   type ParsedNotification,
 } from '../utils/notifications';
-import { emitGlobalRefresh } from '../utils/globalEvents';
 
-import { useMutedList } from '../store/context';
+import { useMutedList, useNotifications as useNotificationStore } from '../store/context';
 import { fetchMutedList } from '../services/HiveMuteService';
 
 interface UseNotificationsResult {
@@ -40,15 +39,25 @@ const STORAGE_KEYS = {
 export const useNotifications = (
   username: string | null
 ): UseNotificationsResult => {
-  const [notifications, setNotifications] = useState<ParsedNotification[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState(getDefaultNotificationSettings());
 
+  // Use store for notification state (shared across app)
+  const {
+    notifications: storeNotifications,
+    unreadCount,
+    setNotifications: setStoreNotifications,
+    markNotificationsRead,
+  } = useNotificationStore();
+
+  // Convert store notifications to ParsedNotification[] (null-safe)
+  const notifications = (storeNotifications || []) as ParsedNotification[];
+
   // Use shared state for muted list (same pattern as FeedScreen)
-  const { 
-    mutedList, 
+  const {
+    mutedList,
     needsRefresh: needsMutedRefresh,
     setMutedList,
     setLoading: setMutedLoading,
@@ -58,19 +67,19 @@ export const useNotifications = (
   // Ensure muted list is loaded
   const ensureMutedListLoaded = useCallback(async () => {
     if (!username) return;
-    
+
     if (!mutedList || mutedList.length === 0 || needsMutedRefresh) {
       if (__DEV__) {
         console.log('[useNotifications] Loading muted list for:', username);
       }
-      
+
       try {
         setMutedLoading(true);
         const mutedSet = await fetchMutedList(username);
         const mutedArray = Array.from(mutedSet);
         setMutedList(mutedArray);
         setMutedError(null);
-        
+
         if (__DEV__) {
           console.log('[useNotifications] Loaded muted list:', mutedArray.length, 'users');
         }
@@ -178,7 +187,7 @@ export const useNotifications = (
         if (__DEV__) {
           console.log('[useNotifications] Fetching notifications for:', username);
         }
-        
+
         // Fetch notifications from Hive API
         const rawNotifications = await fetchNotifications(username, 50);
         const parsed = rawNotifications.map(parseNotification);
@@ -194,7 +203,7 @@ export const useNotifications = (
         const notMuted = withReadStatus.filter((notification: ParsedNotification) => {
           if (!notification.actionUser) return true; // Keep notifications without actionUser
           const isMuted = mutedList && mutedList.includes(notification.actionUser);
-          
+
           return !isMuted;
         });
 
@@ -235,7 +244,8 @@ export const useNotifications = (
       try {
         const fetchedNotifications =
           await fetchNotificationsData(isManualRefresh);
-        setNotifications(fetchedNotifications);
+        // Dispatch to store instead of local state
+        setStoreNotifications(fetchedNotifications);
         lastFetchTime.current = now;
 
         if (isManualRefresh) {
@@ -251,55 +261,41 @@ export const useNotifications = (
         setRefreshing(false);
       }
     },
-    [username, notifications.length, fetchNotificationsData, updateLastCheck]
+    [username, notifications.length, fetchNotificationsData, updateLastCheck, setStoreNotifications]
   );
 
   // Mark single notification as read
   const markAsRead = useCallback(
     async (notificationId: number) => {
-      let changed = false;
+      // Update store state
+      markNotificationsRead(notificationId.toString());
+
+      // Save to SecureStore for persistence
       const updatedNotifications = notifications.map(notification => {
-        if (notification.id === notificationId && !notification.read) {
-          changed = true;
+        if (notification.id === notificationId) {
           return { ...notification, read: true };
         }
         return notification;
       });
-      setNotifications(updatedNotifications);
-
       const readIds = updatedNotifications.filter(n => n.read).map(n => n.id);
       await saveReadStatus(readIds);
-
-      // If we actually changed read state, request a global refresh so the feed updates
-      if (changed) {
-        try { emitGlobalRefresh(); } catch (e) { console.log('unable to refresh') }
-      }
     },
-    [notifications, saveReadStatus]
+    [notifications, saveReadStatus, markNotificationsRead]
   );
 
   // Mark all notifications as read
   const markAllAsRead = useCallback(async () => {
-    // Only emit refresh if there were unread items
-    const hadUnread = notifications.some(n => !n.read);
+    // Update store state
+    const allIds = notifications.map(n => n.id.toString());
+    markNotificationsRead(allIds);
 
-    const updatedNotifications = notifications.map(notification => ({
-      ...notification,
-      read: true,
-    }));
-    setNotifications(updatedNotifications);
-
-    const readIds = updatedNotifications.map(n => n.id);
+    // Save to SecureStore for persistence
+    const readIds = notifications.map(n => n.id);
     await saveReadStatus(readIds);
     await updateLastCheck();
+  }, [notifications, saveReadStatus, updateLastCheck, markNotificationsRead]);
 
-    if (hadUnread) {
-      try { emitGlobalRefresh(); } catch (e) { console.log('unable to refresh') }
-    }
-  }, [notifications, saveReadStatus, updateLastCheck]);
-
-  // Calculate unread count
-  const unreadCount = getUnreadCount(notifications);
+  // Calculate unread count is now from store, no longer needed here
 
   // Set up automatic refresh when app becomes active
   useEffect(() => {
@@ -348,9 +344,10 @@ export const useNotifications = (
       // Re-filter existing notifications with new settings and sort chronologically
       const filtered = filterNotificationsBySettings(notifications, settings);
       const sorted = sortNotifications(filtered, 'chronological');
-      setNotifications(sorted);
+      // Update store with filtered notifications
+      setStoreNotifications(sorted);
     }
-  }, [settings]);
+  }, [settings, username, notifications.length, setStoreNotifications]);
 
   return {
     notifications,

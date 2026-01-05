@@ -250,7 +250,8 @@ const FeedScreenRefactored = () => {
     loadRecentSearches,
   } = useSearch();
 
-  const { unreadCount, refresh: refreshNotifications } = useNotifications(username || null);
+  // Get unread notification count from store (auto-updates when notifications are marked read)
+  const { unreadCount } = useNotifications(username || null);
 
   const [isSearchModalVisible, setIsSearchModalVisible] = useState(false);
   const [vpInfoModalVisible, setVpInfoModalVisible] = useState(false);
@@ -293,7 +294,7 @@ const FeedScreenRefactored = () => {
         console.log(
           `📊 [FeedScreen] After initial fetch: ${postFetchStats.memoryUsage}`
         );
-     
+
         if (postFetchStats.containersInMemory === 0) {
           console.log(
             `⚠️ [FeedScreen] WARNING: No containers created after initial fetch! Container system may not be working.`
@@ -357,12 +358,12 @@ const FeedScreenRefactored = () => {
       console.log(`📜 [SCROLL-DEBUG] Filtered snaps count: ${filteredSnaps.length}`);
       console.log(`📜 [SCROLL-DEBUG] Feed loading: ${feedLoading}`);
     }
-    
+
     if (!canFetchMore()) {
       console.log(`⏹️ [FeedScreen] Not fetching more snaps, limit reached`);
       return;
     }
-   
+
     // Show current memory stats before loading more
     const currentStats = getMemoryStats();
     console.log(
@@ -374,7 +375,7 @@ const FeedScreenRefactored = () => {
         `🔄 [FeedScreen] Triggering loadMoreSnaps for filter: ${currentFilter} - this may trigger memory cleanup!`
       );
       console.log(`📜 [SCROLL-DEBUG] About to call loadMoreSnaps() - WATCH FOR SCROLL RESET`);
-      
+
       loadMoreSnaps().then(() => {
         // Log memory stats after loading more
         const newStats = getMemoryStats();
@@ -398,7 +399,7 @@ const FeedScreenRefactored = () => {
     if (currentFilter === 'following' && !feedLoading && canFetchMore()) {
       const snapCount = filteredSnaps.length;
       console.log(`🎯 [AUTO-FETCH] Following feed has ${snapCount} snaps`);
-      
+
       // If Following feed has very few snaps, auto-trigger load more
       // This fixes the issue where onEndReached doesn't fire for short lists
       if (snapCount < AUTO_FETCH_THRESHOLD) {
@@ -479,7 +480,7 @@ const FeedScreenRefactored = () => {
     try {
       if (username) {
         // Invalidate follow/mute caches first to ensure fresh data
-       
+
         invalidateFollowingCache(username);
         invalidateMutedCache(username);
 
@@ -512,11 +513,7 @@ const FeedScreenRefactored = () => {
           addPromiseIfValid(rcPromise, ops);
         } catch (e) { console.warn('[FeedScreen] refreshResourceCredits error (non-blocking):', e); }
 
-        // Notifications manual refresh returns a promise
-        try {
-          const notifPromise = refreshNotifications();
-          addPromiseIfValid(notifPromise, ops);
-        } catch (e) { console.warn('[FeedScreen] refreshNotifications error (non-blocking):', e); }
+        // Note: Notification count updates automatically via store, no need to refresh here
       }
 
       // Await all promise-based ops (feed + any async hooks) but don't reject on single failure
@@ -528,15 +525,6 @@ const FeedScreenRefactored = () => {
       setGlobalRefreshing(false);
     }
   };
-
-  // Subscribe to programmatic global refresh events (e.g., notifications marked read)
-  useEffect(() => {
-    const unsub = subscribeGlobalRefresh(() => {
-      // Reuse existing handler which contains throttling and guards
-      try { handleGlobalRefresh(); } catch (e) { console.warn('[FeedScreen] Programmatic global refresh failed', e); }
-    });
-    return () => unsub();
-  }, [handleGlobalRefresh]);
 
   // Handle search modal close
   const handleCloseSearchModal = () => {
@@ -646,7 +634,7 @@ const FeedScreenRefactored = () => {
     console.log(`🔍 [DEBUG] Total snaps: ${stats.totalSnaps}`);
     console.log(`🔍 [DEBUG] Memory usage: ${stats.memoryUsage}`);
     console.log(`🔍 [DEBUG] Current snaps shown: ${snaps.length}`);
-    
+
     // Add registry information
     if (stats.registryInfo) {
       console.log(`📝 [DEBUG] === CONTAINER REGISTRY ===`);
@@ -655,7 +643,7 @@ const FeedScreenRefactored = () => {
       console.log(`📝 [DEBUG] Freed: ${stats.registryInfo.freed}`);
       console.log(`📝 [DEBUG] Registry snaps: ${stats.registryInfo.snapsInRegistry}`);
     }
-    
+
     console.log(`🔍 [DEBUG] ===== END MEMORY STATS =====\n`);
     return stats;
   };
@@ -676,16 +664,16 @@ const FeedScreenRefactored = () => {
   // Render footer with loading indicator
   const renderFooter = () => {
     if (!loadingMore) return null;
-    
+
     return (
-      <View style={{ 
-        paddingVertical: LOADING_FOOTER_PADDING_VERTICAL, 
+      <View style={{
+        paddingVertical: LOADING_FOOTER_PADDING_VERTICAL,
         alignItems: 'center',
         justifyContent: 'center'
       }}>
         <ActivityIndicator size="small" color={colors.icon} />
-        <Text style={{ 
-          color: colors.text, 
+        <Text style={{
+          color: colors.text,
           marginTop: LOADING_TEXT_MARGIN_TOP,
           fontSize: LOADING_TEXT_FONT_SIZE,
           opacity: LOADING_TEXT_OPACITY
@@ -853,16 +841,16 @@ const FeedScreenRefactored = () => {
         />
 
         {/* Slogan row */}
-          <View style={styles.sloganRow}>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => router.push('/screens/ComposeScreen')}
-              accessibilityLabel='Create new snap (slogan)'
-            >
-              <Text style={[styles.slogan, { color: colors.text }]}> 
-                What's snappening today?
-              </Text>
-            </TouchableOpacity>
+        <View style={styles.sloganRow}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => router.push('/screens/ComposeScreen')}
+            accessibilityLabel='Create new snap (slogan)'
+          >
+            <Text style={[styles.slogan, { color: colors.text }]}>
+              What's snappening today?
+            </Text>
+          </TouchableOpacity>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity
               style={[styles.searchBtn, { marginRight: 12 }]}
@@ -966,13 +954,13 @@ const FeedScreenRefactored = () => {
             </Text>
           </View>
         ) : filteredSnaps.length === 0 ? (
-          <View style={{ 
-            alignItems: 'center', 
-            marginTop: EMPTY_STATE_MARGIN_TOP, 
-            paddingHorizontal: EMPTY_STATE_PADDING_HORIZONTAL 
+          <View style={{
+            alignItems: 'center',
+            marginTop: EMPTY_STATE_MARGIN_TOP,
+            paddingHorizontal: EMPTY_STATE_PADDING_HORIZONTAL
           }}>
-            <Text style={{ 
-              color: colors.text, 
+            <Text style={{
+              color: colors.text,
               fontSize: EMPTY_STATE_FONT_SIZE,
               textAlign: 'center',
               lineHeight: EMPTY_STATE_LINE_HEIGHT
@@ -1162,8 +1150,8 @@ const FeedScreenRefactored = () => {
                 placeholderTextColor={colors.text + '60'}
                 value={
                   searchType === 'content' &&
-                  searchQuery &&
-                  !searchQuery.startsWith('#')
+                    searchQuery &&
+                    !searchQuery.startsWith('#')
                     ? `#${searchQuery}`
                     : searchQuery
                 }
@@ -1346,7 +1334,7 @@ const FeedScreenRefactored = () => {
                           </Text>
                           <Text style={styles.searchResultMeta}>
                             {result.displayName &&
-                            result.displayName !== result.name
+                              result.displayName !== result.name
                               ? result.displayName
                               : ''}
                           </Text>
