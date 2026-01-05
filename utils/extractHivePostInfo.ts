@@ -22,7 +22,7 @@ export type HiveUrlType = 'profile' | 'ui-page' | 'blog-post';
  */
 const UI_PAGE_SUFFIXES = [
   'wallet',
-  'posts', 
+  'posts',
   'comments',
   'replies',
   'activities',
@@ -39,7 +39,7 @@ const UI_PAGE_SUFFIXES = [
 /**
  * Supported Hive frontend domains
  */
-const HIVE_DOMAINS = ['ecency.com', 'peakd.com', 'hive.blog'] as const;
+const HIVE_DOMAINS = ['ecency.com', 'peakd.com', 'hive.blog', 'snapie.io', 'www.snapie.io'] as const;
 
 type HiveDomain = typeof HIVE_DOMAINS[number];
 
@@ -94,7 +94,7 @@ export function classifyHiveUrl(url: string): HiveUrlType | null {
   try {
     // Normalize URL by removing protocol and www
     const cleanUrl = url.replace(/^https?:\/\/(?:www\.)?/, '').toLowerCase();
-    
+
     // Check if it's a valid Hive domain
     const domain = cleanUrl.split('/')[0] as HiveDomain;
     if (!HIVE_DOMAINS.includes(domain)) {
@@ -197,9 +197,9 @@ export function parseHivePostUrl(
     // Remove protocol and www if present
     const cleanUrl = url.replace(/^https?:\/\/(?:www\.)?/, '');
 
-    // Extract path part
+    // Extract path part - updated to include snapie.io
     const pathMatch = cleanUrl.match(
-      /^(?:ecency\.com|peakd\.com|hive\.blog)\/(.+)$/
+      /^(?:ecency\.com|peakd\.com|hive\.blog|snapie\.io)\/(.+)$/
     );
     if (!pathMatch) {
       console.log(
@@ -232,12 +232,12 @@ export function parseHivePostUrl(
         return null;
       }
 
-  // Check if permlink contains only valid characters (letters, numbers, hyphens)
-  // Allow consecutive hyphens but disallow leading/trailing hyphens
-  // Examples of valid: "abc", "a-b", "a--b", "abc-123", "a-1-b-2"
-  // Examples of invalid: "-abc", "abc-", "-a-", ""
-  const validPermlinkPattern = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/i;
-  if (!validPermlinkPattern.test(permlink)) {
+      // Check if permlink contains only valid characters (letters, numbers, hyphens)
+      // Allow consecutive hyphens but disallow leading/trailing hyphens
+      // Examples of valid: "abc", "a-b", "a--b", "abc-123", "a-1-b-2"
+      // Examples of invalid: "-abc", "abc-", "-a-", ""
+      const validPermlinkPattern = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/i;
+      if (!validPermlinkPattern.test(permlink)) {
         console.log(
           '[extractHivePostInfo] Rejecting invalid permlink format:',
           {
@@ -341,12 +341,12 @@ async function fetchAuthorAvatar(author: string): Promise<string> {
     const url = result?.url || '';
     try {
       console.log(`[Avatar][Extract] ${author} -> ${url || 'EMPTY'} (source=${result?.source || 'unknown'}, cache=${result?.fromCache ? 'hit' : 'miss'})`);
-    } catch {}
+    } catch { }
     return url;
   } catch (error) {
     console.warn('[extractHivePostInfo] AvatarService failed, falling back to Ecency images URL:', { author, error });
     const fallback = `https://images.ecency.com/u/${author}/avatar/original`;
-    try { console.log(`[Avatar][Extract] ${author} -> ${fallback} (fallback)`); } catch {}
+    try { console.log(`[Avatar][Extract] ${author} -> ${fallback} (fallback)`); } catch { }
     return fallback;
   }
 }
@@ -375,8 +375,8 @@ export async function fetchHivePostInfo(
       return null;
     }
 
-  // Fetch post content and author avatar in parallel (avatar via unified service)
-  const [post, avatarUrl] = await Promise.all([
+    // Fetch post content and author avatar in parallel (avatar via unified service)
+    const [post, avatarUrl] = await Promise.all([
       client.database.call('get_content', [author, permlink]),
       fetchAuthorAvatar(author),
     ]);
