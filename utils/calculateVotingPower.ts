@@ -129,5 +129,9 @@ function parseVestingShares(vestingSharesValue: string | { amount: number | stri
  * @returns Formatted string (e.g., "98.5")
  */
 export function formatVotingPower(votingPower: number, decimals: number = 1): string {
+  // Guard against NaN or invalid values
+  if (!Number.isFinite(votingPower)) {
+    return (0).toFixed(decimals);
+  }
   return (votingPower / 100).toFixed(decimals);
 }
