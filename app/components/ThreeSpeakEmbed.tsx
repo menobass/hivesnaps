@@ -109,44 +109,34 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
       {/* Show placeholder while probing or retrying */}
       {(status === 'probing' || status === 'retrying') && (
         <View
-          style={{
-            flex: 1,
-            backgroundColor: themeIsDark ? '#1a1a1a' : '#f5f5f5',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: 20,
-          }}
+          style={[
+            styles.placeholderContainer,
+            { backgroundColor: themeIsDark ? '#1a1a1a' : '#f5f5f5' },
+          ]}
         >
           <ActivityIndicator size="large" color={Colors[themeIsDark ? 'dark' : 'light'].accent} />
           <Text
-            style={{
-              color: themeIsDark ? '#fff' : '#000',
-              fontSize: 16,
-              fontWeight: '600',
-              marginTop: 16,
-              textAlign: 'center',
-            }}
+            style={[
+              styles.placeholderText,
+              { color: themeIsDark ? '#fff' : '#000' },
+            ]}
           >
             {status === 'probing' ? 'Connecting...' : 'Re-attempting connection'}
           </Text>
           <Text
-            style={{
-              color: themeIsDark ? '#aaa' : '#666',
-              fontSize: 14,
-              marginTop: 8,
-              textAlign: 'center',
-            }}
+            style={[
+              styles.placeholderSubtext,
+              { color: themeIsDark ? '#aaa' : '#666' },
+            ]}
           >
             Temporary issue
           </Text>
           {error && (
             <Text
-              style={{
-                color: themeIsDark ? '#888' : '#999',
-                fontSize: 12,
-                marginTop: 4,
-                textAlign: 'center',
-              }}
+              style={[
+                styles.errorDetail,
+                { color: themeIsDark ? '#888' : '#999' },
+              ]}
             >
               {error}
             </Text>
@@ -157,13 +147,10 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
       {/* Show error state with retry option */}
       {status === 'failed' && (
         <View
-          style={{
-            flex: 1,
-            backgroundColor: themeIsDark ? '#1a1a1a' : '#f5f5f5',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: 20,
-          }}
+          style={[
+            styles.errorContainer,
+            { backgroundColor: themeIsDark ? '#1a1a1a' : '#f5f5f5' },
+          ]}
         >
           <FontAwesome
             name="exclamation-circle"
@@ -171,23 +158,18 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
             color={themeIsDark ? '#666' : '#999'}
           />
           <Text
-            style={{
-              color: themeIsDark ? '#fff' : '#000',
-              fontSize: 16,
-              fontWeight: '600',
-              marginTop: 16,
-              textAlign: 'center',
-            }}
+            style={[
+              styles.errorText,
+              { color: themeIsDark ? '#fff' : '#000' },
+            ]}
           >
             Video unavailable
           </Text>
           <Text
-            style={{
-              color: themeIsDark ? '#aaa' : '#666',
-              fontSize: 14,
-              marginTop: 8,
-              textAlign: 'center',
-            }}
+            style={[
+              styles.errorSubtext,
+              { color: themeIsDark ? '#aaa' : '#666' },
+            ]}
           >
             {error || 'Unable to connect to video server'}
           </Text>
@@ -195,18 +177,15 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
           {/* Retry button */}
           <TouchableOpacity
             onPress={retry}
-            style={{
-              backgroundColor: Colors[themeIsDark ? 'dark' : 'light'].accent,
-              paddingHorizontal: 24,
-              paddingVertical: 12,
-              borderRadius: 8,
-              marginTop: 20,
-            }}
+            style={[
+              styles.retryButton,
+              { backgroundColor: Colors[themeIsDark ? 'dark' : 'light'].accent },
+            ]}
             accessibilityLabel="Retry loading video"
             accessibilityRole="button"
             accessibilityHint="Attempts to reconnect to the video server"
           >
-            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>
+            <Text style={styles.retryButtonText}>
               Retry
             </Text>
           </TouchableOpacity>
@@ -214,14 +193,15 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
           {/* Open in browser button */}
           <TouchableOpacity
             onPress={handleOpenInBrowser}
-            style={{
-              marginTop: 12,
-            }}
+            style={styles.linkButton}
             accessibilityLabel="Open video in browser"
             accessibilityRole="button"
             accessibilityHint="Opens the video in your default web browser"
           >
-            <Text style={{ color: Colors[themeIsDark ? 'dark' : 'light'].accent, fontSize: 14 }}>
+            <Text style={[
+              styles.linkButtonText,
+              { color: Colors[themeIsDark ? 'dark' : 'light'].accent },
+            ]}>
               Open in browser
             </Text>
           </TouchableOpacity>
@@ -250,6 +230,62 @@ const styles = StyleSheet.create({
   indicatorText: {
     fontSize: 10,
     fontWeight: 'bold',
+  },
+  placeholderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  placeholderText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  placeholderSubtext: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  errorDetail: {
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  errorSubtext: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  retryButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  linkButton: {
+    marginTop: 12,
+  },
+  linkButtonText: {
+    fontSize: 14,
   },
 });
 
