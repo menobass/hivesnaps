@@ -169,7 +169,9 @@ export async function uploadAudioTo3Speak(
       try {
         const errorData = JSON.parse(errorText);
         errorMessage = errorData.error || errorData.message || errorMessage;
-      } catch {}
+      } catch (parseError: unknown) {
+        console.debug('[Audio Upload] Failed to parse error response:', parseError);
+      }
 
       return {
         success: false,
