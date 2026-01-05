@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, useColorScheme, useWindowDimensions, TouchableO
 import { WebView } from 'react-native-webview';
 import { FontAwesome } from '@expo/vector-icons';
 import { useVideoHostProbe } from '../../hooks/useVideoHostProbe';
+import Colors from '../../constants/Colors';
 
 interface ThreeSpeakEmbedProps {
   embedUrl: string;
@@ -116,7 +117,7 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
             padding: 20,
           }}
         >
-          <ActivityIndicator size="large" color={themeIsDark ? '#fff' : '#007AFF'} />
+          <ActivityIndicator size="large" color={Colors[themeIsDark ? 'dark' : 'light'].accent} />
           <Text
             style={{
               color: themeIsDark ? '#fff' : '#000',
@@ -195,7 +196,7 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
           <TouchableOpacity
             onPress={retry}
             style={{
-              backgroundColor: '#007AFF',
+              backgroundColor: Colors[themeIsDark ? 'dark' : 'light'].accent,
               paddingHorizontal: 24,
               paddingVertical: 12,
               borderRadius: 8,
@@ -220,7 +221,7 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
             accessibilityRole="button"
             accessibilityHint="Opens the video in your default web browser"
           >
-            <Text style={{ color: '#007AFF', fontSize: 14 }}>
+            <Text style={{ color: Colors[themeIsDark ? 'dark' : 'light'].accent, fontSize: 14 }}>
               Open in browser
             </Text>
           </TouchableOpacity>

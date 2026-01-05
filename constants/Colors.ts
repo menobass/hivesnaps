@@ -8,6 +8,7 @@ export default {
     tint: tintColorLight,
     tabIconDefault: '#ccc',
     tabIconSelected: tintColorLight,
+    accent: '#007AFF', // iOS blue - primary action color
     // TOS/Modal colors
     tosBackground: '#FFFFFF',
     tosText: '#0F1419',
@@ -25,6 +26,7 @@ export default {
     tint: tintColorDark,
     tabIconDefault: '#ccc',
     tabIconSelected: tintColorDark,
+    accent: '#0A84FF', // iOS blue for dark mode - slightly lighter
     // TOS/Modal colors
     tosBackground: '#15202B',
     tosText: '#D7DBDC',
