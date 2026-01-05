@@ -107,7 +107,7 @@ export function useVideoHostProbe(
                         ...prev,
                         status: 'retrying',
                         attempt: attemptNumber,
-                        error: `Retrying in ${Math.ceil(delay / 1000)}s...`,
+                        error: 'Retrying...',
                         lastProbeTime: Date.now(),
                     }));
                 } else {
