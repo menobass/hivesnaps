@@ -32,29 +32,57 @@ export function calculateAudioDuration(durationMs: number): number {
 }
 
 /**
- * Upload audio blob to 3Speak Audio API
- * @param audioBlob - The audio blob to upload
+ * Upload audio to 3Speak Audio API
+ * @param audioSource - The audio to upload, either a Blob or a file URI string
  * @param durationSeconds - Duration of the audio in seconds
  * @param username - Hive username uploading the audio
  * @param options - Optional metadata (title, description)
  * @returns Upload result with permlink and playUrl
  */
 export async function uploadAudioTo3Speak(
-  audioBlob: Blob,
+  audioSource: Blob | string,
   durationSeconds: number,
   username: string,
   options: AudioUploadOptions = {}
 ): Promise<AudioUploadResult> {
   try {
+    // Resolve and validate file size
+    let fileSizeBytes: number;
+    let audioBlob: Blob;
+    
+    if (typeof audioSource === 'string') {
+      // audioSource is a file URI
+      const fileInfo = await FileSystem.getInfoAsync(audioSource);
+      if (!fileInfo.exists || fileInfo.size == null) {
+        return {
+          success: false,
+          permlink: '',
+          cid: '',
+          playUrl: '',
+          apiUrl: '',
+          error: 'Audio file does not exist or size could not be determined',
+        };
+      }
+      fileSizeBytes = fileInfo.size;
+      
+      // Convert URI to Blob
+      const response = await fetch(audioSource);
+      audioBlob = await response.blob();
+    } else {
+      // audioSource is already a Blob
+      audioBlob = audioSource;
+      fileSizeBytes = audioBlob.size;
+    }
+    
     // Validate file size
-    if (audioBlob.size > MAX_AUDIO_FILE_BYTES) {
+    if (fileSizeBytes > MAX_AUDIO_FILE_BYTES) {
       return {
         success: false,
         permlink: '',
         cid: '',
         playUrl: '',
         apiUrl: '',
-        error: `Audio file is too large (${(audioBlob.size / (1024 * 1024)).toFixed(1)} MB). Maximum file size is 50 MB.`,
+        error: `Audio file is too large (${(fileSizeBytes / (1024 * 1024)).toFixed(1)} MB). Maximum file size is 50 MB.`,
       };
     }
 
