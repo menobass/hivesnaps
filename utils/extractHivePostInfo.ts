@@ -168,6 +168,10 @@ export function extractHivePostUrls(text: string): string[] {
     // hive.blog patterns
     /(?:https?:\/\/)?(?:www\.)?hive\.blog\/(@[a-z0-9.-]{3,16}\/[a-z0-9-]+)/gi,
     /(?:https?:\/\/)?(?:www\.)?hive\.blog\/([a-z0-9-]+\/@[a-z0-9.-]{3,16}\/[a-z0-9-]+)/gi,
+
+    // snapie.io patterns
+    /(?:https?:\/\/)?(?:www\.)?snapie\.io\/(@[a-z0-9.-]{3,16}\/[a-z0-9-]+)/gi,
+    /(?:https?:\/\/)?(?:www\.)?snapie\.io\/([a-z0-9-]+\/@[a-z0-9.-]{3,16}\/[a-z0-9-]+)/gi,
   ];
 
   patterns.forEach(pattern => {
