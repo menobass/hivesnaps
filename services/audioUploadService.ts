@@ -48,10 +48,11 @@ export async function uploadAudioTo3Speak(
   try {
     // Resolve and validate file size
     let fileSizeBytes: number;
-    let audioBlob: Blob;
+    let base64Data: string;
+    let mimeType: string;
     
     if (typeof audioSource === 'string') {
-      // audioSource is a file URI
+      // audioSource is a file URI - use Expo FileSystem for reliable local file access
       const fileInfo = await FileSystem.getInfoAsync(audioSource);
       if (!fileInfo.exists || fileInfo.size == null) {
         return {
@@ -65,13 +66,31 @@ export async function uploadAudioTo3Speak(
       }
       fileSizeBytes = fileInfo.size;
       
-      // Convert URI to Blob
-      const response = await fetch(audioSource);
-      audioBlob = await response.blob();
+      // Read file directly to base64 using FileSystem (more reliable than fetch + FileReader)
+      base64Data = await FileSystem.readAsStringAsync(audioSource, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      
+      // Determine MIME type from file extension
+      mimeType = audioSource.endsWith('.m4a') ? 'audio/mp4' : 'audio/mpeg';
     } else {
-      // audioSource is already a Blob
-      audioBlob = audioSource;
-      fileSizeBytes = audioBlob.size;
+      // audioSource is a Blob - convert using FileReader
+      fileSizeBytes = audioSource.size;
+      mimeType = audioSource.type || 'audio/mpeg';
+      
+      const reader = new FileReader();
+      base64Data = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => {
+          const result = reader.result as string;
+          // Extract the base64 part (after "data:audio/...;base64,")
+          const base64 = result.split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = () => {
+          reject(new Error('Failed to read audio blob'));
+        };
+        reader.readAsDataURL(audioSource);
+      });
     }
     
     // Validate file size
@@ -99,37 +118,19 @@ export async function uploadAudioTo3Speak(
     }
 
     console.log('[Audio Upload] Starting upload...');
-    console.log('[Audio Upload] Blob type:', audioBlob.type);
-    console.log('[Audio Upload] Blob size:', audioBlob.size, 'bytes');
+    console.log('[Audio Upload] MIME type:', mimeType);
+    console.log('[Audio Upload] File size:', fileSizeBytes, 'bytes');
     console.log('[Audio Upload] Duration:', durationSeconds, 'seconds');
     console.log('[Audio Upload] Username:', username);
-
-    // In React Native, we need to convert the Blob to base64 for FormData
-    // This is because React Native's fetch doesn't handle Blob objects the same way as the browser
-    const reader = new FileReader();
-    const base64Data = await new Promise<string>((resolve, reject) => {
-      reader.onload = () => {
-        const result = reader.result as string;
-        // Extract the base64 part (after "data:audio/...;base64,")
-        const base64 = result.split(',')[1];
-        resolve(base64);
-      };
-      reader.onerror = () => {
-        reject(new Error('Failed to read audio blob'));
-      };
-      reader.readAsDataURL(audioBlob);
-    });
-
     console.log('[Audio Upload] Converted to base64, length:', base64Data.length);
 
     // Create FormData for multipart upload
     const formData = new FormData();
 
     // In React Native, append base64 data with explicit type info
-    // The API will handle this correctly
     formData.append('audio', {
-      uri: `data:${audioBlob.type || 'audio/mpeg'};base64,${base64Data}`,
-      type: audioBlob.type || 'audio/mpeg',
+      uri: `data:${mimeType};base64,${base64Data}`,
+      type: mimeType,
       name: `audio-${Date.now()}.m4a`,
     } as any);
     
