@@ -61,13 +61,14 @@ export function useVideoHostProbe(
 
     const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isMountedRef = useRef(true);
+    const retryGenerationRef = useRef(0);
 
     /**
      * Perform a single probe attempt
      */
     const probe = useCallback(
-        async (attemptNumber: number) => {
-            if (!isMountedRef.current) return;
+        async (attemptNumber: number, generation: number) => {
+            if (!isMountedRef.current || generation !== retryGenerationRef.current) return;
 
             // Update status based on attempt number
             setState((prev) => ({
@@ -79,7 +80,7 @@ export function useVideoHostProbe(
 
             const success = await probeVideoHost(url, probeTimeoutMs);
 
-            if (!isMountedRef.current) return;
+            if (!isMountedRef.current || generation !== retryGenerationRef.current) return;
 
             if (success) {
                 // Probe succeeded - ready to load video
@@ -97,8 +98,8 @@ export function useVideoHostProbe(
                     const delay = calculateBackoffDelay(attemptNumber, baseDelayMs, maxDelayMs);
 
                     retryTimeoutRef.current = setTimeout(() => {
-                        if (isMountedRef.current) {
-                            probe(attemptNumber + 1);
+                        if (isMountedRef.current && generation === retryGenerationRef.current) {
+                            probe(attemptNumber + 1, generation);
                         }
                     }, delay);
 
@@ -128,14 +129,18 @@ export function useVideoHostProbe(
      * Manual retry function (can be called from UI)
      */
     const retry = useCallback(() => {
+        // Increment generation to invalidate any pending retry attempts
+        retryGenerationRef.current += 1;
+        const currentGeneration = retryGenerationRef.current;
+
         // Clear any pending retry timeout
         if (retryTimeoutRef.current) {
             clearTimeout(retryTimeoutRef.current);
             retryTimeoutRef.current = null;
         }
 
-        // Start fresh probe sequence
-        probe(0);
+        // Start fresh probe sequence with new generation
+        probe(0, currentGeneration);
     }, [probe]);
 
     /**
@@ -144,8 +149,12 @@ export function useVideoHostProbe(
     useEffect(() => {
         if (!enabled || !url) return;
 
+        // Increment generation for new probe sequence
+        retryGenerationRef.current += 1;
+        const currentGeneration = retryGenerationRef.current;
+
         // Start initial probe
-        probe(0);
+        probe(0, currentGeneration);
 
         // Cleanup function
         return () => {

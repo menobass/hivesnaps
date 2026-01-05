@@ -39,7 +39,12 @@ export async function probeVideoHost(
             // Consider 2xx and 3xx as successful (server is reachable)
             return response.status >= 200 && response.status < 400;
         } catch (fetchError) {
-            clearTimeout(timeoutId);
+            // Clear timeout only if it hasn't already fired
+            // (For AbortError, timeout already fired; for other errors, it's still pending)
+            const isAbortError = fetchError instanceof Error && fetchError.name === 'AbortError';
+            if (!isAbortError) {
+                clearTimeout(timeoutId);
+            }
 
             // If HEAD fails, it might be blocked - try GET as fallback
             // (some servers don't support HEAD)
@@ -59,7 +64,11 @@ export async function probeVideoHost(
                 clearTimeout(getTimeoutId);
                 return getResponse.status >= 200 && getResponse.status < 400;
             } catch (getError) {
-                clearTimeout(getTimeoutId);
+                // Clear timeout only if it hasn't already fired
+                const isGetAbortError = getError instanceof Error && getError.name === 'AbortError';
+                if (!isGetAbortError) {
+                    clearTimeout(getTimeoutId);
+                }
                 return false;
             }
         }
