@@ -36,6 +36,7 @@ import { useNotifications } from '../../hooks/useNotifications';
 import { useVotingPower } from '../../hooks/useVotingPower';
 import { useResourceCredits } from '../../hooks/useResourceCredits';
 import { useUserProfile } from '../../hooks/useUserProfile';
+import { formatVotingPower } from '../../utils/calculateVotingPower';
 
 // Shared state management
 import { useAppStore, useCurrentUser, useAppDebug, useFollowCacheManagement } from '../../store/context';
@@ -802,8 +803,8 @@ const FeedScreenRefactored = () => {
                 <SmallButton
                   label='VP:'
                   value={
-                    votingPower !== null && Number.isFinite(votingPower)
-                      ? (votingPower / 100).toFixed(1)
+                    votingPower !== null
+                      ? formatVotingPower(votingPower)
                       : '--'
                   }
                   unit='%'
