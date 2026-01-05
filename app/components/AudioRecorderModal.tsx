@@ -50,7 +50,9 @@ const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (soundRef.current) {
-        soundRef.current.unloadAsync().catch(() => {});
+        soundRef.current.unloadAsync().catch((e) => {
+          if (__DEV__) console.debug('[AudioRecorder] Cleanup error:', e);
+        });
       }
     };
   }, []);
@@ -97,16 +99,18 @@ const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({
       await recordingRef.current.stopAndUnloadAsync();
       const uri = recordingRef.current.getURI();
 
+      if (!uri) {
+        throw new Error('Failed to get recording URI');
+      }
+
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
 
-      if (uri) {
-        // Read audio file as blob
-        const audioBlob = await uriToBlob(uri);
-        setAudioBlob(audioBlob);
-      }
+      // Read audio file as blob
+      const audioBlob = await uriToBlob(uri);
+      setAudioBlob(audioBlob);
 
       recordingRef.current = null;
       setIsRecording(false);
@@ -121,7 +125,9 @@ const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({
     setDuration(0);
     setIsPlaying(false);
     if (soundRef.current) {
-      soundRef.current.unloadAsync().catch(() => {});
+      soundRef.current.unloadAsync().catch((e) => {
+        if (__DEV__) console.debug('[AudioRecorder] Cleanup error:', e);
+      });
       soundRef.current = null;
     }
   };
