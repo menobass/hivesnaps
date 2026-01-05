@@ -131,7 +131,8 @@ function parseVestingShares(vestingSharesValue: string | { amount: number | stri
 export function formatVotingPower(votingPower: number, decimals: number = 1): string {
   // Guard against NaN or invalid values
   if (!Number.isFinite(votingPower)) {
-    return (0).toFixed(decimals);
+    // For invalid values, show "--" to match FeedScreen and PR description
+    return '--';
   }
   return (votingPower / 100).toFixed(decimals);
 }
