@@ -261,7 +261,12 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
                     try {
                         const data = JSON.parse(event.nativeEvent.data);
                         if (data.type === 'fullscreen-exit') {
-                            // Always show overlay after exiting fullscreen to allow re-entering
+                            // Android: Always show overlay after exiting fullscreen
+                            // Unlike iOS (which uses native fullscreen and auto-pauses), Android videos
+                            // continue playing in the WebView without accessible controls after exiting.
+                            // The overlay is required to re-enter fullscreen, regardless of play state.
+                            // iOS checks data.paused because allowsInlineMediaPlayback={false} forces
+                            // native fullscreen that auto-pauses on exit. Android needs manual control.
                             setShowPlayButton(true);
                         } else if (data.type === 'fullscreen-error') {
                             // Fullscreen failed, show overlay again to allow retry
