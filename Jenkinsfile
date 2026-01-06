@@ -174,32 +174,22 @@ RELEASE_KEY_ALIAS=${ANDROID_KEY_ALIAS}
 RELEASE_KEY_PASSWORD=${ANDROID_KEY_PASSWORD}
 EOF
 
-                        # Create a separate signing config gradle file
-                        cat > android/app/signing.gradle << 'SIGNING_EOF'
-// Release signing configuration - applied after expo prebuild
-android {
-    signingConfigs {
-        release {
-            if (project.hasProperty('RELEASE_STORE_FILE')) {
-                storeFile file(RELEASE_STORE_FILE)
-                storePassword RELEASE_STORE_PASSWORD
-                keyAlias RELEASE_KEY_ALIAS
-                keyPassword RELEASE_KEY_PASSWORD
-            }
+                        # Add release signing directly to build.gradle at the end
+                        cat >> android/app/build.gradle << 'SIGNING_EOF'
+
+// Release signing configuration - added by Jenkins
+afterEvaluate {
+    android.signingConfigs.create('release') {
+        if (project.hasProperty('RELEASE_STORE_FILE')) {
+            storeFile file(RELEASE_STORE_FILE)
+            storePassword RELEASE_STORE_PASSWORD
+            keyAlias RELEASE_KEY_ALIAS
+            keyPassword RELEASE_KEY_PASSWORD
         }
     }
+    android.buildTypes.release.signingConfig = android.signingConfigs.release
 }
-
-// Update the release buildType to use release signing
-android.buildTypes.release.signingConfig = android.signingConfigs.release
 SIGNING_EOF
-
-                        # Append the apply statement to build.gradle if not already present
-                        if ! grep -q "apply from: 'signing.gradle'" android/app/build.gradle; then
-                            echo "" >> android/app/build.gradle
-                            echo "// Apply release signing configuration" >> android/app/build.gradle
-                            echo "apply from: 'signing.gradle'" >> android/app/build.gradle
-                        fi
                         
                         echo "✓ Release signing configured"
                     '''
