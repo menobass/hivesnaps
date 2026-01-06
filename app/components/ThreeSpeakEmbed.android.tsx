@@ -32,20 +32,28 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
     const containerWidth = width - 32; // Account for horizontal padding
     const videoHeight = containerWidth; // Square aspect ratio
 
-    // Handle play button tap
-    const handlePlayButtonPress = () => {
+    // Handle overlay tap - re-enter fullscreen or play if paused
+    const handleOverlayPress = () => {
         setShowPlayButton(false);
-        // Inject JS to find and click the play button in the 3Speak player
+        // Inject JS to request fullscreen (and play if paused)
         webViewRef.current?.injectJavaScript(`
             (function() {
                 const video = document.querySelector('video');
                 if (video) {
-                    video.play();
-                }
-                // Also try to find and click any play button in the player UI
-                const playButton = document.querySelector('[class*="play"], [aria-label*="play" i], button[class*="control"]');
-                if (playButton) {
-                    playButton.click();
+                    // If paused, play first
+                    if (video.paused) {
+                        video.play();
+                    }
+                    // Request fullscreen
+                    setTimeout(() => {
+                        if (video.requestFullscreen) {
+                            video.requestFullscreen();
+                        } else if (video.webkitRequestFullscreen) {
+                            video.webkitRequestFullscreen();
+                        } else if (video.mozRequestFullScreen) {
+                            video.mozRequestFullScreen();
+                        }
+                    }, 100);
                 }
             })();
             true;
@@ -206,10 +214,8 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
                         const data = JSON.parse(event.nativeEvent.data);
                         if (data.type === 'fullscreen-exit') {
                             hasPlayedOnce.current = true;
-                            // Show play button overlay if video is paused after exiting fullscreen
-                            if (data.paused) {
-                                setShowPlayButton(true);
-                            }
+                            // Always show overlay after exiting fullscreen to allow re-entering
+                            setShowPlayButton(true);
                         }
                     } catch (e) {
                         // Ignore parsing errors
@@ -224,11 +230,11 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
                     );
                 }}
             />
-            {/* Custom play button overlay - shown after exiting fullscreen */}
+            {/* Overlay after exiting fullscreen - tap to re-enter fullscreen */}
             {showPlayButton && (
                 <TouchableOpacity
                     style={styles.playButtonOverlay}
-                    onPress={handlePlayButtonPress}
+                    onPress={handleOverlayPress}
                     activeOpacity={0.8}
                 >
                     <View style={styles.playButtonContainer}>
