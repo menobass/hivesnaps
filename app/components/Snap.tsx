@@ -533,8 +533,15 @@ const Snap: React.FC<SnapProps> = ({
       });
     } catch (error) {
       console.error('Error sharing snap:', error);
-      // Don't show alert for user cancellation
-      if ((error as any)?.message !== 'User did not share') {
+      // Don't show alert for user cancellation - check multiple error indicators
+      const shareError = error as { message?: string; code?: string };
+      const isUserCancelled =
+        shareError.message === 'User did not share' ||
+        shareError.code === 'CANCELLED' ||
+        shareError.code === 'ECANCELLED' ||
+        shareError.code === 'E_SHARE_CANCELLED';
+
+      if (!isUserCancelled) {
         Alert.alert('Share Failed', 'Unable to share snap. Please try again.');
       }
     }
