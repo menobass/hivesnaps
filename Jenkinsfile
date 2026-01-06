@@ -34,6 +34,12 @@ pipeline {
         
         // Discord webhook for notifications (configure in Jenkins or set here)
         DISCORD_WEBHOOK_URL = "${env.DISCORD_WEBHOOK_URL ?: ''}"
+        
+        // Android release signing (configure these in Jenkins credentials)
+        ANDROID_KEYSTORE_FILE = credentials('android-keystore-file')
+        ANDROID_KEYSTORE_PASSWORD = credentials('android-keystore-password')
+        ANDROID_KEY_ALIAS = credentials('android-key-alias')
+        ANDROID_KEY_PASSWORD = credentials('android-key-password')
     }
 
     stages {
@@ -146,18 +152,61 @@ pipeline {
             }
         }
 
-        // Stage 5: Build Android APK/AAB
+        // Stage 5: Setup Release Signing
+        stage('Setup Release Signing') {
+            steps {
+                script {
+                    echo "Setting up Android release signing..."
+                    sh '''
+                        # Copy keystore to android directory
+                        cp "${ANDROID_KEYSTORE_FILE}" android/app/release.keystore
+                        
+                        # Create gradle.properties with signing config
+                        cat > android/gradle.properties << EOF
+org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+android.useAndroidX=true
+android.enableJetifier=true
+
+# Release signing
+RELEASE_STORE_FILE=release.keystore
+RELEASE_STORE_PASSWORD=${ANDROID_KEYSTORE_PASSWORD}
+RELEASE_KEY_ALIAS=${ANDROID_KEY_ALIAS}
+RELEASE_KEY_PASSWORD=${ANDROID_KEY_PASSWORD}
+EOF
+
+                        # Update build.gradle to use release signing
+                        sed -i.bak 's/signingConfig signingConfigs.debug$/signingConfig signingConfigs.release/' android/app/build.gradle
+                        
+                        # Add release signing config to build.gradle
+                        sed -i.bak '/signingConfigs {/,/}/ {
+                            /}/ i\
+        release {\
+            if (project.hasProperty("RELEASE_STORE_FILE")) {\
+                storeFile file(RELEASE_STORE_FILE)\
+                storePassword RELEASE_STORE_PASSWORD\
+                keyAlias RELEASE_KEY_ALIAS\
+                keyPassword RELEASE_KEY_PASSWORD\
+            }\
+        }
+                        }' android/app/build.gradle
+                        
+                        echo "✓ Release signing configured"
+                    '''
+                }
+            }
+        }
+
+        // Stage 6: Build Android APK/AAB
         stage('Build Android') {
             steps {
                 dir('android') {
                     script {
-                        echo "Building Android release..."
+                        echo "Building Android release with proper signing..."
                         sh '''
                             # Kill any existing Gradle daemons to prevent stale process issues
                             ./gradlew --stop || true
                             
-                            # Build with no daemon (more resilient to Jenkins restarts)
-                            # Use parallel builds and multiple workers for speed
+                            # Build release with signing
                             ./gradlew assembleRelease bundleRelease \
                                 --no-daemon \
                                 --stacktrace \
@@ -173,7 +222,7 @@ pipeline {
             }
         }
 
-        // Stage 6: Archive Artifacts
+        // Stage 7: Archive Artifacts
         stage('Archive Artifacts') {
             steps {
                 script {
@@ -187,7 +236,7 @@ pipeline {
                         fi
                     """
                     
-                    // Archive AAB
+                    // Archive AAB (this should be properly signed now)
                     sh """
                         if [ -f android/app/build/outputs/bundle/release/app-release.aab ]; then
                             cp android/app/build/outputs/bundle/release/app-release.aab \
@@ -217,8 +266,12 @@ pipeline {
                     fi
                     
                     if [ -f android/app/build/outputs/bundle/release/app-release.aab ]; then
-                        echo "✓ AAB built successfully"
+                        echo "✓ AAB built successfully (with release signing)"
                         ls -lh android/app/build/outputs/bundle/release/app-release.aab
+                        
+                        # Verify signing
+                        echo "Checking AAB signing..."
+                        jarsigner -verify android/app/build/outputs/bundle/release/app-release.aab || echo "Warning: Could not verify AAB signature"
                     else
                         echo "✗ AAB not found"
                     fi
@@ -254,7 +307,7 @@ pipeline {
                       -d '{
                         "embeds": [{
                           "title": "✅ Build Successful!",
-                          "description": "**Job:** ${env.JOB_NAME}\\n**Build:** #${env.BUILD_NUMBER}\\n**Branch:** ${branch}${prInfo}\\n**Duration:** ${duration}\\n**Artifacts:** APK & AAB ready\\n[View Build](${env.BUILD_URL})",
+                          "description": "**Job:** ${env.JOB_NAME}\n**Build:** #${env.BUILD_NUMBER}\n**Branch:** ${branch}${prInfo}\n**Duration:** ${duration}\n**Artifacts:** Signed APK & AAB ready\n[View Build](${env.BUILD_URL})",
                           "color": 3066993,
                           "footer": {"text": "HiveSnaps Android CI"}
                         }]
