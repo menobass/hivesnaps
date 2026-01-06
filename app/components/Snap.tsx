@@ -777,7 +777,6 @@ const Snap: React.FC<SnapProps> = ({
         {/* Body */}
         {cleanTextBody.length > 0 &&
           (() => {
-            const windowWidth = Dimensions.get('window').width;
             const isHtml = containsHtml(cleanTextBody);
             if (onContentPress) {
               return (
