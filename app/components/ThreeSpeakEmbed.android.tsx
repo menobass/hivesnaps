@@ -119,6 +119,15 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
             function setupFullscreenExitDetection(video) {
                 if (!video) return;
                 
+                // iOS-specific fullscreen exit event
+                // Added for completeness in case WebView JS is ever reused cross-platform
+                video.addEventListener('webkitendfullscreen', () => {
+                    window.ReactNativeWebView?.postMessage(JSON.stringify({
+                        type: 'fullscreen-exit',
+                        paused: video.paused
+                    }));
+                });
+                
                 // Standard fullscreen change events
                 document.addEventListener('fullscreenchange', () => {
                     if (!document.fullscreenElement) {
