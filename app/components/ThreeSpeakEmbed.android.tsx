@@ -37,26 +37,52 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
     // Handle overlay tap - re-enter fullscreen or play if paused
     const handleOverlayPress = () => {
         setShowPlayButton(false);
-        // Inject JS to request fullscreen (and play if paused)
+        // Inject JS to request fullscreen (and play if paused) with error handling
         webViewRef.current?.injectJavaScript(`
             (function() {
                 const video = document.querySelector('video');
-                if (video) {
-                    // If paused, play first
-                    if (video.paused) {
-                        video.play();
-                    }
-                    // Request fullscreen
-                    setTimeout(() => {
-                        if (video.requestFullscreen) {
-                            video.requestFullscreen();
-                        } else if (video.webkitRequestFullscreen) {
-                            video.webkitRequestFullscreen();
-                        } else if (video.mozRequestFullScreen) {
-                            video.mozRequestFullScreen();
-                        }
-                    }, 100);
+                if (!video) {
+                    window.ReactNativeWebView?.postMessage(JSON.stringify({
+                        type: 'fullscreen-error',
+                        message: 'Video element not found'
+                    }));
+                    return;
                 }
+                
+                // If paused, play first
+                if (video.paused) {
+                    video.play().catch(err => {
+                        console.error('Play failed:', err);
+                    });
+                }
+                
+                // Request fullscreen with error handling
+                setTimeout(() => {
+                    let fullscreenPromise = null;
+                    
+                    if (video.requestFullscreen) {
+                        fullscreenPromise = video.requestFullscreen();
+                    } else if (video.webkitRequestFullscreen) {
+                        fullscreenPromise = video.webkitRequestFullscreen();
+                    } else if (video.mozRequestFullScreen) {
+                        fullscreenPromise = video.mozRequestFullScreen();
+                    }
+                    
+                    if (fullscreenPromise && typeof fullscreenPromise.catch === 'function') {
+                        fullscreenPromise.catch(err => {
+                            console.error('Fullscreen request failed:', err);
+                            window.ReactNativeWebView?.postMessage(JSON.stringify({
+                                type: 'fullscreen-error',
+                                message: 'Fullscreen not supported or denied'
+                            }));
+                        });
+                    } else if (!fullscreenPromise) {
+                        window.ReactNativeWebView?.postMessage(JSON.stringify({
+                            type: 'fullscreen-error',
+                            message: 'Fullscreen API not available'
+                        }));
+                    }
+                }, 100);
             })();
             true;
         `);
@@ -217,6 +243,10 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
                         if (data.type === 'fullscreen-exit') {
                             hasPlayedOnce.current = true;
                             // Always show overlay after exiting fullscreen to allow re-entering
+                            setShowPlayButton(true);
+                        } else if (data.type === 'fullscreen-error') {
+                            // Fullscreen failed, show overlay again to allow retry
+                            console.warn('[ThreeSpeakEmbed] Fullscreen error:', data.message);
                             setShowPlayButton(true);
                         }
                     } catch (e) {
