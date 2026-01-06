@@ -197,24 +197,16 @@ SIGNING
                         # Insert release signing config after the signingConfigs { line
                         sed -i '/signingConfigs {/r /tmp/release_signing.txt' android/app/build.gradle
                         
-                        # Change release buildType to use release signing instead of debug  
-                        python3 << 'PYEOF'
+                        # Change release buildType to use release signing instead of debug
+                        cat > /tmp/fix_signing.py << 'PYEOF'
 import re
-
 with open('android/app/build.gradle', 'r') as f:
     content = f.read()
-
-# Replace signingConfig in release buildType
-content = re.sub(
-    r'(release\s*{[^}]*signingConfig\s+)signingConfigs\.debug',
-    r'\1signingConfigs.release',
-    content,
-    flags=re.DOTALL
-)
-
+content = re.sub(r'(release\s*{[^}]*signingConfig\s+)signingConfigs\.debug', r'\1signingConfigs.release', content, flags=re.DOTALL)
 with open('android/app/build.gradle', 'w') as f:
     f.write(content)
 PYEOF
+                        python3 /tmp/fix_signing.py
                         
                         # Verify the changes
                         echo "=== Verifying signing configuration ==="
