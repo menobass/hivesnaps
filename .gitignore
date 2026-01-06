@@ -17,6 +17,9 @@ PAGINATION_SOLUTION_BACKUP.txt
 .kotlin/
 *.orig.*
 *.jks
+*.keystore
+release-keystore.jks
+@menobass__hivesnaps.jks
 *.p8
 *.p12
 *.key
@@ -54,3 +57,4 @@ test-*.ts
 
 # Local design / implementation notes
 TRENDING_FEED_IMPLEMENTATION_GUIDE.md
+GOOGLE_LOGIN_IMPLEMENTATION_PLAN.md
