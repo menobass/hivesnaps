@@ -19,7 +19,9 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
     embedUrl,
     isDark,
 }) => {
-    console.log('🎬 [ThreeSpeakEmbed.android.tsx] Android-SPECIFIC version loaded');
+    if (__DEV__) {
+        console.log('🎬 [ThreeSpeakEmbed.android.tsx] Android-SPECIFIC version loaded');
+    }
     const colorScheme = useColorScheme();
     const themeIsDark = isDark ?? colorScheme === 'dark';
     const { width } = useWindowDimensions();
