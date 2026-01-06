@@ -188,12 +188,10 @@ android {
             }
         }
     }
-    buildTypes {
-        release {
-            signingConfig signingConfigs.release
-        }
-    }
 }
+
+// Update the release buildType to use release signing
+android.buildTypes.release.signingConfig = android.signingConfigs.release
 SIGNING_EOF
 
                         # Append the apply statement to build.gradle if not already present
