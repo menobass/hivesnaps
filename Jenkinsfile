@@ -182,22 +182,11 @@ RELEASE_KEY_ALIAS=${ANDROID_KEY_ALIAS}
 RELEASE_KEY_PASSWORD=${ANDROID_KEY_PASSWORD}
 EOF
 
-                        # Add release signing directly to build.gradle at the end
-                        cat >> android/app/build.gradle << 'SIGNING_EOF'
-
-// Release signing configuration - added by Jenkins
-afterEvaluate {
-    android.signingConfigs.create('release') {
-        if (project.hasProperty('RELEASE_STORE_FILE')) {
-            storeFile file(RELEASE_STORE_FILE)
-            storePassword RELEASE_STORE_PASSWORD
-            keyAlias RELEASE_KEY_ALIAS
-            keyPassword RELEASE_KEY_PASSWORD
-        }
-    }
-    android.buildTypes.release.signingConfig = android.signingConfigs.release
-}
-SIGNING_EOF
+                        # Add release signing config to signingConfigs block
+                        sed -i '/signingConfigs {/a\        release {\n            if (project.hasProperty("RELEASE_STORE_FILE")) {\n                storeFile file(RELEASE_STORE_FILE)\n                storePassword RELEASE_STORE_PASSWORD\n                keyAlias RELEASE_KEY_ALIAS\n                keyPassword RELEASE_KEY_PASSWORD\n            }\n        }' android/app/build.gradle
+                        
+                        # Change release buildType to use release signing
+                        sed -i 's/signingConfig signingConfigs\.debug$/signingConfig signingConfigs.release/' android/app/build.gradle | grep -A 5 "buildTypes {" android/app/build.gradle
                         
                         echo "✓ Release signing configured"
                     '''
