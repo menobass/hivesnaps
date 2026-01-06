@@ -523,6 +523,13 @@ const Snap: React.FC<SnapProps> = ({
   const handleShareSnap = async () => {
     setMoreMenuVisible(false);
 
+    // Guard: ensure permlink is defined before sharing
+    if (!permlink) {
+      console.warn('[handleShareSnap] Cannot share: permlink is undefined');
+      Alert.alert('Share Failed', 'Unable to share snap. Snap information is missing.');
+      return;
+    }
+
     try {
       const snapUrl = buildSnapieUrl(author, permlink);
 
