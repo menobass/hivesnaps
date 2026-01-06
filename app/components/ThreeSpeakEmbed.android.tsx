@@ -34,8 +34,8 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
     const containerWidth = width - 32; // Account for horizontal padding
     const videoHeight = containerWidth; // Square aspect ratio
 
-    // Handle overlay tap - re-enter fullscreen or play if paused
-    const handleOverlayPress = () => {
+    // Handle play button tap - re-enter fullscreen or play if paused
+    const handlePlayButtonPress = () => {
         setShowPlayButton(false);
         // Inject JS to request fullscreen (and play if paused) with error handling
         webViewRef.current?.injectJavaScript(`
@@ -266,7 +266,7 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
             {showPlayButton && (
                 <TouchableOpacity
                     style={styles.playButtonOverlay}
-                    onPress={handleOverlayPress}
+                    onPress={handlePlayButtonPress}
                     activeOpacity={0.8}
                 >
                     <View style={styles.playButtonContainer}>
