@@ -27,7 +27,6 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
     const { width } = useWindowDimensions();
     const webViewRef = useRef<WebView>(null);
     const [showPlayButton, setShowPlayButton] = useState(false);
-    const hasPlayedOnce = useRef(false);
 
     // Calculate responsive height based on screen width (1:1 square)
     // Assumes some padding/margins in the parent container
@@ -250,7 +249,6 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
                     try {
                         const data = JSON.parse(event.nativeEvent.data);
                         if (data.type === 'fullscreen-exit') {
-                            hasPlayedOnce.current = true;
                             // Always show overlay after exiting fullscreen to allow re-entering
                             setShowPlayButton(true);
                         } else if (data.type === 'fullscreen-error') {
