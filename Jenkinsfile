@@ -129,10 +129,8 @@ pipeline {
                 script {
                     echo "Running Expo prebuild to generate/update native Android code..."
                     sh '''
-                        # Clean previous builds
-                        rm -rf android/app/build
-                        rm -rf android/build
-                        rm -rf android/.gradle
+                        # Complete clean of android directory
+                        rm -rf android
                         
                         # Run expo prebuild for Android only
                         npx expo prebuild --platform android --clean
@@ -145,6 +143,10 @@ pipeline {
                         
                         # Make gradlew executable
                         chmod +x android/gradlew
+                        
+                        # Debug: Show what was generated around line 177
+                        echo "=== Checking build.gradle around line 177 ==="
+                        sed -n '170,185p' android/app/build.gradle
                         
                         echo "✓ Prebuild completed successfully"
                     '''
