@@ -144,11 +144,17 @@ pipeline {
                         # Make gradlew executable
                         chmod +x android/gradlew
                         
-                        # Debug: Show what was generated around line 177
-                        echo "=== Checking build.gradle around line 177 ==="
-                        sed -n '170,185p' android/app/build.gradle
+                        # Fix hermesEnabled missing variable
+                        echo "=== Patching build.gradle to define hermesEnabled ==="
+                        # Insert hermesEnabled definition after jscFlavor line
+                        sed -i "/^def jscFlavor = /a\\
+def hermesEnabled = project.ext.react.get(\\"enableHermes\\", true)" android/app/build.gradle
                         
-                        echo "✓ Prebuild completed successfully"
+                        # Verify the fix
+                        echo "=== Checking patched build.gradle ==="
+                        grep -A 2 "def jscFlavor" android/app/build.gradle
+                        
+                        echo "✓ Prebuild completed and patched successfully"
                     '''
                 }
             }
