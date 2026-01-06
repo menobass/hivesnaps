@@ -91,6 +91,7 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
     const injectedJavaScript = `
         (function() {
             const processedVideos = new WeakSet(); // Track videos that already have listeners
+            let fullscreenListenersAdded = false; // Ensure document listeners added only once
             
             // Function to attempt fullscreen on a video element
             function requestFullscreen(video) {
@@ -114,36 +115,47 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
                 return false;
             }
             
-            // Notify React Native when video exits fullscreen
-            function setupFullscreenExitDetection(video) {
-                if (!video) return;
-                
-                // iOS-specific fullscreen exit event
-                // Added for completeness in case WebView JS is ever reused cross-platform
-                video.addEventListener('webkitendfullscreen', () => {
-                    window.ReactNativeWebView?.postMessage(JSON.stringify({
-                        type: 'fullscreen-exit',
-                        paused: video.paused
-                    }));
-                });
+            // Setup document-level fullscreen exit detection (called once)
+            function setupDocumentFullscreenListeners() {
+                if (fullscreenListenersAdded) return; // Already added
+                fullscreenListenersAdded = true;
                 
                 // Standard fullscreen change events
                 document.addEventListener('fullscreenchange', () => {
                     if (!document.fullscreenElement) {
+                        const video = document.querySelector('video');
                         window.ReactNativeWebView?.postMessage(JSON.stringify({
                             type: 'fullscreen-exit',
-                            paused: video.paused
+                            paused: video ? video.paused : false
                         }));
                     }
                 });
                 
                 document.addEventListener('webkitfullscreenchange', () => {
                     if (!document.webkitFullscreenElement) {
+                        const video = document.querySelector('video');
                         window.ReactNativeWebView?.postMessage(JSON.stringify({
                             type: 'fullscreen-exit',
-                            paused: video.paused
+                            paused: video ? video.paused : false
                         }));
                     }
+                });
+            }
+            
+            // Notify React Native when video exits fullscreen
+            function setupFullscreenExitDetection(video) {
+                if (!video) return;
+                
+                // Setup document-level listeners once
+                setupDocumentFullscreenListeners();
+                
+                // iOS-specific fullscreen exit event (video-level)
+                // Added for completeness in case WebView JS is ever reused cross-platform
+                video.addEventListener('webkitendfullscreen', () => {
+                    window.ReactNativeWebView?.postMessage(JSON.stringify({
+                        type: 'fullscreen-exit',
+                        paused: video.paused
+                    }));
                 });
             }
             
