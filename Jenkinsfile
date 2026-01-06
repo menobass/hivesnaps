@@ -174,22 +174,11 @@ RELEASE_KEY_ALIAS=${ANDROID_KEY_ALIAS}
 RELEASE_KEY_PASSWORD=${ANDROID_KEY_PASSWORD}
 EOF
 
-                        # Fix build.gradle signing configuration
-                        python3 -c "
-import re
-
-# Read the build.gradle file
-with open('android/app/build.gradle', 'r') as f:
-    content = f.read()
-
-# Replace the signingConfigs section with proper release config
-new_signing_configs = '''    signingConfigs {
-        debug {
-            storeFile file('debug.keystore')
-            storePassword 'android'
-            keyAlias 'androiddebugkey'
-            keyPassword 'android'
-        }
+                        # Create a separate signing config gradle file
+                        cat > android/app/signing.gradle << 'SIGNING_EOF'
+// Release signing configuration - applied after expo prebuild
+android {
+    signingConfigs {
         release {
             if (project.hasProperty('RELEASE_STORE_FILE')) {
                 storeFile file(RELEASE_STORE_FILE)
@@ -198,19 +187,21 @@ new_signing_configs = '''    signingConfigs {
                 keyPassword RELEASE_KEY_PASSWORD
             }
         }
-    }'''
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+        }
+    }
+}
+SIGNING_EOF
 
-# Replace the existing signingConfigs section
-pattern = r'    signingConfigs\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
-content = re.sub(pattern, new_signing_configs, content, flags=re.DOTALL)
-
-# Update release buildType to use release signing
-content = re.sub(r'signingConfig signingConfigs\.debug(\s+)', r'signingConfig signingConfigs.release\1', content)
-
-# Write back to file
-with open('android/app/build.gradle', 'w') as f:
-    f.write(content)
-"
+                        # Append the apply statement to build.gradle if not already present
+                        if ! grep -q "apply from: 'signing.gradle'" android/app/build.gradle; then
+                            echo "" >> android/app/build.gradle
+                            echo "// Apply release signing configuration" >> android/app/build.gradle
+                            echo "apply from: 'signing.gradle'" >> android/app/build.gradle
+                        fi
                         
                         echo "✓ Release signing configured"
                     '''
