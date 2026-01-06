@@ -174,21 +174,43 @@ RELEASE_KEY_ALIAS=${ANDROID_KEY_ALIAS}
 RELEASE_KEY_PASSWORD=${ANDROID_KEY_PASSWORD}
 EOF
 
-                        # Update build.gradle to use release signing
-                        sed -i.bak 's/signingConfig signingConfigs.debug$/signingConfig signingConfigs.release/' android/app/build.gradle
-                        
-                        # Add release signing config to build.gradle
-                        sed -i.bak '/signingConfigs {/,/}/ {
-                            /}/ i\
-        release {\
-            if (project.hasProperty("RELEASE_STORE_FILE")) {\
-                storeFile file(RELEASE_STORE_FILE)\
-                storePassword RELEASE_STORE_PASSWORD\
-                keyAlias RELEASE_KEY_ALIAS\
-                keyPassword RELEASE_KEY_PASSWORD\
-            }\
+                        # Fix build.gradle signing configuration
+                        python3 -c "
+import re
+
+# Read the build.gradle file
+with open('android/app/build.gradle', 'r') as f:
+    content = f.read()
+
+# Replace the signingConfigs section with proper release config
+new_signing_configs = '''    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
         }
-                        }' android/app/build.gradle
+        release {
+            if (project.hasProperty('RELEASE_STORE_FILE')) {
+                storeFile file(RELEASE_STORE_FILE)
+                storePassword RELEASE_STORE_PASSWORD
+                keyAlias RELEASE_KEY_ALIAS
+                keyPassword RELEASE_KEY_PASSWORD
+            }
+        }
+    }'''
+
+# Replace the existing signingConfigs section
+pattern = r'    signingConfigs\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
+content = re.sub(pattern, new_signing_configs, content, flags=re.DOTALL)
+
+# Update release buildType to use release signing
+content = re.sub(r'signingConfig signingConfigs\.debug(\s+)', r'signingConfig signingConfigs.release\1', content)
+
+# Write back to file
+with open('android/app/build.gradle', 'w') as f:
+    f.write(content)
+"
                         
                         echo "✓ Release signing configured"
                     '''
