@@ -185,8 +185,23 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
                             if (video.videoWidth > 0 && video.videoHeight > 0) {
                                 requestFullscreen(video);
                             } else {
-                                // If dimensions not ready, wait a bit more
-                                setTimeout(() => requestFullscreen(video), 200);
+                                // If dimensions not ready, wait a bit more and try again
+                                setTimeout(() => {
+                                    if (video.videoWidth > 0 && video.videoHeight > 0) {
+                                        requestFullscreen(video);
+                                    } else {
+                                        // Video dimensions still not ready - likely a loading issue
+                                        console.error('Video dimensions not available after retries:', {
+                                            videoWidth: video.videoWidth,
+                                            videoHeight: video.videoHeight,
+                                            readyState: video.readyState
+                                        });
+                                        window.ReactNativeWebView?.postMessage(JSON.stringify({
+                                            type: 'fullscreen-error',
+                                            message: 'Video dimensions not loaded'
+                                        }));
+                                    }
+                                }, 200);
                             }
                         }, 300);
                     }
