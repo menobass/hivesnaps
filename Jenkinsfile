@@ -174,6 +174,11 @@ pipeline {
                         echo "✓ build.gradle already patched"
                     fi
                 '''
+                }
+            }
+        }
+
+        // Stage 5: Setup Release Signing (Only for main branch or when explicitly requested)
         stage('Setup Release Signing') {
             when {
                 expression { 
