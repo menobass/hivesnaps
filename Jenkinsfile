@@ -214,14 +214,11 @@ pipeline {
                             # Copy keystore to android/app directory
                             cp "$KEYSTORE_FILE" android/app/release.keystore
                             
-                            # Create gradle.properties with signing configuration
-                            # These properties are read by build.gradle
-                            cat > android/gradle.properties << EOF
-org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-android.useAndroidX=true
-android.enableJetifier=true
+                            # APPEND signing configuration to existing gradle.properties
+                            # Do NOT overwrite - expo prebuild generates critical settings
+                            cat >> android/gradle.properties << EOF
 
-# Release signing configuration
+# === Release Signing Configuration (added by Jenkins) ===
 RELEASE_STORE_FILE=release.keystore
 RELEASE_STORE_PASSWORD=$KEYSTORE_PASSWORD
 RELEASE_KEY_ALIAS=$KEY_ALIAS
@@ -231,6 +228,9 @@ EOF
                             echo "✓ Release signing configured successfully"
                             echo "  - Keystore: release.keystore"
                             echo "  - Key alias: $KEY_ALIAS"
+                            echo ""
+                            echo "Current gradle.properties:"
+                            cat android/gradle.properties
                         '''
                     }
                 }
