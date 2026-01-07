@@ -160,12 +160,19 @@ pipeline {
                         echo "✓ Prebuild completed successfully"
                     '''
                 
-                // Fix: Expo prebuild regenerates build.gradle without hermesEnabled as project ext property
-                // expo-modules-core expects it to be accessible as project(':app').hermesEnabled
-                echo "Patching build.gradle to fix hermesEnabled variable..."
+                // Fix: Expo prebuild regenerates android files - patch required settings
+                echo "Patching Android configuration files..."
                 sh '''
+                    # 1. Ensure newArchEnabled is set (required by react-native-reanimated)
+                    if ! grep -q "newArchEnabled=true" android/gradle.properties; then
+                        echo "newArchEnabled=true" >> android/gradle.properties
+                        echo "✓ Added newArchEnabled=true to gradle.properties"
+                    else
+                        echo "✓ newArchEnabled already set in gradle.properties"
+                    fi
+                    
+                    # 2. Add hermesEnabled ext property to build.gradle
                     cd android/app
-                    # Check if hermesEnabled ext property is already defined
                     if ! grep -q "ext.hermesEnabled" build.gradle; then
                         # Create a temp file with the ext block and the rest of build.gradle
                         {
