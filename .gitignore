@@ -48,6 +48,9 @@ Thumbs.db
 # Development backup and test files
 *BACKUP*
 *backup*
+
+# Jenkins setup documentation (internal use only)
+JENKINS_CLEAN_SETUP.md
 test-*.js
 test-*.ts
 /test
