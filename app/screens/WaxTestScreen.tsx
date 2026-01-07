@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router';
-import WaxTest from '../../../components/WaxTest';
+import WaxTest from '../../components/WaxTest';
 
 export default function WaxTestScreen() {
     return (
