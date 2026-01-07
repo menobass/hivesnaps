@@ -118,9 +118,9 @@ pipeline {
                     echo "SHOULD_RELEASE_SIGN: ${env.SHOULD_RELEASE_SIGN}"
                     
                     if (env.SHOULD_RELEASE_SIGN == 'true') {
-                        echo "✓ Release signing will be used"
+                        echo "[OK] Release signing will be used"
                     } else {
-                        echo "⚠ Debug signing will be used"
+                        echo "[WARN] Debug signing will be used"
                     }
                 }
             }
