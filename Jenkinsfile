@@ -159,11 +159,21 @@ pipeline {
                         
                         echo "✓ Prebuild completed successfully"
                     '''
-                }
-            }
-        }
-
-        // Stage 5: Setup Release Signing (Only for main branch or when explicitly requested)
+                
+                // Fix: Expo prebuild regenerates build.gradle without hermesEnabled variable
+                // Apply patch to define hermesEnabled in dependencies block
+                echo "Patching build.gradle to fix hermesEnabled variable..."
+                sh '''
+                    cd android/app
+                    # Check if hermesEnabled is already defined in dependencies block
+                    if ! grep -q "def hermesEnabled" build.gradle; then
+                        # Insert the hermesEnabled definition after other def statements in dependencies
+                        sed -i '/def isWebpAnimatedEnabled/a\\    def hermesEnabled = (findProperty('"'"'hermesEnabled'"'"') ?: "true").toBoolean();' build.gradle
+                        echo "✓ Patched build.gradle successfully"
+                    else
+                        echo "✓ build.gradle already patched"
+                    fi
+                '''
         stage('Setup Release Signing') {
             when {
                 expression { 
