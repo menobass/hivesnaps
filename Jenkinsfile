@@ -248,6 +248,11 @@ EOF
                             # Kill any existing Gradle daemons to prevent stale process issues
                             ./gradlew --stop || true
                             
+                            # Export critical Gradle properties as environment variables
+                            # This ensures they're visible regardless of gradle.properties timing
+                            export ORG_GRADLE_PROJECT_newArchEnabled=true
+                            export NODE_ENV=production
+                            
                             # Build with no daemon (more resilient to Jenkins restarts)
                             # Use parallel builds and multiple workers for speed
                             ./gradlew assembleRelease bundleRelease \
