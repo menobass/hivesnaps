@@ -2,6 +2,20 @@
 pipeline {
     agent any
     
+    // Build parameters for manual control
+    parameters {
+        booleanParam(
+            name: 'FORCE_RELEASE_SIGNING',
+            defaultValue: false,
+            description: 'Force release signing even on non-main branches (for testing)'
+        )
+        booleanParam(
+            name: 'PUBLISH_TO_PLAYSTORE',
+            defaultValue: false,
+            description: 'Publish AAB to Google Play Store internal track (only works on main branch)'
+        )
+    }
+    
     // Trigger builds on GitHub push and PRs
     triggers {
         githubPush()
@@ -34,6 +48,9 @@ pipeline {
         
         // Discord webhook for notifications (configure in Jenkins or set here)
         DISCORD_WEBHOOK_URL = "${env.DISCORD_WEBHOOK_URL ?: ''}"
+        
+        // Build flags
+        IS_MAIN_BRANCH = "${env.BRANCH_NAME == 'main' || env.GIT_BRANCH == 'origin/main'}"
     }
 
     stages {
@@ -146,12 +163,58 @@ pipeline {
             }
         }
 
-        // Stage 5: Build Android APK/AAB
+        // Stage 5: Setup Release Signing (Only for main branch or when explicitly requested)
+        stage('Setup Release Signing') {
+            when {
+                expression { 
+                    return env.IS_MAIN_BRANCH == 'true' || params.FORCE_RELEASE_SIGNING == true
+                }
+            }
+            steps {
+                script {
+                    echo "=== Setting up release signing for production build ==="
+                    // Use withCredentials for secure credential handling
+                    // This prevents credentials from appearing in logs
+                    withCredentials([
+                        file(credentialsId: 'android-keystore-file', variable: 'KEYSTORE_FILE'),
+                        string(credentialsId: 'android-keystore-password', variable: 'KEYSTORE_PASSWORD'),
+                        string(credentialsId: 'android-key-alias', variable: 'KEY_ALIAS'),
+                        string(credentialsId: 'android-key-password', variable: 'KEY_PASSWORD')
+                    ]) {
+                        sh '''
+                            # Copy keystore to android/app directory
+                            cp "$KEYSTORE_FILE" android/app/release.keystore
+                            
+                            # Create gradle.properties with signing configuration
+                            # These properties are read by build.gradle
+                            cat > android/gradle.properties << EOF
+org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+android.useAndroidX=true
+android.enableJetifier=true
+
+# Release signing configuration
+RELEASE_STORE_FILE=release.keystore
+RELEASE_STORE_PASSWORD=$KEYSTORE_PASSWORD
+RELEASE_KEY_ALIAS=$KEY_ALIAS
+RELEASE_KEY_PASSWORD=$KEY_PASSWORD
+EOF
+                            
+                            echo "✓ Release signing configured successfully"
+                            echo "  - Keystore: release.keystore"
+                            echo "  - Key alias: $KEY_ALIAS"
+                        '''
+                    }
+                }
+            }
+        }
+
+        // Stage 6: Build Android APK/AAB
         stage('Build Android') {
             steps {
                 dir('android') {
                     script {
-                        echo "Building Android release..."
+                        def buildType = env.IS_MAIN_BRANCH == 'true' ? 'release (signed)' : 'release (debug-signed)'
+                        echo "Building Android ${buildType}..."
                         sh '''
                             # Kill any existing Gradle daemons to prevent stale process issues
                             ./gradlew --stop || true
@@ -167,31 +230,44 @@ pipeline {
                                 --max-workers=4
                             
                             echo "✓ Build completed successfully"
+                            
+                            # Verify signing
+                            if [ -f "app/build/outputs/apk/release/app-release.apk" ]; then
+                                echo "=== APK Signature Info ==="
+                                $ANDROID_HOME/build-tools/34.0.0/apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk || true
+                            fi
+                            
+                            if [ -f "app/build/outputs/bundle/release/app-release.aab" ]; then
+                                echo "=== AAB Signature Info ==="
+                                jarsigner -verify -verbose -certs app/build/outputs/bundle/release/app-release.aab || true
+                            fi
                         '''
                     }
                 }
             }
         }
 
-        // Stage 6: Archive Artifacts
+        // Stage 7: Archive Artifacts
         stage('Archive Artifacts') {
             steps {
                 script {
                     def timestamp = new Date().format('yyyyMMddHHmmss')
+                    def branch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'unknown'
+                    def buildType = env.IS_MAIN_BRANCH == 'true' ? 'release' : 'debug'
                     
-                    // Archive APK
+                    // Archive APK with descriptive name
                     sh """
                         if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then
                             cp android/app/build/outputs/apk/release/app-release.apk \
-                               hivesnaps-${timestamp}.apk
+                               hivesnaps-${buildType}-${timestamp}.apk
                         fi
                     """
                     
-                    // Archive AAB
+                    // Archive AAB with descriptive name
                     sh """
                         if [ -f android/app/build/outputs/bundle/release/app-release.aab ]; then
                             cp android/app/build/outputs/bundle/release/app-release.aab \
-                               hivesnaps-${timestamp}.aab
+                               hivesnaps-${buildType}-${timestamp}.aab
                         fi
                     """
                     
@@ -199,6 +275,43 @@ pipeline {
                     archiveArtifacts artifacts: '*.apk,*.aab', allowEmptyArchive: true, fingerprint: true
                     archiveArtifacts artifacts: 'android/app/build/outputs/**/*.apk', allowEmptyArchive: true
                     archiveArtifacts artifacts: 'android/app/build/outputs/**/*.aab', allowEmptyArchive: true
+                }
+            }
+        }
+
+        // Stage 8: Publish to Google Play Store (Optional - Only on main branch)
+        // SETUP REQUIRED: See docs/JENKINS_PLAYSTORE_SETUP.md
+        stage('Publish to Play Store') {
+            when {
+                expression { 
+                    // Only publish on main branch AND if enabled
+                    return env.IS_MAIN_BRANCH == 'true' && params.PUBLISH_TO_PLAYSTORE == true
+                }
+            }
+            steps {
+                script {
+                    echo "=== Publishing to Google Play Store ==="
+                    withCredentials([
+                        file(credentialsId: 'google-play-service-account-json', variable: 'PLAY_SERVICE_ACCOUNT_JSON')
+                    ]) {
+                        dir('android') {
+                            sh '''
+                                # Copy service account JSON to expected location
+                                mkdir -p app
+                                cp "$PLAY_SERVICE_ACCOUNT_JSON" app/play-service-account.json
+                                
+                                # Publish AAB to Play Store internal track
+                                # Using gradle-play-publisher plugin
+                                ./gradlew publishReleaseBundle \
+                                    --no-daemon \
+                                    --stacktrace \
+                                    --console=plain
+                                
+                                echo "✓ Published to Play Store internal track!"
+                                echo "  → Go to Play Console to promote to production"
+                            '''
+                        }
+                    }
                 }
             }
         }
