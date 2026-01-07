@@ -160,18 +160,18 @@ pipeline {
                         echo "✓ Prebuild completed successfully"
                     '''
                 
-                // Fix: Expo prebuild regenerates build.gradle without hermesEnabled variable
-                // Apply patch to define hermesEnabled in dependencies block
+                // Fix: Expo prebuild regenerates build.gradle without hermesEnabled as project ext property
+                // expo-modules-core expects it to be accessible as project(':app').hermesEnabled
                 echo "Patching build.gradle to fix hermesEnabled variable..."
                 sh '''
                     cd android/app
-                    # Check if hermesEnabled is already defined in dependencies block
-                    if ! grep -q "def hermesEnabled" build.gradle; then
-                        # Insert the hermesEnabled definition after other def statements in dependencies
-                        sed -i '/def isWebpAnimatedEnabled/a\\    def hermesEnabled = (findProperty('"'"'hermesEnabled'"'"') ?: "true").toBoolean();' build.gradle
-                        echo "✓ Patched build.gradle successfully"
+                    # Check if hermesEnabled ext property is already defined
+                    if ! grep -q "ext.hermesEnabled" build.gradle; then
+                        # Add hermesEnabled as an ext property after the android block
+                        sed -i '/^android {/i\\ext {\n    hermesEnabled = (findProperty('"'"'hermesEnabled'"'"') ?: "true").toBoolean()\n}\n' build.gradle
+                        echo "✓ Patched build.gradle - added hermesEnabled ext property"
                     else
-                        echo "✓ build.gradle already patched"
+                        echo "✓ build.gradle already has hermesEnabled ext property"
                     fi
                 '''
                 }
