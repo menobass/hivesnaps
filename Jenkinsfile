@@ -167,8 +167,15 @@ pipeline {
                     cd android/app
                     # Check if hermesEnabled ext property is already defined
                     if ! grep -q "ext.hermesEnabled" build.gradle; then
-                        # Add hermesEnabled as an ext property after the android block
-                        sed -i '/^android {/i\\ext {\n    hermesEnabled = (findProperty('"'"'hermesEnabled'"'"') ?: "true").toBoolean()\n}\n' build.gradle
+                        # Create a temp file with the ext block and the rest of build.gradle
+                        {
+                            echo 'ext {'
+                            echo '    hermesEnabled = (findProperty("hermesEnabled") ?: "true").toBoolean()'
+                            echo '}'
+                            echo ''
+                            cat build.gradle
+                        } > build.gradle.tmp
+                        mv build.gradle.tmp build.gradle
                         echo "✓ Patched build.gradle - added hermesEnabled ext property"
                     else
                         echo "✓ build.gradle already has hermesEnabled ext property"
