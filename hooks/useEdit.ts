@@ -203,13 +203,19 @@ export const useEdit = (
 
     // Validate and throw errors instead of silently returning
     if (!target) {
-      throw new Error('No edit target specified. Please try again.');
+      const error = new Error('No edit target specified. Please try again.');
+      setState(prev => ({ ...prev, error: error.message, editing: false }));
+      throw error;
     }
     if (!text.trim() && images.length === 0 && gifs.length === 0 && !video) {
-      throw new Error('Edit cannot be empty. Please add text, images, GIFs, or video.');
+      const error = new Error('Edit cannot be empty. Please add text, images, GIFs, or video.');
+      setState(prev => ({ ...prev, error: error.message, editing: false }));
+      throw error;
     }
     if (!currentUsername) {
-      throw new Error('Not logged in. Please log in to edit.');
+      const error = new Error('Not logged in. Please log in to edit.');
+      setState(prev => ({ ...prev, error: error.message, editing: false }));
+      throw error;
     }
 
     setState(prev => ({ ...prev, editing: true, error: null }));

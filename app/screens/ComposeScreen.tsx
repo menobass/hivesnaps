@@ -120,21 +120,6 @@ export default function ComposeScreen() {
   const replyTargetRef = useRef<{ author: string; permlink: string } | null>(null);
   const editTargetRef = useRef<{ author: string; permlink: string } | null>(null);
 
-  // GIF picker state - using our new professional hook
-  const gifPicker = useGifPicker({
-    onGifSelected: (gifUrl: string) => {
-      if (mode === 'reply') {
-        reply.addReplyGif(gifUrl);
-      } else if (mode === 'edit') {
-        edit.addEditGif(gifUrl);
-      } else {
-        setGifs(prev => [...prev, gifUrl]);
-      }
-    },
-    // Remove loadTrendingOnOpen to use default (false)
-    limit: 20,
-  });
-
   // Reply and edit hooks for modal-less operation
   // Note: Parent screens (ConversationScreen, HivePostScreen) should use useFocusEffect
   // to refresh their data when this screen navigates back
@@ -148,6 +133,29 @@ export default function ComposeScreen() {
     undefined,
     undefined // We'll handle navigation after showing success alert
   );
+
+  // Store reply/edit in refs to avoid stale closures in callbacks
+  const replyRef = useRef(reply);
+  const editRef = useRef(edit);
+  useEffect(() => {
+    replyRef.current = reply;
+    editRef.current = edit;
+  }, [reply, edit]);
+
+  // GIF picker state - using our new professional hook
+  const gifPicker = useGifPicker({
+    onGifSelected: (gifUrl: string) => {
+      if (mode === 'reply') {
+        replyRef.current.addReplyGif(gifUrl);
+      } else if (mode === 'edit') {
+        editRef.current.addEditGif(gifUrl);
+      } else {
+        setGifs(prev => [...prev, gifUrl]);
+      }
+    },
+    // Remove loadTrendingOnOpen to use default (false)
+    limit: 20,
+  });
 
   const colors = {
     background: isDark ? '#15202B' : '#fff',
@@ -272,10 +280,17 @@ export default function ComposeScreen() {
         !url.includes('media.giphy')
       );
 
+      // Extract video embed URL (3speak format)
+      const videoMatch = initialText.match(/https:\/\/3speak\.tv\/watch\?v=[^\s)]+/);
+      const extractedVideo = videoMatch ? videoMatch[0] : null;
+
       // Set local text and media state for the compose screen
       setText(textBody);
       setImages(imageUrls);
       setGifs(gifUrls);
+      if (extractedVideo) {
+        setVideoAssetId(extractedVideo);
+      }
 
       // Store in ref for immediate synchronous access
       editTargetRef.current = { author: parentAuthor, permlink: parentPermlink };
@@ -288,7 +303,7 @@ export default function ComposeScreen() {
 
       console.log('[ComposeScreen] Edit target ref set:', editTargetRef.current);
     }
-  }, [mode, parentAuthor, parentPermlink, initialText]);
+  }, [mode, parentAuthor, parentPermlink, initialText, reply, edit]);
 
   // Handle resnap URL parameter
   useEffect(() => {
@@ -754,6 +769,7 @@ export default function ComposeScreen() {
       setText('');
       setImages([]);
       setGifs([]);
+      clearVideoState();
       replyTargetRef.current = null;
 
       Alert.alert(
@@ -807,7 +823,8 @@ export default function ComposeScreen() {
       });
       console.log('[ComposeScreen] Edit submission completed successfully');
 
-      // Success - clear refs and show success alert
+      // Success - clear refs, video state, and show success alert
+      clearVideoState();
       editTargetRef.current = null;
 
       Alert.alert(
