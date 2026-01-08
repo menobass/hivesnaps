@@ -90,12 +90,10 @@ const DiscoveryScreen = () => {
   const [loading, setLoading] = useState(true);
   const [avatarCache, setAvatarCache] = useState<{ [username: string]: { url: string; ts: number } }>({});
 
-  // Edit functionality
-  const {
-    // Removed useEdit hook - now using ComposeScreen for edit
+  // Removed useEdit hook - now using ComposeScreen for edit
 
-    // Avatar helper (deterministic); service will be used to warm/update
-    const getAvatarUrl = (username: string) => `https://images.hive.blog/u/${username}/avatar/original`;
+  // Avatar helper (deterministic); service will be used to warm/update
+  const getAvatarUrl = (username: string) => `https://images.hive.blog/u/${username}/avatar/original`;
 
   // Load legacy avatar cache (optional); will be superseded by service updates
   useEffect(() => {

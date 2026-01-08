@@ -130,12 +130,10 @@ const ProfileScreen = () => {
     updateSnap
   );
 
-  // Edit functionality
-  const {
-    // Removed useEdit hook - now using ComposeScreen for edit
+  // Removed useEdit hook - now using ComposeScreen for edit
 
-    // Initialize styles
-    const styles = createProfileScreenStyles(isDark);
+  // Initialize styles
+  const styles = createProfileScreenStyles(isDark);
 
   // Colors for JSX elements (using the same theme as styles)
   const colors = {

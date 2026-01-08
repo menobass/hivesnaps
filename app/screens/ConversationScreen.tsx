@@ -23,7 +23,7 @@ import {
 import RenderHtml from 'react-native-render-html';
 import { ConversationScreenStyles } from '../../styles/ConversationScreenStyles';
 import { FontAwesome } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import Modal from 'react-native-modal';
 import Markdown from 'react-native-markdown-display';
 import {
@@ -149,6 +149,27 @@ const ConversationScreenRefactored = () => {
   const [modalImages, setModalImages] = useState<Array<{ uri: string }>>([]);
   const [modalImageIndex, setModalImageIndex] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Refresh conversation when screen comes back into focus (e.g., after posting a reply)
+  // Use a ref to track if this is the initial mount (don't refresh on first focus)
+  const hasInitiallyLoadedRef = useRef(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasInitiallyLoadedRef.current) {
+        // First time loading - don't refresh, just mark as loaded
+        hasInitiallyLoadedRef.current = true;
+        console.log('[ConversationScreen] Initial load, skipping auto-refresh');
+        return;
+      }
+
+      // Coming back from another screen - do a full refresh to get new replies
+      if (author && permlink) {
+        console.log('[ConversationScreen] Screen focused, refreshing conversation...');
+        refreshConversation();
+      }
+    }, [author, permlink, refreshConversation])
+  );
 
   const handlePullToRefresh = async () => {
     setRefreshing(true);
