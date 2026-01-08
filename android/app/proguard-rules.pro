@@ -57,4 +57,8 @@
 # Keep Expo Router classes
 -keep class expo.router.** { *; }
 
+# Keep the app's main application class and all app classes
+-keep class com.menobass.hivesnaps.** { *; }
+-keepnames class com.menobass.hivesnaps.** { *; }
+
 # Add any project specific keep options here:
