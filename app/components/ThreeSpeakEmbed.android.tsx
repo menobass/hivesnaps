@@ -273,9 +273,10 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
                 ref={webViewRef}
                 source={{ uri: embedUrl }}
                 style={{ flex: 1, backgroundColor: themeIsDark ? '#000' : '#fff' }}
-                allowsFullscreenVideo
-                javaScriptEnabled
-                domStorageEnabled
+                allowsFullscreenVideo={true}
+                allowsInlineMediaPlayback={false}
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
                 mixedContentMode="compatibility"
                 injectedJavaScript={injectedJavaScript}
                 mediaPlaybackRequiresUserAction={false}
