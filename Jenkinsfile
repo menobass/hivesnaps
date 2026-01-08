@@ -34,9 +34,6 @@ pipeline {
     }
 
     environment {
-        // Determine if we're on main branch
-        IS_MAIN_BRANCH = "${env.BRANCH_NAME == 'main' || env.GIT_BRANCH == 'main' || env.GIT_BRANCH == 'origin/main'}"
-        
         // NPM cache
         NPM_CONFIG_CACHE = "${env.WORKSPACE}/.npm"
         
@@ -94,7 +91,42 @@ pipeline {
             }
         }
 
-        // Stage 2: Install Android SDK if needed
+        // Stage 2: Detect Branch & Set Signing Flag
+        stage('Detect Branch') {
+            steps {
+                script {
+                    echo "=== Branch Detection ==="
+                    echo "BRANCH_NAME: ${env.BRANCH_NAME}"
+                    echo "GIT_BRANCH: ${env.GIT_BRANCH}"
+                    echo "GIT_LOCAL_BRANCH: ${env.GIT_LOCAL_BRANCH}"
+                    
+                    // Get actual branch name from git
+                    def gitBranch = sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
+                    echo "Git reports branch: ${gitBranch}"
+                    
+                    // Determine if we should use release signing
+                    def isMainBranch = (gitBranch == 'main' || 
+                                       env.BRANCH_NAME == 'main' || 
+                                       env.GIT_BRANCH == 'main' || 
+                                       env.GIT_BRANCH == 'origin/main')
+                    
+                    env.IS_MAIN_BRANCH = isMainBranch ? 'true' : 'false'
+                    env.SHOULD_RELEASE_SIGN = (isMainBranch || params.FORCE_RELEASE_SIGNING) ? 'true' : 'false'
+                    
+                    echo "IS_MAIN_BRANCH: ${env.IS_MAIN_BRANCH}"
+                    echo "FORCE_RELEASE_SIGNING param: ${params.FORCE_RELEASE_SIGNING}"
+                    echo "SHOULD_RELEASE_SIGN: ${env.SHOULD_RELEASE_SIGN}"
+                    
+                    if (env.SHOULD_RELEASE_SIGN == 'true') {
+                        echo "[OK] Release signing will be used"
+                    } else {
+                        echo "[WARN] Debug signing will be used"
+                    }
+                }
+            }
+        }
+
+        // Stage 3: Install Android SDK if needed
         stage('Setup Android SDK') {
             when {
                 expression { !fileExists("${env.ANDROID_HOME}/cmdline-tools") }
@@ -201,7 +233,7 @@ pipeline {
         stage('Setup Release Signing') {
             when {
                 expression {
-                    return env.IS_MAIN_BRANCH == 'true' || params.FORCE_RELEASE_SIGNING == true
+                    return env.SHOULD_RELEASE_SIGN == 'true'
                 }
             }
             steps {
