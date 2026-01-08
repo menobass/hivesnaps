@@ -35,6 +35,9 @@ import { useGifPicker } from '../../hooks/useGifPickerV2';
 import { GifPickerModal } from '../../components/GifPickerModalV2';
 import { SnapData } from '../../hooks/useConversationData';
 import Preview from '../components/Preview';
+import { useReply } from '../../hooks/useReply';
+import { useEdit } from '../../hooks/useEdit';
+import { stripImageTags, getAllImageUrls } from '../../utils/extractImageInfo';
 import {
   generateVideoThumbnail,
   prepareLocalVideoAsset,
@@ -58,7 +61,19 @@ export default function ComposeScreen() {
   const colorScheme = useColorScheme() || 'light';
   const isDark = colorScheme === 'dark';
   const router = useRouter();
-  const params = useLocalSearchParams();
+  const params = useLocalSearchParams<{
+    mode?: 'compose' | 'reply' | 'edit';
+    parentAuthor?: string;
+    parentPermlink?: string;
+    initialText?: string;
+    resnapUrl?: string | string[];
+  }>();
+
+  // Determine the mode and related params
+  const mode = params.mode || 'compose';
+  const parentAuthor = params.parentAuthor;
+  const parentPermlink = params.parentPermlink;
+  const initialText = params.initialText;
 
   // Share extension integration
   const { sharedContent, hasSharedContent, clearSharedContent } =
@@ -101,14 +116,38 @@ export default function ComposeScreen() {
   const videoCancelRequestedRef = useRef(false);
   const thumbnailIpfsUploadPromiseRef = useRef<Promise<string | null> | null>(null);
 
+  // Track if reply/edit target has been initialized (refs are synchronous)
+  const replyTargetRef = useRef<{ author: string; permlink: string } | null>(null);
+  const editTargetRef = useRef<{ author: string; permlink: string } | null>(null);
+
   // GIF picker state - using our new professional hook
   const gifPicker = useGifPicker({
     onGifSelected: (gifUrl: string) => {
-      setGifs(prev => [...prev, gifUrl]);
+      if (mode === 'reply') {
+        reply.addReplyGif(gifUrl);
+      } else if (mode === 'edit') {
+        edit.addEditGif(gifUrl);
+      } else {
+        setGifs(prev => [...prev, gifUrl]);
+      }
     },
     // Remove loadTrendingOnOpen to use default (false)
     limit: 20,
   });
+
+  // Reply and edit hooks for modal-less operation
+  // Note: Parent screens (ConversationScreen, HivePostScreen) should use useFocusEffect
+  // to refresh their data when this screen navigates back
+  const reply = useReply(
+    currentUsername,
+    undefined,
+    undefined // We'll handle navigation after showing success alert
+  );
+  const edit = useEdit(
+    currentUsername,
+    undefined,
+    undefined // We'll handle navigation after showing success alert
+  );
 
   const colors = {
     background: isDark ? '#15202B' : '#fff',
@@ -124,7 +163,8 @@ export default function ComposeScreen() {
   // Computed video variables
   const videoEmbedUrl = videoAssetId || null;
   const hasPostableContent = Boolean(text.trim() || images.length > 0 || gifs.length > 0 || videoEmbedUrl);
-  const disablePostButton = posting || videoUploading || !hasPostableContent;
+  const isSubmitting = posting || reply.posting || edit.editing || videoUploading;
+  const disablePostButton = isSubmitting || !hasPostableContent;
   const hasDraftContent = Boolean(
     text.trim() || images.length > 0 || gifs.length > 0 || videoAsset || videoAssetId || videoUploading
   );
@@ -147,7 +187,7 @@ export default function ComposeScreen() {
             .then(({ url }) => {
               if (url) setAvatarUrl(url);
             })
-            .catch(() => {});
+            .catch(() => { });
         }
       } catch (e) {
         console.error('Error loading credentials:', e);
@@ -200,6 +240,55 @@ export default function ComposeScreen() {
       clearSharedContent();
     }
   }, [sharedContent, hasSharedContent, clearSharedContent]);
+
+  // Initialize reply/edit mode with content
+  useEffect(() => {
+    if (mode === 'reply' && parentAuthor && parentPermlink) {
+      console.log('[ComposeScreen] Initializing reply mode for', parentAuthor, parentPermlink);
+
+      // Store in ref for immediate synchronous access (React state is async)
+      replyTargetRef.current = { author: parentAuthor, permlink: parentPermlink };
+
+      // Also set hook state for submission
+      reply.openReplyModal({ author: parentAuthor, permlink: parentPermlink });
+
+      console.log('[ComposeScreen] Reply target ref set:', replyTargetRef.current);
+    } else if (mode === 'edit' && parentAuthor && parentPermlink && initialText) {
+      console.log('[ComposeScreen] Initializing edit mode for', parentAuthor, parentPermlink);
+      const textBody = stripImageTags(initialText);
+      const allUrls = getAllImageUrls(initialText);
+
+      // Separate GIFs (Tenor/Giphy URLs) from regular images
+      const gifUrls = allUrls.filter(url =>
+        url.includes('tenor.com') ||
+        url.includes('giphy.com') ||
+        url.includes('media.tenor') ||
+        url.includes('media.giphy')
+      );
+      const imageUrls = allUrls.filter(url =>
+        !url.includes('tenor.com') &&
+        !url.includes('giphy.com') &&
+        !url.includes('media.tenor') &&
+        !url.includes('media.giphy')
+      );
+
+      // Set local text and media state for the compose screen
+      setText(textBody);
+      setImages(imageUrls);
+      setGifs(gifUrls);
+
+      // Store in ref for immediate synchronous access
+      editTargetRef.current = { author: parentAuthor, permlink: parentPermlink };
+
+      // Also set edit hook state for submission
+      edit.openEditModal(
+        { author: parentAuthor, permlink: parentPermlink, type: 'snap' },
+        initialText
+      );
+
+      console.log('[ComposeScreen] Edit target ref set:', editTargetRef.current);
+    }
+  }, [mode, parentAuthor, parentPermlink, initialText]);
 
   // Handle resnap URL parameter
   useEffect(() => {
@@ -270,7 +359,7 @@ export default function ComposeScreen() {
         try {
           console.log('⏳ Waiting for thumbnail IPFS upload to complete...');
           const ipfsUrl = await thumbnailIpfsUploadPromiseRef.current;
-          
+
           if (ipfsUrl) {
             console.log('✅ Thumbnail IPFS upload complete, setting on 3Speak...');
             const permlink = extractPermlinkFromEmbedUrl(result.embedUrl);
@@ -568,7 +657,7 @@ export default function ComposeScreen() {
           result.assets.map(asset => asset.uri),
           0.8
         );
-        
+
         const uploadPromises = convertedImages.map(async (converted, index) => {
           const fileToUpload = {
             uri: converted.uri,
@@ -627,7 +716,130 @@ export default function ComposeScreen() {
     setGifs(prev => prev.filter((_, index) => index !== indexToRemove));
   };
 
+  // ===== Submit Handlers =====
+
+  const handleReplySubmit = async () => {
+    if (!parentAuthor || !parentPermlink) {
+      console.error('[ComposeScreen] Missing parent author or permlink for reply');
+      Alert.alert('Error', 'Missing reply information. Please try again.');
+      return;
+    }
+
+    if (!text.trim() && images.length === 0 && gifs.length === 0 && !videoEmbedUrl) {
+      console.error('[ComposeScreen] Reply has no content');
+      Alert.alert('Error', 'Please enter some text or add an image/GIF/video.');
+      return;
+    }
+
+    console.log('[ComposeScreen] Submitting reply to', parentAuthor, parentPermlink);
+    console.log('[ComposeScreen] Reply content:', {
+      text: text.substring(0, 50) + (text.length > 50 ? '...' : ''),
+      images: images.length,
+      gifs: gifs.length,
+      video: videoEmbedUrl ? 'yes' : 'no',
+    });
+
+    // Submit reply - pass values directly to avoid async state timing issues
+    try {
+      await reply.submitReply({
+        target: { author: parentAuthor, permlink: parentPermlink },
+        text: text,
+        images: images,
+        gifs: gifs,
+        video: videoEmbedUrl,
+      });
+      console.log('[ComposeScreen] Reply submission completed successfully');
+
+      // Success - clear form and show success alert
+      setText('');
+      setImages([]);
+      setGifs([]);
+      replyTargetRef.current = null;
+
+      Alert.alert(
+        'Reply Posted!',
+        'Your reply has been published to the Hive blockchain.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              console.log('[ComposeScreen] Reply submitted, navigating back');
+              router.back();
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('[ComposeScreen] Reply submission exception:', error);
+      Alert.alert('Reply Failed', error instanceof Error ? error.message : 'Unknown error occurred');
+    }
+  };
+
+  const handleEditSubmit = async () => {
+    if (!parentAuthor || !parentPermlink) {
+      console.error('[ComposeScreen] Missing parent author or permlink for edit');
+      Alert.alert('Error', 'Missing edit information. Please try again.');
+      return;
+    }
+
+    if (!text.trim() && images.length === 0 && gifs.length === 0 && !videoEmbedUrl) {
+      console.error('[ComposeScreen] Edit has no content');
+      Alert.alert('Error', 'Please enter some text or add an image/GIF/video.');
+      return;
+    }
+
+    console.log('[ComposeScreen] Submitting edit for', parentAuthor, parentPermlink);
+    console.log('[ComposeScreen] Edit content:', {
+      text: text.substring(0, 50) + (text.length > 50 ? '...' : ''),
+      images: images.length,
+      gifs: gifs.length,
+      video: videoEmbedUrl ? 'yes' : 'no',
+    });
+
+    // Submit edit - pass values directly to avoid async state timing issues
+    try {
+      await edit.submitEdit({
+        target: { author: parentAuthor, permlink: parentPermlink },
+        text: text,
+        images: images,
+        gifs: gifs,
+        video: videoEmbedUrl,
+      });
+      console.log('[ComposeScreen] Edit submission completed successfully');
+
+      // Success - clear refs and show success alert
+      editTargetRef.current = null;
+
+      Alert.alert(
+        'Edit Saved!',
+        'Your changes have been published to the Hive blockchain.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              console.log('[ComposeScreen] Edit submitted, navigating back');
+              router.back();
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('[ComposeScreen] Edit submission exception:', error);
+      Alert.alert('Edit Failed', error instanceof Error ? error.message : 'Unknown error occurred');
+    }
+  };
+
   const handleSubmit = async () => {
+    // Route to appropriate submit handler based on mode
+    if (mode === 'reply') {
+      await handleReplySubmit();
+      return;
+    } else if (mode === 'edit') {
+      await handleEditSubmit();
+      return;
+    }
+
+    // Original compose logic
     if (videoUploading) {
       Alert.alert('Video Uploading', 'Please wait for the video upload to finish.');
       return;
@@ -920,9 +1132,20 @@ export default function ComposeScreen() {
             </Text>
           </TouchableOpacity>
 
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            New Snap
-          </Text>
+          <View style={styles.headerTitleContainer}>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>
+              {mode === 'reply'
+                ? 'Reply'
+                : mode === 'edit'
+                  ? 'Edit Snap'
+                  : 'New Snap'}
+            </Text>
+            {mode === 'reply' && parentAuthor && parentAuthor !== 'peak.snaps' && (
+              <Text style={[styles.headerSubtitle, { color: colors.info }]}>
+                @{parentAuthor}
+              </Text>
+            )}
+          </View>
 
           <TouchableOpacity
             onPress={handleSubmit}
@@ -932,18 +1155,18 @@ export default function ComposeScreen() {
               styles.postButton,
               {
                 backgroundColor: disablePostButton
-                    ? colors.buttonInactive
-                    : colors.button,
+                  ? colors.buttonInactive
+                  : colors.button,
               },
             ]}
           >
-            {posting ? (
+            {isSubmitting ? (
               <ActivityIndicator size='small' color={colors.buttonText} />
             ) : (
               <Text
                 style={[styles.headerButtonText, { color: colors.buttonText }]}
               >
-                Post
+                {mode === 'edit' ? 'Save' : 'Post'}
               </Text>
             )}
           </TouchableOpacity>
@@ -1208,7 +1431,7 @@ export default function ComposeScreen() {
                   </TouchableOpacity>
                 )}
               </View>
-              
+
               <View style={{
                 marginTop: 8,
                 padding: 12,
@@ -1242,7 +1465,7 @@ export default function ComposeScreen() {
                       <FontAwesome name="video-camera" size={24} color={colors.text} />
                     </View>
                   )}
-                  
+
                   <View style={{ flex: 1 }}>
                     <Text
                       style={{ color: colors.text, fontSize: 14, fontWeight: '500' }}
@@ -1281,7 +1504,7 @@ export default function ComposeScreen() {
                     </View>
                   </View>
                 </View>
-                
+
                 {videoUploading && videoUploadProgress && (
                   <View style={{ marginTop: 12 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -1306,7 +1529,7 @@ export default function ComposeScreen() {
                     </View>
                   </View>
                 )}
-                
+
                 {videoUploadError && (
                   <View style={{ marginTop: 12 }}>
                     <Text style={{ color: '#ff3b30', fontSize: 12, marginBottom: 8 }}>
@@ -1343,7 +1566,7 @@ export default function ComposeScreen() {
                     </View>
                   </View>
                 )}
-                
+
                 {videoAssetId && !videoUploading && !videoUploadError && (
                   <View style={{ marginTop: 8 }}>
                     <Text style={{ color: '#34c759', fontSize: 12, fontWeight: '500' }}>
@@ -1352,7 +1575,7 @@ export default function ComposeScreen() {
                   </View>
                 )}
               </View>
-              
+
               {(videoAsset || videoAssetId) && (
                 <Text style={{
                   fontSize: 11,
@@ -1418,10 +1641,10 @@ export default function ComposeScreen() {
                 onPress={() => setPreviewVisible(true)}
                 disabled={!text.trim() && images.length === 0 && gifs.length === 0}
               >
-                <FontAwesome 
-                  name='eye' 
-                  size={16} 
-                  color={(!text.trim() && images.length === 0 && gifs.length === 0) ? colors.info : colors.button} 
+                <FontAwesome
+                  name='eye'
+                  size={16}
+                  color={(!text.trim() && images.length === 0 && gifs.length === 0) ? colors.info : colors.button}
                 />
               </TouchableOpacity>
             </View>
@@ -1693,6 +1916,15 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  headerTitleContainer: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 2,
   },
   content: {
     flex: 1,

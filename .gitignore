@@ -48,9 +48,13 @@ Thumbs.db
 # Development backup and test files
 *BACKUP*
 *backup*
+
+# Jenkins setup documentation (internal use only)
+JENKINS_CLEAN_SETUP.md
 test-*.js
 test-*.ts
 /test
 
 # Local design / implementation notes
 TRENDING_FEED_IMPLEMENTATION_GUIDE.md
+GOOGLE_LOGIN_IMPLEMENTATION_PLAN.md
