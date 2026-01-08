@@ -1,9 +1,1 @@
-<resources>
-  <color name="splashscreen_background">#000000</color>
-  <color name="iconBackground">#000000</color>
-  <color name="colorPrimary">#8e44ad</color>
-  <color name="colorPrimaryDark">#000000</color>
-  <color name="android_colorBackground">#121212</color>
-  <color name="android_textColorPrimary">#ffffff</color>
-  <color name="android_textColorSecondary">#b3b3b3</color>
-</resources>
+<resources/>
