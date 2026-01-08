@@ -301,11 +301,15 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
                 }}
                 onShouldStartLoadWithRequest={request => {
                     // Allow 3Speak URLs (legacy and new play subdomain), block others
-                    return (
-                        request.url.includes('3speak.tv') ||
-                        request.url.includes('3speak.online') ||
-                        request.url.includes('play.3speak.tv')
-                    );
+                    try {
+                        const parsedUrl = new URL(request.url);
+                        const hostname = parsedUrl.hostname.toLowerCase();
+                        const allowedHosts = new Set(['3speak.tv', '3speak.online', 'play.3speak.tv']);
+                        return allowedHosts.has(hostname);
+                    } catch {
+                        // If the URL cannot be parsed, block the navigation
+                        return false;
+                    }
                 }}
             />
             {/* Overlay after exiting fullscreen - tap to re-enter fullscreen */}
