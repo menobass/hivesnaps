@@ -3,7 +3,4 @@
   <color name="iconBackground">#ffffff</color>
   <color name="colorPrimary">#023c69</color>
   <color name="colorPrimaryDark">#ffffff</color>
-  <color name="android_colorBackground">#ffffff</color>
-  <color name="android_textColorPrimary">#000000</color>
-  <color name="android_textColorSecondary">#666666</color>
 </resources>
