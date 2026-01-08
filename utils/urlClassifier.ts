@@ -35,9 +35,9 @@ export function classifyUrl(url: string): UrlInfo {
     };
   }
 
-  // Check for Hive post URLs
+  // Check for Hive post URLs (including snapie.io)
   const hivePostMatch = cleanUrl.match(
-    /(?:https?:\/\/)?(?:www\.)?(?:ecency\.com|peakd\.com|hive\.blog)\/(?:[a-z0-9-]+\/)?(@[a-z0-9.-]{3,16}\/([a-z0-9-]+))/i
+    /(?:https?:\/\/)?(?:www\.)?(?:ecency\.com|peakd\.com|hive\.blog|snapie\.io)\/(?:[a-z0-9-]+\/)?(@[a-z0-9.-]{3,16}\/([a-z0-9-]+))/i
   );
   if (hivePostMatch) {
     return {

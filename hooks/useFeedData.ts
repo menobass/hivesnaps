@@ -328,7 +328,7 @@ export function useFeedData(): UseFeedDataReturn {
   const needsFollowingRefreshRef = useRef(needsFollowingRefresh);
   const mutedListRef = useRef(mutedList);
   const needsMutedRefreshRef = useRef(needsMutedRefresh);
-  
+
   useEffect(() => {
     followingListRef.current = followingList;
     needsFollowingRefreshRef.current = needsFollowingRefresh;
@@ -364,7 +364,7 @@ export function useFeedData(): UseFeedDataReturn {
         `🔍 [applyFilter] Applying filter "${filter}" to ${snaps.length} snaps`
       );
 
-  let filteredSnaps = snaps;
+      let filteredSnaps = snaps;
 
       switch (filter) {
         case 'following':
@@ -463,7 +463,7 @@ export function useFeedData(): UseFeedDataReturn {
         cachedUrls[a] = cached || `https://images.hive.blog/u/${a}/avatar/original`;
         try {
           console.log(`[Avatar][Feed] initial ${a} -> ${cachedUrls[a] || 'EMPTY'}`);
-        } catch {}
+        } catch { }
       });
       setState(prev => ({
         ...prev,
@@ -475,7 +475,7 @@ export function useFeedData(): UseFeedDataReturn {
       }));
 
       // Start loading avatars for all authors (fire-and-forget)
-      avatarService.preloadAvatars(authors).catch(() => {});
+      avatarService.preloadAvatars(authors).catch(() => { });
 
       // Listener now handled by a single useEffect subscription with cleanup
       authors.forEach(author => {
@@ -488,7 +488,7 @@ export function useFeedData(): UseFeedDataReturn {
   // Subscribe once to avatar updates and clean up on unmount
   useEffect(() => {
     const unsubscribe = avatarService.subscribe((updatedUsername, avatarUrl) => {
-      try { console.log(`[Avatar][Feed] updated ${updatedUsername} -> ${avatarUrl || 'EMPTY'}`); } catch {}
+      try { console.log(`[Avatar][Feed] updated ${updatedUsername} -> ${avatarUrl || 'EMPTY'}`); } catch { }
       setState(prev => {
         let changed = false;
         const snaps = prev.snaps.map(s => {
@@ -565,10 +565,20 @@ export function useFeedData(): UseFeedDataReturn {
             discussion.permlink
           );
           // Fetch all snaps (replies) for this container
-          const replies: Snap[] = await client.database.call(
+          const replies: Snap[] | null = await client.database.call(
             'get_content_replies',
             [discussion.author, discussion.permlink]
           );
+
+          // Handle null replies (API can return null)
+          if (!replies) {
+            console.warn(
+              '⚠️ [FetchSnaps] Container',
+              discussion.permlink,
+              'returned null replies, skipping'
+            );
+            continue; // Skip this container
+          }
 
           console.log(
             '📝 [FetchSnaps] Container',
@@ -614,11 +624,11 @@ export function useFeedData(): UseFeedDataReturn {
           const enriched = filteredSnaps.map(s => {
             const cached = avatarService.getCachedAvatarUrl(s.author);
             const chosen = s.avatarUrl || cached || `https://images.hive.blog/u/${s.author}/avatar/original`;
-            try { console.log(`[Avatar][Feed] initial ${s.author} -> ${chosen || 'EMPTY'}`); } catch {}
+            try { console.log(`[Avatar][Feed] initial ${s.author} -> ${chosen || 'EMPTY'}`); } catch { }
             return { ...s, avatarUrl: chosen };
           });
           // Fire-and-forget preloading to backfill better sizes or late cache
-          try { avatarService.preloadAvatars(authors).catch(() => {}); } catch {}
+          try { avatarService.preloadAvatars(authors).catch(() => { }); } catch { }
           console.log(`📄 [useFeedData] Updated feed with ${enriched.length} snaps`);
           return { ...prev, snaps: enriched, loading: false };
         });
@@ -641,7 +651,7 @@ export function useFeedData(): UseFeedDataReturn {
               }
             })
           );
-        } catch {}
+        } catch { }
       } catch (error) {
         console.error('❌ [FetchSnaps] Error fetching snaps:', error);
         setState(prev => ({
@@ -693,7 +703,7 @@ export function useFeedData(): UseFeedDataReturn {
         author: containerPost.author,
         fetchedAt: Date.now(),
       };
-  setState(prev => {
+      setState(prev => {
         const map = prev.containerMap;
         // Find the most recent container by created date
         let mostRecentKey: string | undefined;
@@ -711,8 +721,8 @@ export function useFeedData(): UseFeedDataReturn {
           map.prepend(containerPost.permlink, containerMetadata);
         }
         map.logState();
-  const allSnaps = map.getAllSnaps();
-  const filteredSnaps = applyFilter(
+        const allSnaps = map.getAllSnaps();
+        const filteredSnaps = applyFilter(
           allSnaps,
           prev.currentFilter,
           followingListRef.current || [],
@@ -723,10 +733,10 @@ export function useFeedData(): UseFeedDataReturn {
         const enriched = filteredSnaps.map(s => {
           const cached = avatarService.getCachedAvatarUrl(s.author);
           const chosen = s.avatarUrl || cached || `https://images.hive.blog/u/${s.author}/avatar/original`;
-          try { console.log(`[Avatar][Feed] initial ${s.author} -> ${chosen || 'EMPTY'}`); } catch {}
+          try { console.log(`[Avatar][Feed] initial ${s.author} -> ${chosen || 'EMPTY'}`); } catch { }
           return { ...s, avatarUrl: chosen };
         });
-        try { avatarService.preloadAvatars(authors).catch(() => {}); } catch {}
+        try { avatarService.preloadAvatars(authors).catch(() => { }); } catch { }
         return { ...prev, snaps: enriched, loading: false };
       });
       // Kick background checks for negative-hinted items without active_votes
@@ -745,7 +755,7 @@ export function useFeedData(): UseFeedDataReturn {
             }
           })
         );
-      } catch {}
+      } catch { }
       updateSnapsWithAvatars(containerMetadata.snaps);
     } catch (error) {
       console.error('❌ [refreshSnaps] Error refreshing snaps:', error);
@@ -793,8 +803,8 @@ export function useFeedData(): UseFeedDataReturn {
   const clearContainerMap = useCallback(() => {
     setState(prev => {
       const newContainerMap = new OrderedContainerMap(MAX_CONTAINERS_IN_MEMORY);
-      return { 
-        ...prev, 
+      return {
+        ...prev,
         containerMap: newContainerMap,
         snaps: []
       };
@@ -809,7 +819,7 @@ export function useFeedData(): UseFeedDataReturn {
             '📝 [useFeedData] updateSnap called for',
             author + '/' + permlink
           );
-        } catch {}
+        } catch { }
       }
       setState(prev => {
         // Apply updates in-place to the flattened snaps array
@@ -977,7 +987,7 @@ export function useFeedData(): UseFeedDataReturn {
   const prevEnsureFollowingRef = useRef<any>(ensureFollowingListCached);
   const prevFetchAndCacheMutedRef = useRef<any>(fetchAndCacheMutedList);
   const prevEnsureMutedRef = useRef<any>(ensureMutedListCached);
-  
+
   useEffect(() => {
     if (prevFetchAndCacheRef.current !== fetchAndCacheFollowingList) {
       console.log('[useFeedData] fetchAndCacheFollowingList reference changed');
@@ -1014,25 +1024,25 @@ export function useFeedData(): UseFeedDataReturn {
   const memoizedFilteredSnaps = useMemo(() => {
     const allSnaps = state.containerMap.getAllSnaps();
     if (allSnaps.length === 0) return [];
-    
+
     const filteredSnaps = applyFilter(
       allSnaps,
       state.currentFilter,
       followingListRef.current || [],
       username
     );
-    
+
     console.log(
       `🎯 [memoizedFilteredSnaps] Filter "${state.currentFilter}": ${allSnaps.length} → ${filteredSnaps.length} snaps`
     );
-    
+
     return filteredSnaps;
   }, [state.containerMap, state.currentFilter, followingList, username, applyFilter]);
 
   // Memoize enriched snaps to avoid re-processing avatars when filter result is the same
   const memoizedEnrichedSnaps = useMemo(() => {
     if (memoizedFilteredSnaps.length === 0) return [];
-    
+
     const authors = Array.from(new Set(memoizedFilteredSnaps.map(s => s.author)));
     const enrichedSnaps = memoizedFilteredSnaps.map(snap => ({
       ...snap,
@@ -1041,14 +1051,14 @@ export function useFeedData(): UseFeedDataReturn {
         avatarService.getCachedAvatarUrl(snap.author) ||
         `https://images.hive.blog/u/${snap.author}/avatar/original`,
     }));
-    
+
     // Kick off background preloads to ensure updates arrive
-    try { 
-      avatarService.preloadAvatars(authors).catch(() => {}); 
-    } catch {}
-    
+    try {
+      avatarService.preloadAvatars(authors).catch(() => { });
+    } catch { }
+
     console.log(`🎯 [memoizedEnrichedSnaps] Enriched ${enrichedSnaps.length} snaps with avatars`);
-    
+
     return enrichedSnaps;
   }, [memoizedFilteredSnaps]);
 
@@ -1061,12 +1071,12 @@ export function useFeedData(): UseFeedDataReturn {
           console.log('🎯 [setFilter] Filter unchanged, skipping recalculation');
           return prev;
         }
-        
+
         console.log(`🎯 [setFilter] Changing filter from "${prev.currentFilter}" to "${filter}"`);
-        
+
         // Update filter - memoized calculations will handle the heavy lifting
         const newState = { ...prev, currentFilter: filter };
-        
+
         // For immediate response, we'll compute enriched snaps here
         // But on next render, memoizedEnrichedSnaps will take over
         const allSnaps = prev.containerMap.getAllSnaps();
@@ -1076,7 +1086,7 @@ export function useFeedData(): UseFeedDataReturn {
           followingListRef.current || [],
           username
         );
-        
+
         const enrichedSnaps = filteredSnaps.map(snap => ({
           ...snap,
           avatarUrl:
@@ -1095,7 +1105,7 @@ export function useFeedData(): UseFeedDataReturn {
           // Use setTimeout to avoid blocking the state update
           setTimeout(() => fetchSnaps(false, containersToFetch), 0);
         }
-        
+
         return { ...newState, snaps: enrichedSnaps };
       });
     },
