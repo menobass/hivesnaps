@@ -318,6 +318,8 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
                     style={styles.playButtonOverlay}
                     onPress={handlePlayButtonPress}
                     activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Play 3Speak video"
                 >
                     <View style={styles.playButtonContainer}>
                         <Ionicons name="play-circle" size={80} color="rgba(255,255,255,0.9)" />
