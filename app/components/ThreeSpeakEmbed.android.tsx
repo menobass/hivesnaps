@@ -236,7 +236,7 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
                             }
                         }
                     } catch (e) {
-                        // Cross-origin iframe - cannot access
+                        console.warn('ThreeSpeakEmbed: Unable to access iframe content (likely cross-origin). Video inside iframe may not be detected.', e);
                     }
                 });
                 
