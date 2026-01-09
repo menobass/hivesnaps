@@ -146,8 +146,10 @@ export default function ComposeScreen() {
   const handleGifSelected = useCallback((gifUrl: string) => {
     if (mode === 'reply') {
       replyRef.current.addReplyGif(gifUrl);
+      setGifs(prev => [...prev, gifUrl]); // Also update local state for UI display
     } else if (mode === 'edit') {
       editRef.current.addEditGif(gifUrl);
+      setGifs(prev => [...prev, gifUrl]); // Also update local state for UI display
     } else {
       setGifs(prev => [...prev, gifUrl]);
     }
