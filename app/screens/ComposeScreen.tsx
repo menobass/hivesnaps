@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -142,17 +142,20 @@ export default function ComposeScreen() {
     editRef.current = edit;
   }, [reply, edit]);
 
+  // Memoized GIF selection callback to prevent infinite re-render loop
+  const handleGifSelected = useCallback((gifUrl: string) => {
+    if (mode === 'reply') {
+      replyRef.current.addReplyGif(gifUrl);
+    } else if (mode === 'edit') {
+      editRef.current.addEditGif(gifUrl);
+    } else {
+      setGifs(prev => [...prev, gifUrl]);
+    }
+  }, [mode]);
+
   // GIF picker state - using our new professional hook
   const gifPicker = useGifPicker({
-    onGifSelected: (gifUrl: string) => {
-      if (mode === 'reply') {
-        replyRef.current.addReplyGif(gifUrl);
-      } else if (mode === 'edit') {
-        editRef.current.addEditGif(gifUrl);
-      } else {
-        setGifs(prev => [...prev, gifUrl]);
-      }
-    },
+    onGifSelected: handleGifSelected,
     // Remove loadTrendingOnOpen to use default (false)
     limit: 20,
   });
