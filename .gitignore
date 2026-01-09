@@ -57,3 +57,4 @@ test-*.ts
 
 # Local design / implementation notes
 TRENDING_FEED_IMPLEMENTATION_GUIDE.md
+GOOGLE_LOGIN_IMPLEMENTATION_PLAN.md
