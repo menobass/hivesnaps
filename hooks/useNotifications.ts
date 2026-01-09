@@ -11,9 +11,8 @@ import {
   filterNotificationsBySettings,
   type ParsedNotification,
 } from '../utils/notifications';
-import { emitGlobalRefresh } from '../utils/globalEvents';
 
-import { useMutedList } from '../store/context';
+import { useMutedList, useNotifications as useNotificationStore } from '../store/context';
 import { fetchMutedList } from '../services/HiveMuteService';
 
 interface UseNotificationsResult {
@@ -46,9 +45,12 @@ export const useNotifications = (
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState(getDefaultNotificationSettings());
 
+  // Get store's setNotificationUnreadCount to update bell badge
+  const { setNotificationUnreadCount } = useNotificationStore();
+
   // Use shared state for muted list (same pattern as FeedScreen)
-  const { 
-    mutedList, 
+  const {
+    mutedList,
     needsRefresh: needsMutedRefresh,
     setMutedList,
     setLoading: setMutedLoading,
@@ -58,19 +60,19 @@ export const useNotifications = (
   // Ensure muted list is loaded
   const ensureMutedListLoaded = useCallback(async () => {
     if (!username) return;
-    
+
     if (!mutedList || mutedList.length === 0 || needsMutedRefresh) {
       if (__DEV__) {
         console.log('[useNotifications] Loading muted list for:', username);
       }
-      
+
       try {
         setMutedLoading(true);
         const mutedSet = await fetchMutedList(username);
         const mutedArray = Array.from(mutedSet);
         setMutedList(mutedArray);
         setMutedError(null);
-        
+
         if (__DEV__) {
           console.log('[useNotifications] Loaded muted list:', mutedArray.length, 'users');
         }
@@ -178,7 +180,7 @@ export const useNotifications = (
         if (__DEV__) {
           console.log('[useNotifications] Fetching notifications for:', username);
         }
-        
+
         // Fetch notifications from Hive API
         const rawNotifications = await fetchNotifications(username, 50);
         const parsed = rawNotifications.map(parseNotification);
@@ -194,7 +196,7 @@ export const useNotifications = (
         const notMuted = withReadStatus.filter((notification: ParsedNotification) => {
           if (!notification.actionUser) return true; // Keep notifications without actionUser
           const isMuted = mutedList && mutedList.includes(notification.actionUser);
-          
+
           return !isMuted;
         });
 
@@ -236,6 +238,11 @@ export const useNotifications = (
         const fetchedNotifications =
           await fetchNotificationsData(isManualRefresh);
         setNotifications(fetchedNotifications);
+
+        // Update store's unread count so FeedScreen bell shows correct number
+        const newUnreadCount = getUnreadCount(fetchedNotifications);
+        setNotificationUnreadCount(newUnreadCount);
+
         lastFetchTime.current = now;
 
         if (isManualRefresh) {
@@ -251,7 +258,7 @@ export const useNotifications = (
         setRefreshing(false);
       }
     },
-    [username, notifications.length, fetchNotificationsData, updateLastCheck]
+    [username, notifications.length, fetchNotificationsData, updateLastCheck, setNotificationUnreadCount]
   );
 
   // Mark single notification as read
@@ -270,17 +277,17 @@ export const useNotifications = (
       const readIds = updatedNotifications.filter(n => n.read).map(n => n.id);
       await saveReadStatus(readIds);
 
-      // If we actually changed read state, request a global refresh so the feed updates
+      // Update store's unread count so FeedScreen bell updates
       if (changed) {
-        try { emitGlobalRefresh(); } catch (e) { console.log('unable to refresh') }
+        const newUnreadCount = updatedNotifications.filter(n => !n.read).length;
+        setNotificationUnreadCount(newUnreadCount);
       }
     },
-    [notifications, saveReadStatus]
+    [notifications, saveReadStatus, setNotificationUnreadCount]
   );
 
   // Mark all notifications as read
   const markAllAsRead = useCallback(async () => {
-    // Only emit refresh if there were unread items
     const hadUnread = notifications.some(n => !n.read);
 
     const updatedNotifications = notifications.map(notification => ({
@@ -293,13 +300,14 @@ export const useNotifications = (
     await saveReadStatus(readIds);
     await updateLastCheck();
 
+    // Update store's unread count to 0 so FeedScreen bell updates
     if (hadUnread) {
-      try { emitGlobalRefresh(); } catch (e) { console.log('unable to refresh') }
+      setNotificationUnreadCount(0);
     }
-  }, [notifications, saveReadStatus, updateLastCheck]);
+  }, [notifications, saveReadStatus, updateLastCheck, setNotificationUnreadCount]);
 
-  // Calculate unread count
-  const unreadCount = getUnreadCount(notifications);
+  // Get unread count from store (source of truth, updated when notifications change)
+  const { unreadCount } = useNotificationStore();
 
   // Set up automatic refresh when app becomes active
   useEffect(() => {
