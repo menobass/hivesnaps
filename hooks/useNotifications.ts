@@ -306,9 +306,8 @@ export const useNotifications = (
     }
   }, [notifications, saveReadStatus, updateLastCheck, setNotificationUnreadCount]);
 
-  // Get unread count from store (updated when marking as read)
-  const { unreadCount: storeUnreadCount } = useNotificationStore();
-  const unreadCount = storeUnreadCount ?? getUnreadCount(notifications);
+  // Get unread count from store (source of truth, updated when notifications change)
+  const { unreadCount } = useNotificationStore();
 
   // Set up automatic refresh when app becomes active
   useEffect(() => {
