@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -205,6 +205,15 @@ export default function ComposeScreen() {
       }
     };
     loadCredentials();
+
+    // Cleanup: abort any ongoing video upload when component unmounts
+    return () => {
+      if (videoUploadControllerRef.current) {
+        console.log('[ComposeScreen] Unmounting - aborting video upload');
+        videoCancelRequestedRef.current = true;
+        videoUploadControllerRef.current.abort();
+      }
+    };
   }, []);
 
   // Handle shared content when component mounts or shared content changes
@@ -306,7 +315,9 @@ export default function ComposeScreen() {
 
       console.log('[ComposeScreen] Edit target ref set:', editTargetRef.current);
     }
-  }, [mode, parentAuthor, parentPermlink, initialText, reply, edit]);
+    // Note: reply and edit hooks are intentionally omitted from dependencies
+    // They recreate on every render but refs (replyRef, editRef) keep them updated
+  }, [mode, parentAuthor, parentPermlink, initialText]);
 
   // Handle resnap URL parameter
   useEffect(() => {
@@ -320,11 +331,14 @@ export default function ComposeScreen() {
         setText(newText);
 
         // Focus the input and position cursor after URL and line breaks
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           textInputRef.current?.focus();
           const cursorPosition = newText.length;
           textInputRef.current?.setSelection(cursorPosition, cursorPosition);
         }, 100);
+
+        // Cleanup timeout if component unmounts
+        return () => clearTimeout(timeoutId);
       }
     }
   }, [params.resnapUrl]);
