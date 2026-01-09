@@ -156,11 +156,13 @@ export const HivePostPreview: React.FC<HivePostPreviewProps> = ({
               fontWeight: '500',
             }}
           >
-            {postInfo.originalUrl.includes('ecency.com')
-              ? 'Ecency'
-              : postInfo.originalUrl.includes('peakd.com')
-                ? 'PeakD'
-                : 'Hive.blog'}
+            {postInfo.originalUrl.includes('snapie.io')
+              ? 'Snapie'
+              : postInfo.originalUrl.includes('ecency.com')
+                ? 'Ecency'
+                : postInfo.originalUrl.includes('peakd.com')
+                  ? 'PeakD'
+                  : 'Hive.blog'}
           </Text>
         </View>
         <Pressable onPress={handleExternalLinkPress} hitSlop={8}>
