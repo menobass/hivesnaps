@@ -140,13 +140,13 @@ export const useReply = (
       if (!result.canceled && result.assets && result.assets[0]) {
         const asset = result.assets[0];
 
-        // Convert HEIC and other formats to JPEG
-        const converted = await convertToJPEG(asset.uri, 0.8);
+        // Smart conversion - only converts HEIC, preserves GIFs
+        const converted = await convertImageSmart(asset.uri, asset.fileName, 0.8);
 
         const fileToUpload = {
           uri: converted.uri,
-          name: `reply-${Date.now()}.jpg`,
-          type: 'image/jpeg',
+          name: converted.name,
+          type: converted.type,
         };
 
         const uploadResult = await uploadImageSmart(fileToUpload, currentUsername);

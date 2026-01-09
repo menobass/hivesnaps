@@ -4,7 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import { uploadImageSmart } from '../utils/imageUploadService';
 import { stripImageTags, getAllImageUrls } from '../utils/extractImageInfo';
 import * as ImagePicker from 'expo-image-picker';
-import { convertToJPEG } from '../utils/imageConverter';
+import { convertImageSmart } from '../utils/imageConverter';
 
 const HIVE_NODES = [
   'https://api.hive.blog',
@@ -152,13 +152,13 @@ export const useEdit = (
       if (!result.canceled && result.assets && result.assets[0]) {
         const asset = result.assets[0];
 
-        // Convert HEIC and other formats to JPEG
-        const converted = await convertToJPEG(asset.uri, 0.8);
+        // Smart conversion - only converts HEIC, preserves GIFs
+        const converted = await convertImageSmart(asset.uri, asset.fileName, 0.8);
 
         const fileToUpload = {
           uri: converted.uri,
-          name: `edit-${Date.now()}.jpg`,
-          type: 'image/jpeg',
+          name: converted.name,
+          type: converted.type,
         };
 
         const uploadResult = await uploadImageSmart(fileToUpload, currentUsername);
