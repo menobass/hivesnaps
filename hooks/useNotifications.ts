@@ -52,8 +52,18 @@ export const useNotifications = (
     markNotificationsRead,
   } = useNotificationStore();
 
-  // Convert store notifications to ParsedNotification[] (null-safe)
-  const notifications = (storeNotifications || []) as ParsedNotification[];
+  // Convert store notifications to ParsedNotification[] (null-safe and type-safe)
+  const notifications: ParsedNotification[] = (storeNotifications || []).map(
+    (notification) =>
+    ({
+      ...notification,
+      // Ensure ID is a number, as required by ParsedNotification / HiveNotification
+      id:
+        typeof notification.id === 'string'
+          ? Number.parseInt(notification.id, 10)
+          : notification.id,
+    } as ParsedNotification)
+  );
 
   // Use shared state for muted list (same pattern as FeedScreen)
   const {
@@ -267,8 +277,8 @@ export const useNotifications = (
   // Mark single notification as read
   const markAsRead = useCallback(
     async (notificationId: number) => {
-      // Update store state
-      markNotificationsRead(notificationId.toString());
+      // Update store state (markNotificationsRead handles string conversion)
+      markNotificationsRead(notificationId);
 
       // Save to SecureStore for persistence
       const updatedNotifications = notifications.map(notification => {
@@ -285,8 +295,8 @@ export const useNotifications = (
 
   // Mark all notifications as read
   const markAllAsRead = useCallback(async () => {
-    // Update store state
-    const allIds = notifications.map(n => n.id.toString());
+    // Update store state (markNotificationsRead handles string conversion)
+    const allIds = notifications.map(n => n.id);
     markNotificationsRead(allIds);
 
     // Save to SecureStore for persistence

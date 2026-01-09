@@ -17,7 +17,7 @@ import { authSelectors } from './authSlice';
 interface AppContextType {
   state: AppState;
   dispatch: React.Dispatch<AppAction>;
-  
+
   // User actions
   setCurrentUser: (username: string | null) => void;
   setUserProfile: (username: string, profile: UserProfile) => void;
@@ -29,17 +29,17 @@ interface AppContextType {
   invalidateFollowingCache: (username: string) => void;
   invalidateMutedCache: (username: string) => void;
   clearUserCache: (username?: string, type?: keyof AppState['user']['loading']) => void;
-  
+
   // Hive actions
   setHiveData: (data: Partial<AppState['hive']['data']>) => void;
   setHivePost: (author: string, permlink: string, post: any) => void;
   setHiveLoading: (type: keyof AppState['hive']['loading'], key: string, loading: boolean) => void;
-  
+
   // Notification actions
   setNotifications: (notifications: any[]) => void;
-  markNotificationsRead: (ids: string | string[]) => void;
+  markNotificationsRead: (ids: number | number[] | string | string[]) => void;
   setNotificationLoading: (loading: boolean) => void;
-  
+
   // Auth actions
   setAuthToken: (token: string | null) => void;
   setAuthRefreshToken: (refreshToken: string | null) => void;
@@ -47,7 +47,7 @@ interface AppContextType {
   setAuthLoading: (loading: boolean) => void;
   setAuthError: (error: string | null) => void;
   clearAuth: () => void;
-  
+
   // Selectors (memoized)
   selectors: {
     // User selectors
@@ -63,18 +63,18 @@ interface AppContextType {
       following: (username: string) => boolean;
       muted: (username: string) => boolean;
     };
-    
+
     // Hive selectors
     getHiveData: () => AppState['hive']['data'];
     needsHiveDataRefresh: () => boolean;
     getPost: (author: string, permlink: string) => any | null;
     needsPostRefresh: (author: string, permlink: string) => boolean;
-    
+
     // Notification selectors
     getNotifications: () => any[] | null;
     getUnreadCount: () => number;
     needsNotificationRefresh: () => boolean;
-    
+
     // Auth selectors
     getAuthToken: () => string | null;
     getAuthRefreshToken: () => string | null;
@@ -82,7 +82,7 @@ interface AppContextType {
     isAuthLoading: () => boolean;
     getAuthError: () => string | null;
     isAuthenticationFresh: () => boolean;
-    
+
     // Cross-slice selectors
     getCurrentUserFollowing: () => string[] | null;
     doesCurrentUserFollow: (username: string) => boolean | null;
@@ -103,10 +103,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   console.log('🚀 [AppProvider] Starting initialization...');
   console.log('🚀 [AppProvider] appReducer type:', typeof appReducer);
   console.log('🚀 [AppProvider] initialAppState:', JSON.stringify(initialAppState, null, 2));
-  
+
   const [state, dispatch] = useReducer(appReducer, initialAppState);
   console.log('🚀 [AppProvider] useReducer successful');
-  
+
   // Initialize current user from SecureStore on app mount
   useEffect(() => {
     const initializeUser = async () => {
@@ -122,16 +122,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.error('🔐 [AppProvider] Error loading username from SecureStore:', error);
       }
     };
-    
+
     initializeUser();
   }, []); // Only run on mount
-  
+
   // 🔍 Debug: Track provider initialization
   useEffect(() => {
     console.log('🏗️ [AppProvider] Provider initialized/re-initialized');
     console.log('🏗️ [AppProvider] Initial user state:', state.user);
   }, []); // Empty dependency - only runs on mount
-    
+
   // 🔍 Debug: Track state changes (simplified)
   useEffect(() => {
     try {
@@ -146,7 +146,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.error('🔄 [AppProvider] Error in state debug:', err);
     }
   }, [state]);
-  
+
   // User action creators
   const setCurrentUser = useCallback((username: string | null) => {
     dispatch({ type: 'USER_SET_CURRENT', payload: username });
@@ -207,8 +207,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     dispatch({ type: 'NOTIFICATION_SET_DATA', payload: notifications });
   }, []);
 
-  const markNotificationsRead = useCallback((ids: string | string[]) => {
-    dispatch({ type: 'NOTIFICATION_MARK_READ', payload: ids });
+  const markNotificationsRead = useCallback((ids: number | number[] | string | string[]) => {
+    // Convert IDs to strings to match store's Notification interface
+    const stringIds = Array.isArray(ids)
+      ? ids.map(id => typeof id === 'number' ? id.toString() : id)
+      : typeof ids === 'number' ? ids.toString() : ids;
+    dispatch({ type: 'NOTIFICATION_MARK_READ', payload: stringIds });
   }, []);
 
   const setNotificationLoading = useCallback((loading: boolean) => {
@@ -249,7 +253,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     getMutedList: (username: string) => userSelectors.getMutedList(state.user, username),
     isFollowing: (follower: string, following: string) => userSelectors.isFollowing(state.user, follower, following),
     isMuted: (muter: string, muted: string) => userSelectors.isMuted(state.user, muter, muted),
-    isUserLoading: (type: keyof AppState['user']['loading'], username: string) => 
+    isUserLoading: (type: keyof AppState['user']['loading'], username: string) =>
       userSelectors.isLoading(state.user, type, username),
     needsUserRefresh: {
       profile: (username: string) => userSelectors.needsRefresh.profile(state.user, username),
@@ -283,33 +287,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     getCacheStats: () => appSelectors.getCacheStats(state),
   }), [state]);    // ...existing code...
 
-    const contextValue: AppContextType = {
-      state,
-      dispatch,
-      setCurrentUser,
-      setUserProfile,
-      setFollowingList,
-      setFollowerList,
-      setMutedList,
-      setUserLoading,
-      setUserError,
-      invalidateFollowingCache,
-      invalidateMutedCache,
-      clearUserCache,
-      setHiveData,
-      setHivePost,
-      setHiveLoading,
-      setNotifications,
-      markNotificationsRead,
-      setNotificationLoading,
-      setAuthToken,
-      setAuthRefreshToken,
-      setAuthTokens,
-      setAuthLoading,
-      setAuthError,
-      clearAuth,
-      selectors,
-    };
+  const contextValue: AppContextType = {
+    state,
+    dispatch,
+    setCurrentUser,
+    setUserProfile,
+    setFollowingList,
+    setFollowerList,
+    setMutedList,
+    setUserLoading,
+    setUserError,
+    invalidateFollowingCache,
+    invalidateMutedCache,
+    clearUserCache,
+    setHiveData,
+    setHivePost,
+    setHiveLoading,
+    setNotifications,
+    markNotificationsRead,
+    setNotificationLoading,
+    setAuthToken,
+    setAuthRefreshToken,
+    setAuthTokens,
+    setAuthLoading,
+    setAuthError,
+    clearAuth,
+    selectors,
+  };
 
   return (
     <AppContext.Provider value={contextValue}>
@@ -349,7 +353,7 @@ export function useAuth() {
     } catch (err) {
       throw new Error(
         'Logout failed: ' +
-          (err instanceof Error ? err.message : JSON.stringify(err))
+        (err instanceof Error ? err.message : JSON.stringify(err))
       );
     }
   }, [setCurrentUser]);
@@ -390,7 +394,7 @@ export function useFollowingList(username: string) {
 // Hook to access cache invalidation functions
 export function useFollowCacheManagement() {
   const { invalidateFollowingCache, invalidateMutedCache } = useAppStore();
-  
+
   return {
     invalidateFollowingCache,
     invalidateMutedCache,
@@ -421,7 +425,7 @@ export function useMutedList(username: string) {
 
 export function useNotifications() {
   const { selectors, setNotifications, markNotificationsRead, setNotificationLoading } = useAppStore();
-  
+
   return {
     notifications: selectors.getNotifications(),
     unreadCount: selectors.getUnreadCount(),
@@ -435,7 +439,7 @@ export function useNotifications() {
 // Debug hook
 export function useAppDebug() {
   const { selectors } = useAppStore();
-  
+
   return {
     cacheStats: selectors.getCacheStats(),
     isAnyLoading: selectors.isAnyLoading(),
