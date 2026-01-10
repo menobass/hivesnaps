@@ -17,7 +17,7 @@ import {
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image';
-import SnapieHivePostRenderer from '../components/SnapieHivePostRenderer';
+import NativeHivePostRenderer from '../components/NativeHivePostRenderer';
 import { Dimensions } from 'react-native';
 import { useCurrentUser } from '../../store/context';
 import { useUpvote } from '../../hooks/useUpvote';
@@ -384,19 +384,249 @@ const HivePostScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Snapie.io WebView Renderer - takes all available space and scrolls internally */}
-      <SnapieHivePostRenderer
-        author={post.author}
-        permlink={post.permlink}
-        colors={{
-          background: colors.background,
-          text: colors.text,
-        }}
-        onExternalLink={(url) => {
-          console.log('[HivePostScreen] External link clicked:', url);
-          Linking.openURL(url);
-        }}
-      />
+      <ScrollView
+        style={HivePostScreenStyles.scrollContainer}
+        contentContainerStyle={HivePostScreenStyles.contentContainer}
+      >
+        {/* Author Info */}
+        <View style={HivePostScreenStyles.authorInfo}>
+          <ExpoImage
+            source={post.avatarUrl ? { uri: post.avatarUrl } : genericAvatar}
+            style={HivePostScreenStyles.avatar}
+            contentFit='cover'
+          />
+          <View style={HivePostScreenStyles.authorDetails}>
+            <Text
+              style={[HivePostScreenStyles.authorName, { color: colors.text }]}
+            >
+              {post.author}
+            </Text>
+            <Text
+              style={[HivePostScreenStyles.timestamp, { color: colors.icon }]}
+            >
+              {new Date(post.created + 'Z').toLocaleString()}
+            </Text>
+          </View>
+        </View>
+
+        {/* Title */}
+        {post.title && (
+          <Text style={[HivePostScreenStyles.title, { color: colors.text }]}>
+            {post.title}
+          </Text>
+        )}
+
+        {/* Native Renderer with @snapie/renderer */}
+        <NativeHivePostRenderer
+          body={post.body}
+          colors={{
+            background: colors.background,
+            text: colors.text,
+            link: colors.button,
+          }}
+        />
+
+        {/* Tags */}
+        {post.tags && post.tags.length > 0 && (
+          <View style={HivePostScreenStyles.tagsContainer}>
+            {post.tags.slice(0, 5).map((tag, index) => (
+              <View
+                key={index}
+                style={[
+                  HivePostScreenStyles.tag,
+                  { backgroundColor: colors.button },
+                ]}
+              >
+                <Text
+                  style={[
+                    HivePostScreenStyles.tagText,
+                    { color: colors.buttonText },
+                  ]}
+                >
+                  #{tag}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Engagement Metrics */}
+        <View
+          style={[
+            HivePostScreenStyles.engagementMetrics,
+            { borderTopColor: colors.border },
+          ]}
+        >
+          <View style={HivePostScreenStyles.engagementLeft}>
+            <TouchableOpacity
+              onPress={handleUpvotePress}
+              disabled={post.hasUpvoted}
+              style={HivePostScreenStyles.upvoteButton}
+            >
+              <FontAwesome
+                name='arrow-up'
+                size={20}
+                color={post.hasUpvoted ? '#8e44ad' : colors.icon}
+              />
+            </TouchableOpacity>
+            <Text
+              style={[
+                HivePostScreenStyles.engagementText,
+                { color: colors.text },
+              ]}
+            >
+              {post.voteCount}
+            </Text>
+            <FontAwesome
+              name='comment-o'
+              size={16}
+              color={colors.icon}
+              style={HivePostScreenStyles.commentIcon}
+            />
+            <Text
+              style={[
+                HivePostScreenStyles.engagementText,
+                { color: colors.text },
+              ]}
+            >
+              {post.replyCount}
+            </Text>
+            <TouchableOpacity
+              onPress={() => handleOpenReplyModal(post.author, post.permlink)}
+              style={HivePostScreenStyles.replyButton}
+            >
+              <FontAwesome
+                name='reply'
+                size={16}
+                color={colors.icon}
+                style={HivePostScreenStyles.replyIcon}
+              />
+              <Text
+                style={[HivePostScreenStyles.replyText, { color: colors.text }]}
+              >
+                Reply
+              </Text>
+            </TouchableOpacity>
+            {/* Resnap button */}
+            <TouchableOpacity
+              onPress={handleResnap}
+              accessibilityRole='button'
+              accessibilityLabel='Resnap this post'
+              style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16 }}
+            >
+              <FontAwesome name='retweet' size={18} color={colors.icon} />
+            </TouchableOpacity>
+          </View>
+          <Text
+            style={[HivePostScreenStyles.payoutText, { color: colors.payout }]}
+          >
+            ${post.payout.toFixed(2)}
+          </Text>
+        </View>
+
+        {/* Comments Section */}
+        <View style={HivePostScreenStyles.commentsSection}>
+          <View
+            style={[
+              HivePostScreenStyles.commentsHeader,
+              {
+                borderTopColor: colors.border,
+                borderBottomColor: colors.border,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                HivePostScreenStyles.commentsHeaderText,
+                { color: colors.text },
+              ]}
+            >
+              Comments ({post.replyCount})
+            </Text>
+            {commentsLoading && (
+              <ActivityIndicator size='small' color={colors.button} />
+            )}
+          </View>
+
+          {/* Comments Error */}
+          {commentsError && (
+            <View style={HivePostScreenStyles.commentsError}>
+              <Text
+                style={[
+                  HivePostScreenStyles.commentsErrorText,
+                  { color: colors.icon },
+                ]}
+              >
+                {commentsError}
+              </Text>
+              <TouchableOpacity
+                onPress={refreshAll}
+                style={[
+                  HivePostScreenStyles.retryCommentsButton,
+                  { backgroundColor: colors.button },
+                ]}
+              >
+                <Text
+                  style={[
+                    HivePostScreenStyles.retryCommentsButtonText,
+                    { color: colors.buttonText },
+                  ]}
+                >
+                  Retry
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Render Comments */}
+          {!commentsLoading && !commentsError && filteredComments.length > 0 && (
+            <View style={HivePostScreenStyles.commentsList}>
+              {flattenComments(filteredComments).map(comment => (
+                <Snap
+                  key={
+                    comment.author +
+                    comment.permlink +
+                    '-' +
+                    comment.visualLevel
+                  }
+                  snap={{ ...comment, community: post?.category }}
+                  onUpvotePress={handleCommentUpvotePress}
+                  onReplyPress={handleOpenReplyModal}
+                  onEditPress={(snapData: { author: string; permlink: string; body: string }) => {
+                    console.log('Edit comment:', snapData);
+                    // TODO: Implement edit functionality
+                  }}
+                  onUserPress={username => {
+                    router.push(`/screens/ProfileScreen?username=${username}` as any);
+                  }}
+                  onImagePress={handleImagePress}
+                  currentUsername={currentUsername}
+                  // Reply-specific props
+                  visualLevel={comment.visualLevel}
+                  isReply={true}
+                  compactMode={true}
+                  showAuthor={true}
+                />
+              ))}
+            </View>
+          )}
+
+          {/* No Comments State */}
+          {!commentsLoading && !commentsError && filteredComments.length === 0 && (
+            <View style={HivePostScreenStyles.noCommentsContainer}>
+              <FontAwesome name='comment-o' size={32} color={colors.icon} />
+              <Text
+                style={[
+                  HivePostScreenStyles.noCommentsText,
+                  { color: colors.icon },
+                ]}
+              >
+                No comments yet. Be the first to comment!
+              </Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
 
       {/* Reply Modal */}
       <ContentModal
