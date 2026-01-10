@@ -17,7 +17,7 @@ import {
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image';
-import PostBody from '../components/PostBody';
+import SnapieHivePostRenderer from '../components/SnapieHivePostRenderer';
 import { Dimensions } from 'react-native';
 import { useCurrentUser } from '../../store/context';
 import { useUpvote } from '../../hooks/useUpvote';
@@ -113,7 +113,7 @@ const HivePostScreen = () => {
     return true; // Always return true since we refreshed
   });
 
-    // GIF picker functionality - using new professional hook
+  // GIF picker functionality - using new professional hook
   const gifPicker = useGifPicker({
     onGifSelected: (gifUrl: string) => {
       addGif(gifUrl);
@@ -186,7 +186,7 @@ const HivePostScreen = () => {
 
     // Ensure mutedList is a Set for efficient lookups
     const mutedSet = mutedList instanceof Set ? mutedList : new Set(mutedList);
-    
+
     const filterCommentsRecursively = (commentList: typeof comments): typeof comments => {
       return commentList
         .filter(comment => !mutedSet.has(comment.author))
@@ -291,7 +291,7 @@ const HivePostScreen = () => {
           { backgroundColor: colors.background },
         ]}
       >
-        <View 
+        <View
           style={HivePostScreenStyles.errorContainer}
           accessible={true}
           accessibilityLabel="Loading post"
@@ -388,60 +388,21 @@ const HivePostScreen = () => {
         style={HivePostScreenStyles.scrollContainer}
         contentContainerStyle={HivePostScreenStyles.contentContainer}
       >
-        {/* Author Info */}
-        <View style={HivePostScreenStyles.authorInfo}>
-          <ExpoImage
-            source={post.avatarUrl ? { uri: post.avatarUrl } : genericAvatar}
-            style={HivePostScreenStyles.avatar}
-            contentFit='cover'
+        {/* Snapie.io WebView Renderer for Hive Post Content */}
+        <View style={{ flex: 1, minHeight: 600 }}>
+          <SnapieHivePostRenderer
+            author={post.author}
+            permlink={post.permlink}
+            colors={{
+              background: colors.background,
+              text: colors.text,
+            }}
+            onExternalLink={(url) => {
+              console.log('[HivePostScreen] External link clicked:', url);
+              Linking.openURL(url);
+            }}
           />
-          <View style={HivePostScreenStyles.authorDetails}>
-            <Text
-              style={[HivePostScreenStyles.authorName, { color: colors.text }]}
-            >
-              {post.author}
-            </Text>
-            <Text
-              style={[HivePostScreenStyles.timestamp, { color: colors.icon }]}
-            >
-              {new Date(post.created + 'Z').toLocaleString()}
-            </Text>
-          </View>
         </View>
-
-        {/* Title */}
-        {post.title && (
-          <Text style={[HivePostScreenStyles.title, { color: colors.text }]}>
-            {post.title}
-          </Text>
-        )}
-
-        {/* Content */}
-        <PostBody body={post.body} colors={colors} isDark={isDark} />
-
-        {/* Tags */}
-        {post.tags && post.tags.length > 0 && (
-          <View style={HivePostScreenStyles.tagsContainer}>
-            {post.tags.slice(0, 5).map((tag, index) => (
-              <View
-                key={index}
-                style={[
-                  HivePostScreenStyles.tag,
-                  { backgroundColor: colors.button },
-                ]}
-              >
-                <Text
-                  style={[
-                    HivePostScreenStyles.tagText,
-                    { color: colors.buttonText },
-                  ]}
-                >
-                  #{tag}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
 
         {/* Engagement Metrics */}
         <View
@@ -582,7 +543,7 @@ const HivePostScreen = () => {
                     '-' +
                     comment.visualLevel
                   }
-                  snap={{...comment, community: post?.category}}
+                  snap={{ ...comment, community: post?.category }}
                   onUpvotePress={handleCommentUpvotePress}
                   onReplyPress={handleOpenReplyModal}
                   onEditPress={(snapData: { author: string; permlink: string; body: string }) => {
