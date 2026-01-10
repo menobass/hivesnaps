@@ -6,6 +6,15 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { THREE_SPEAK_API_KEY, AUDIO_API_ENDPOINT } from '../app/config/env';
 
+/**
+ * Type definition for FormData blob in React Native
+ */
+interface ReactNativeBlob {
+  uri: string;
+  type: string;
+  name: string;
+}
+
 export interface AudioUploadOptions {
   title?: string;
   description?: string;
@@ -50,7 +59,7 @@ export async function uploadAudioTo3Speak(
     let fileSizeBytes: number;
     let base64Data: string;
     let mimeType: string;
-    
+
     if (typeof audioSource === 'string') {
       // audioSource is a file URI - use Expo FileSystem for reliable local file access
       const fileInfo = await FileSystem.getInfoAsync(audioSource);
@@ -65,19 +74,19 @@ export async function uploadAudioTo3Speak(
         };
       }
       fileSizeBytes = fileInfo.size;
-      
+
       // Read file directly to base64 using FileSystem (more reliable than fetch + FileReader)
       base64Data = await FileSystem.readAsStringAsync(audioSource, {
         encoding: FileSystem.EncodingType.Base64,
       });
-      
+
       // Determine MIME type from file extension
       mimeType = audioSource.endsWith('.m4a') ? 'audio/mp4' : 'audio/mpeg';
     } else {
       // audioSource is a Blob - convert using FileReader
       fileSizeBytes = audioSource.size;
       mimeType = audioSource.type || 'audio/mpeg';
-      
+
       const reader = new FileReader();
       base64Data = await new Promise<string>((resolve, reject) => {
         reader.onload = () => {
@@ -92,7 +101,7 @@ export async function uploadAudioTo3Speak(
         reader.readAsDataURL(audioSource);
       });
     }
-    
+
     // Validate file size
     if (fileSizeBytes > MAX_AUDIO_FILE_BYTES) {
       return {
@@ -128,12 +137,13 @@ export async function uploadAudioTo3Speak(
     const formData = new FormData();
 
     // In React Native, append base64 data with explicit type info
-    formData.append('audio', {
+    const audioBlob: ReactNativeBlob = {
       uri: `data:${mimeType};base64,${base64Data}`,
       type: mimeType,
       name: `audio-${Date.now()}.m4a`,
-    } as any);
-    
+    };
+    formData.append('audio', audioBlob as any);
+
     formData.append('duration', durationSeconds.toString());
     formData.append('format', 'm4a');
 
@@ -184,7 +194,7 @@ export async function uploadAudioTo3Speak(
     }
 
     const result = await response.json();
-    
+
     // Validate required fields in response
     if (!result.permlink || !result.playUrl) {
       console.error('[Audio Upload] Invalid response - missing required fields:', result);
@@ -197,7 +207,7 @@ export async function uploadAudioTo3Speak(
         error: 'Invalid response from server - missing required fields',
       };
     }
-    
+
     console.log('[Audio Upload] Success! Permlink:', result.permlink);
 
     return {

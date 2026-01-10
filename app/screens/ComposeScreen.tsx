@@ -123,6 +123,7 @@ export default function ComposeScreen() {
   const [audioRecorderVisible, setAudioRecorderVisible] = useState(false);
   const [audioEmbedUrl, setAudioEmbedUrl] = useState<string | null>(null);
   const [audioUploading, setAudioUploading] = useState(false);
+  const [audioDuration, setAudioDuration] = useState<number>(0);
 
   // Track if reply/edit target has been initialized (refs are synchronous)
   const replyTargetRef = useRef<{ author: string; permlink: string } | null>(null);
@@ -782,6 +783,7 @@ export default function ComposeScreen() {
       }
 
       setAudioEmbedUrl(result.playUrl);
+      setAudioDuration(durationSeconds);
       setAudioRecorderVisible(false);
 
       Alert.alert(
@@ -1696,6 +1698,7 @@ export default function ComposeScreen() {
             <AudioPreview
               isUploading={audioUploading}
               onRemove={handleRemoveAudio}
+              durationSeconds={audioDuration}
               colors={colors}
             />
           )}

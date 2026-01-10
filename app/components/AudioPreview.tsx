@@ -20,6 +20,8 @@ interface AudioPreviewProps {
   isUploading: boolean;
   /** Callback to remove the audio */
   onRemove: () => void;
+  /** Duration of the audio in seconds */
+  durationSeconds?: number;
   /** Theme colors */
   colors: AudioPreviewColors;
 }
@@ -30,8 +32,14 @@ interface AudioPreviewProps {
 const AudioPreview: React.FC<AudioPreviewProps> = ({
   isUploading,
   onRemove,
+  durationSeconds = 0,
   colors,
 }) => {
+  const formatDuration = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
   return (
     <View style={[styles.container, { paddingVertical: 12 }]}>
       {/* Header */}
@@ -61,9 +69,16 @@ const AudioPreview: React.FC<AudioPreviewProps> = ({
             color={colors.button}
             style={styles.musicIcon}
           />
-          <Text style={[styles.readyText, { color: colors.text }]}>
-            Audio Snap Ready
-          </Text>
+          <View style={styles.textContainer}>
+            <Text style={[styles.readyText, { color: colors.text }]}>
+              Audio Snap Ready
+            </Text>
+            {durationSeconds > 0 && (
+              <Text style={[styles.durationText, { color: colors.text }]}>
+                {formatDuration(durationSeconds)}
+              </Text>
+            )}
+          </View>
           {!isUploading && (
             <View style={styles.buttonContainer}>
               <TouchableOpacity
@@ -123,10 +138,17 @@ const styles = StyleSheet.create({
   musicIcon: {
     marginRight: 12,
   },
+  textContainer: {
+    flex: 1,
+  },
   readyText: {
     fontSize: 14,
     fontWeight: '500',
-    flex: 1,
+  },
+  durationText: {
+    fontSize: 12,
+    opacity: 0.7,
+    marginTop: 2,
   },
   buttonContainer: {
     flexDirection: 'row',

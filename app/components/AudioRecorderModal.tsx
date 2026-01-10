@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesome } from '@expo/vector-icons';
-import { Audio } from 'expo-av';
+import { Audio, AVPlaybackStatus } from 'expo-av';
 
 interface AudioRecorderModalProps {
   isVisible: boolean;
@@ -147,8 +147,8 @@ const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({
             const dataUri = reader.result as string;
             const sound = new Audio.Sound();
             await sound.loadAsync({ uri: dataUri });
-            sound.setOnPlaybackStatusUpdate((status: any) => {
-              if (status.didJustFinish) {
+            sound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
+              if (status.isLoaded && status.didJustFinish) {
                 setIsPlaying(false);
               }
             });
