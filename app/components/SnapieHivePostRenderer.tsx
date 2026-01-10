@@ -41,8 +41,9 @@ const SnapieHivePostRenderer: React.FC<SnapieHivePostRendererProps> = ({
     const [error, setError] = useState<string | null>(null);
     const webViewRef = useRef<WebView>(null);
 
-    // Build snapie.io URL for this post
-    const snapieUrl = buildSnapieUrl(author, permlink);
+    // Build snapie.io URL for this post with embed parameter
+    // The embed parameter tells snapie.io to hide navigation/footer
+    const snapieUrl = `${buildSnapieUrl(author, permlink)}?embed=true`;
 
     // Handle navigation state changes
     const handleNavigationStateChange = (navState: WebViewNavigation) => {
@@ -61,8 +62,8 @@ const SnapieHivePostRenderer: React.FC<SnapieHivePostRendererProps> = ({
 
     // Inject CSS to customize appearance and match app theme
     const injectedCSS = `
-    /* Hide snapie.io header/footer for clean embedded view */
-    header, footer, .navbar, .site-header {
+    /* Hide snapie.io navigation for embedded view */
+    header, footer, .navbar, .site-header, .bottom-nav, .site-footer, nav {
       display: none !important;
     }
 
@@ -70,12 +71,27 @@ const SnapieHivePostRenderer: React.FC<SnapieHivePostRendererProps> = ({
     body {
       background-color: ${colors.background} !important;
       color: ${colors.text} !important;
+      margin: 0 !important;
+      padding: 0 !important;
     }
 
-    /* Remove max-width for mobile optimization */
-    .container, .content, main {
+    /* Optimize container padding for mobile */
+    .container, .content, main, article {
       max-width: 100% !important;
-      padding: 16px !important;
+      padding: 12px !important;
+      margin: 0 !important;
+    }
+
+    /* Ensure images don't overflow */
+    img {
+      max-width: 100% !important;
+      height: auto !important;
+    }
+
+    /* Better spacing */
+    p, h1, h2, h3, h4, h5, h6 {
+      margin-top: 8px !important;
+      margin-bottom: 8px !important;
     }
 
     /* Ensure images are responsive */

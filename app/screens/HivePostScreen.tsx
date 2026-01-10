@@ -384,7 +384,7 @@ const HivePostScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Snapie.io WebView Renderer - takes all available space and scrolls internally */}
+      {/* Snapie.io WebView Renderer - content only */}
       <SnapieHivePostRenderer
         author={post.author}
         permlink={post.permlink}
@@ -397,6 +397,83 @@ const HivePostScreen = () => {
           Linking.openURL(url);
         }}
       />
+
+      {/* Native Engagement Bar - Fixed at bottom for user interactions */}
+      <View
+        style={[
+          HivePostScreenStyles.engagementMetrics,
+          {
+            borderTopColor: colors.border,
+            backgroundColor: colors.background,
+            borderTopWidth: 1,
+          },
+        ]}
+      >
+        <View style={HivePostScreenStyles.engagementLeft}>
+          <TouchableOpacity
+            onPress={handleUpvotePress}
+            disabled={post.hasUpvoted}
+            style={HivePostScreenStyles.upvoteButton}
+          >
+            <FontAwesome
+              name='arrow-up'
+              size={20}
+              color={post.hasUpvoted ? '#8e44ad' : colors.icon}
+            />
+          </TouchableOpacity>
+          <Text
+            style={[
+              HivePostScreenStyles.engagementText,
+              { color: colors.text },
+            ]}
+          >
+            {post.voteCount}
+          </Text>
+          <FontAwesome
+            name='comment-o'
+            size={16}
+            color={colors.icon}
+            style={HivePostScreenStyles.commentIcon}
+          />
+          <Text
+            style={[
+              HivePostScreenStyles.engagementText,
+              { color: colors.text },
+            ]}
+          >
+            {post.replyCount}
+          </Text>
+          <TouchableOpacity
+            onPress={() => handleOpenReplyModal(post.author, post.permlink)}
+            style={HivePostScreenStyles.replyButton}
+          >
+            <FontAwesome
+              name='reply'
+              size={16}
+              color={colors.icon}
+              style={HivePostScreenStyles.replyIcon}
+            />
+            <Text
+              style={[HivePostScreenStyles.replyText, { color: colors.text }]}
+            >
+              Reply
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleResnap}
+            accessibilityRole='button'
+            accessibilityLabel='Resnap this post'
+            style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16 }}
+          >
+            <FontAwesome name='retweet' size={18} color={colors.icon} />
+          </TouchableOpacity>
+        </View>
+        <Text
+          style={[HivePostScreenStyles.payoutText, { color: colors.payout }]}
+        >
+          ${post.payout.toFixed(2)}
+        </Text>
+      </View>
 
       {/* Reply Modal */}
       <ContentModal
