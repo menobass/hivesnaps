@@ -844,7 +844,10 @@ export default function ComposeScreen() {
       });
       console.log('[ComposeScreen] Edit submission completed successfully');
 
-      // Success - clear refs, video state, and show success alert
+      // Success - clear form state and show success alert
+      setText('');
+      setImages([]);
+      setGifs([]);
       clearVideoState();
       editTargetRef.current = null;
 
