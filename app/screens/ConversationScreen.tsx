@@ -49,6 +49,7 @@ import TwitterEmbed from '../components/TwitterEmbed';
 import YouTubeEmbed from '../components/YouTubeEmbed';
 import UpvoteModal from '../../components/UpvoteModal';
 import Snap from '../components/Snap';
+import AudioRecorderModal from '../components/AudioRecorderModal';
 
 // ContentModal removed - now using ComposeScreen for reply/edit
 
@@ -143,6 +144,9 @@ const ConversationScreenRefactored = () => {
   };
 
   // Removed GIF picker state - now handled in ComposeScreen
+
+  // Audio recorder state for replies
+  const [replyAudioRecorderVisible, setReplyAudioRecorderVisible] = useState(false);
 
   // Local UI state
   const [imageModalVisible, setImageModalVisible] = useState(false);

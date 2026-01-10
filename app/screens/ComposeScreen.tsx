@@ -27,6 +27,9 @@ import { Client, PrivateKey } from '@hiveio/dhive';
 import { avatarService } from '../../services/AvatarService';
 import { uploadImageSmart } from '../../utils/imageUploadService';
 import { postSnapWithBeneficiaries } from '../../services/snapPostingService';
+import AudioRecorderModal from '../components/AudioRecorderModal';
+import AudioPreview from '../components/AudioPreview';
+import { uploadAudioTo3Speak } from '../../services/audioUploadService';
 import { useSharedContent } from '../../hooks/useSharedContent';
 import { uploadThumbnailToThreeSpeak, extractPermlinkFromEmbedUrl } from '../../services/threeSpeakUploadService';
 import { uploadThumbnailToIPFS } from '../../utils/ipfsUpload';
@@ -116,6 +119,12 @@ export default function ComposeScreen() {
   const videoCancelRequestedRef = useRef(false);
   const thumbnailIpfsUploadPromiseRef = useRef<Promise<string | null> | null>(null);
 
+  // Audio upload state
+  const [audioRecorderVisible, setAudioRecorderVisible] = useState(false);
+  const [audioEmbedUrl, setAudioEmbedUrl] = useState<string | null>(null);
+  const [audioUploading, setAudioUploading] = useState(false);
+  const [audioDuration, setAudioDuration] = useState<number>(0);
+
   // Track if reply/edit target has been initialized (refs are synchronous)
   const replyTargetRef = useRef<{ author: string; permlink: string } | null>(null);
   const editTargetRef = useRef<{ author: string; permlink: string } | null>(null);
@@ -175,11 +184,11 @@ export default function ComposeScreen() {
 
   // Computed video variables
   const videoEmbedUrl = videoAssetId || null;
-  const hasPostableContent = Boolean(text.trim() || images.length > 0 || gifs.length > 0 || videoEmbedUrl);
-  const isSubmitting = posting || reply.posting || edit.editing || videoUploading;
+  const hasPostableContent = Boolean(text.trim() || images.length > 0 || gifs.length > 0 || videoEmbedUrl || audioEmbedUrl);
+  const isSubmitting = posting || reply.posting || edit.editing || videoUploading || audioUploading;
   const disablePostButton = isSubmitting || !hasPostableContent;
   const hasDraftContent = Boolean(
-    text.trim() || images.length > 0 || gifs.length > 0 || videoAsset || videoAssetId || videoUploading
+    text.trim() || images.length > 0 || gifs.length > 0 || videoAsset || videoAssetId || videoUploading || audioEmbedUrl
   );
 
   // Load user credentials and avatar
@@ -752,6 +761,53 @@ export default function ComposeScreen() {
     setGifs(prev => prev.filter((_, index) => index !== indexToRemove));
   };
 
+  // ===== Audio Handlers =====
+
+  const handleAudioRecorded = async (audioBlob: Blob, durationSeconds: number) => {
+    setAudioUploading(true);
+
+    try {
+      if (!currentUsername) {
+        throw new Error('Not logged in');
+      }
+
+      const result = await uploadAudioTo3Speak(
+        audioBlob,
+        durationSeconds,
+        currentUsername,
+        {
+          title: `Audio Snap by ${currentUsername}`,
+        }
+      );
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to upload audio');
+      }
+
+      setAudioEmbedUrl(result.playUrl);
+      setAudioDuration(durationSeconds);
+      setAudioRecorderVisible(false);
+
+      Alert.alert(
+        'Audio Uploaded',
+        'Your audio has been uploaded successfully!',
+        [{ text: 'OK' }]
+      );
+    } catch (error: any) {
+      console.error('Error uploading audio:', error);
+      Alert.alert(
+        'Upload Error',
+        error.message || 'Failed to upload audio. Please try again.'
+      );
+    } finally {
+      setAudioUploading(false);
+    }
+  };
+
+  const handleRemoveAudio = () => {
+    setAudioEmbedUrl(null);
+  };
+
   // ===== Submit Handlers =====
 
   const handleReplySubmit = async () => {
@@ -761,9 +817,9 @@ export default function ComposeScreen() {
       return;
     }
 
-    if (!text.trim() && images.length === 0 && gifs.length === 0 && !videoEmbedUrl) {
+    if (!text.trim() && images.length === 0 && gifs.length === 0 && !videoEmbedUrl && !audioEmbedUrl) {
       console.error('[ComposeScreen] Reply has no content');
-      Alert.alert('Error', 'Please enter some text or add an image/GIF/video.');
+      Alert.alert('Error', 'Please enter some text or add an image/GIF/video/audio.');
       return;
     }
 
@@ -773,6 +829,7 @@ export default function ComposeScreen() {
       images: images.length,
       gifs: gifs.length,
       video: videoEmbedUrl ? 'yes' : 'no',
+      audio: audioEmbedUrl ? 'yes' : 'no',
     });
 
     // Submit reply - pass values directly to avoid async state timing issues
@@ -783,6 +840,7 @@ export default function ComposeScreen() {
         images: images,
         gifs: gifs,
         video: videoEmbedUrl,
+        audio: audioEmbedUrl,
       });
       console.log('[ComposeScreen] Reply submission completed successfully');
 
@@ -791,6 +849,7 @@ export default function ComposeScreen() {
       setImages([]);
       setGifs([]);
       clearVideoState();
+      setAudioEmbedUrl(null);
       replyTargetRef.current = null;
 
       Alert.alert(
@@ -819,9 +878,9 @@ export default function ComposeScreen() {
       return;
     }
 
-    if (!text.trim() && images.length === 0 && gifs.length === 0 && !videoEmbedUrl) {
+    if (!text.trim() && images.length === 0 && gifs.length === 0 && !videoEmbedUrl && !audioEmbedUrl) {
       console.error('[ComposeScreen] Edit has no content');
-      Alert.alert('Error', 'Please enter some text or add an image/GIF/video.');
+      Alert.alert('Error', 'Please enter some text or add an image/GIF/video/audio.');
       return;
     }
 
@@ -831,6 +890,7 @@ export default function ComposeScreen() {
       images: images.length,
       gifs: gifs.length,
       video: videoEmbedUrl ? 'yes' : 'no',
+      audio: audioEmbedUrl ? 'yes' : 'no',
     });
 
     // Submit edit - pass values directly to avoid async state timing issues
@@ -841,11 +901,13 @@ export default function ComposeScreen() {
         images: images,
         gifs: gifs,
         video: videoEmbedUrl,
+        audio: audioEmbedUrl,
       });
       console.log('[ComposeScreen] Edit submission completed successfully');
 
-      // Success - clear refs, video state, and show success alert
+      // Success - clear refs, video state, audio state, and show success alert
       clearVideoState();
+      setAudioEmbedUrl(null);
       editTargetRef.current = null;
 
       Alert.alert(
@@ -925,6 +987,9 @@ export default function ComposeScreen() {
       if (videoEmbedUrl) {
         body += `\n${videoEmbedUrl}`;
       }
+      if (audioEmbedUrl) {
+        body += `\n${audioEmbedUrl}`;
+      }
 
       // Get latest @peak.snaps post (container) - Same as FeedScreen
       const discussions = await client.database.call(
@@ -946,10 +1011,11 @@ export default function ComposeScreen() {
         tags: ['hive-178315', 'snaps'],
         image: allMedia, // Include all images and GIFs in metadata
         video: videoEmbedUrl ? { platform: '3speak', url: videoEmbedUrl, uploadUrl: videoUploadUrl } : undefined,
+        audio: audioEmbedUrl ? { platform: '3speak', url: audioEmbedUrl } : undefined,
         shared: hasSharedContent, // Additional flag for shared content
       });
 
-      // Post to Hive blockchain as reply to container with beneficiaries if video is present
+      // Post to Hive blockchain as reply to container with beneficiaries if video/audio present
       await postSnapWithBeneficiaries(
         client,
         {
@@ -960,7 +1026,8 @@ export default function ComposeScreen() {
           title: '',
           body,
           jsonMetadata: json_metadata,
-          hasVideo: !!videoEmbedUrl, // Add beneficiaries if there's a video
+          hasVideo: !!videoEmbedUrl,
+          hasAudio: !!audioEmbedUrl,
         },
         postingKey
       );
@@ -970,6 +1037,7 @@ export default function ComposeScreen() {
       setImages([]);
       setGifs([]);
       clearVideoState();
+      setAudioEmbedUrl(null);
       clearSharedContent(); // Clear any shared content
 
       Alert.alert(
@@ -1627,6 +1695,16 @@ export default function ComposeScreen() {
             </View>
           )}
 
+          {/* Audio Preview */}
+          {audioEmbedUrl && (
+            <AudioPreview
+              isUploading={audioUploading}
+              onRemove={handleRemoveAudio}
+              durationSeconds={audioDuration}
+              colors={colors}
+            />
+          )}
+
           {/* Action buttons */}
           <View style={styles.actions}>
             {/* Markdown formatting toolbar */}
@@ -1775,6 +1853,31 @@ export default function ComposeScreen() {
                   </View>
                 )}
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  { backgroundColor: colors.inputBg, marginLeft: 12 },
+                ]}
+                onPress={() => setAudioRecorderVisible(true)}
+                disabled={audioEmbedUrl !== null || audioUploading}
+              >
+                <FontAwesome
+                  name="microphone"
+                  size={20}
+                  color={audioEmbedUrl !== null || audioUploading ? colors.info : colors.button}
+                />
+                {audioEmbedUrl && (
+                  <View
+                    style={[
+                      styles.imageBadge,
+                      { backgroundColor: colors.button },
+                    ]}
+                  >
+                    <Text style={styles.imageBadgeText}>♪</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
             </View>
 
             {images.length >= 10 && (
@@ -1824,6 +1927,13 @@ export default function ComposeScreen() {
           inputBorder: colors.inputBorder,
           button: colors.button,
         }}
+      />
+
+      {/* Audio Recorder Modal */}
+      <AudioRecorderModal
+        isVisible={audioRecorderVisible}
+        onClose={() => setAudioRecorderVisible(false)}
+        onAudioRecorded={handleAudioRecorded}
       />
 
       {/* Spoiler Modal */}

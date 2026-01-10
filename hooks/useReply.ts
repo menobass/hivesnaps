@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import { Client, PrivateKey } from '@hiveio/dhive';
 import * as SecureStore from 'expo-secure-store';
 import { uploadImageSmart } from '../utils/imageUploadService';
+import { uploadAudioTo3Speak } from '../services/audioUploadService';
+import { postSnapWithBeneficiaries } from '../services/snapPostingService';
 import * as ImagePicker from 'expo-image-picker';
 import { convertToJPEG } from '../utils/imageConverter';
 
@@ -22,9 +24,11 @@ interface ReplyState {
   replyText: string;
   replyImages: string[]; // Changed to array
   replyGifs: string[]; // Changed to array
+  replyAudioUrl: string | null; // Audio embed URL from 3Speak
   replyTarget: ReplyTarget | null;
   posting: boolean;
   uploading: boolean;
+  audioUploading: boolean; // Separate state for audio upload
   processing: boolean; // New state for blockchain processing
   error: string | null;
 }
@@ -39,12 +43,16 @@ interface UseReplyReturn extends ReplyState {
   removeReplyImage: (imageUrl: string) => void;
   addReplyGif: (gifUrl: string) => void;
   removeReplyGif: (gifUrl: string) => void;
+  addReplyAudio: (audioUrl: string) => void;
+  removeReplyAudio: () => void;
+  handleAudioRecorded: (audioBlob: Blob, durationSeconds: number) => Promise<void>;
   submitReply: (overrides?: {
     target?: { author: string; permlink: string };
     text?: string;
     images?: string[];
     gifs?: string[];
     video?: string | null;
+    audio?: string | null;
   }) => Promise<void>;
   addImage: (mode: 'reply') => Promise<void>;
   addGif: (gifUrl: string) => void;
@@ -61,9 +69,11 @@ export const useReply = (
     replyText: '',
     replyImages: [], // Changed to array
     replyGifs: [], // Changed to array
+    replyAudioUrl: null,
     replyTarget: null,
     posting: false,
     uploading: false,
+    audioUploading: false,
     processing: false,
     error: null,
   });
@@ -83,6 +93,7 @@ export const useReply = (
       replyText: '',
       replyImages: [], // Changed to array
       replyGifs: [], // Changed to array
+      replyAudioUrl: null,
       replyTarget: null,
       error: null,
     }));
@@ -121,6 +132,47 @@ export const useReply = (
       replyGifs: prev.replyGifs.filter(gif => gif !== gifUrl)
     }));
   }, []);
+
+  const addReplyAudio = useCallback((audioUrl: string) => {
+    setState(prev => ({ ...prev, replyAudioUrl: audioUrl }));
+  }, []);
+
+  const removeReplyAudio = useCallback(() => {
+    setState(prev => ({ ...prev, replyAudioUrl: null }));
+  }, []);
+
+  const handleAudioRecorded = useCallback(async (audioBlob: Blob, durationSeconds: number) => {
+    setState(prev => ({ ...prev, audioUploading: true, error: null }));
+
+    try {
+      if (!currentUsername) {
+        throw new Error('Not logged in');
+      }
+
+      const result = await uploadAudioTo3Speak(
+        audioBlob,
+        durationSeconds,
+        currentUsername,
+        {
+          title: `Audio Reply by ${currentUsername}`,
+        }
+      );
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to upload audio');
+      }
+
+      addReplyAudio(result.playUrl);
+    } catch (error: any) {
+      console.error('Error uploading reply audio:', error);
+      setState(prev => ({
+        ...prev,
+        error: error.message || 'Failed to upload audio',
+      }));
+    } finally {
+      setState(prev => ({ ...prev, audioUploading: false }));
+    }
+  }, [currentUsername]);
 
   const addImage = useCallback(async (mode: 'reply') => {
     if (mode !== 'reply') return;
@@ -181,6 +233,7 @@ export const useReply = (
     images?: string[];
     gifs?: string[];
     video?: string | null; // 3speak video embed URL
+    audio?: string | null; // 3speak audio embed URL
   }) => {
     // Use overrides if provided, otherwise fall back to state
     const target = overrides?.target || state.replyTarget;
@@ -188,6 +241,7 @@ export const useReply = (
     const images = overrides?.images ?? state.replyImages;
     const gifs = overrides?.gifs ?? state.replyGifs;
     const video = overrides?.video ?? null;
+    const audio = overrides?.audio ?? state.replyAudioUrl;
 
     // Validate and throw errors instead of silently returning
     if (!target) {
@@ -195,8 +249,8 @@ export const useReply = (
       setState(prev => ({ ...prev, error: error.message, posting: false }));
       throw error;
     }
-    if (!text.trim() && images.length === 0 && gifs.length === 0 && !video) {
-      const error = new Error('Reply cannot be empty. Please add text, images, GIFs, or video.');
+    if (!text.trim() && images.length === 0 && gifs.length === 0 && !video && !audio) {
+      const error = new Error('Reply cannot be empty. Please add text, images, GIFs, video, or audio.');
       setState(prev => ({ ...prev, error: error.message, posting: false }));
       throw error;
     }
@@ -233,6 +287,11 @@ export const useReply = (
         body += `\n${video}`;
       }
 
+      // Add audio URL (without markdown link, just the embed URL)
+      if (audio) {
+        body += `\n${audio}`;
+      }
+
       const parent_author = target.author;
       const parent_permlink = target.permlink;
       const author = currentUsername;
@@ -260,16 +319,23 @@ export const useReply = (
         json_metadata.video = { platform: '3speak', url: video };
       }
 
-      // Post to Hive blockchain
-      await client.broadcast.comment(
+      // Add audio to metadata if present
+      if (audio) {
+        json_metadata.audio = { platform: '3speak', url: audio };
+      }
+
+      // Use postSnapWithBeneficiaries to handle audio beneficiaries (5% to @snapie)
+      await postSnapWithBeneficiaries(
+        client,
         {
-          parent_author,
-          parent_permlink,
+          parentAuthor: parent_author,
+          parentPermlink: parent_permlink,
           author,
           permlink,
           title: '',
           body,
-          json_metadata: JSON.stringify(json_metadata),
+          jsonMetadata: JSON.stringify(json_metadata),
+          hasAudio: !!audio,
         },
         postingKey
       );
@@ -332,6 +398,7 @@ export const useReply = (
     state.replyText,
     state.replyImages,
     state.replyGifs,
+    state.replyAudioUrl,
     currentUsername,
     closeReplyModal,
     onRefresh,
@@ -353,6 +420,9 @@ export const useReply = (
     removeReplyImage,
     addReplyGif,
     removeReplyGif,
+    addReplyAudio,
+    removeReplyAudio,
+    handleAudioRecorded,
     submitReply,
     addImage,
     addGif,
