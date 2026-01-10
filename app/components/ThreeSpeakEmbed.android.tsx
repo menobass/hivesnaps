@@ -98,14 +98,14 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
                 if (!video) return false;
                 
                 try {
-                    // Defensive: Check for iOS methods in case WebView environment provides them
-                    // (WebView can sometimes expose webkit APIs even on Android)
+                    // iOS-specific: webkitEnterFullscreen (added for cross-platform completeness)
+                    // This is the reliable method for iOS native fullscreen
                     if (video.webkitEnterFullscreen) {
                         video.webkitEnterFullscreen();
                         return true;
                     }
                     
-                    // Standard fullscreen APIs for Android
+                    // Standard fullscreen APIs for Android and other platforms
                     if (video.requestFullscreen) {
                         video.requestFullscreen();
                         return true;
@@ -156,8 +156,8 @@ const ThreeSpeakEmbed: React.FC<ThreeSpeakEmbedProps> = ({
                 // Setup document-level listeners once
                 setupDocumentFullscreenListeners();
                 
-                // Defensive: Listen for webkit fullscreen exit in case WebView provides it
-                // (WebView can sometimes expose webkit APIs even on Android)
+                // iOS-specific fullscreen exit event (video-level)
+                // Added for completeness in case WebView JS is ever reused cross-platform
                 video.addEventListener('webkitendfullscreen', () => {
                     window.ReactNativeWebView?.postMessage(JSON.stringify({
                         type: 'fullscreen-exit',
